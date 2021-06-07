@@ -1,6 +1,6 @@
 # jax-strong-lensing
 
-## JAX-enabled autodifferentiable strong lens modelling
+### JAX-enabled autodifferentiable strong lens modelling
 
 #### Recommended Usage
 First create an independent python environment.
@@ -16,7 +16,7 @@ pip install .
 
 The following dependencies will be installed automatically.
 
-###### Requirements (tested version)
+#### Requirements (tested version)
 - `numpy` (1.20.3)
 - `scipy` (1.6.3)
 - `jax` (0.2.13)
