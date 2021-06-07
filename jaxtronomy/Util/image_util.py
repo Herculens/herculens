@@ -1,0 +1,165 @@
+import numpy as np
+# import jax.numpy as np
+# from jax import random
+# from scipy import ndimage, interpolate
+from scipy.ndimage import interpolation as interp
+# import jaxtronomy.Util.util as util
+
+
+def add_layer2image(grid2d, x_pos, y_pos, kernel, order=1):
+    """
+    adds a kernel on the grid2d image at position x_pos, y_pos with an interpolated subgrid pixel shift of order=order
+    :param grid2d: 2d pixel grid (i.e. image)
+    :param x_pos: x-position center (pixel coordinate) of the layer to be added
+    :param y_pos: y-position center (pixel coordinate) of the layer to be added
+    :param kernel: the layer to be added to the image
+    :param order: interpolation order for sub-pixel shift of the kernel to be added
+    :return: image with added layer, cut to original size
+    """
+
+    x_int = int(round(x_pos))
+    y_int = int(round(y_pos))
+    shift_x = x_int - x_pos
+    shift_y = y_int - y_pos
+    kernel_shifted = interp.shift(kernel, [-shift_y, -shift_x], order=order)
+    return add_layer2image_int(grid2d, x_int, y_int, kernel_shifted)
+
+
+def add_layer2image_int(grid2d, x_pos, y_pos, kernel):
+    """
+    adds a kernel on the grid2d image at position x_pos, y_pos at integer positions of pixel
+    :param grid2d: 2d pixel grid (i.e. image)
+    :param x_pos: x-position center (pixel coordinate) of the layer to be added
+    :param y_pos: y-position center (pixel coordinate) of the layer to be added
+    :param kernel: the layer to be added to the image
+    :return: image with added layer
+    """
+    nx, ny = np.shape(kernel)
+    if nx % 2 == 0:
+        raise ValueError("kernel needs odd numbers of pixels")
+
+    num_x, num_y = np.shape(grid2d)
+    x_int = int(round(x_pos))
+    y_int = int(round(y_pos))
+
+    k_x, k_y = np.shape(kernel)
+    k_l2_x = int((k_x - 1) / 2)
+    k_l2_y = int((k_y - 1) / 2)
+
+    min_x = np.maximum(0, x_int-k_l2_x)
+    min_y = np.maximum(0, y_int-k_l2_y)
+    max_x = np.minimum(num_x, x_int+k_l2_x + 1)
+    max_y = np.minimum(num_y, y_int+k_l2_y + 1)
+
+    min_xk = np.maximum(0, -x_int + k_l2_x)
+    min_yk = np.maximum(0, -y_int + k_l2_y)
+    max_xk = np.minimum(k_x, -x_int + k_l2_x + num_x)
+    max_yk = np.minimum(k_y, -y_int + k_l2_y + num_y)
+    if min_x >= max_x or min_y >= max_y or min_xk >= max_xk or min_yk >= max_yk or (max_x-min_x != max_xk-min_xk) or (max_y-min_y != max_yk-min_yk):
+        return grid2d
+    kernel_re_sized = kernel[min_yk:max_yk, min_xk:max_xk]
+    new = grid2d.copy()
+    new[min_y:max_y, min_x:max_x] += kernel_re_sized
+    return new
+
+
+def add_background(image, sigma_bkd):
+    """
+    adds background noise to image
+    :param image: pixel values of image
+    :param sigma_bkd: background noise (sigma)
+    :return: a realisation of Gaussian noise of the same size as image
+    """
+    # # JAX pseudo-random number generator key
+    # key, subkey = random.split(random.PRNGKey(42))
+    # background = random.normal(subkey, shape=np.shape(image)) * sigma_bkd
+    # return background
+    nx, ny = np.shape(image)
+    background = np.random.randn(nx, ny) * sigma_bkd
+    return background
+
+
+def add_poisson(image, exp_time):
+    """
+    adds a poison (or Gaussian) distributed noise with mean given by surface brightness
+    :param image: pixel values (photon counts per unit exposure time)
+    :param exp_time: exposure time
+    :return: Poisson noise realization of input image
+    """
+    """
+    adds a poison (or Gaussian) distributed noise with mean given by surface brightness
+    """
+
+    # sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
+    # # JAX pseudo-random number generator key
+    # key, subkey = random.split(random.PRNGKey(42))
+    # poisson = random.normal(subkey, shape=np.shape(image)) * sigma
+    # return poisson
+    sigma = np.sqrt(np.abs(image)/exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
+    nx, ny = np.shape(image)
+    poisson = np.random.randn(nx, ny) * sigma
+    return poisson
+
+
+def cut_edges(image, numPix):
+    """
+    cuts out the edges of a 2d image and returns re-sized image to numPix
+    center is well defined for odd pixel sizes.
+    :param image: 2d numpy array
+    :param numPix: square size of cut out image
+    :return: cutout image with size numPix
+    """
+    nx, ny = image.shape
+    if nx < numPix or ny < numPix:
+        raise ValueError('image can not be resized, in routine cut_edges with image shape (%s %s) '
+                         'and desired new shape (%s %s)' % (nx, ny, numPix, numPix))
+    if (nx % 2 == 0 and ny % 2 == 1) or (nx % 2 == 1 and ny % 2 == 0):
+        raise ValueError('image with odd and even axis (%s %s) not supported for re-sizeing' % (nx, ny))
+    if (nx % 2 == 0 and numPix % 2 == 1) or (nx % 2 == 1 and numPix % 2 == 0):
+        raise ValueError('image can only be re-sized from even to even or odd to odd number.')
+
+    x_min = int((nx - numPix) / 2)
+    y_min = int((ny - numPix) / 2)
+    x_max = nx - x_min
+    y_max = ny - y_min
+    resized = image[x_min:x_max, y_min:y_max]
+    # return copy.deepcopy(resized)
+    return resized  # No need to copy, since JAX returns a new DeviceArray
+
+
+def radial_profile(data, center=[0, 0]):
+    """
+    computes radial profile
+
+    :param data: 2d numpy array
+    :param center: center [x, y] from where to compute the radial profile
+    :return: radial profile (in units pixel)
+    """
+    y, x = np.indices((data.shape))
+    r = np.sqrt((x - center[0])**2 + (y - center[1])**2)
+    r = r.astype(np.int)
+
+    tbin = np.bincount(r.ravel(), data.ravel())
+    nr = np.bincount(r.ravel())
+    radialprofile = tbin / nr
+    return radialprofile
+
+
+def re_size(image, factor=1):
+    """
+    re-sizes image with nx x ny to nx/factor x ny/factor
+    :param image: 2d image with shape (nx,ny)
+    :param factor: integer >=1
+    :return:
+    """
+    if factor < 1:
+        raise ValueError('scaling factor in re-sizing %s < 1' %factor)
+    elif factor == 1:
+        return image
+    f = int(factor)
+    nx, ny = np.shape(image)
+    if int(nx/f) == nx/f and int(ny/f) == ny/f:
+        small = image.reshape([int(nx/f), f, int(ny/f), f]).mean(3).mean(1)
+        return small
+    else:
+        raise ValueError("scaling with factor %s is not possible with grid size %s, %s" %(f, nx, ny))
