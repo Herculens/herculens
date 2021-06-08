@@ -1,11 +1,12 @@
 import math
-import jax.numpy as np
+import numpy as np
+import jax.numpy as jnp
 
 
 def rotate(xcoords, ycoords, angle):
     """Rotate points about the origin by an angle."""
-    new_x = xcoords * np.cos(angle) + ycoords * np.sin(angle)
-    new_y = -xcoords * np.sin(angle) + ycoords * np.cos(angle)
+    new_x = xcoords * jnp.cos(angle) + ycoords * jnp.sin(angle)
+    new_y = -xcoords * jnp.sin(angle) + ycoords * jnp.cos(angle)
     return new_x, new_y
 
 

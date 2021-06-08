@@ -1,5 +1,5 @@
-import numpy as onp
-import jax.numpy as np
+import numpy as np
+import jax.numpy as jnp
 from jaxtronomy.Util import image_util
 
 
@@ -32,13 +32,13 @@ from jaxtronomy.Util import image_util
 #         self._background_rms = background_rms
 #         self._noise_map = noise_map
 #         if noise_map is not None:
-#             assert onp.shape(noise_map) == onp.shape(image_data)
+#             assert np.shape(noise_map) == np.shape(image_data)
 #         else:
 #             if background_rms is not None and exposure_time is not None:
-#                 if background_rms * onp.max(exposure_time) < 1 and verbose is True:
+#                 if background_rms * np.max(exposure_time) < 1 and verbose is True:
 #                     print("WARNING! sigma_b*f %s < 1 count may introduce unstable error estimates with a Gaussian"
 #                           " error function for a Poisson distribution with mean < 1." % (
-#                         background_rms * onp.max(exposure_time)))
+#                         background_rms * np.max(exposure_time)))
 #         self._data = image_data
 #         self._gradient_boost_factor = gradient_boost_factor
 #
@@ -51,7 +51,7 @@ from jaxtronomy.Util import image_util
 #         if self._background_rms is None:
 #             if self._noise_map is None:
 #                 raise ValueError("rms background value as 'background_rms' not specified!")
-#             self._background_rms = onp.median(self._noise_map)
+#             self._background_rms = np.median(self._noise_map)
 #         return self._background_rms
 #
 #     @property
@@ -119,9 +119,9 @@ from jaxtronomy.Util import image_util
 #         gradient_map = image_util.gradient_map(data) * gradient_boost_factor
 #     else:
 #         gradient_map = 0
-#     # d_pos = np.zeros_like(data)
+#     # d_pos = jnp.zeros_like(data)
 #     # d_pos[data >= 0] = data[data >= 0]
 #     # print(type(data))
-#     d_pos = np.maximum(0, data)
+#     d_pos = jnp.maximum(0, data)
 #     sigma = d_pos / exposure_map + background_rms ** 2 + gradient_map ** 2
 #     return sigma

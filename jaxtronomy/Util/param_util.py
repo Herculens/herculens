@@ -1,4 +1,4 @@
-import jax.numpy as np
+import jax.numpy as jnp
 
 
 # def phi_q2_ellipticity(phi, q):
@@ -28,8 +28,8 @@ def ellipticity2phi_q(e1, e2):
         Position angle (rad) and axis ratio (semi-minor / semi-major axis)
 
     """
-    phi = np.arctan2(e2, e1) / 2
-    c = np.sqrt(e1**2 + e2**2)
-    c = np.minimum(c, 0.9999)
+    phi = jnp.arctan2(e2, e1) / 2
+    c = jnp.sqrt(e1**2 + e2**2)
+    c = jnp.minimum(c, 0.9999)
     q = (1. - c) / (1. + c)
     return phi, q

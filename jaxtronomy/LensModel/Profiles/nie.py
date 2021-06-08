@@ -1,4 +1,5 @@
-import jax.numpy as np
+import numpy as np
+import jax.numpy as jnp
 import jaxtronomy.Util.util as util
 import jaxtronomy.Util.param_util as param_util
 from jaxtronomy.LensModel.Profiles.base_profile import LensProfileBase
@@ -39,8 +40,8 @@ class NIE(LensProfileBase):
 
         phi_G, q = param_util.ellipticity2phi_q(e1, e2)
         theta_E_conv = self._theta_E_q_convert(theta_E, q)
-        b = theta_E_conv * np.sqrt((1 + q**2)/2)
-        s = s_scale * np.sqrt((1 + q**2) / (2*q**2))
+        b = theta_E_conv * jnp.sqrt((1 + q**2)/2)
+        s = s_scale * jnp.sqrt((1 + q**2) / (2*q**2))
         return b, s, q, phi_G
 
     def set_static(self, theta_E, e1, e2, s_scale, center_x=0, center_y=0):
@@ -165,7 +166,7 @@ class NIE(LensProfileBase):
         :param q: axis ratio minor/major
         :return: theta_E in convention of kappa=  b *(q2(s2 + x2) + y2􏰉)−1/2
         """
-        theta_E_new = theta_E / (np.sqrt((1.+q**2) / (2. * q))) #/ (1+(1-q)/2.)
+        theta_E_new = theta_E / (jnp.sqrt((1. + q**2) / (2. * q))) #/ (1+(1-q)/2.)
         return theta_E_new
 
 
@@ -188,17 +189,17 @@ class NIEMajorAxis(LensProfileBase):
     def function(self, x, y, b, s, q):
         psi = self._psi(x, y, q, s)
         alpha_x, alpha_y = self.derivatives(x, y, b, s, q)
-        f_ = x * alpha_x + y * alpha_y - b * s * 1. / 2. * np.log((psi + s) ** 2 + (1. - q ** 2) * x ** 2)
+        f_ = x * alpha_x + y * alpha_y - b * s * 1. / 2. * np.log((psi + s)**2 + (1. - q**2) * x**2)
         return f_
 
     def derivatives(self, x, y, b, s, q):
         """
         returns df/dx and df/dy of the function
         """
-        q = np.clip(q, a_max=0.99999999)
+        q = jnp.clip(q, a_max=0.99999999)
         psi = self._psi(x, y, q, s)
-        f_x = b / np.sqrt(1. - q ** 2) * np.arctan(np.sqrt(1. - q ** 2) * x / (psi + s))
-        f_y = b / np.sqrt(1. - q ** 2) * np.arctanh(np.sqrt(1. - q ** 2) * y / (psi + q ** 2 * s))
+        f_x = b / jnp.sqrt(1. - q**2) * jnp.arctan(jnp.sqrt(1. - q**2) * x / (psi + s))
+        f_y = b / jnp.sqrt(1. - q**2) * jnp.arctanh(jnp.sqrt(1. - q**2) * y / (psi + q**2 * s))
         return f_x, f_y
 
     def hessian(self, x, y, b, s, q):
@@ -242,4 +243,4 @@ class NIEMajorAxis(LensProfileBase):
         :param s: smoothing scale in major axis direction
         :return: phi
         """
-        return np.sqrt(q**2 * (s**2 + x**2) + y**2)
+        return jnp.sqrt(q**2 * (s**2 + x**2) + y**2)

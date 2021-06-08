@@ -4,68 +4,6 @@ import numpy as np
 # import lenstronomy.Util.image_util as image_util
 from jaxtronomy.LightModel.Profiles.gaussian import Gaussian
 # import lenstronomy.Util.multi_gauss_expansion as mge
-#
-# from lenstronomy.Util.package_util import exporter
-# export, __all__ = exporter()
-#
-#
-# @export
-# def de_shift_kernel(kernel, shift_x, shift_y, iterations=20, fractional_step_size=1):
-#     """
-#     de-shifts a shifted kernel to the center of a pixel. This is performed iteratively.
-#
-#     The input kernel is the solution of a linear interpolated shift of a sharper kernel centered in the middle of the
-#      pixel. To find the de-shifted kernel, we perform an iterative correction of proposed de-shifted kernels and compare
-#      its shifted version with the input kernel.
-#
-#     :param kernel: (shifted) kernel, e.g. a star in an image that is not centered in the pixel grid
-#     :param shift_x: x-offset relative to the center of the pixel (sub-pixel shift)
-#     :param shift_y: y-offset relative to the center of the pixel (sub-pixel shift)
-#     :param iterations: number of repeated iterations of shifting a new de-shifted kernel and apply corrections
-#     :param fractional_step_size: float (0, 1] correction factor relative to previous proposal (can be used for stability
-#     :return: de-shifted kernel such that the interpolated shift boy (shift_x, shift_y) results in the input kernel
-#     """
-#     nx, ny = np.shape(kernel)
-#     kernel_new = np.zeros((nx+2, ny+2)) + (kernel[0, 0] + kernel[0, -1] + kernel[-1, 0] + kernel[-1, -1]) / 4.
-#     kernel_new[1:-1, 1:-1] = kernel
-#     int_shift_x = int(round(shift_x))
-#     frac_x_shift = shift_x - int_shift_x
-#     int_shift_y = int(round(shift_y))
-#     frac_y_shift = shift_y - int_shift_y
-#     kernel_init = copy.deepcopy(kernel_new)
-#     kernel_init_shifted = copy.deepcopy(interp.shift(kernel_init, [int_shift_y, int_shift_x], order=1))
-#     kernel_new = interp.shift(kernel_new, [int_shift_y, int_shift_x], order=1)
-#     norm = np.sum(kernel_init_shifted)
-#     for i in range(iterations):
-#         kernel_shifted_inv = interp.shift(kernel_new, [-frac_y_shift, -frac_x_shift], order=1)
-#         delta = kernel_init_shifted - kernel_norm(kernel_shifted_inv) * norm
-#         kernel_new += delta * fractional_step_size
-#         kernel_new = kernel_norm(kernel_new) * norm
-#     return kernel_new[1:-1, 1:-1]
-#
-#
-# @export
-# def center_kernel(kernel, iterations=20):
-#     """
-#     given a kernel that might not be perfectly centered, this routine computes its light weighted center and then
-#     moves the center in an iterative process such that it is centered
-#
-#     :param kernel: 2d array (odd numbers)
-#     :param iterations: int, number of iterations
-#     :return: centered kernel
-#     """
-#     kernel = kernel_norm(kernel)
-#     nx, ny = np.shape(kernel)
-#     if nx %2 == 0:
-#         raise ValueError("kernel needs odd number of pixels")
-#     # make coordinate grid of kernel
-#     x_grid, y_grid = util.make_grid(nx, deltapix=1, left_lower=False)
-#     # compute 1st moments to get light weighted center
-#     x_w = np.sum(kernel * util.array2image(x_grid))
-#     y_w = np.sum(kernel * util.array2image(y_grid))
-#     # de-shift kernel
-#     kernel_centered = de_shift_kernel(kernel, shift_x=-x_w, shift_y=-y_w, iterations=iterations)
-#     return kernel_norm(kernel_centered)
 
 
 def kernel_norm(kernel):
@@ -139,73 +77,6 @@ def subgrid_kernel(kernel, subgrid_res, odd=False, num_iter=100):
     return kernel_norm(kernel_subgrid - delta_kernel_sub)
 
 
-# @export
-# def averaging_even_kernel(kernel_high_res, subgrid_res):
-#     """
-#     makes a lower resolution kernel based on the kernel_high_res (odd numbers) and the subgrid_res (even number), both
-#     meant to be centered.
-#
-#     :param kernel_high_res: high resolution kernel with even subsampling resolution, centered
-#     :param subgrid_res: subsampling resolution (even number)
-#     :return: averaged undersampling kernel
-#     """
-#     n_kernel_high_res = len(kernel_high_res)
-#     n_low = int(round(n_kernel_high_res / subgrid_res + 0.5))
-#     if n_low % 2 == 0:
-#         n_low += 1
-#     n_high = int(n_low * subgrid_res - 1)
-#     assert n_high % 2 == 1
-#     if n_high == n_kernel_high_res:
-#         kernel_high_res_edges = kernel_high_res
-#     else:
-#         i_start = int((n_high - n_kernel_high_res) / 2)
-#         kernel_high_res_edges = np.zeros((n_high, n_high))
-#         kernel_high_res_edges[i_start:-i_start, i_start:-i_start] = kernel_high_res
-#     kernel_low_res = np.zeros((n_low, n_low))
-#     # adding pixels that are fully within a single re-binned pixel
-#     for i in range(subgrid_res-1):
-#         for j in range(subgrid_res-1):
-#             kernel_low_res += kernel_high_res_edges[i::subgrid_res, j::subgrid_res]
-#     # adding half of a pixel that has over-lap with two pixels
-#     i = subgrid_res - 1
-#     for j in range(subgrid_res - 1):
-#         kernel_low_res[1:, :] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
-#         kernel_low_res[:-1, :] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
-#     j = subgrid_res - 1
-#     for i in range(subgrid_res - 1):
-#         kernel_low_res[:, 1:] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
-#         kernel_low_res[:, :-1] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
-#     # adding a quarter of a pixel value that is at the boarder of four pixels
-#     i = subgrid_res - 1
-#     j = subgrid_res - 1
-#     kernel_edge = kernel_high_res_edges[i::subgrid_res, j::subgrid_res]
-#     kernel_low_res[1:, 1:] += kernel_edge / 4
-#     kernel_low_res[:-1, 1:] += kernel_edge / 4
-#     kernel_low_res[1:, :-1] += kernel_edge / 4
-#     kernel_low_res[:-1, :-1] += kernel_edge / 4
-#     return kernel_low_res
-#
-#
-# @export
-# def kernel_pixelsize_change(kernel, deltaPix_in, deltaPix_out):
-#     """
-#     change the pixel size of a given kernel
-#     :param kernel:
-#     :param deltaPix_in:
-#     :param deltaPix_out:
-#     :return:
-#     """
-#     numPix = len(kernel)
-#     numPix_new = int(round(numPix * deltaPix_in/deltaPix_out))
-#     if numPix_new % 2 == 0:
-#         numPix_new -= 1
-#     x_in = np.linspace(-(numPix-1)/2*deltaPix_in, (numPix-1)/2*deltaPix_in, numPix)
-#     x_out = np.linspace(-(numPix_new-1)/2*deltaPix_out, (numPix_new-1)/2*deltaPix_out, numPix_new)
-#     kernel_out = image_util.re_size_array(x_in, x_in, kernel, x_out, x_out)
-#     kernel_out = kernel_norm(kernel_out)
-#     return kernel_out
-
-
 def cut_psf(psf_data, psf_size):
     """
     cut the psf properly
@@ -236,38 +107,6 @@ def pixel_kernel(point_source_kernel, subgrid_res=7):
             kernel_pixel = image_util.add_layer2image(kernel_pixel, k_x, k_y, kernel_subgrid)
     kernel_pixel = util.averaging(kernel_pixel, numGrid=kernel_size*subgrid_res, numPix=kernel_size)
     return kernel_norm(kernel_pixel)
-#
-#
-# @export
-# def kernel_average_pixel(kernel_super, supersampling_factor):
-#     """
-#     computes the effective convolution kernel assuming a uniform surface brightness on the scale of a pixel
-#
-#     :param kernel_super: supersampled PSF of a point source (odd number per axis
-#     :param supersampling_factor: supersampling factor (int)
-#     :return:
-#     """
-#     kernel_sum = np.sum(kernel_super)
-#     kernel_size = int(round(len(kernel_super)/float(supersampling_factor) + 0.5))
-#     if kernel_size % 2 == 0:
-#         kernel_size += 1
-#     n_high = kernel_size*supersampling_factor
-#     if n_high % 2 == 0:
-#         n_high += 1
-#     kernel_pixel = np.zeros((n_high, n_high))
-#     for i in range(supersampling_factor):
-#         k_x = int((kernel_size - 1) / 2 * supersampling_factor + i)
-#         for j in range(supersampling_factor):
-#             k_y = int((kernel_size - 1) / 2 * supersampling_factor + j)
-#             kernel_pixel = image_util.add_layer2image(kernel_pixel, k_x, k_y, kernel_super)
-#
-#     if supersampling_factor % 2 == 0:
-#         kernel_pixel = averaging_even_kernel(kernel_pixel, supersampling_factor)
-#     else:
-#         kernel_pixel = util.averaging(kernel_pixel, numGrid=n_high,
-#                                                    numPix=kernel_size)
-#     kernel_pixel /= np.sum(kernel_pixel)
-#     return kernel_pixel * kernel_sum
 
 
 def kernel_gaussian(kernel_numPix, deltaPix, fwhm):
@@ -347,47 +186,6 @@ def degrade_kernel(kernel_super, degrading_factor):
     return kernel_low_res
 
 
-# @export
-# def cutout_source(x_pos, y_pos, image, kernelsize, shift=True):
-#     """
-#     cuts out point source (e.g. PSF estimate) out of image and shift it to the center of a pixel
-#     :param x_pos:
-#     :param y_pos:
-#     :param image:
-#     :param kernelsize:
-#     :return:
-#     """
-#     if kernelsize % 2 == 0:
-#         raise ValueError("even pixel number kernel size not supported!")
-#     x_int = int(round(x_pos))
-#     y_int = int(round(y_pos))
-#     n = len(image)
-#     d = (kernelsize - 1)/2
-#     x_max = int(np.minimum(x_int + d + 1, n))
-#     x_min = int(np.maximum(x_int - d, 0))
-#     y_max = int(np.minimum(y_int + d + 1, n))
-#     y_min = int(np.maximum(y_int - d, 0))
-#     image_cut = copy.deepcopy(image[y_min:y_max, x_min:x_max])
-#     shift_x = x_int - x_pos
-#     shift_y = y_int - y_pos
-#     if shift is True:
-#         kernel_shift = de_shift_kernel(image_cut, shift_x, shift_y, iterations=50)
-#     else:
-#         kernel_shift = image_cut
-#     kernel_final = np.zeros((kernelsize, kernelsize))
-#
-#     k_l2_x = int((kernelsize - 1) / 2)
-#     k_l2_y = int((kernelsize - 1) / 2)
-#
-#     xk_min = np.maximum(0, -x_int + k_l2_x)
-#     yk_min = np.maximum(0, -y_int + k_l2_y)
-#     xk_max = np.minimum(kernelsize, -x_int + k_l2_x + n)
-#     yk_max = np.minimum(kernelsize, -y_int + k_l2_y + n)
-#
-#     kernel_final[yk_min:yk_max, xk_min:xk_max] = kernel_shift
-#     return kernel_final
-
-
 def fwhm_kernel(kernel):
     """
 
@@ -432,22 +230,3 @@ def estimate_amp(data, x_pos, y_pos, psf_kernel):
     else:
         amp_estimated = 0
     return amp_estimated
-
-
-# @export
-# def mge_kernel(kernel, order=5):
-#     """
-#     azimutal Multi-Gaussian expansion of a pixelized kernel
-#
-#     :param kernel: 2d numpy array
-#     :return:
-#     """
-#     # radial average
-#     n = len(kernel)
-#     center = (n - 1) / 2.
-#     psf_r = image_util.radial_profile(kernel, center=[center, center])
-#     # MGE of radial average
-#     n_r = len(psf_r)
-#     r_array = np.linspace(start=0., stop=n_r - 1, num=n_r)
-#     amps, sigmas, norm = mge.mge_1d(r_array, psf_r, N=order, linspace=True)
-#     return amps, sigmas, norm
