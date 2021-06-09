@@ -1,4 +1,3 @@
-import jax.numpy as np
 from jaxtronomy.Util.jax_util import BilinearInterpolator, BicubicInterpolator
 
 

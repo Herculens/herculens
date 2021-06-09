@@ -13,9 +13,7 @@ __all__ = ['ImageModel']
 
 
 class ImageModel(object):
-    """
-    this class uses functions of lens_model and source_model to make a lensed image
-    """
+    """Generate lensed images from source light and lens mass/light models."""
     def __init__(self, data_class, psf_class, lens_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
                  point_source_class=None, extinction_class=None,
