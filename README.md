@@ -9,9 +9,9 @@ conda create -n jax-strong-lensing python=3.7
 conda activate jax-strong-lensing
 ```
 
-Then pip install the local `jaxtronomy` package.
+Then pip install (develop) the local `jaxtronomy` package.
 ```sh
-pip install .
+pip install (-e) .
 ```
 
 The following dependencies will be installed automatically.

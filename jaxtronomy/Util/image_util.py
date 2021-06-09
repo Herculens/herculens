@@ -95,7 +95,7 @@ def add_poisson(image, exp_time):
     # key, subkey = random.split(random.PRNGKey(42))
     # poisson = random.normal(subkey, shape=np.shape(image)) * sigma
     # return poisson
-    sigma = np.sqrt(np.abs(image)/exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
+    sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
     nx, ny = np.shape(image)
     poisson = np.random.randn(nx, ny) * sigma
     return poisson

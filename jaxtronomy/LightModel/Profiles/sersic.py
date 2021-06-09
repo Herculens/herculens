@@ -1,4 +1,4 @@
-import jax.numpy as np
+import numpy as np
 from jaxtronomy.LensModel.Profiles.sersic_utils import SersicUtil
 import jaxtronomy.Util.param_util as param_util
 
