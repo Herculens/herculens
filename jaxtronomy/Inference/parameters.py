@@ -10,8 +10,8 @@ __all__ = ['Parameters']
 class Parameters(object):
     """Class that manages parameters in JAX / auto-differentiable framework.
     Currently, it handles:
-    - conversions from differentiable parameter vector to user-friendly dictionnaries 'kwargs'
-    - negative log-prior values, that are meant to be added to the full loss function
+    - conversions from the differentiable parameter vector to user-friendly dictionnaries (args-to-kwargs, kwargs-to-args)
+    - log-prior values, that are meant to be added to the full loss function
     """
 
     _bound_penalty = 1e10
@@ -40,6 +40,10 @@ class Parameters(object):
         return self._prior_types
 
     @property
+    def bounds(self):
+        return self._lowers, self._uppers
+
+    @property
     def names(self):
         if not hasattr(self, '_names'):
             self._names = self._set_names('lens_model_list', 'kwargs_lens')
@@ -53,8 +57,30 @@ class Parameters(object):
             self._symbols = self._name2latex(self.names)
         return self._symbols
 
-    def initial_values(self, as_kwargs=False):
+    def initial_values(self, as_kwargs=False, original=False):
+        if hasattr(self, '_best_fit') and original is False:
+            return self.best_fit_values(as_kwargs=as_kwargs)
         return self._kwargs_init if as_kwargs else self._inits
+    
+    def set_best_fit(self, args):
+        self._best_fit = args
+        if hasattr(self, '_kwargs_best_fit'):
+            delattr(self, '_kwargs_best_fit')
+
+    def best_fit_values(self, as_kwargs=False):
+        if not hasattr(self, '_kwargs_best_fit') and as_kwargs is True:
+            self._kwargs_best_fit = self.args2kwargs(self._best_fit)
+        return self._kwargs_best_fit if as_kwargs else self._best_fit
+
+    def set_samples(self, samples):
+        self._map = jnp.median(samples, axis=0)  # maximum a-posterio values
+        if hasattr(self, '_kwargs_map'):
+            delattr(self, '_kwargs_map')
+
+    def map_values(self, as_kwargs=False):
+        if not hasattr(self, '_kwargs_map') and as_kwargs is True:
+            self._kwargs_map = self.args2kwargs(self._map)
+        return self._kwargs_map if as_kwargs else self._map
 
     #@functools.partial(jit, static_argnums=(0,))
     def args2kwargs(self, args):
