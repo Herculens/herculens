@@ -2,6 +2,7 @@ import time
 from scipy import optimize
 from functools import partial
 from jax import jit, grad, jacfwd, jacrev
+import numpy as np
 
 __all__ = ['Optimizer']
 
@@ -49,7 +50,6 @@ class Optimizer(object):
         runtime = time.time() - start
         logL = - float(self._metrics.loss_history[-1])
         self._param_class.set_best_fit(best_fit)
-        print("AAAA", best_fit)
         return best_fit, logL, extra_fields, runtime
 
     def _run_minimizer_scipy(self, x0, method, callback):
@@ -71,9 +71,11 @@ class Optimizer(object):
         from lenstronomy.Sampling.Samplers.pso import ParticleSwarmOptimizer
         from lenstronomy.Sampling.Pool.pool import choose_pool
         pool = choose_pool(mpi=False, processes=n_threads, use_dill=True)
-        optimizer = ParticleSwarmOptimizer(jit(lambda x: - self.loss(x)),
-                                           self._param_class._lowers, self._param_class._uppers, 
-                                           n_particles, pool=pool)
+        lowers, uppers = self._param_class.bounds
+        if np.any(np.isnan(lowers)):
+            raise ValueError("PSO needs lower and upper bounds, i.e. prior distributions with a finite support")
+        optimizer = ParticleSwarmOptimizer(jit(lambda x: - self.loss(x)), 
+                                           lowers, uppers, n_particles, pool=pool)
         init_params = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
         optimizer.set_global_best(init_params, [0]*len(init_params), - self.loss(init_params))
         start = time.time()
@@ -81,7 +83,6 @@ class Optimizer(object):
         runtime = time.time() - start
         logL = float(chi2_list[-1])
         extra_fields = {'chi2_list': chi2_list, 'pos_list': pos_list, 'vel_list': vel_list}
-        print("MAIS NOE", best_fit)
         self._param_class.set_best_fit(best_fit)
         return best_fit, logL, extra_fields, runtime
 
