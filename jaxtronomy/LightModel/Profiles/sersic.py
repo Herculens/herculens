@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 from jaxtronomy.LensModel.Profiles.sersic_utils import SersicUtil
 import jaxtronomy.Util.param_util as param_util
 
@@ -63,7 +64,7 @@ class SersicElliptic(SersicUtil):
         :return: Sersic profile value at (x, y)
         """
 
-        R_sersic = np.maximum(0, R_sersic)
+        R_sersic = jnp.maximum(0, R_sersic)
         phi_G, q = param_util.ellipticity2phi_q(e1, e2)
         R = self.get_distance_from_center(x, y, phi_G, q, center_x, center_y)
         result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
