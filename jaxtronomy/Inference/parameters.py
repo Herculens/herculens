@@ -1,4 +1,4 @@
-import functools
+from functools import partial
 import numpy as np
 import jax.numpy as jnp
 from jax import lax, jit
@@ -84,7 +84,6 @@ class Parameters(object):
             self._kwargs_map = self.args2kwargs(self._map)
         return self._kwargs_map if as_kwargs else self._map
 
-    #@functools.partial(jit, static_argnums=(0,))
     def args2kwargs(self, args):
         i = 0
         args = jnp.atleast_1d(args)
@@ -94,7 +93,6 @@ class Parameters(object):
         kwargs = {'kwargs_lens': kwargs_lens, 'kwargs_source': kwargs_source, 'kwargs_lens_light': kwargs_lens_light}
         return kwargs
 
-    #@functools.partial(jit, static_argnums=(0,))
     def kwargs2args(self, kwargs):
         args = self._set_params(kwargs, 'lens_model_list', 'kwargs_lens')
         args += self._set_params(kwargs, 'source_model_list', 'kwargs_source')
@@ -112,7 +110,7 @@ class Parameters(object):
         widths = widths_m + widths_s + widths_l
         return types, np.array(lowers), np.array(uppers), np.array(means), np.array(widths)
 
-    #@jit
+    @partial(jit, static_argnums=(0,))
     def log_prior(self, args):
         logP = 0
         for i in range(self.num_parameters):
@@ -121,6 +119,15 @@ class Parameters(object):
             logP += lax.cond(gaussian_prior, lambda _: - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2, lambda _: 0., operand=None)
             logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._bound_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
             logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._bound_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+        return logP
+
+    def log_prior_nojit(self, args):
+        logP = 0
+        for i in range(self.num_parameters):
+            if self._prior_types[i] == 'gaussian':
+                logP += - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2
+            elif self._prior_types[i] == 'uniform' and not (self._lowers[i] <= args[i] <= self._uppers[i]):
+                logP += - self._bound_penalty
         return logP
 
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
