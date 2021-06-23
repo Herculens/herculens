@@ -38,49 +38,6 @@ class special(object):
         return sign * np.exp(gammaln(x))
 
 
-# def gaussian_filter(image, sigma, mode='nearest', truncate=4.0):
-#     """Convolve an image by a gaussian filter.
-#
-#     Parameters
-#     ----------
-#     image : array_like
-#         Image to filter.
-#     sigma : float
-#         Standard deviation of the Gaussian kernel.
-#     mode : str, {'constant', 'nearest'}
-#         How the input array is extended when the filter overlaps a border.
-#         See the `scipy.ndimage.gaussian_filter` documentation.
-#         Default is 'nearest'.
-#     truncate : float, optional
-#         Truncate the filter at this many standard deviations. Default is 4.0.
-#
-#     Note
-#     ----
-#     Reproduces `scipy.ndimage.gaussian_filter` well with mode options
-#     'constant' and 'nearest'.
-#
-#     """
-#     def gaussian(x, sigma):
-#         y = np.asarray(x, dtype=float) / sigma
-#         return np.exp(-0.5 * y**2) / (2 * np.pi * sigma**2)
-#
-#     # Determine the kernel size (rounded up to an odd int) based on truncation
-#     N = int(np.ceil(2 * truncate * sigma) // 2 * 2 + 1)
-#
-#     # Don't convolve if kernel is only one pixel
-#     # if N < 3:
-#     #     return image
-#
-#     # Compute the kernel
-#     x, y = np.indices((N, N))  # pixel coordinates
-#     x0, y0 = (N - 1) / 2., (N - 1) / 2.  # center pixel
-#     kernel = gaussian(np.hypot(x - x0, y - y0), sigma)
-#
-#     # Convolve
-#     pad_mode = ['constant', 'edge'][mode == 'nearest']
-#     image_padded = np.pad(image, pad_width=(N // 2), mode=pad_mode)
-#     return convolve2d(image_padded, kernel, mode='valid')
-
 class GaussianFilter(object):
     """JAX-friendly Gaussian filter."""
     def __init__(self, sigma, truncate=4.0):
@@ -286,31 +243,24 @@ class BicubicInterpolator(object):
 
     """
     def __init__(self, x, y, z, zx=None, zy=None, zxy=None):
-        self.x = x
-        self.y = y
-        self.z = z
+        self.x = np.array(x)
+        self.y = np.array(y)
+        self.z = np.array(z)
 
         # Assume uniform coordinate spacing
         self.dx = self.x[1] - self.x[0]
         self.dy = self.y[1] - self.y[0]
 
         # Compute approximate partial derivatives if not provided
-        # if zx is None or zy is None or zxy is None:
-        #     ext = self._extend_image(self.z)
-        #     _zx = (ext[2:, :] - ext[:-2, :]) / 2. / self.dx
-        #     _zy = (ext[:, 2:] - ext[:, :-2]) / 2. / self.dy
         if zx is None:
-            # self.zx = _zx[:, 1:-1]
             self.zx = np.gradient(z, axis=0) / self.dx
         else:
             self.zx = zy
         if zy is None:
-            # self.zy = _zy[1:-1, :]
             self.zy = np.gradient(z, axis=1) / self.dy
         else:
             self.zy = zx
         if zxy is None:
-            # self.zxy = ((_zx[:, 2:] - _zx[:, :-2]) / 2.) / self.dy
             self.zxy = np.gradient(self.zx, axis=1) / self.dy
         else:
             self.zxy = zxy
