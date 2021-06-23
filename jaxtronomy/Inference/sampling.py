@@ -61,6 +61,7 @@ class Sampler(InferenceBase):
 
     def mcmc(self, log_likelihood_fn, init_stds, walker_ratio=10, num_warmup=100, num_samples=100, 
              restart_from_init=False, num_threads=1, progress_bar=True):
+        """`log_likelihood_fn` needs to be non.jitted (emcee pickles this function, which is incomptabile with JAX objetcs)""" 
         from emcee import EnsembleSampler
         from lenstronomy.Sampling.Pool.pool import choose_pool
         pool = choose_pool(mpi=False, processes=1, use_dill=True)

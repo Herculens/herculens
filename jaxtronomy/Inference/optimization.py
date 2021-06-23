@@ -2,6 +2,7 @@ import time
 from scipy import optimize
 from jax import jit
 import numpy as np
+from scipy.optimize import Bounds
 
 from jaxtronomy.Inference.inference_base import InferenceBase
 
@@ -30,19 +31,26 @@ class Optimizer(InferenceBase):
             raise ValueError("You must run the optimizer at least once to access the history")
         return self._metrics.param_history
 
-    def minimize(self, method='BFGS', restart_from_init=False, always_use_hessian=False):
+    def minimize(self, method='BFGS', use_scipy_bounds=False, restart_from_init=False, always_use_hessian=False):
         # TODO: should we call once / a few times all jitted functions, to potentially speed things up?
         init_params = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
+        if use_scipy_bounds is True:
+            lowers, uppers = self._param_class.bounds
+            assert np.any(np.isnan(lowers)) is False, "NaNs found in lower bounds, please check uniform prior bounds"
+            assert np.any(np.isnan(uppers)) is False, "NaNs found in upper bounds, please check uniform prior bounds"
+            bounds = Bounds(lowers, uppers)
+        else:
+            bounds = None
         self._metrics = Metrics(self.loss)
         start = time.time()
         best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, self._metrics,
-                                                           always_use_hessian)
+                                                           bounds, always_use_hessian)
         runtime = time.time() - start
         logL = - float(self._metrics.loss_history[-1])
         self._param_class.set_best_fit(best_fit)
         return best_fit, logL, extra_fields, runtime
 
-    def _run_scipy_minimizer(self, x0, method, callback, always_use_hessian):
+    def _run_scipy_minimizer(self, x0, method, bounds, callback, always_use_hessian):
         if method in ['Nelder-Mead']:  # TODO: add methods
             extra_kwargs = {}
         elif method in ['BFGS']:
@@ -52,7 +60,7 @@ class Optimizer(InferenceBase):
                 extra_kwargs = {'jac': self.jacobian, 'hess': self.hessian}
             else:
                 extra_kwargs = {'jac': self.jacobian, 'hessp': self.hessian_vec_prod}
-        opt = optimize.minimize(self.loss, x0, method=method, 
+        opt = optimize.minimize(self.loss, x0, method=method, bounds=bounds,
                                 callback=callback, **extra_kwargs)
         extra_fields = {'jac': None, 'hess': None, 'hess_inv': None}
         for key in extra_fields:
