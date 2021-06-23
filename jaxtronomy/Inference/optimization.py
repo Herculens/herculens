@@ -1,34 +1,18 @@
 import time
 from scipy import optimize
-from functools import partial
-from jax import jit, grad, jacfwd, jacrev
+from jax import jit
 import numpy as np
+
+from jaxtronomy.Inference.inference_base import InferenceBase
 
 __all__ = ['Optimizer']
 
 
-class Optimizer(object):
+class Optimizer(InferenceBase):
     """"""
 
     def __init__(self, loss_fn, param_class):
-        self._loss_fn = loss_fn
-        self._param_class = param_class
-
-    @partial(jit, static_argnums=(0,))  # because first argument is 'self'
-    def loss(self, args):
-        return self._loss_fn(self._param_class.args2kwargs(args))
-
-    @partial(jit, static_argnums=(0,))
-    def jacobian(self, args):
-        return grad(self.loss)(args)
-
-    @partial(jit, static_argnums=(0,))
-    def hessian(self, args):
-        return jacfwd(jacrev(self.loss))(args)
-
-    #TODO
-    # def hessian_vector_product(self, args):
-    #     return 
+        super().__init__(loss_fn, param_class)
 
     @property
     def loss_history(self):
@@ -42,23 +26,27 @@ class Optimizer(object):
             raise ValueError("You muts run the optimizer at least once to access the history")
         return self._metrics.param_history
 
-    def minimize(self, method='BFGS', restart_from_init=False):
+    def minimize(self, method='BFGS', restart_from_init=False, always_use_hessian=False):
         init_params = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
         self._metrics = Metrics(self.loss)
         start = time.time()
-        best_fit, extra_fields = self._run_minimizer_scipy(init_params, method, self._metrics)
+        best_fit, extra_fields = self._run_minimizer_scipy(init_params, method, self._metrics,
+                                                           always_use_hessian)
         runtime = time.time() - start
         logL = - float(self._metrics.loss_history[-1])
         self._param_class.set_best_fit(best_fit)
         return best_fit, logL, extra_fields, runtime
 
-    def _run_minimizer_scipy(self, x0, method, callback):
+    def _run_minimizer_scipy(self, x0, method, callback, always_use_hessian):
         if method in ['Nelder-Mead']:  # TODO: add methods
             extra_kwargs = {}
-        elif method in ['BFGS']:  # TODO: add methods
+        elif method in ['BFGS']:
             extra_kwargs = {'jac': self.jacobian}
-        elif method in ['Newton-CG', 'trust-krylov']:  # TODO: add methods
-            extra_kwargs = {'jac': self.jacobian, 'hess': self.hessian}
+        elif method in ['Newton-CG', 'trust-krylov', 'trust-exact']:
+            if method in ['trust-exact'] or always_use_hessian:
+                extra_kwargs = {'jac': self.jacobian, 'hess': self.hessian}
+            else:
+                extra_kwargs = {'jac': self.jacobian, 'hessp': self.hessian_vec_prod}
         opt = optimize.minimize(self.loss, x0, method=method, 
                                 callback=callback, **extra_kwargs)
         extra_fields = {'jac': None, 'hess': None, 'hess_inv': None}
