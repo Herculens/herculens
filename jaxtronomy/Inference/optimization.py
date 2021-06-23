@@ -9,7 +9,11 @@ __all__ = ['Optimizer']
 
 
 class Optimizer(InferenceBase):
-    """"""
+    """Class that handles optimization tasks, i.e. finding best-fit point estimates of parameters
+    It currently handles:
+    - a subset of scipy.optimize.minimize routines, using first and second order derivatives when required
+    - a particle swarm optimizer (PSO), implemented in lenstronomy
+    """
 
     def __init__(self, loss_fn, param_class):
         super().__init__(loss_fn, param_class)

@@ -11,7 +11,9 @@ class Parameters(object):
     """Class that manages parameters in JAX / auto-differentiable framework.
     Currently, it handles:
     - conversions from the differentiable parameter vector to user-friendly dictionnaries (args-to-kwargs, kwargs-to-args)
+    - uniform and gaussian priors for subsets of parameters
     - log-prior values, that are meant to be added to the full loss function
+    - nice LaTeX format for parameter names
     """
 
     _bound_penalty = 1e10
