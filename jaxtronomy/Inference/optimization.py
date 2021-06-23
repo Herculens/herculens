@@ -21,27 +21,28 @@ class Optimizer(InferenceBase):
     @property
     def loss_history(self):
         if not hasattr(self, '_metrics'):
-            raise ValueError("You muts run the optimizer at least once to access the history")
+            raise ValueError("You must run the optimizer at least once to access the history")
         return self._metrics.loss_history
 
     @property
     def param_history(self):
         if not hasattr(self, '_metrics'):
-            raise ValueError("You muts run the optimizer at least once to access the history")
+            raise ValueError("You must run the optimizer at least once to access the history")
         return self._metrics.param_history
 
     def minimize(self, method='BFGS', restart_from_init=False, always_use_hessian=False):
+        # TODO: should we call once / a few times all jitted functions, to potentially speed things up?
         init_params = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
         self._metrics = Metrics(self.loss)
         start = time.time()
-        best_fit, extra_fields = self._run_minimizer_scipy(init_params, method, self._metrics,
+        best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, self._metrics,
                                                            always_use_hessian)
         runtime = time.time() - start
         logL = - float(self._metrics.loss_history[-1])
         self._param_class.set_best_fit(best_fit)
         return best_fit, logL, extra_fields, runtime
 
-    def _run_minimizer_scipy(self, x0, method, callback, always_use_hessian):
+    def _run_scipy_minimizer(self, x0, method, callback, always_use_hessian):
         if method in ['Nelder-Mead']:  # TODO: add methods
             extra_kwargs = {}
         elif method in ['BFGS']:
@@ -66,7 +67,7 @@ class Optimizer(InferenceBase):
         lowers, uppers = self._param_class.bounds
         if np.any(np.isnan(lowers)):
             raise ValueError("PSO needs lower and upper bounds, i.e. prior distributions with a finite support")
-        optimizer = ParticleSwarmOptimizer(jit(lambda x: - self.loss(x)), 
+        optimizer = ParticleSwarmOptimizer(self.log_likelihood(x), 
                                            lowers, uppers, n_particles, pool=pool)
         init_params = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
         optimizer.set_global_best(init_params, [0]*len(init_params), - self.loss(init_params))
