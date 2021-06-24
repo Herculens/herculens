@@ -20,10 +20,14 @@ __all__ = ['Sampler']
 
 
 class Sampler(InferenceBase):
-    """"""
+    """Class that handles sampling tasks, i.e. approximating posterior distributions of parameters.
+    It currently supports:
+    - Hamiltonian Monte Carlo from numpyro
+    - Ensemble Affine Invariant MCMC from emcee
+    """
 
-    def __init__(self, loss_fn, param_class):
-        super().__init__(loss_fn, param_class)
+    def __init__(self, loss_fn, param_class, loss_input_as_kwargs=True):
+        super().__init__(loss_fn, param_class, loss_input_as_kwargs)
 
     def hmc(self, num_warmup=100, num_samples=100, num_chains=1, restart_from_init=False,
             sampler_type='NUTS', seed=0, progress_bar=True, sampler_kwargs={}):

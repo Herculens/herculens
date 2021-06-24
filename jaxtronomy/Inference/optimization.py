@@ -18,8 +18,8 @@ class Optimizer(InferenceBase):
 
     _supported_scipy_methods = ['Nelder-Mead', 'BFGS', 'Newton-CG', 'trust-krylov', 'trust-exact', 'trust-constr']
 
-    def __init__(self, loss_fn, param_class):
-        super().__init__(loss_fn, param_class)
+    def __init__(self, loss_fn, param_class, loss_input_as_kwargs=True):
+        super().__init__(loss_fn, param_class, loss_input_as_kwargs)
 
     @property
     def loss_history(self):
