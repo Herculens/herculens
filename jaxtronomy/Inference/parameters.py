@@ -144,8 +144,17 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    kwargs[name] = args[i]
-                    i += 1
+                    if model in ['PIXELATED']:
+                        if 'x_coords' not in kwargs_fixed or 'y_coords' not in kwargs_fixed:
+                            raise ValueError(f"'x_coords' and 'y_coords' all need to be fixed for '{model}' models")
+                        n_pix_x = len(kwargs_fixed['x_coords'])
+                        n_pix_y = len(kwargs_fixed['y_coords'])
+                        num_param = int(n_pix_x * n_pix_y)
+                        kwargs['image'] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
+                    else:
+                        num_param = 1
+                        kwargs[name] = args[i]
+                    i += num_param
                 else:
                     kwargs[name] = kwargs_fixed[name]
             kwargs_list.append(kwargs)
@@ -159,7 +168,13 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    args.append(kwargs_profile[name])
+                    if model in ['PIXELATED']:
+                        if name in ['x_coords', 'y_coords']:
+                            raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
+                        else:
+                            args += kwargs_profile['image'].flatten().tolist()
+                    else:
+                        args.append(kwargs_profile[name])
         return args
 
     def _set_params_prior(self, kwargs, kwargs_model_key, kwargs_key):
@@ -170,36 +185,46 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    if name in kwargs_profile:
-                        prior_type = kwargs_profile[name][0]
-                        types.append(prior_type)
-                        if prior_type == 'uniform':
-                            lowers.append(kwargs_profile[name][1])
-                            uppers.append(kwargs_profile[name][2])
-                            means.append(np.nan)
-                            widths.append(np.nan)
-                        elif prior_type == 'gaussian':
-                            lowers.append(np.nan)
-                            uppers.append(np.nan)
-                            means.append(kwargs_profile[name][1])
-                            widths.append(kwargs_profile[name][2])
-                        else:
-                            types.append(None)
-                            lowers.append(np.nan)
-                            uppers.append(np.nan)
-                            means.append(np.nan)
-                            widths.append(np.nan)
-                    else:
+                    prior_type = kwargs_profile[name][0]
+                    if name not in kwargs_profile or prior_type not in ['uniform', 'gaussian']:
                         types.append(None)
                         lowers.append(np.nan)
                         uppers.append(np.nan)
                         means.append(np.nan)
                         widths.append(np.nan)
+                    else:
+                        if prior_type == 'uniform':
+                            if model in ['PIXELATED']:
+                                if name in ['x_coords', 'y_coords']:
+                                    raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
+                                n_pix_x = len(kwargs_fixed['x_coords'])
+                                n_pix_y = len(kwargs_fixed['y_coords'])
+                                num_param = int(n_pix_x * n_pix_y)
+                                types  += [prior_type]*num_param
+                                lowers += kwargs_profile['image'][1].flatten().tolist()
+                                uppers += kwargs_profile['image'][2].flatten().tolist()
+                                means  += [np.nan]*num_param
+                                widths += [np.nan]*num_param
+                            else:
+                                types.append(prior_type)
+                                lowers.append(kwargs_profile[name][1])
+                                uppers.append(kwargs_profile[name][2])
+                                means.append(np.nan)
+                                widths.append(np.nan)
+                        elif prior_type == 'gaussian':
+                            if model in ['PIXELATED']:
+                                raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
+                            else:
+                                types.append(prior_type)
+                                lowers.append(np.nan)
+                                uppers.append(np.nan)
+                                means.append(kwargs_profile[name][1])
+                                widths.append(kwargs_profile[name][2])
         return types, lowers, uppers, means, widths
 
     @staticmethod
     def _get_param_names_for_model(kwargs_key, model):
-        if kwargs_key == 'kwargs_source':
+        if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
             if model == 'GAUSSIAN':
                 from jaxtronomy.LightModel.Profiles.gaussian import Gaussian
                 profile_class = Gaussian
@@ -228,13 +253,21 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    names.append(name)
+                    if model in ['PIXELATED']:
+                        n_pix_x = len(kwargs_fixed['x_coords'])
+                        n_pix_y = len(kwargs_fixed['y_coords'])
+                        num_param = int(n_pix_x * n_pix_y)
+                        names += [f'a_{i}' for i in range(num_param)]
+                    else:
+                        names.append(name)
         return names
 
     def _name2latex(self, names):
         latexs = []
         for name in names:
-            if name == 'theta_E':
+            if name[:2] == 'a_':  # for 'PIXELATED' models
+                latex = r"$a_{}$".format(int(name[2:]))
+            elif name == 'theta_E':
                 latex = r"$\theta_{\rm E}$"
             elif name == 'gamma':
                 latex = r"$\gamma'$"
