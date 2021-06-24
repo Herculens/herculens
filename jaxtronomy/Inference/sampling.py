@@ -25,7 +25,7 @@ class Sampler(InferenceBase):
     def __init__(self, loss_fn, param_class):
         super().__init__(loss_fn, param_class)
 
-    def hmc(self, num_warmup=100, num_samples=100, restart_from_init=False,
+    def hmc(self, num_warmup=100, num_samples=100, num_chains=1, restart_from_init=False,
             sampler_type='NUTS', seed=0, progress_bar=True, sampler_kwargs={}):
         rng_key = PRNGKey(seed)
 
@@ -39,20 +39,26 @@ class Sampler(InferenceBase):
         init_params = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
         # alternative way to provide initial parameters through a NamedTuple:
         #init_params = ParamInfo(init_params, potential_fn(init_params), kinetic_fn(init_params))
+        num_dims = len(init_params)
         start = time.time()
         samples, extra_fields = self._run_numpyro_mcmc(kernel, init_params, rng_key, 
-                                                       num_warmup, num_samples, progress_bar)
+                                                       num_warmup, num_samples, num_chains, progress_bar)
         runtime = time.time() - start
         logL = - extra_fields['potential_energy']
+        samples = np.asarray(samples)
+        expected_shape = (num_samples*num_chains, num_dims)
+        if samples.shape != expected_shape:  # this happens sometimes...
+            raise RuntimeError(f"HMC samples do not have correct shape, {samples.shape} instead of {expected_shape}")
+        logL = np.asarray(logL)
         self._param_class.set_samples(samples)
-        return np.asarray(samples), np.asarray(logL), extra_fields, runtime
+        return samples, logL, extra_fields, runtime
 
     @staticmethod
-    def _run_numpyro_mcmc(kernel, init_params, rng_key, num_warmup, num_samples, progress_bar):
-        # NOTE 1: num_chains > 1, init_params should be of shape (num_chains, num_dims) instead of (num_dims,)
-        #init_params = np.repeat(np.expand_dims(init_params, axis=0), 3, axis=0)
-        # NOTE 2: disabling the progress-bar can speed up the sampling
-        mcmc = MCMC(kernel, num_warmup, num_samples, num_chains=1, progress_bar=progress_bar)
+    def _run_numpyro_mcmc(kernel, init_params, rng_key, num_warmup, num_samples, num_chains, progress_bar):
+        # NOTE: disabling the progress-bar can speed up the sampling
+        if num_chains > 1:
+            init_params = np.repeat(np.expand_dims(init_params, axis=0), num_chains, axis=0)
+        mcmc = MCMC(kernel, num_warmup, num_samples, num_chains=num_chains, progress_bar=progress_bar)
         mcmc.run(rng_key, init_params=init_params, extra_fields=('potential_energy', 'energy', 'r', 'accept_prob'))
         mcmc.print_summary(exclude_deterministic=False)
         samples = mcmc.get_samples()
@@ -61,14 +67,17 @@ class Sampler(InferenceBase):
 
     def mcmc(self, log_likelihood_fn, init_stds, walker_ratio=10, num_warmup=100, num_samples=100, 
              restart_from_init=False, num_threads=1, progress_bar=True):
-        """`log_likelihood_fn` needs to be non.jitted (emcee pickles this function, which is incomptabile with JAX objetcs)""" 
+        """legacy sampling method from lenstronomy, mainly for comparison.
+        Warning: `log_likelihood_fn` needs to be non.jitted (emcee pickles this function, which is incomptabile with JAX objetcs)
+        """ 
         from emcee import EnsembleSampler
         from lenstronomy.Sampling.Pool.pool import choose_pool
-        pool = choose_pool(mpi=False, processes=1, use_dill=True)
+        pool = choose_pool(mpi=False, processes=num_threads, use_dill=True)
         init_means = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
         num_dims = len(init_means)
         num_walkers = int(walker_ratio * num_dims)
-        init_params = self._init_ball(init_means, init_stds, size=num_walkers, dist='normal')
+        init_params = self._init_ball(np.asarray(init_means), np.asarray(init_stds), 
+                                      size=num_walkers, dist='normal')
         start = time.time()
         sampler = EnsembleSampler(num_walkers, num_dims, log_likelihood_fn,
                                   pool=pool, backend=None)

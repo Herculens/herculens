@@ -24,11 +24,11 @@ class Parameters(object):
         self._kwargs_prior = kwargs_prior
         self._kwargs_fixed = kwargs_fixed
         
-        self._inits  = self.kwargs2args(self._kwargs_init)
+        self._init_values  = self.kwargs2args(self._kwargs_init)
         self._prior_types, self._lowers, self._uppers, self._means, self._widths \
             = self.kwargs2args_prior(self._kwargs_prior)
 
-        self._num_params = len(self._inits)
+        self._num_params = len(self._init_values)
 
         # TODO: write function that checks that no fields are missing
         # and fill those with default values if needed
@@ -60,29 +60,35 @@ class Parameters(object):
         return self._symbols
 
     def initial_values(self, as_kwargs=False, original=False):
-        if hasattr(self, '_best_fit') and original is False:
-            return self.best_fit_values(as_kwargs=as_kwargs)
-        return self._kwargs_init if as_kwargs else self._inits
-    
-    def set_best_fit(self, args):
-        self._best_fit = args
-        if hasattr(self, '_kwargs_best_fit'):
-            delattr(self, '_kwargs_best_fit')
+        if hasattr(self, '_ml_values') and original is False:
+            return self.ML_values(as_kwargs=as_kwargs)
+        return self._kwargs_init if as_kwargs else self._init_values
 
     def best_fit_values(self, as_kwargs=False):
-        if not hasattr(self, '_kwargs_best_fit') and as_kwargs is True:
-            self._kwargs_best_fit = self.args2kwargs(self._best_fit)
-        return self._kwargs_best_fit if as_kwargs else self._best_fit
+        """Maximum-likelhood estimate"""
+        return self.ML_values(as_kwargs=as_kwargs)
 
+    def ML_values(self, as_kwargs=False):
+        """Maximum-likelhood estimate"""
+        if not hasattr(self, '_kwargs_ml') and as_kwargs is True:
+            self._kwargs_ml = self.args2kwargs(self._ml_values)
+        return self._kwargs_ml if as_kwargs else self._ml_values
+
+    def MAP_values(self, as_kwargs=False):
+        """Maximum-a-postriori estimate"""
+        if not hasattr(self, '_kwargs_map') and as_kwargs is True:
+            self._kwargs_map = self.args2kwargs(self._map_values)
+        return self._kwargs_map if as_kwargs else self._map_values
+
+    def set_best_fit(self, args):
+        self._ml_values = args
+        if hasattr(self, '_kwargs_ml'):
+            delattr(self, '_kwargs_ml')
+    
     def set_samples(self, samples):
-        self._map = jnp.median(samples, axis=0)  # maximum a-posterio values
+        self._map_values = np.median(samples, axis=0)  # maximum a-posteriori values
         if hasattr(self, '_kwargs_map'):
             delattr(self, '_kwargs_map')
-
-    def map_values(self, as_kwargs=False):
-        if not hasattr(self, '_kwargs_map') and as_kwargs is True:
-            self._kwargs_map = self.args2kwargs(self._map)
-        return self._kwargs_map if as_kwargs else self._map
 
     def args2kwargs(self, args):
         i = 0
