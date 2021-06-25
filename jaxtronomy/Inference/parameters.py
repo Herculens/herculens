@@ -127,6 +127,14 @@ class Parameters(object):
             logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._bound_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
         return logP
 
+    @partial(jit, static_argnums=(0,))
+    def log_prior_no_uniform(self, args):
+        logP = 0
+        for i in range(self.num_parameters):
+            gaussian_prior = self._prior_types[i] == 'gaussian'
+            logP += lax.cond(gaussian_prior, lambda _: - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2, lambda _: 0., operand=None)
+        return logP
+
     def log_prior_nojit(self, args):
         logP = 0
         for i in range(self.num_parameters):
@@ -185,14 +193,14 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    prior_type = kwargs_profile[name][0]
-                    if name not in kwargs_profile or prior_type not in ['uniform', 'gaussian']:
+                    if name not in kwargs_profile:
                         types.append(None)
-                        lowers.append(np.nan)
-                        uppers.append(np.nan)
+                        lowers.append(-np.inf)
+                        uppers.append(+np.inf)
                         means.append(np.nan)
                         widths.append(np.nan)
                     else:
+                        prior_type = kwargs_profile[name][0]
                         if prior_type == 'uniform':
                             if model in ['PIXELATED']:
                                 if name in ['x_coords', 'y_coords']:
@@ -211,15 +219,18 @@ class Parameters(object):
                                 uppers.append(kwargs_profile[name][2])
                                 means.append(np.nan)
                                 widths.append(np.nan)
+
                         elif prior_type == 'gaussian':
                             if model in ['PIXELATED']:
                                 raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
                             else:
                                 types.append(prior_type)
-                                lowers.append(np.nan)
-                                uppers.append(np.nan)
+                                lowers.append(-np.inf)
+                                uppers.append(+np.inf)
                                 means.append(kwargs_profile[name][1])
                                 widths.append(kwargs_profile[name][2])
+                        else:
+                            raise ValueError(f"Prior type '{prior_type}' is not supported")
         return types, lowers, uppers, means, widths
 
     @staticmethod
@@ -231,6 +242,9 @@ class Parameters(object):
             elif model == 'SERSIC':
                 from jaxtronomy.LightModel.Profiles.sersic import Sersic
                 profile_class = Sersic
+            elif model == 'SERSIC_ELLIPSE':
+                from jaxtronomy.LightModel.Profiles.sersic import SersicElliptic
+                profile_class = SersicElliptic
             elif model == 'PIXELATED':
                 from jaxtronomy.LightModel.Profiles.pixelated import PixelatedSource
                 profile_class = PixelatedSource
