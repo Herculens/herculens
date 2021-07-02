@@ -26,9 +26,6 @@ class Sampler(InferenceBase):
     - Ensemble Affine Invariant MCMC from emcee
     """
 
-    def __init__(self, loss_fn, param_class, loss_input_as_kwargs=True):
-        super().__init__(loss_fn, param_class, loss_input_as_kwargs)
-
     def hmc(self, num_warmup=100, num_samples=100, num_chains=1, restart_from_init=False,
             sampler_type='NUTS', seed=0, progress_bar=True, sampler_kwargs={}):
         rng_key = PRNGKey(seed)
