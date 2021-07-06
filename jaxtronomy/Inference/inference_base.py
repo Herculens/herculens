@@ -7,7 +7,7 @@ __all__ = ['InferenceBase']
 
 class InferenceBase(object):
 
-    def __init__(self, loss_fn, param_class, loss_input_as_kwargs):
+    def __init__(self, loss_fn, param_class, loss_input_as_kwargs=True):
         self._loss_fn = loss_fn
         self._param_class = param_class
         if loss_input_as_kwargs is True:
