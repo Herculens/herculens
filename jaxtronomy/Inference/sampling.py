@@ -48,8 +48,10 @@ class Sampler(InferenceBase):
         logL = - extra_fields['potential_energy']
         samples = np.asarray(samples)
         expected_shape = (num_samples*num_chains, num_dims)
-        if samples.shape != expected_shape:  # this happens sometimes...
-            raise RuntimeError(f"HMC samples do not have correct shape, {samples.shape} instead of {expected_shape}")
+        if samples.T.shape != expected_shape:  # this happens sometimes...
+            samples = samples.T
+            #raise RuntimeError(f"HMC samples do not have correct shape, {samples.shape} instead of {expected_shape}")
+            
         logL = np.asarray(logL)
         self._param_class.set_samples(samples)
         return samples, logL, extra_fields, runtime
