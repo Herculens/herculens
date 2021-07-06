@@ -1,5 +1,6 @@
 from scipy import fftpack #, ndimage, signal
-import jax.numpy as np
+import numpy as np
+import jax.numpy as jnp
 from jax.scipy import signal
 from jaxtronomy.Util.jax_util import GaussianFilter
 import threading
@@ -240,7 +241,8 @@ class MultiGaussianConvolution(object):
     to the simplified convolution kernel relative to a pixelized kernel.
     """
 
-    def __init__(self, sigma_list, fraction_list, pixel_scale, supersampling_factor=1, supersampling_convolution=False,
+    def __init__(self, sigma_list, fraction_list, pixel_scale,
+                 supersampling_factor=1, supersampling_convolution=False,
                  truncation=2):
         """
 
@@ -251,10 +253,10 @@ class MultiGaussianConvolution(object):
         Default is 4.0.
         """
         self._num_gaussians = len(sigma_list)
-        self._sigmas_scaled = np.array(sigma_list) / pixel_scale
+        self._sigmas_scaled = jnp.array(sigma_list) / pixel_scale
         if supersampling_convolution is True:
             self._sigmas_scaled *= supersampling_factor
-        self._fraction_list = np.array(fraction_list) / sum(fraction_list)
+        self._fraction_list = jnp.array(fraction_list) / sum(fraction_list)
         assert len(self._sigmas_scaled) == len(self._fraction_list)
         self._truncation = truncation
         self._pixel_scale = pixel_scale
@@ -271,15 +273,6 @@ class MultiGaussianConvolution(object):
         :param image: 2d numpy array, image to be convolved
         :return: convolved image, 2d numpy array
         """
-        # image_conv = None
-        # for i in range(self._num_gaussians):
-        #     if image_conv is None:
-        #         image_conv = ndimage.filters.gaussian_filter(image, self._sigmas_scaled[i], mode='nearest',
-        #                                                      truncate=self._truncation) * self._fraction_list[i]
-        #     else:
-        #         image_conv += ndimage.filters.gaussian_filter(image, self._sigmas_scaled[i], mode='nearest',
-        #                                                       truncate=self._truncation) * self._fraction_list[i]
-
         image_conv = self._gaussian_filters[0](image) * self._fraction_list[0]
         for i in range(1, self._num_gaussians):
             image_conv += self._gaussian_filters[i](image) * self._fraction_list[i]
@@ -292,7 +285,7 @@ class MultiGaussianConvolution(object):
         :param image_high_res: supersampled image/model to be convolved on a regular pixel grid
         :return: convolved and re-sized image
         """
-        if self._supersampling_convolution is True:
+        if self._supersampling_convolution:
             image_high_res_conv = self.convolution2d(image_high_res)
             image_resized_conv = image_util.re_size(image_high_res_conv, self._supersampling_factor)
         else:
@@ -306,9 +299,10 @@ class MultiGaussianConvolution(object):
         :param num_pix: int, size of kernel (odd number per axis)
         :return: pixel kernel centered
         """
+        # TODO avoid this hidden import
         from jaxtronomy.LightModel.Profiles.gaussian import MultiGaussian
         mg = MultiGaussian()
         x, y = util.make_grid(numPix=num_pix, deltapix=self._pixel_scale)
         kernel = mg.function(x, y, amp=self._fraction_list, sigma=self._sigmas_scaled)
         kernel = util.array2image(kernel)
-        return kernel / np.sum(kernel)
+        return kernel / jnp.sum(kernel)
