@@ -7,30 +7,18 @@ __all__ = ['InferenceBase']
 
 class InferenceBase(object):
 
-    def __init__(self, loss_fn, param_class, loss_input_as_kwargs=True):
-        self._loss_fn = loss_fn
-        self._param_class = param_class
-        if loss_input_as_kwargs is True:
-            self.loss = self._loss_kwargs
-        else:
-            self.loss = self._loss_args
+    def __init__(self, loss_class, param_class):
+        self._loss = loss_class
+        self._param = param_class
         self.kinetic_fn = None  # for numpyro HMC, will default to Euclidean kinetic energy
 
     @partial(jit, static_argnums=(0,))  # because first argument is 'self' and should be static
-    def _loss_kwargs(self, args):
-        """
-        loss function to be minimized (aka negative log-likelihood + negative log-prior)
-        Called if arguments of self._loss_fn should be kwargs-like.
-        """
-        return self._loss_fn(self._param_class.args2kwargs(args))
-
-    @partial(jit, static_argnums=(0,))  # because first argument is 'self' and should be static
-    def _loss_args(self, args):
+    def loss(self, args):
         """
         loss function to be minimized (aka negative log-likelihood + negative log-prior)
         Called if arguments of self._loss_fn should be args-like (i.e. as an array).
         """
-        return self._loss_fn(args)
+        return self._loss(args)
 
     @partial(jit, static_argnums=(0,))
     def jacobian(self, args):

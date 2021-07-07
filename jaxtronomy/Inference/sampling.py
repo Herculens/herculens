@@ -37,7 +37,7 @@ class Sampler(InferenceBase):
             kernel = NUTS(potential_fn=self.potential_fn, kinetic_fn=self.kinetic_fn, 
                           **sampler_kwargs)
         
-        init_params = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
+        init_params = self._param.initial_values(as_kwargs=False, original=restart_from_init)
         # alternative way to provide initial parameters through a NamedTuple:
         #init_params = ParamInfo(init_params, potential_fn(init_params), kinetic_fn(init_params))
         num_dims = len(init_params)
@@ -53,7 +53,7 @@ class Sampler(InferenceBase):
             #raise RuntimeError(f"HMC samples do not have correct shape, {samples.shape} instead of {expected_shape}")
             
         logL = np.asarray(logL)
-        self._param_class.set_samples(samples)
+        self._param.set_samples(samples)
         return samples, logL, extra_fields, runtime
 
     @staticmethod
@@ -76,7 +76,7 @@ class Sampler(InferenceBase):
         from emcee import EnsembleSampler
         from lenstronomy.Sampling.Pool.pool import choose_pool
         pool = choose_pool(mpi=False, processes=num_threads, use_dill=True)
-        init_means = self._param_class.initial_values(as_kwargs=False, original=restart_from_init)
+        init_means = self._param.initial_values(as_kwargs=False, original=restart_from_init)
         num_dims = len(init_means)
         num_walkers = int(walker_ratio * num_dims)
         init_params = self._init_ball(np.asarray(init_means), np.asarray(init_stds), 
@@ -89,7 +89,7 @@ class Sampler(InferenceBase):
         samples = sampler.get_chain(discard=num_warmup, thin=1, flat=True)
         logL = sampler.get_log_prob(flat=True, discard=num_warmup, thin=1)
         extra_fields = None
-        self._param_class.set_samples(samples)
+        self._param.set_samples(samples)
         return samples, logL, extra_fields, runtime
 
     @staticmethod

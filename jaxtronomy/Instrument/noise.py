@@ -41,8 +41,18 @@ class Noise(object):
         self._data = None
 
     def set_data(self, data):
-        assert np.shape(data) == (nx, ny)
+        assert np.shape(data) == (self._nx, self._ny)
+        self._reset_cache()
         self._data = data
+
+    def compute_noise_map_from_model(self, model):
+        if self._noise_map is not None:
+            print("Warning: previous noise map will be replaced with new estimate from a model")
+            self._noise_map = None
+            #raise ValueError("A noise map has already been set!")
+        noise_map = np.sqrt(self.C_D_model(model))
+        self._reset_cache()
+        self._noise_map = noise_map
 
     def realisation(self, model, add_gaussian=True, add_poisson=True):
         noise_real = 0.
@@ -105,6 +115,10 @@ class Noise(object):
             return self._noise_map ** 2
         else:
             return covariance_matrix(model, self._background_rms, self._exp_map)
+
+    def _reset_cache(self):
+        if hasattr(self, '_C_D'):
+            delattr(self, '_C_D')
 
 
 def covariance_matrix(data, background_rms, exposure_map):

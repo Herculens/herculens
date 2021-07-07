@@ -125,12 +125,19 @@ class LensImage(object):
             model += self.lens_surface_brightness(kwargs_lens_light, unconvolved=unconvolved)
         return model
 
-    def simulation(self, add_poisson=True, add_gaussian=True, **model_kwargs):
+    def simulation(self, add_poisson=True, add_gaussian=True, compute_true_noise_map=True, **model_kwargs):
         """
         same as model() but with noise added
+
+        :param compute_true_noise_map: if True (default), define the noise map (diagonal covariance matrix)
+        to be the 'true' one, i.e. based on the noiseless model image.
         """
         if self.Noise is None:
             raise ValueError("Impossible to generate noise realisation because no noise class has been set")
         model = self.model(**model_kwargs)
         noise = self.Noise.realisation(model, add_poisson=add_poisson, add_gaussian=add_gaussian)
-        return model + noise
+        simu = model + noise
+        self.Noise.set_data(simu)
+        if compute_true_noise_map is True:
+            self.Noise.compute_noise_map_from_model(model)
+        return simu
