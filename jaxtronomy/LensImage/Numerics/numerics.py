@@ -1,7 +1,7 @@
 import numpy as np
-from jaxtronomy.ImSim.Numerics.grid import RegularGrid, AdaptiveGrid
-from jaxtronomy.ImSim.Numerics.convolution import SubgridKernelConvolution, PixelKernelConvolution, MultiGaussianConvolution
-from jaxtronomy.ImSim.Numerics.point_source_rendering import PointSourceRendering
+from jaxtronomy.LensImage.Numerics.grid import RegularGrid, AdaptiveGrid
+from jaxtronomy.LensImage.Numerics.convolution import SubgridKernelConvolution, PixelKernelConvolution, MultiGaussianConvolution
+from jaxtronomy.LensImage.Numerics.point_source_rendering import PointSourceRendering
 from jaxtronomy.Util import util
 from jaxtronomy.Util import kernel_util
 

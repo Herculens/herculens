@@ -1,5 +1,5 @@
 import numpy as np
-from jaxtronomy.Data.coord_transforms import Coordinates
+from jaxtronomy.Coordinates.coord_transforms import Coordinates
 
 __all__ = ['PixelGrid']
 

@@ -1,7 +1,7 @@
 import numpy as np
-from jaxtronomy.ImSim.Numerics.numerics import Numerics
-from jaxtronomy.ImSim.Numerics.point_source_rendering import PointSourceRendering
-from jaxtronomy.Data.pixel_grid import PixelGrid
+from jaxtronomy.LensImage.Numerics.numerics import Numerics
+from jaxtronomy.LensImage.Numerics.point_source_rendering import PointSourceRendering
+from jaxtronomy.Coordinates.pixel_grid import PixelGrid
 
 __all__ = ['NumericsSubFrame']
 

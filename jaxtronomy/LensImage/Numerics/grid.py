@@ -2,7 +2,7 @@ import jax.numpy as np
 from jax import ops  # Try to avoid index updates eventually
 from jaxtronomy.Util import util
 from jaxtronomy.Util import image_util
-from jaxtronomy.Data.coord_transforms import Coordinates1D
+from jaxtronomy.Coordinates.coord_transforms import Coordinates1D
 
 
 class AdaptiveGrid(Coordinates1D):
