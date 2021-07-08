@@ -1,4 +1,4 @@
-import jax.numpy as np
+import jax.numpy as jnp
 from jaxtronomy.LightModel.Profiles import sersic, pixelated
 from jaxtronomy.Util.util import convert_bool_list
 
@@ -52,12 +52,11 @@ class LightModelBase(object):
             Position index of a single source model component.
 
         """
-        x = np.array(x, dtype=float)
-        y = np.array(y, dtype=float)
-        flux = np.zeros_like(x)
+        x = jnp.array(x, dtype=float)
+        y = jnp.array(y, dtype=float)
+        flux = jnp.zeros_like(x)
         bool_list = convert_bool_list(self._num_func, k=k)
         for i, func in enumerate(self.func_list):
             if bool_list[i]:
-                out = np.array(func.function(x, y, **kwargs_list[i]), dtype=float)
-                flux += out
+                flux += func.function(x, y, **kwargs_list[i])
         return flux

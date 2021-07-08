@@ -20,22 +20,22 @@ class Image2SourceMapping(object):
     the mapping between source to image plane.
     """
 
-    def __init__(self, lensModel, sourceModel):
+    def __init__(self, lens_model, source_model):
         """
 
-        :param lensModel: jaxtronomy LensModel() class instance
-        :param sourceModel: LightModel () class instance
+        :param lens_model: jaxtronomy LensModel() class instance
+        :param source_model: LightModel () class instance
         The lightModel includes:
         - source_scale_factor_list: list of floats corresponding to the rescaled deflection angles to the specific source
          components. None indicates that the list will be set to 1, meaning a single source plane model (in single lens plane mode).
         - source_redshift_list: list of redshifts of the light components (in multi lens plane mode)
         """
-        self._lightModel = sourceModel
-        self._lensModel = lensModel
-        light_model_list = sourceModel.profile_type_list
-        self._multi_lens_plane = lensModel.multi_plane  # Always False for now
-        self._source_redshift_list = sourceModel.redshift_list
-        self._deflection_scaling_list = sourceModel.deflection_scaling_list
+        self._lightModel = source_model
+        self._lensModel = lens_model
+        light_model_list = source_model.profile_type_list
+        self._multi_lens_plane = lens_model.multi_plane  # Always False for now
+        self._source_redshift_list = source_model.redshift_list
+        self._deflection_scaling_list = source_model.deflection_scaling_list
         self._multi_source_plane = True
 
         if self._deflection_scaling_list is None:
