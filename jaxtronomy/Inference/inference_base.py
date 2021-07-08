@@ -7,6 +7,11 @@ __all__ = ['InferenceBase']
 
 class InferenceBase(object):
 
+    """Class that defines wraps the loss function, and defins first and second order derivatives.
+    :param loss_class: jaxtronomy.Inference.loss.Loss instance
+    :param param_class: jaxtronomy.Parameters.parameters.Parameters instance
+    """
+
     def __init__(self, loss_class, param_class):
         self._loss = loss_class
         self._param = param_class
@@ -15,7 +20,7 @@ class InferenceBase(object):
     @partial(jit, static_argnums=(0,))  # because first argument is 'self' and should be static
     def loss(self, args):
         """
-        loss function to be minimized (aka negative log-likelihood + negative log-prior)
+        loss function to be minimized, aka -log(likelihood*prior)
         Called if arguments of self._loss_fn should be args-like (i.e. as an array).
         """
         return self._loss(args)

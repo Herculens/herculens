@@ -45,6 +45,6 @@ class Loss(object):
 
     @partial(jit, static_argnums=(0,))
     def _gaussian_log_likelihood(self, model):
-        #noise_var = self._image.C_D_model(model)
+        #noise_var = self._image.Noise.C_D_model(model)
         noise_var = self._image.Noise.C_D
         return - 0.5 * jnp.sum((self._data - model)**2 / noise_var)

@@ -38,6 +38,8 @@ class Optimizer(InferenceBase):
         best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, self._metrics,
                                                            use_exact_hessian_if_allowed)
         runtime = time.time() - start
+        if self._metrics.loss_history == []:
+            raise ValueError("The loss history does not contain any value")
         logL_best_fit = - float(self._metrics.loss_history[-1])
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
@@ -57,13 +59,13 @@ class Optimizer(InferenceBase):
                 extra_kwargs['hessp'] = self.hessian_vec_prod
             if method == 'trust-constr':
                 extra_kwargs['bounds'] = Bounds(*self._param.bounds)
-        opt = optimize.minimize(self.loss, x0, method=method, callback=callback, 
+        res = optimize.minimize(self.loss, x0, method=method, callback=callback, 
                                 **extra_kwargs)
-        extra_fields = {'jac': None, 'hess': None, 'hess_inv': None}
+        extra_fields = {'result_class': res, 'jac': None, 'hess': None, 'hess_inv': None}
         for key in extra_fields:
-            if hasattr(opt, key):
-                extra_fields[key] = getattr(opt, key)
-        return opt.x, extra_fields
+            if hasattr(res, key):
+                extra_fields[key] = getattr(res, key)
+        return res.x, extra_fields
 
     def pso(self, n_particles=100, n_iterations=100, restart_from_init=False, n_threads=1):
         """legacy optimization method from lenstronomy, mainly for comparison"""
