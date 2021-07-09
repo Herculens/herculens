@@ -207,6 +207,7 @@ class Parameters(object):
                         uppers.append(+np.inf)
                         means.append(np.nan)
                         widths.append(np.nan)
+
                     else:
                         prior_type = kwargs_profile[name][0]
                         if prior_type == 'uniform':
@@ -221,14 +222,21 @@ class Parameters(object):
                                 n_pix_y = len(kwargs_fixed['y_coords'])
                                 num_param = int(n_pix_x * n_pix_y)
                                 types  += [prior_type]*num_param
-                                lowers += kwargs_profile[pixels][1].flatten().tolist()
-                                uppers += kwargs_profile[pixels][2].flatten().tolist()
+                                lowers_tmp, uppers_tmp = kwargs_profile[pixels][1], kwargs_profile[pixels][2]
+                                # those bounds can either be whole array (values per pixel)
+                                if isinstance(lowers_tmp, (np.ndarray, jnp.ndarray)):
+                                    lowers += lowers_tmp.flatten().tolist()
+                                    uppers += uppers_tmp.flatten().tolist()
+                                # or they can be single numbers, in which case they are considered the same for pixel
+                                elif isinstance(lowers_tmp, (int, float)):
+                                    lowers += [float(lowers_tmp)]*num_param
+                                    uppers += [float(uppers_tmp)]*num_param
                                 means  += [np.nan]*num_param
                                 widths += [np.nan]*num_param
                             else:
                                 types.append(prior_type)
-                                lowers.append(kwargs_profile[name][1])
-                                uppers.append(kwargs_profile[name][2])
+                                lowers.append(float(kwargs_profile[name][1]))
+                                uppers.append(float(kwargs_profile[name][2]))
                                 means.append(np.nan)
                                 widths.append(np.nan)
 
@@ -241,6 +249,7 @@ class Parameters(object):
                                 uppers.append(+np.inf)
                                 means.append(kwargs_profile[name][1])
                                 widths.append(kwargs_profile[name][2])
+
                         else:
                             raise ValueError(f"Prior type '{prior_type}' is not supported")
         return types, lowers, uppers, means, widths
