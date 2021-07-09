@@ -158,7 +158,11 @@ class Parameters(object):
                         n_pix_x = len(kwargs_fixed['x_coords'])
                         n_pix_y = len(kwargs_fixed['y_coords'])
                         num_param = int(n_pix_x * n_pix_y)
-                        kwargs['image'] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
+                        if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+                            pixels = 'image'
+                        elif kwargs_key == 'kwargs_lens':
+                            pixels = 'psi_grid'
+                        kwargs[pixels] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
                     else:
                         num_param = 1
                         kwargs[name] = args[i]
@@ -180,7 +184,11 @@ class Parameters(object):
                         if name in ['x_coords', 'y_coords']:
                             raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
                         else:
-                            args += kwargs_profile['image'].flatten().tolist()
+                            if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+                                pixels = 'image'
+                            elif kwargs_key == 'kwargs_lens':
+                                pixels = 'psi_grid'
+                            args += kwargs_profile[pixels].flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
         return args
@@ -205,12 +213,16 @@ class Parameters(object):
                             if model in ['PIXELATED']:
                                 if name in ['x_coords', 'y_coords']:
                                     raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
+                                if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+                                    pixels = 'image'
+                                elif kwargs_key == 'kwargs_lens':
+                                    pixels = 'psi_grid'
                                 n_pix_x = len(kwargs_fixed['x_coords'])
                                 n_pix_y = len(kwargs_fixed['y_coords'])
                                 num_param = int(n_pix_x * n_pix_y)
                                 types  += [prior_type]*num_param
-                                lowers += kwargs_profile['image'][1].flatten().tolist()
-                                uppers += kwargs_profile['image'][2].flatten().tolist()
+                                lowers += kwargs_profile[pixels][1].flatten().tolist()
+                                uppers += kwargs_profile[pixels][2].flatten().tolist()
                                 means  += [np.nan]*num_param
                                 widths += [np.nan]*num_param
                             else:
@@ -258,6 +270,9 @@ class Parameters(object):
             elif model == 'SHEAR_GAMMA_PSI':
                 from jaxtronomy.LensModel.Profiles.shear import ShearGammaPsi
                 profile_class = Shear
+            elif model == 'PIXELATED':
+                from jaxtronomy.LensModel.Profiles.pixelated import PixelatedPotential
+                profile_class = PixelatedPotential
         return profile_class.param_names
 
     def _set_names(self, kwargs_model_key, kwargs_key):
@@ -271,7 +286,12 @@ class Parameters(object):
                         n_pix_x = len(kwargs_fixed['x_coords'])
                         n_pix_y = len(kwargs_fixed['y_coords'])
                         num_param = int(n_pix_x * n_pix_y)
-                        names += [f'a_{i}' for i in range(num_param)]
+                        if kwargs_key == 'kwargs_lens_light':
+                            names += [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
+                        elif kwargs_key == 'kwargs_source':
+                            names += [f"s_{i}" for i in range(num_param)]  # 's' for source
+                        elif kwargs_key == 'kwargs_lens':
+                            names += [f"dpsi_{i}" for i in range(num_param)]  # 'dpsi' for potential corrections
                     else:
                         names.append(name)
         return names
@@ -279,8 +299,14 @@ class Parameters(object):
     def _name2latex(self, names):
         latexs = []
         for name in names:
-            if name[:2] == 'a_':  # for 'PIXELATED' models
-                latex = r"$a_{}$".format(int(name[2:]))
+            # pixelated models
+            if name[:2] == 'd_':  
+                latex = r"$d_{}$".format(int(name[2:]))
+            elif name[:2] == 's_':  
+                latex = r"$s_{}$".format(int(name[2:]))
+            elif name[:2] == 'dpsi_':  
+                latex = r"$\delta\psi_{}$".format(int(name[2:]))
+            # other parametric models
             elif name == 'theta_E':
                 latex = r"$\theta_{\rm E}$"
             elif name == 'gamma':
