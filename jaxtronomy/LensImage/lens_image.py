@@ -47,7 +47,7 @@ class LensImage(object):
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class
         self._kwargs_numerics = kwargs_numerics
-        self.source_mapping = Image2SourceMapping(lensModel=lens_model_class, sourceModel=source_model_class)
+        self.source_mapping = Image2SourceMapping(lens_model_class, source_model_class)
 
     def update_psf(self, psf_class):
         """
