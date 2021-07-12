@@ -16,7 +16,7 @@ class Parameters(object):
     - nice LaTeX format for parameter names
     """
 
-    _bound_penalty = 1e10
+    _unif_prior_penalty = 1e10
 
     def __init__(self, kwargs_model, kwargs_init, kwargs_prior, kwargs_fixed):
         self._kwargs_model = kwargs_model
@@ -123,16 +123,25 @@ class Parameters(object):
             gaussian_prior = self._prior_types[i] == 'gaussian'
             uniform_prior  = self._prior_types[i] == 'uniform'
             logP += lax.cond(gaussian_prior, lambda _: - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2, lambda _: 0., operand=None)
-            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._bound_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
-            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._bound_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
         return logP
 
     @partial(jit, static_argnums=(0,))
-    def log_prior_no_uniform(self, args):
+    def log_prior_gaussian(self, args):
         logP = 0
         for i in range(self.num_parameters):
             gaussian_prior = self._prior_types[i] == 'gaussian'
             logP += lax.cond(gaussian_prior, lambda _: - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2, lambda _: 0., operand=None)
+        return logP
+
+    @partial(jit, static_argnums=(0,))
+    def log_prior_uniform(self, args):
+        logP = 0
+        for i in range(self.num_parameters):
+            uniform_prior  = self._prior_types[i] == 'uniform'
+            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
         return logP
 
     def log_prior_nojit(self, args):
@@ -141,7 +150,7 @@ class Parameters(object):
             if self._prior_types[i] == 'gaussian':
                 logP += - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2
             elif self._prior_types[i] == 'uniform' and not (self._lowers[i] <= args[i] <= self._uppers[i]):
-                logP += - self._bound_penalty
+                logP += - self._unif_prior_penalty
         return logP
 
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
@@ -310,11 +319,11 @@ class Parameters(object):
         for name in names:
             # pixelated models
             if name[:2] == 'd_':  
-                latex = r"$d_{}$".format(int(name[2:]))
+                latex = r"$d_{" + r"{}".format(int(name[2:])) + r"}$"
             elif name[:2] == 's_':  
-                latex = r"$s_{}$".format(int(name[2:]))
-            elif name[:2] == 'dpsi_':  
-                latex = r"$\delta\psi_{}$".format(int(name[2:]))
+                latex = r"$s_{" + r"{}".format(int(name[2:])) + r"}$"
+            elif name[:5] == 'dpsi_':  
+                latex = r"$\delta\psi_{" + r"{}".format(int(name[5:])) + r"}$"
             # other parametric models
             elif name == 'theta_E':
                 latex = r"$\theta_{\rm E}$"
