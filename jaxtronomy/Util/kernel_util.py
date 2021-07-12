@@ -1,6 +1,6 @@
 import numpy as np
 # import scipy.ndimage.interpolation as interp
-# import lenstronomy.Util.util as util
+import jaxtronomy.Util.util as util
 # import lenstronomy.Util.image_util as image_util
 from jaxtronomy.LightModel.Profiles.gaussian import Gaussian
 # import lenstronomy.Util.multi_gauss_expansion as mge

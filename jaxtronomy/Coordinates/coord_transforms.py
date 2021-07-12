@@ -122,7 +122,6 @@ class Coordinates(object):
             ra_shift, dec_shift = self.map_pix2coord(x_shift, y_shift)
             ra_shift -= self._ra_at_xy_0
             dec_shift -= self._dec_at_xy_0
-            print(ra_shift, dec_shift, 'test')
         else:
             ra_shift, dec_shift = x_shift, y_shift
         self._ra_at_xy_0 += ra_shift
