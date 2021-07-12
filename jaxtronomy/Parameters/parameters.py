@@ -16,7 +16,7 @@ class Parameters(object):
     - nice LaTeX format for parameter names
     """
 
-    _bound_penalty = 1e10
+    _unif_prior_penalty = 1e10
 
     def __init__(self, kwargs_model, kwargs_init, kwargs_prior, kwargs_fixed):
         self._kwargs_model = kwargs_model
@@ -123,16 +123,25 @@ class Parameters(object):
             gaussian_prior = self._prior_types[i] == 'gaussian'
             uniform_prior  = self._prior_types[i] == 'uniform'
             logP += lax.cond(gaussian_prior, lambda _: - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2, lambda _: 0., operand=None)
-            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._bound_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
-            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._bound_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
         return logP
 
     @partial(jit, static_argnums=(0,))
-    def log_prior_no_uniform(self, args):
+    def log_prior_gaussian(self, args):
         logP = 0
         for i in range(self.num_parameters):
             gaussian_prior = self._prior_types[i] == 'gaussian'
             logP += lax.cond(gaussian_prior, lambda _: - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2, lambda _: 0., operand=None)
+        return logP
+
+    @partial(jit, static_argnums=(0,))
+    def log_prior_uniform(self, args):
+        logP = 0
+        for i in range(self.num_parameters):
+            uniform_prior  = self._prior_types[i] == 'uniform'
+            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
         return logP
 
     def log_prior_nojit(self, args):
@@ -141,7 +150,7 @@ class Parameters(object):
             if self._prior_types[i] == 'gaussian':
                 logP += - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2
             elif self._prior_types[i] == 'uniform' and not (self._lowers[i] <= args[i] <= self._uppers[i]):
-                logP += - self._bound_penalty
+                logP += - self._unif_prior_penalty
         return logP
 
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
@@ -158,7 +167,11 @@ class Parameters(object):
                         n_pix_x = len(kwargs_fixed['x_coords'])
                         n_pix_y = len(kwargs_fixed['y_coords'])
                         num_param = int(n_pix_x * n_pix_y)
-                        kwargs['image'] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
+                        if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+                            pixels = 'image'
+                        elif kwargs_key == 'kwargs_lens':
+                            pixels = 'psi_grid'
+                        kwargs[pixels] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
                     else:
                         num_param = 1
                         kwargs[name] = args[i]
@@ -180,7 +193,11 @@ class Parameters(object):
                         if name in ['x_coords', 'y_coords']:
                             raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
                         else:
-                            args += kwargs_profile['image'].flatten().tolist()
+                            if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+                                pixels = 'image'
+                            elif kwargs_key == 'kwargs_lens':
+                                pixels = 'psi_grid'
+                            args += kwargs_profile[pixels].flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
         return args
@@ -199,24 +216,36 @@ class Parameters(object):
                         uppers.append(+np.inf)
                         means.append(np.nan)
                         widths.append(np.nan)
+
                     else:
                         prior_type = kwargs_profile[name][0]
                         if prior_type == 'uniform':
                             if model in ['PIXELATED']:
                                 if name in ['x_coords', 'y_coords']:
                                     raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
+                                if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+                                    pixels = 'image'
+                                elif kwargs_key == 'kwargs_lens':
+                                    pixels = 'psi_grid'
                                 n_pix_x = len(kwargs_fixed['x_coords'])
                                 n_pix_y = len(kwargs_fixed['y_coords'])
                                 num_param = int(n_pix_x * n_pix_y)
                                 types  += [prior_type]*num_param
-                                lowers += kwargs_profile['image'][1].flatten().tolist()
-                                uppers += kwargs_profile['image'][2].flatten().tolist()
+                                lowers_tmp, uppers_tmp = kwargs_profile[pixels][1], kwargs_profile[pixels][2]
+                                # those bounds can either be whole array (values per pixel)
+                                if isinstance(lowers_tmp, (np.ndarray, jnp.ndarray)):
+                                    lowers += lowers_tmp.flatten().tolist()
+                                    uppers += uppers_tmp.flatten().tolist()
+                                # or they can be single numbers, in which case they are considered the same for pixel
+                                elif isinstance(lowers_tmp, (int, float)):
+                                    lowers += [float(lowers_tmp)]*num_param
+                                    uppers += [float(uppers_tmp)]*num_param
                                 means  += [np.nan]*num_param
                                 widths += [np.nan]*num_param
                             else:
                                 types.append(prior_type)
-                                lowers.append(kwargs_profile[name][1])
-                                uppers.append(kwargs_profile[name][2])
+                                lowers.append(float(kwargs_profile[name][1]))
+                                uppers.append(float(kwargs_profile[name][2]))
                                 means.append(np.nan)
                                 widths.append(np.nan)
 
@@ -229,6 +258,7 @@ class Parameters(object):
                                 uppers.append(+np.inf)
                                 means.append(kwargs_profile[name][1])
                                 widths.append(kwargs_profile[name][2])
+
                         else:
                             raise ValueError(f"Prior type '{prior_type}' is not supported")
         return types, lowers, uppers, means, widths
@@ -258,6 +288,9 @@ class Parameters(object):
             elif model == 'SHEAR_GAMMA_PSI':
                 from jaxtronomy.LensModel.Profiles.shear import ShearGammaPsi
                 profile_class = Shear
+            elif model == 'PIXELATED':
+                from jaxtronomy.LensModel.Profiles.pixelated import PixelatedPotential
+                profile_class = PixelatedPotential
         return profile_class.param_names
 
     def _set_names(self, kwargs_model_key, kwargs_key):
@@ -271,7 +304,12 @@ class Parameters(object):
                         n_pix_x = len(kwargs_fixed['x_coords'])
                         n_pix_y = len(kwargs_fixed['y_coords'])
                         num_param = int(n_pix_x * n_pix_y)
-                        names += [f'a_{i}' for i in range(num_param)]
+                        if kwargs_key == 'kwargs_lens_light':
+                            names += [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
+                        elif kwargs_key == 'kwargs_source':
+                            names += [f"s_{i}" for i in range(num_param)]  # 's' for source
+                        elif kwargs_key == 'kwargs_lens':
+                            names += [f"dpsi_{i}" for i in range(num_param)]  # 'dpsi' for potential corrections
                     else:
                         names.append(name)
         return names
@@ -279,8 +317,14 @@ class Parameters(object):
     def _name2latex(self, names):
         latexs = []
         for name in names:
-            if name[:2] == 'a_':  # for 'PIXELATED' models
-                latex = r"$a_{}$".format(int(name[2:]))
+            # pixelated models
+            if name[:2] == 'd_':  
+                latex = r"$d_{" + r"{}".format(int(name[2:])) + r"}$"
+            elif name[:2] == 's_':  
+                latex = r"$s_{" + r"{}".format(int(name[2:])) + r"}$"
+            elif name[:5] == 'dpsi_':  
+                latex = r"$\delta\psi_{" + r"{}".format(int(name[5:])) + r"}$"
+            # other parametric models
             elif name == 'theta_E':
                 latex = r"$\theta_{\rm E}$"
             elif name == 'gamma':

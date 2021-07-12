@@ -3,6 +3,8 @@ from jaxtronomy.Util.jax_util import BicubicInterpolator
 
 
 class PixelatedPotential(LensProfileBase):
+    param_names = ['x_coords', 'y_coords', 'psi_grid']
+
     def __init__(self):
         """Lensing potential on a fixed coordinate grid."""
         # self.x_coords = x_coords
