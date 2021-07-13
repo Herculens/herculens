@@ -67,7 +67,7 @@ class LinearBasis(LightModelBase):
         """
         n_list = []
         for kwargs, model in zip(kwargs_list, self.profile_type_list):
-            if model in ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC']:
+            if model in ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM']:
                 n_list += [1]
             elif model == 'PIXELATED':
                 n_list += [kwargs['image'].size]
@@ -92,7 +92,7 @@ class LinearBasis(LightModelBase):
         pos_bool = True
         for kwargs, model in zip(kwargs_list, self.profile_type_list):
             if 'amp' in kwargs:
-                if model in ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC']:
+                if model in ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM']:
                     if kwargs['amp'] < 0:
                         pos_bool = False
                         break

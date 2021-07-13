@@ -1,11 +1,11 @@
 import jax.numpy as jnp
-from jaxtronomy.LightModel.Profiles import sersic, pixelated
+from jaxtronomy.LightModel.Profiles import sersic, pixelated, uniform
 from jaxtronomy.Util.util import convert_bool_list
 
 __all__ = ['LightModelBase']
 
 
-_SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'PIXELATED']
+_SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXELATED']
 
 
 class LightModelBase(object):
@@ -30,6 +30,8 @@ class LightModelBase(object):
                 func_list.append(sersic.SersicElliptic(smoothing))
             elif profile_type == 'CORE_SERSIC':
                 func_list.append(sersic.CoreSersic(smoothing))
+            elif profile_type == 'UNIFORM':
+                func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
                 func_list.append(pixelated.PixelatedSource())
             else:

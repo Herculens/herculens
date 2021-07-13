@@ -51,7 +51,6 @@ class Sampler(InferenceBase):
         if samples.T.shape == expected_shape:  # this happens sometimes...
             samples = samples.T
             #raise RuntimeError(f"HMC samples do not have correct shape, {samples.shape} instead of {expected_shape}")
-            
         logL = np.asarray(logL)
         self._param.set_samples(samples)
         return samples, logL, extra_fields, runtime
@@ -61,9 +60,10 @@ class Sampler(InferenceBase):
         # NOTE: disabling the progress-bar can speed up the sampling
         if num_chains > 1:
             init_params = np.repeat(np.expand_dims(init_params, axis=0), num_chains, axis=0)
-        mcmc = MCMC(kernel, num_warmup, num_samples, num_chains=num_chains, progress_bar=progress_bar)
+        mcmc = MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples, 
+                    num_chains=num_chains, progress_bar=progress_bar)
         mcmc.run(rng_key, init_params=init_params, extra_fields=('potential_energy', 'energy', 'r', 'accept_prob'))
-        mcmc.print_summary(exclude_deterministic=False)
+        #mcmc.print_summary(exclude_deterministic=False)
         samples = mcmc.get_samples()
         extra_fields = mcmc.get_extra_fields()
         return samples, extra_fields

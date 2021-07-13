@@ -30,12 +30,12 @@ class Optimizer(InferenceBase):
             raise ValueError("You must run the optimizer at least once to access the history")
         return self._metrics.param_history
 
-    def minimize(self, method='BFGS', restart_from_init=False, use_exact_hessian_if_allowed=False):
+    def minimize(self, method='BFGS', maxiter=None, restart_from_init=False, use_exact_hessian_if_allowed=False):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
         init_params = self._param.initial_values(as_kwargs=False, original=restart_from_init)
         self._metrics = MinimizeMetrics(self.loss, method)
         start = time.time()
-        best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, self._metrics,
+        best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, maxiter, self._metrics,
                                                            use_exact_hessian_if_allowed)
         runtime = time.time() - start
         if self._metrics.loss_history == []:
@@ -44,7 +44,7 @@ class Optimizer(InferenceBase):
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 
-    def _run_scipy_minimizer(self, x0, method, callback, exact_hessian):
+    def _run_scipy_minimizer(self, x0, method, maxiter, callback, exact_hessian):
         if method not in self._supported_scipy_methods:
             raise ValueError(f"Minimize method '{method}' is not supported.")
         # here we only put select the kwargs related to the chosen method 
@@ -59,6 +59,8 @@ class Optimizer(InferenceBase):
                 extra_kwargs['hessp'] = self.hessian_vec_prod
             if method == 'trust-constr':
                 extra_kwargs['bounds'] = Bounds(*self._param.bounds)
+        if maxiter is not None:
+            extra_kwargs['options'] = {'maxiter': maxiter}
         res = optimize.minimize(self.loss, x0, method=method, callback=callback, 
                                 **extra_kwargs)
         extra_fields = {'result_class': res, 'jac': None, 'hess': None, 'hess_inv': None}

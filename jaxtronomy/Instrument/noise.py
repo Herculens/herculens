@@ -56,7 +56,7 @@ class Noise(object):
 
     def realisation(self, model, add_gaussian=True, add_poisson=True):
         noise_real = 0.
-        if add_poisson:
+        if add_poisson and self._exp_map is not None:
             noise_real += image_util.add_poisson(model, self._exp_map)
         if add_gaussian:
             noise_real += image_util.add_background(model, self._background_rms)
@@ -139,6 +139,8 @@ def covariance_matrix(data, background_rms, exposure_map):
     :param exposure_map: exposure time per pixel, e.g. in units of seconds
     :return: len(d) x len(d) matrix that give the error of background and Poisson components; (photons/second)^2
     """
-    d_pos = jnp.maximum(0, data)
-    sigma = d_pos / exposure_map + background_rms ** 2
+    sigma = background_rms**2
+    if exposure_map is not None:
+        d_pos = jnp.maximum(0, data)
+        sigma += d_pos / exposure_map
     return sigma
