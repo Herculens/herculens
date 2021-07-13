@@ -26,7 +26,7 @@ The following dependencies will be installed automatically.
 - `corner` (2.2.1), for corner plots
 - `numpyro` (0.7.1), for HMC sampling
 - `emcee` (3.0.2), for MCMC
-- `jaxns` (0.0.7), for jay-enabled nested sampling
+- `jaxns` (0.0.7), for `jax`-enabled nested sampling
 - `dynesty` (1.1), for nested sampling using Hamiltonian slice sampling
 - `lenstronomy` (1.6.0), for particle swarm optimization
 
