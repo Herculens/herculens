@@ -1,6 +1,5 @@
 import numpy as np
 from functools import partial
-from jax import jit
 import jax.numpy as jnp
 from jaxtronomy.Util.jax_util import starlet2d
 
@@ -35,9 +34,9 @@ class Loss(object):
             dirac = np.diag((np.arange(npix_dirac) == int(npix_dirac / 2)).astype(float))
             wt_dirac = starlet2d(dirac, self._n_scales)
             self._wt_norm = np.sqrt(jnp.sum(wt_dirac**2, axis=(1, 2,)))[:self._n_scales]
-            self._lambda_regul = lambda_regul
         else:
             raise NotImplementedError(f"Regularisation terms {regularisation_terms} is/are not supported")
+        self._lambda_regul = float(lambda_regul)
 
         if prior_terms is None or 'none' in prior_terms:
             self._log_prior = lambda args: 0.
@@ -50,11 +49,9 @@ class Loss(object):
         else:
             raise NotImplementedError(f"Prior terms {prior_terms} is/are not supported")
 
-    @partial(jit, static_argnums=(0,))
     def __call__(self, args):
         return self.loss(args)
 
-    @partial(jit, static_argnums=(0,))
     def loss(self, args):
         kwargs = self._param.args2kwargs(args)
         log_L = self.log_likelihood(self._image.model(**kwargs))
@@ -62,36 +59,29 @@ class Loss(object):
         log_P = self.log_prior(args)
         return - log_L - log_R - log_P
 
-    @partial(jit, static_argnums=(0,))
     def log_likelihood(self, model):
         return self._log_likelihood(model)
 
-    @partial(jit, static_argnums=(0,))
     def log_regularisation(self, kwargs):
         return self._log_regul(kwargs)
 
-    @partial(jit, static_argnums=(0,))
     def log_prior(self, args):
         return self._log_prior(args)
 
-    @partial(jit, static_argnums=(0,))
     def _gaussian_log_likelihood(self, model):
         #noise_var = self._image.Noise.C_D_model(model)
         noise_var = self._image.Noise.C_D
         return - 0.5 * jnp.sum((self._data - model)**2 / noise_var)
 
-    @partial(jit, static_argnums=(0,))
     def _chi2_log_likelihood(self, model):
         #noise_var = self._image.Noise.C_D_model(model)
         noise_var = self._image.Noise.C_D
         return - jnp.mean((self._data - model)**2 / noise_var)
 
-    @partial(jit, static_argnums=(0,))
     def _mse_log_likelihood(self, model):
         model /= self._image.Data.pixel_width**2 # TEMP!
         return - jnp.mean((self._data - model)**2)
 
-    @partial(jit, static_argnums=(0,))
     def _log_regularisation_starlets_l1(self, kwargs):
         source_model = self._image.source_surface_brightness(kwargs['kwargs_source'], unconvolved=True, de_lensed=True)
         source_model /= self._image.Data.pixel_width**2 # TEMP!

@@ -1,7 +1,7 @@
 from functools import partial
 import numpy as np
 import jax.numpy as jnp
-from jax import lax, jit
+from jax import lax
 
 
 __all__ = ['Parameters']
@@ -116,7 +116,6 @@ class Parameters(object):
         widths = widths_m + widths_s + widths_l
         return types, np.array(lowers), np.array(uppers), np.array(means), np.array(widths)
 
-    @partial(jit, static_argnums=(0,))
     def log_prior(self, args):
         logP = 0
         for i in range(self.num_parameters):
@@ -127,7 +126,6 @@ class Parameters(object):
             logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
         return logP
 
-    @partial(jit, static_argnums=(0,))
     def log_prior_gaussian(self, args):
         logP = 0
         for i in range(self.num_parameters):
@@ -135,7 +133,6 @@ class Parameters(object):
             logP += lax.cond(gaussian_prior, lambda _: - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2, lambda _: 0., operand=None)
         return logP
 
-    @partial(jit, static_argnums=(0,))
     def log_prior_uniform(self, args):
         logP = 0
         for i in range(self.num_parameters):
@@ -275,6 +272,9 @@ class Parameters(object):
             elif model == 'SERSIC_ELLIPSE':
                 from jaxtronomy.LightModel.Profiles.sersic import SersicElliptic
                 profile_class = SersicElliptic
+            elif model == 'UNIFORM':
+                from jaxtronomy.LightModel.Profiles.uniform import Uniform
+                profile_class = Uniform
             elif model == 'PIXELATED':
                 from jaxtronomy.LightModel.Profiles.pixelated import PixelatedSource
                 profile_class = PixelatedSource
