@@ -1,5 +1,7 @@
 import functools
 import jax.numpy as np
+from functools import partial
+from jax import jit
 from jaxtronomy.LensImage.Numerics.numerics_subframe import NumericsSubFrame
 from jaxtronomy.LensImage.image2source_mapping import Image2SourceMapping
 from jaxtronomy.LensModel.lens_model import LensModel
@@ -99,6 +101,7 @@ class LensImage(object):
         lens_light_final = self.ImageNumerics.re_size_convolve(lens_light, unconvolved=unconvolved)
         return lens_light_final
 
+    @partial(jit, static_argnums=(0,))
     def model(self, kwargs_lens=None, kwargs_source=None,
               kwargs_lens_light=None, unconvolved=False, source_add=True,
               lens_light_add=True):
