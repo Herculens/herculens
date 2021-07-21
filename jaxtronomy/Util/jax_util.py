@@ -148,6 +148,70 @@ def starlet2d(image, nscales):
 
     return result
 
+@functools.partial(jit, static_argnums=(1,))
+def battlelemarie2d(image, nscales):
+    """JAX-based starlet transform of an image.
+
+    Parameters
+    ----------
+    image : TODO
+    nscales : TODO
+
+    Returns
+    -------
+    TODO
+
+    """
+    # Validate input
+    assert nscales >= 0, "nscales must be a non-negative integer"
+    if nscales == 0:
+        return image
+
+    # Preparations
+    shape = image.shape
+    image = np.expand_dims(image, (0, 3))
+    h = np.array([-0.000122686, -0.000224296, 0.000511636, 
+                    0.000923371, -0.002201945, -0.003883261, 0.009990599, 
+                    0.016974805, -0.051945337, -0.06910102, 0.39729643, 
+                    0.817645956, 0.39729643, -0.06910102, -0.051945337, 
+                    0.016974805, 0.009990599, -0.003883261, -0.002201945,
+                    0.000923371, 0.000511636, -0.000224296, -0.000122686])
+    h /= h.sum()
+    kernel = np.expand_dims(np.outer(h, h), (2, 3))
+    dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
+    dn = conv_dimension_numbers(image.shape, kernel.shape, dimension_numbers)
+
+    # Compute the first scale
+    c0 = image
+    padded = np.pad(c0, ((0, 0), (11, 11), (11, 11), (0, 0)), mode='edge')
+    c1 = conv_general_dilated(padded, kernel,
+                              window_strides=(1, 1),
+                              padding='VALID',
+                              rhs_dilation=(1, 1),
+                              dimension_numbers=dn)
+    w0 = (c0 - c1)[0,:,:,0]  # Wavelet coefficients
+    result = np.expand_dims(w0, 0)
+    cj = c1
+
+    # Compute the remaining scales
+    for ii in range(1, nscales):
+        b = 11**(ii + 1)  # padding pixels
+        padded = np.pad(cj, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
+        cj1 = conv_general_dilated(padded, kernel,
+                                   window_strides=(1, 1),
+                                   padding='VALID',
+                                   rhs_dilation=(11**ii, 11**ii),
+                                   dimension_numbers=dn)
+        # wavelet coefficients
+        wj = (cj - cj1)[0,:,:,0]
+        result = np.concatenate((result, np.expand_dims(wj, 0)), axis=0)
+        cj = cj1
+
+    # Append final coarse scale
+    result = np.concatenate((result, cj[:,:,:,0]), axis=0)
+
+    return result
+
 
 class BilinearInterpolator(object):
     """Bilinear interpolation of a 2D field.
