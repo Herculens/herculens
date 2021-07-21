@@ -222,3 +222,13 @@ def convert_bool_list(n, k=None):
     else:
         raise ValueError('input list k as %s not compatible' % k)
     return bool_list
+
+def get_mgrid_(sidelen,bounds,dim=2):
+
+    '''Generates a flattened grid of (x,y,...) coordinates in a range of -1 to 1.
+    sidelen: int
+    dim: int'''
+    tensors = tuple(dim * [np.linspace(-bounds, bounds, num=sidelen)])
+    mgrid = np.stack(np.meshgrid(*tensors,indexing='ij'), axis=-1)
+    mgrid = mgrid.reshape(-1, dim)
+    return mgrid

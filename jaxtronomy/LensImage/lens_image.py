@@ -1,11 +1,12 @@
 import functools
+import jax
 from jax import jit
 import jax.numpy as np
 from jaxtronomy.LensImage.Numerics.numerics_subframe import NumericsSubFrame
 from jaxtronomy.LensImage.image2source_mapping import Image2SourceMapping
 from jaxtronomy.LensModel.lens_model import LensModel
 from jaxtronomy.LightModel.light_model import LightModel
-from jaxtronomy.Util import util
+from jaxtronomy.Util import models
 
 __all__ = ['ImageModel']
 
@@ -141,3 +142,27 @@ class LensImage(object):
         if compute_true_noise_map is True:
             self.Noise.compute_noise_map_from_model(model)
         return simu
+
+
+    def fit_perturbation(self, main_mass=None, kwargs_source=None,kwargs_lens_light=None,params=None):
+        hybrid_image = self.model(kwargs_lens=[main_mass,{'state':params}],kwargs_source=kwargs_source,kwargs_lens_light=kwargs_lens_light)
+        return hybrid_image
+
+
+    @functools.partial(jit, static_argnums=(0,))
+    def train_step(self,state,label,noise_add=1.,main_mass=None, kwargs_source=None,kwargs_lens_light=None):
+        """Train for a single step."""
+        def loss_fn(params):
+            hybrid_image=self.fit_perturbation(main_mass=main_mass, kwargs_source=kwargs_source,kwargs_lens_light=kwargs_lens_light,params=params)
+            loss = models.mse_loss(logits=hybrid_image, labels=label,noise_add=noise_add)
+            return loss, hybrid_image
+        grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+        (_, logits), grads = grad_fn(state.params)
+        state = state.apply_gradients(grads=grads)
+        return state
+
+    @functools.partial(jit, static_argnums=(0,))
+    def eval_step(self, label, noise_add=1.,main_mass=None, kwargs_source=None,kwargs_lens_light=None,params=None):
+        hybrid_image=self.fit_perturbation(main_mass=main_mass, kwargs_source=kwargs_source,kwargs_lens_light=kwargs_lens_light,params=params)
+        loss = models.mse_loss(logits=hybrid_image, labels=label,noise_add=noise_add)
+        return loss

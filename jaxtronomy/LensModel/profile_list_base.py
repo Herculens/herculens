@@ -1,9 +1,9 @@
-from jaxtronomy.LensModel.Profiles import shear, sie, pixelated
+from jaxtronomy.LensModel.Profiles import shear, sie, pixelated, network
 from jaxtronomy.Util.util import convert_bool_list
 
 __all__ = ['ProfileListBase']
 
-_SUPPORTED_MODELS = ['SHEAR', 'SHEAR_GAMMA_PSI', 'SIE', 'PIXELATED']
+_SUPPORTED_MODELS = ['SHEAR', 'SHEAR_GAMMA_PSI', 'SIE', 'PIXELATED','NETWORK']
 
 
 class ProfileListBase(object):
@@ -53,6 +53,8 @@ class ProfileListBase(object):
             return sie.SIE()
         elif lens_type == 'PIXELATED':
             return pixelated.PixelatedPotential()
+        elif lens_type == 'NETWORK':
+            return network.NetworkPotential()
         else:
             err_msg = (f"{lens_type} is not a valid lens model. " +
                        f"Supported types are {_SUPPORTED_MODELS}")
