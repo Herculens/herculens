@@ -1,7 +1,7 @@
 import numpy as np
 from functools import partial
 import jax.numpy as jnp
-from jaxtronomy.Util.jax_util import starlet2d
+from jaxtronomy.Util.jax_util import WaveletTransform
 
 
 class Loss(object):
@@ -32,7 +32,8 @@ class Loss(object):
             self._n_scales = int(np.log2(min(*self._data.shape)))
             npix_dirac = 2**(self._n_scales + 2)
             dirac = np.diag((np.arange(npix_dirac) == int(npix_dirac / 2)).astype(float))
-            wt_dirac = starlet2d(dirac, self._n_scales)
+            self._starlet = WaveletTransform(self._n_scales, wavelet_type='starlet')
+            wt_dirac = self._starlet.decompose(dirac)
             self._wt_norm = np.sqrt(jnp.sum(wt_dirac**2, axis=(1, 2,)))[:self._n_scales]
         else:
             raise NotImplementedError(f"Regularisation terms {regularisation_terms} is/are not supported")
@@ -86,7 +87,7 @@ class Loss(object):
         source_model = self._image.source_surface_brightness(kwargs['kwargs_source'], unconvolved=True, de_lensed=True)
         source_model /= self._image.Data.pixel_width**2 # TEMP!
         sigma_noise = self._image.Noise.background_rms  # TODO: generalise this for Poisson noise
-        wt = starlet2d(source_model, self._n_scales)
+        wt = self._starlet.decompose(source_model)
         weights = jnp.expand_dims(sigma_noise * self._wt_norm, (1, 2))   # <<-- not full noise sigma !
         reg = jnp.sum(weights * jnp.abs(wt[:-1]))
         return - self._lambda_regul * reg
