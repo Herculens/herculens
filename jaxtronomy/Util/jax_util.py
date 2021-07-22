@@ -90,127 +90,98 @@ class GaussianFilter(object):
         return convolve2d(image_padded, self.kernel, mode='valid')
 
 
-@functools.partial(jit, static_argnums=(1,))
-def starlet2d(image, nscales):
-    """JAX-based starlet transform of an image.
+class WaveletTransform(object):
+    """
+    Class that handles wavelet transform using JAX, using the 'a trous' algorithm
 
     Parameters
     ----------
-    image : TODO
-    nscales : TODO
-
-    Returns
-    -------
-    TODO
+    nscales : number of scales in the decomposition
+    wavelet_type : supported types are 'starlet', 'battle-lemarie-1', 'battle-lemarie-3'
 
     """
-    # Validate input
-    assert nscales >= 0, "nscales must be a non-negative integer"
-    if nscales == 0:
-        return image
+    def __init__(self, nscales, wavelet_type='starlet'):
+        self._nscales = nscales
+        if wavelet_type == 'starlet':
+            self._h = np.array([1, 4, 6, 4, 1]) / 16.
+            self._fac = 2
+        elif wavelet_type == 'starlet-gen2':
+            raise NotImplementedError("Second generation starlet transorm not yet implemented")
+        elif wavelet_type == 'battle-lemarie-1':
+            self._h = np.array([-0.000122686, -0.000224296, 0.000511636, 
+                        0.000923371, -0.002201945, -0.003883261, 0.009990599, 
+                        0.016974805, -0.051945337, -0.06910102, 0.39729643, 
+                        0.817645956, 0.39729643, -0.06910102, -0.051945337, 
+                        0.016974805, 0.009990599, -0.003883261, -0.002201945,
+                        0.000923371, 0.000511636, -0.000224296, -0.000122686])
+            self._h /= self._h.sum()
+            self._fac = 11
+        elif wavelet_type == 'battle-lemarie-3':
+            self._h = np.array([0.000146098, -0.000232304, -0.000285414, 
+                          0.000462093, 0.000559952, -0.000927187, -0.001103748, 
+                          0.00188212, 0.002186714, -0.003882426, -0.00435384, 
+                          0.008201477, 0.008685294, -0.017982291, -0.017176331, 
+                          0.042068328, 0.032080869, -0.110036987, -0.050201753, 
+                          0.433923147, 0.766130398, 0.433923147, -0.050201753, 
+                          -0.110036987, 0.032080869, 0.042068328, -0.017176331, 
+                          -0.017982291, 0.008685294, 0.008201477, -0.00435384, 
+                          -0.003882426, 0.002186714, 0.00188212, -0.001103748, 
+                          -0.000927187, 0.000559952, 0.000462093, -0.000285414, 
+                          -0.000232304, 0.000146098])
+            self._h /= self._h.sum()
+            self._fac = 20
+        else:
+            raise ValueError(f"'{wavelet_type}' starlet transform is not supported")
 
-    # Preparations
-    shape = image.shape
-    image = np.expand_dims(image, (0, 3))
-    h = np.array([1, 4, 6, 4, 1]) / 16.
-    kernel = np.expand_dims(np.outer(h, h), (2, 3))
-    dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
-    dn = conv_dimension_numbers(image.shape, kernel.shape, dimension_numbers)
+    @functools.partial(jit, static_argnums=(0,))
+    def decompose(self, image):
+        """Decompose an image into the chosen wavelet basis"""
+        # Validate input
+        assert self._nscales >= 0, "nscales must be a non-negative integer"
+        if self._nscales == 0:
+            return image
 
-    # Compute the first scale
-    c0 = image
-    padded = np.pad(c0, ((0, 0), (2, 2), (2, 2), (0, 0)), mode='edge')
-    c1 = conv_general_dilated(padded, kernel,
-                              window_strides=(1, 1),
-                              padding='VALID',
-                              rhs_dilation=(1, 1),
-                              dimension_numbers=dn)
-    w0 = (c0 - c1)[0,:,:,0]  # Wavelet coefficients
-    result = np.expand_dims(w0, 0)
-    cj = c1
+        # Preparations
+        shape = image.shape
+        image = np.expand_dims(image, (0, 3))
+        kernel = np.expand_dims(np.outer(self._h, self._h), (2, 3))
+        dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
+        dn = conv_dimension_numbers(image.shape, kernel.shape, dimension_numbers)
 
-    # Compute the remaining scales
-    for ii in range(1, nscales):
-        b = 2**(ii + 1)  # padding pixels
-        padded = np.pad(cj, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
-        cj1 = conv_general_dilated(padded, kernel,
-                                   window_strides=(1, 1),
-                                   padding='VALID',
-                                   rhs_dilation=(2**ii, 2**ii),
-                                   dimension_numbers=dn)
-        # wavelet coefficients
-        wj = (cj - cj1)[0,:,:,0]
-        result = np.concatenate((result, np.expand_dims(wj, 0)), axis=0)
-        cj = cj1
+        # Compute the first scale
+        c0 = image
+        padded = np.pad(c0, ((0, 0), (self._fac, self._fac), (self._fac, self._fac), (0, 0)), mode='edge')
+        c1 = conv_general_dilated(padded, kernel,
+                                  window_strides=(1, 1),
+                                  padding='VALID',
+                                  rhs_dilation=(1, 1),
+                                  dimension_numbers=dn)
+        w0 = (c0 - c1)[0,:,:,0]  # Wavelet coefficients
+        result = np.expand_dims(w0, 0)
+        cj = c1
 
-    # Append final coarse scale
-    result = np.concatenate((result, cj[:,:,:,0]), axis=0)
+        # Compute the remaining scales
+        for ii in range(1, self._nscales):
+            b = self._fac**(ii + 1)  # padding pixels
+            padded = np.pad(cj, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
+            cj1 = conv_general_dilated(padded, kernel,
+                                       window_strides=(1, 1),
+                                       padding='VALID',
+                                       rhs_dilation=(self._fac**ii, self._fac**ii),
+                                       dimension_numbers=dn)
+            # wavelet coefficients
+            wj = (cj - cj1)[0,:,:,0]
+            result = np.concatenate((result, np.expand_dims(wj, 0)), axis=0)
+            cj = cj1
 
-    return result
+        # Append final coarse scale
+        result = np.concatenate((result, cj[:,:,:,0]), axis=0)
+        return result
 
-@functools.partial(jit, static_argnums=(1,))
-def battlelemarie2d(image, nscales):
-    """JAX-based starlet transform of an image.
-
-    Parameters
-    ----------
-    image : TODO
-    nscales : TODO
-
-    Returns
-    -------
-    TODO
-
-    """
-    # Validate input
-    assert nscales >= 0, "nscales must be a non-negative integer"
-    if nscales == 0:
-        return image
-
-    # Preparations
-    shape = image.shape
-    image = np.expand_dims(image, (0, 3))
-    h = np.array([-0.000122686, -0.000224296, 0.000511636, 
-                    0.000923371, -0.002201945, -0.003883261, 0.009990599, 
-                    0.016974805, -0.051945337, -0.06910102, 0.39729643, 
-                    0.817645956, 0.39729643, -0.06910102, -0.051945337, 
-                    0.016974805, 0.009990599, -0.003883261, -0.002201945,
-                    0.000923371, 0.000511636, -0.000224296, -0.000122686])
-    h /= h.sum()
-    kernel = np.expand_dims(np.outer(h, h), (2, 3))
-    dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
-    dn = conv_dimension_numbers(image.shape, kernel.shape, dimension_numbers)
-
-    # Compute the first scale
-    c0 = image
-    padded = np.pad(c0, ((0, 0), (11, 11), (11, 11), (0, 0)), mode='edge')
-    c1 = conv_general_dilated(padded, kernel,
-                              window_strides=(1, 1),
-                              padding='VALID',
-                              rhs_dilation=(1, 1),
-                              dimension_numbers=dn)
-    w0 = (c0 - c1)[0,:,:,0]  # Wavelet coefficients
-    result = np.expand_dims(w0, 0)
-    cj = c1
-
-    # Compute the remaining scales
-    for ii in range(1, nscales):
-        b = 11**(ii + 1)  # padding pixels
-        padded = np.pad(cj, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
-        cj1 = conv_general_dilated(padded, kernel,
-                                   window_strides=(1, 1),
-                                   padding='VALID',
-                                   rhs_dilation=(11**ii, 11**ii),
-                                   dimension_numbers=dn)
-        # wavelet coefficients
-        wj = (cj - cj1)[0,:,:,0]
-        result = np.concatenate((result, np.expand_dims(wj, 0)), axis=0)
-        cj = cj1
-
-    # Append final coarse scale
-    result = np.concatenate((result, cj[:,:,:,0]), axis=0)
-
-    return result
+    @functools.partial(jit, static_argnums=(0,))
+    def reconstruct(self, coeffs):
+        """Reconstruct an image from wavelet decomposition coefficients"""
+        return jnp.sum(coeffs, axis=0)
 
 
 class BilinearInterpolator(object):
