@@ -26,14 +26,22 @@ class Loss(object):
         
         if regul_terms is None or 'none' in regul_terms:
             self._log_regul = lambda args: 0.
-        elif regul_terms == ['starlets_source'] \
-            and self._image.SourceModel.profile_type_list == ['PIXELATED']:
+        elif regul_terms == ['starlets_source']:
+            if self._image.SourceModel.profile_type_list != ['PIXELATED']:
+                raise ValueError("Regularisation terms {regul_terms} are only compatible with a 'PIXELATED' source light profile")
             self._log_regul = self._log_regularisation_starlets_l1
-            n_scales = int(np.log2(min(*self._data.shape)))
+            n_scales = int(np.log2(min(*self._data.shape)))  # maximum allowed number of scales
             self._starlet = WaveletTransform(n_scales, wavelet_type='starlet')
             sigma_noise = self._image.Noise.background_rms  # TODO: generalise this for Poisson noise
             self._st_weights = jnp.expand_dims(sigma_noise * self._starlet.scale_norms, (1, 2))   # <<-- not full noise sigma !
-            self._st_lambda = float(regul_strengths[0])
+            strength = regul_strengths[0]
+            if isinstance(strength, (int, float)):
+                self._st_lambda = self._st_lambda_hf = float(strength)
+            elif isinstance(strength, (tuple, list)):
+                if len(strength) > 2:
+                    raise ValueError("You can only specify two starlet regularisation strength values at maximum")
+                self._st_lambda_hf = float(strength[0])
+                self._st_lambda = float(strength[1])
         else:
             raise NotImplementedError(f"Regularisation terms {regul_terms} is/are not supported")
         
@@ -82,6 +90,7 @@ class Loss(object):
         #source_model = self._image.source_surface_brightness(kwargs['kwargs_source'], unconvolved=True, de_lensed=True)
         #source_model /= self._image.Data.pixel_width**2 # TEMP!
         source_model = kwargs['kwargs_source'][0]['image']
-        st = self._starlet.decompose(source_model)
-        st_weighted_l1 = jnp.sum(self._st_weights * jnp.abs(st[:-1]))
-        return - self._st_lambda * st_weighted_l1
+        st = self._starlet.decompose(source_model)[:-1]
+        st_weighted_l1_hf = jnp.sum(self._st_weights[0] * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
+        st_weighted_l1 = jnp.sum(self._st_weights[1:] * jnp.abs(st[1:]))  # other scales
+        return - (self._st_lambda_hf * st_weighted_l1_hf + self._st_lambda * st_weighted_l1)
