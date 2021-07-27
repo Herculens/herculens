@@ -61,7 +61,7 @@ class LensImage(object):
         self.PSF = psf_class
         self.PSF.set_pixel_size(self.Data.pixel_width)
         self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Data, psf=self.PSF, **self._kwargs_numerics)
-
+    
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, de_lensed=False, k=None,
                                   update_pixelbased_mapping=True):
