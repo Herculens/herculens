@@ -1,5 +1,5 @@
 import functools
-import jax.numpy as np
+import jax.numpy as jnp
 from jax import jit, vmap
 from jax.scipy.special import gammaln
 from jax.scipy.signal import convolve2d
@@ -33,9 +33,9 @@ class special(object):
             Values of the Gamma function.
         """
         # Properly account for the sign of negative x values
-        sign_condition = (x > 0) | (np.ceil(x) % 2 != 0) | (x % 2 == 0)
-        sign = 2 * np.asarray(sign_condition, dtype=float) - 1
-        return sign * np.exp(gammaln(x))
+        sign_condition = (x > 0) | (jnp.ceil(x) % 2 != 0) | (x % 2 == 0)
+        sign = 2 * jnp.asarray(sign_condition, dtype=float) - 1
+        return sign * jnp.exp(gammaln(x))
 
 
 class GaussianFilter(object):
@@ -60,16 +60,16 @@ class GaussianFilter(object):
 
     def gaussian_kernel(self, sigma, truncate):
         # Determine the kernel pixel size (rounded up to an odd int)
-        self.radius = int(np.ceil(2 * truncate * sigma)) // 2
+        self.radius = int(jnp.ceil(2 * truncate * sigma)) // 2
         npix = self.radius * 2 + 1  # always at least 1
 
         # Return the identity if sigma is not a positive number
         if sigma <= 0:
-            return np.array([[1.]])
+            return jnp.array([[1.]])
 
         # Compute the kernel
-        x, y = np.indices((npix, npix))  # pixel coordinates
-        kernel = norm.pdf(np.hypot(x - self.radius, y - self.radius) / sigma)
+        x, y = jnp.indices((npix, npix))  # pixel coordinates
+        kernel = norm.pdf(jnp.hypot(x - self.radius, y - self.radius) / sigma)
         kernel /= kernel.sum()
 
         return kernel
@@ -85,8 +85,8 @@ class GaussianFilter(object):
         """
         # Convolve
         # pad_mode = ['constant', 'edge'][mode == 'nearest']
-        # image_padded = np.pad(image, pad_width=radius, mode=pad_mode)
-        image_padded = np.pad(image, pad_width=self.radius, mode='edge')
+        # image_padded = jnp.pad(image, pad_width=radius, mode=pad_mode)
+        image_padded = jnp.pad(image, pad_width=self.radius, mode='edge')
         return convolve2d(image_padded, self.kernel, mode='valid')
 
 
@@ -101,14 +101,14 @@ class WaveletTransform(object):
 
     """
     def __init__(self, nscales, wavelet_type='starlet'):
-        self._nscales = nscales
+        self._n_scales = nscales
         if wavelet_type == 'starlet':
-            self._h = np.array([1, 4, 6, 4, 1]) / 16.
+            self._h = jnp.array([1, 4, 6, 4, 1]) / 16.
             self._fac = 2
         elif wavelet_type == 'starlet-gen2':
             raise NotImplementedError("Second generation starlet transorm not yet implemented")
         elif wavelet_type == 'battle-lemarie-1':
-            self._h = np.array([-0.000122686, -0.000224296, 0.000511636, 
+            self._h = jnp.array([-0.000122686, -0.000224296, 0.000511636, 
                         0.000923371, -0.002201945, -0.003883261, 0.009990599, 
                         0.016974805, -0.051945337, -0.06910102, 0.39729643, 
                         0.817645956, 0.39729643, -0.06910102, -0.051945337, 
@@ -117,7 +117,7 @@ class WaveletTransform(object):
             self._h /= self._h.sum()
             self._fac = 11
         elif wavelet_type == 'battle-lemarie-3':
-            self._h = np.array([0.000146098, -0.000232304, -0.000285414, 
+            self._h = jnp.array([0.000146098, -0.000232304, -0.000285414, 
                           0.000462093, 0.000559952, -0.000927187, -0.001103748, 
                           0.00188212, 0.002186714, -0.003882426, -0.00435384, 
                           0.008201477, 0.008685294, -0.017982291, -0.017176331, 
@@ -133,37 +133,46 @@ class WaveletTransform(object):
         else:
             raise ValueError(f"'{wavelet_type}' starlet transform is not supported")
 
+    @property
+    def scale_norms(self):
+        if not hasattr(self, '_norms'):
+            npix_dirac = 2**(self._n_scales + 2)
+            dirac = jnp.diag((jnp.arange(npix_dirac) == int(npix_dirac / 2)).astype(float))
+            wt_dirac = self.decompose(dirac)
+            self._norms = jnp.sqrt(jnp.sum(wt_dirac**2, axis=(1, 2,)))[:self._n_scales]
+        return self._norms
+
     @functools.partial(jit, static_argnums=(0,))
     def decompose(self, image):
         """Decompose an image into the chosen wavelet basis"""
         # Validate input
-        assert self._nscales >= 0, "nscales must be a non-negative integer"
-        if self._nscales == 0:
+        assert self._n_scales >= 0, "nscales must be a non-negative integer"
+        if self._n_scales == 0:
             return image
 
         # Preparations
         shape = image.shape
-        image = np.expand_dims(image, (0, 3))
-        kernel = np.expand_dims(np.outer(self._h, self._h), (2, 3))
+        image = jnp.expand_dims(image, (0, 3))
+        kernel = jnp.expand_dims(jnp.outer(self._h, self._h), (2, 3))
         dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
         dn = conv_dimension_numbers(image.shape, kernel.shape, dimension_numbers)
 
         # Compute the first scale
         c0 = image
-        padded = np.pad(c0, ((0, 0), (self._fac, self._fac), (self._fac, self._fac), (0, 0)), mode='edge')
+        padded = jnp.pad(c0, ((0, 0), (self._fac, self._fac), (self._fac, self._fac), (0, 0)), mode='edge')
         c1 = conv_general_dilated(padded, kernel,
                                   window_strides=(1, 1),
                                   padding='VALID',
                                   rhs_dilation=(1, 1),
                                   dimension_numbers=dn)
         w0 = (c0 - c1)[0,:,:,0]  # Wavelet coefficients
-        result = np.expand_dims(w0, 0)
+        result = jnp.expand_dims(w0, 0)
         cj = c1
 
         # Compute the remaining scales
-        for ii in range(1, self._nscales):
+        for ii in range(1, self._n_scales):
             b = self._fac**(ii + 1)  # padding pixels
-            padded = np.pad(cj, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
+            padded = jnp.pad(cj, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
             cj1 = conv_general_dilated(padded, kernel,
                                        window_strides=(1, 1),
                                        padding='VALID',
@@ -171,11 +180,11 @@ class WaveletTransform(object):
                                        dimension_numbers=dn)
             # wavelet coefficients
             wj = (cj - cj1)[0,:,:,0]
-            result = np.concatenate((result, np.expand_dims(wj, 0)), axis=0)
+            result = jnp.concatenate((result, jnp.expand_dims(wj, 0)), axis=0)
             cj = cj1
 
         # Append final coarse scale
-        result = np.concatenate((result, cj[:,:,:,0]), axis=0)
+        result = jnp.concatenate((result, cj[:,:,:,0]), axis=0)
         return result
 
     @functools.partial(jit, static_argnums=(0,))
@@ -213,8 +222,8 @@ class BilinearInterpolator(object):
             nonzero at a time.
 
         """
-        x = np.atleast_1d(x)
-        y = np.atleast_1d(y)
+        x = jnp.atleast_1d(x)
+        y = jnp.atleast_1d(y)
 
         error_msg_type = "dx and dy must be integers"
         error_msg_value = "dx and dy must only be either 0 or 1"
@@ -227,12 +236,12 @@ class BilinearInterpolator(object):
     # @functools.partial(jit, static_argnums=(0,))
     def _compute_coeffs(self, x, y):
         # Find the pixel that the point (x, y) falls in
-        # x_ind = np.digitize(x, self.x_padded) - 1
-        # y_ind = np.digitize(y, self.y_padded) - 1
-        x_ind = np.searchsorted(self.x_coords, x, side='right') - 1
-        x_ind = np.clip(x_ind, a_min=0, a_max=(len(self.x_coords) - 2))
-        y_ind = np.searchsorted(self.y_coords, y, side='right') - 1
-        y_ind = np.clip(y_ind, a_min=0, a_max=(len(self.y_coords) - 2))
+        # x_ind = jnp.digitize(x, self.x_padded) - 1
+        # y_ind = jnp.digitize(y, self.y_padded) - 1
+        x_ind = jnp.searchsorted(self.x_coords, x, side='right') - 1
+        x_ind = jnp.clip(x_ind, a_min=0, a_max=(len(self.x_coords) - 2))
+        y_ind = jnp.searchsorted(self.y_coords, y, side='right') - 1
+        y_ind = jnp.clip(y_ind, a_min=0, a_max=(len(self.y_coords) - 2))
 
         # Determine the coordinates and dimensions of this pixel
         x1 = self.x_coords[x_ind]
@@ -278,9 +287,9 @@ class BicubicInterpolator(object):
 
     """
     def __init__(self, x, y, z, zx=None, zy=None, zxy=None):
-        self.x = np.array(x)
-        self.y = np.array(y)
-        self.z = np.array(z)
+        self.x = jnp.array(x)
+        self.y = jnp.array(y)
+        self.z = jnp.array(z)
 
         # Assume uniform coordinate spacing
         self.dx = self.x[1] - self.x[0]
@@ -288,36 +297,36 @@ class BicubicInterpolator(object):
 
         # Compute approximate partial derivatives if not provided
         if zx is None:
-            self.zx = np.gradient(z, axis=0) / self.dx
+            self.zx = jnp.gradient(z, axis=0) / self.dx
         else:
             self.zx = zy
         if zy is None:
-            self.zy = np.gradient(z, axis=1) / self.dy
+            self.zy = jnp.gradient(z, axis=1) / self.dy
         else:
             self.zy = zx
         if zxy is None:
-            self.zxy = np.gradient(self.zx, axis=1) / self.dy
+            self.zxy = jnp.gradient(self.zx, axis=1) / self.dy
         else:
             self.zxy = zxy
 
         # Prepare coefficients for function evaluations
-        self._A = np.array([[1., 0., 0., 0.],
+        self._A = jnp.array([[1., 0., 0., 0.],
                             [0., 0., 1., 0.],
                             [-3., 3., -2., -1.],
                             [2., -2., 1., 1.]])
-        self._B = np.array([[1., 0., -3., 2.],
+        self._B = jnp.array([[1., 0., -3., 2.],
                             [0., 0., 3., -2.],
                             [0., 1., -2., 1.],
                             [0., 0., -1., 1.]])
         row0 = [self.z[:-1,:-1], self.z[:-1,1:], self.dy * self.zy[:-1,:-1], self.dy * self.zy[:-1,1:]]
         row1 = [self.z[1:,:-1], self.z[1:,1:], self.dy * self.zy[1:,:-1], self.dy * self.zy[1:,1:]]
-        row2 = self.dx * np.array([self.zx[:-1,:-1], self.zx[:-1,1:],
+        row2 = self.dx * jnp.array([self.zx[:-1,:-1], self.zx[:-1,1:],
                                    self.dy * self.zxy[:-1,:-1], self.dy * self.zxy[:-1,1:]])
-        row3 = self.dx * np.array([self.zx[1:,:-1], self.zx[1:,1:],
+        row3 = self.dx * jnp.array([self.zx[1:,:-1], self.zx[1:,1:],
                                    self.dy * self.zxy[1:,:-1], self.dy * self.zxy[1:,1:]])
-        self._m = np.array([row0, row1, row2, row3])
+        self._m = jnp.array([row0, row1, row2, row3])
 
-        self._m = np.transpose(self._m, axes=(2, 3, 0, 1))
+        self._m = jnp.transpose(self._m, axes=(2, 3, 0, 1))
 
     def __call__(self, x, y, dx=0, dy=0):
         """Vectorized evaluation of the interpolation or its derivatives.
@@ -332,8 +341,8 @@ class BicubicInterpolator(object):
             should be nonzero at a time.
 
         """
-        x = np.atleast_1d(x)
-        y = np.atleast_1d(y)
+        x = jnp.atleast_1d(x)
+        y = jnp.atleast_1d(y)
         if x.ndim == 1:
             vmap_call = vmap(self._evaluate, in_axes=(0, 0, None, None))
         elif x.ndim == 2:
@@ -344,27 +353,27 @@ class BicubicInterpolator(object):
     def _evaluate(self, x, y, dx=0, dy=0):
         """Evaluate the interpolation at a single point."""
         # Determine which pixel (i, j) the point (x, y) falls in
-        i = np.maximum(0, np.searchsorted(self.x, x) - 1)
-        j = np.maximum(0, np.searchsorted(self.y, y) - 1)
+        i = jnp.maximum(0, jnp.searchsorted(self.x, x) - 1)
+        j = jnp.maximum(0, jnp.searchsorted(self.y, y) - 1)
 
         # Rescale coordinates into (0, 1)
         u = (x - self.x[i]) / self.dx
         v = (y - self.y[j]) / self.dy
 
         # Compute interpolation coefficients
-        a = np.dot(self._A, np.dot(self._m[i, j], self._B))
+        a = jnp.dot(self._A, jnp.dot(self._m[i, j], self._B))
 
         if dx == 0:
-            uu = np.asarray([1., u, u**2, u**3])
+            uu = jnp.asarray([1., u, u**2, u**3])
         if dx == 1:
-            uu = np.asarray([0., 1., 2. * u, 3. * u**2]) / self.dx
+            uu = jnp.asarray([0., 1., 2. * u, 3. * u**2]) / self.dx
         if dx == 2:
-            uu = np.asarray([0., 0., 2., 6. * u]) / self.dx**2
+            uu = jnp.asarray([0., 0., 2., 6. * u]) / self.dx**2
         if dy == 0:
-            vv = np.asarray([1., v, v**2, v**3])
+            vv = jnp.asarray([1., v, v**2, v**3])
         if dy == 1:
-            vv = np.asarray([0., 1., 2. * v, 3. * v**2]) / self.dy
+            vv = jnp.asarray([0., 1., 2. * v, 3. * v**2]) / self.dy
         if dy == 2:
-            vv = np.asarray([0., 0., 2., 6. * v]) / self.dy**2
+            vv = jnp.asarray([0., 0., 2., 6. * v]) / self.dy**2
 
-        return np.dot(uu, np.dot(a, vv))
+        return jnp.dot(uu, jnp.dot(a, vv))
