@@ -186,7 +186,7 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    if model in ['PIXELATED']:
+                    if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                         if name in ['x_coords', 'y_coords']:
                             raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
                         else:
@@ -217,7 +217,7 @@ class Parameters(object):
                     else:
                         prior_type = kwargs_profile[name][0]
                         if prior_type == 'uniform':
-                            if model in ['PIXELATED']:
+                            if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                                 if name in ['x_coords', 'y_coords']:
                                     raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
                                 if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
@@ -247,7 +247,7 @@ class Parameters(object):
                                 widths.append(np.nan)
 
                         elif prior_type == 'gaussian':
-                            if model in ['PIXELATED']:
+                            if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                                 raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
                             else:
                                 types.append(prior_type)
@@ -275,9 +275,9 @@ class Parameters(object):
             elif model == 'UNIFORM':
                 from jaxtronomy.LightModel.Profiles.uniform import Uniform
                 profile_class = Uniform
-            elif model == 'PIXELATED':
-                from jaxtronomy.LightModel.Profiles.pixelated import PixelatedSource
-                profile_class = PixelatedSource
+            elif model in ['PIXELATED', 'PIXELATED_BICUBIC']:
+                from jaxtronomy.LightModel.Profiles.pixelated import Pixelated
+                profile_class = Pixelated
         elif kwargs_key == 'kwargs_lens':
             if model == 'SIE':
                 from jaxtronomy.LensModel.Profiles.sie import SIE
@@ -300,7 +300,7 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    if model in ['PIXELATED']:
+                    if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                         n_pix_x = len(kwargs_fixed['x_coords'])
                         n_pix_y = len(kwargs_fixed['y_coords'])
                         num_param = int(n_pix_x * n_pix_y)

@@ -1,6 +1,7 @@
 import numpy as np
 from functools import partial
 import jax.numpy as jnp
+from jax import jit
 from jaxtronomy.Util.jax_util import WaveletTransform
 
 
@@ -27,9 +28,11 @@ class Loss(object):
         if regul_terms is None or 'none' in regul_terms:
             self._log_regul = lambda args: 0.
         elif regul_terms == ['starlets_source']:
-            if self._image.SourceModel.profile_type_list != ['PIXELATED']:
+            source_profile_list = self._image.SourceModel.profile_type_list
+            if source_profile_list not in (['PIXELATED'], ['PIXELATED_BICUBIC']):
                 raise ValueError("Regularisation terms {regul_terms} are only compatible with a 'PIXELATED' source light profile")
             self._log_regul = self._log_regularisation_starlets_l1
+            # TODO: here we consider the source is on the same grid as the data!
             n_scales = int(np.log2(min(*self._data.shape)))  # maximum allowed number of scales
             self._starlet = WaveletTransform(n_scales, wavelet_type='starlet')
             sigma_noise = self._image.Noise.background_rms  # TODO: generalise this for Poisson noise
@@ -56,6 +59,7 @@ class Loss(object):
         else:
             raise NotImplementedError(f"Prior terms {prior_terms} is/are not supported")
 
+    @partial(jit, static_argnums=(0,))
     def __call__(self, args):
         return self.loss(args)
 
@@ -86,8 +90,8 @@ class Loss(object):
         return - 0.5 * jnp.sum((self._data - model)**2)
 
     def _log_regularisation_starlets_l1(self, kwargs):
-        # TODO: fix issue with JAX and .source_surface_brightness() method
-        #source_model = self._image.source_surface_brightness(kwargs['kwargs_source'], unconvolved=True, de_lensed=True)
+        # TODO: this is much slower when calling the function below, that interpolates the array on the coordinate grid
+        #source_model = self._image.source_surface_brightness(kwargs['kwargs_source'])
         #source_model /= self._image.Data.pixel_width**2 # TEMP!
         source_model = kwargs['kwargs_source'][0]['image']
         st = self._starlet.decompose(source_model)[:-1]

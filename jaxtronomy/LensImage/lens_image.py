@@ -63,8 +63,7 @@ class LensImage(object):
         self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Data, psf=self.PSF, **self._kwargs_numerics)
     
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
-                                  unconvolved=False, de_lensed=False, k=None,
-                                  update_pixelbased_mapping=True):
+                                  unconvolved=False, de_lensed=False, k=None):
         """
 
         computes the source surface brightness distribution
@@ -101,7 +100,7 @@ class LensImage(object):
         lens_light_final = self.ImageNumerics.re_size_convolve(lens_light, unconvolved=unconvolved)
         return lens_light_final
 
-    @partial(jit, static_argnums=(0,))
+    @partial(jit, static_argnums=(0, 4, 5, 6))
     def model(self, kwargs_lens=None, kwargs_source=None,
               kwargs_lens_light=None, unconvolved=False, source_add=True,
               lens_light_add=True):
