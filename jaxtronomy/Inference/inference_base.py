@@ -17,10 +17,14 @@ class InferenceBase(object):
         self._param = param_class
         self.kinetic_fn = None  # for numpyro HMC, will default to Euclidean kinetic energy
 
+    @property
+    def parameters(self):
+        return self._param
+
     @partial(jit, static_argnums=(0,))
     def loss(self, args):
         """
-        loss function to be minimized, aka -log(likelihood*prior)
+        loss function to be minimized
         Called if arguments of self._loss_fn should be args-like (i.e. as an array).
         """
         return self._loss(args)

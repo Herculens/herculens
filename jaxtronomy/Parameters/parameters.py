@@ -150,6 +150,57 @@ class Parameters(object):
                 logP += - self._unif_prior_penalty
         return logP
 
+    @property
+    def pixelated_source_shape(self):
+        # TODO: should it be provided by the SourceModel class instead?
+        if not hasattr(self, '_pix_src_shape'):
+            idx = self.pixelated_source_index
+            if idx is not None:
+                kwargs_pixelated = self._kwargs_fixed['kwargs_source'][idx]
+                self._pix_src_shape = (len(kwargs_pixelated['x_coords']), len(kwargs_pixelated['y_coords']))
+            else:
+                self._pix_src_shape = None
+        return self._pix_src_shape
+
+    @property
+    def pixelated_source_index(self):
+        # TODO: should it be provided by the SourceModel class instead?
+        if not hasattr(self, '_pix_src_idx'):
+            source_model_list = self._kwargs_model['source_model_list']
+            if 'PIXELATED' in source_model_list or 'PIXELATED_BICUBIC' in source_model_list:
+                try:
+                    idx = source_model_list.index('PIXELATED')
+                except IndexError:
+                    idx = source_model_list.index('PIXELATED_BICUBIC')
+                self._pix_src_idx = idx
+            else:
+                self._pix_src_idx = None
+        return self._pix_src_idx
+
+    @property
+    def pixelated_potential_shape(self):
+        # TODO: should it be provided by the LensModel class instead?
+        if not hasattr(self, '_pix_pot_shape'):
+            idx = self.pixelated_potential_index
+            if idx is not None:
+                kwargs_pixelated = self._kwargs_fixed['kwargs_lens'][idx]
+                self._pix_pot_shape = (len(kwargs_pixelated['x_coords']), len(kwargs_pixelated['y_coords']))
+            else:
+                self._pix_pot_shape = None
+        return self._pix_pot_shape
+
+    @property
+    def pixelated_potential_index(self):
+        # TODO: should it be provided by the LensModel class instead?
+        if not hasattr(self, '_pix_pot_idx'):
+            lens_model_list = self._kwargs_model['lens_model_list']
+            if 'PIXELATED' in lens_model_list:
+                idx = lens_model_list.index('PIXELATED')
+                self._pix_pot_idx = idx
+            else:
+                self._pix_pot_idx = None
+        return self._pix_pot_idx
+
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
         kwargs_list = []
         for k, model in enumerate(self._kwargs_model[kwargs_model_key]):

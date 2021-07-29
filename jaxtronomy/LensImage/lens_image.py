@@ -31,7 +31,7 @@ class LensImage(object):
         self.num_bands = 1
         self.PSF = psf_class
         self.Noise = noise_class
-        self.Data = data_class
+        self.Data = data_class  # TODO: rename self.Data in self.Grid
         self.PSF.set_pixel_size(self.Data.pixel_width)
         if kwargs_numerics is None:
             kwargs_numerics = {}

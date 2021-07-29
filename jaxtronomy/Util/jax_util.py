@@ -114,7 +114,7 @@ class WaveletTransform(object):
                         0.817645956, 0.39729643, -0.06910102, -0.051945337, 
                         0.016974805, 0.009990599, -0.003883261, -0.002201945,
                         0.000923371, 0.000511636, -0.000224296, -0.000122686])
-            self._h /= self._h.sum()
+            self._h /= 1.4140825479999999  # sum of coefficients above
             self._fac = 11
         elif wavelet_type == 'battle-lemarie-3':
             self._h = jnp.array([0.000146098, -0.000232304, -0.000285414, 
@@ -128,7 +128,7 @@ class WaveletTransform(object):
                           -0.003882426, 0.002186714, 0.00188212, -0.001103748, 
                           -0.000927187, 0.000559952, 0.000462093, -0.000285414, 
                           -0.000232304, 0.000146098])
-            self._h /= self._h.sum()
+            self._h /= 1.4141580200000003  # sum of coefficients above
             self._fac = 20
         else:
             raise ValueError(f"'{wavelet_type}' starlet transform is not supported")
@@ -139,7 +139,7 @@ class WaveletTransform(object):
             npix_dirac = 2**(self._n_scales + 2)
             dirac = jnp.diag((jnp.arange(npix_dirac) == int(npix_dirac / 2)).astype(float))
             wt_dirac = self.decompose(dirac)
-            self._norms = jnp.sqrt(jnp.sum(wt_dirac**2, axis=(1, 2,)))[:self._n_scales]
+            self._norms = jnp.sqrt(jnp.sum(wt_dirac**2, axis=(1, 2,)))
         return self._norms
 
     @functools.partial(jit, static_argnums=(0,))
