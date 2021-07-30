@@ -2,6 +2,8 @@
 
 ## JAX-enabled autodifferentiable strong lens modelling
 
+![Building blocks](images/scheme.jpg "Building blocks")
+
 ### Recommended Usage
 First create an independent python environment.
 ```sh
