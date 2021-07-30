@@ -31,7 +31,7 @@ class PixelatedPotential(LensProfileBase):
         # Due to matching scipy's interpolation, we need to switch x and y
         # coordinates as well as transpose
         interp = BicubicInterpolator(x_coords, y_coords, psi_grid)
-        return interp(y, x).T
+        return interp(y, x)
 
     def derivatives(self, x, y, x_coords, y_coords, psi_grid):
         """Spatial first derivatives of the lensing potential.
@@ -49,7 +49,7 @@ class PixelatedPotential(LensProfileBase):
 
         """
         interp = BicubicInterpolator(x_coords, y_coords, psi_grid)
-        return interp(y, x, dy=1).T, interp(y, x, dx=1).T
+        return interp(y, x, dy=1), interp(y, x, dx=1)
 
     def hessian(self, x, y, x_coords, y_coords, psi_grid):
         """Spatial second derivatives of the lensing potential.
@@ -68,7 +68,7 @@ class PixelatedPotential(LensProfileBase):
         """
         interp = BicubicInterpolator(x_coords, y_coords, psi_grid)
         # TODO Why doesn't this follow the pattern of the first derivatives ?
-        psi_xx = interp(y, x, dx=2).T
-        psi_yy = interp(y, x, dy=2).T
-        psi_xy = interp(y, x, dx=1, dy=1).T
+        psi_xx = interp(y, x, dx=2)
+        psi_yy = interp(y, x, dy=2)
+        psi_xy = interp(y, x, dx=1, dy=1)
         return psi_xx, psi_yy, psi_xy
