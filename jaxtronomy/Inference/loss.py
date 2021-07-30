@@ -50,7 +50,7 @@ class Loss(object):
         kwargs = self._param.args2kwargs(args)
         model = self._image.model(**kwargs)
         neg_log = - self._log_likelihood(model) - self._log_regul(kwargs) - self._log_prior(args)
-        neg_log /= self._global_norm
+        neg_log /= self._global_norm  # to keep loss magnitude in acceptable range
         return neg_log
 
     def _check_choices(self, likelihood_type, prior_terms, regularization_terms, regularization_strengths):
@@ -61,6 +61,9 @@ class Loss(object):
                 if term not in self._supported_prior:
                     raise ValueError(f"Prior term '{term}' is not supported")
         if regularization_terms is not None:
+            if likelihood_type == 'chi2':
+                print(f"WARNING: likelihood type is '{likelihood_type}', which might "
+                      "cause issues with some regularization choices")
             for term in regularization_terms:
                 if term not in self._supported_regul_source + self._supported_regul_lens:
                     raise ValueError(f"Regularization term '{term}' is not supported")
@@ -131,6 +134,12 @@ class Loss(object):
                                      "strength for Battle-Lemarie regularization")
                 self._bt_src_lambda = float(strength)
 
+            elif term == 'positivity_source':
+                if isinstance(strength, (tuple, list)):
+                    raise ValueError("You can only specify one regularization "
+                                     "strength for positivity constraint")
+                self._pos_src_lambda = float(strength)
+
             elif term == 'l1_starlet_potential':
                 n_pix_pot = min(*self._param.pixelated_potential_shape)
                 n_scales = int(np.log2(n_pix_pot))  # maximum allowed number of scales
@@ -156,11 +165,11 @@ class Loss(object):
                                      "strength for Battle-Lemarie regularization")
                 self._bt_pot_lambda = float(strength)
 
-            elif term == 'positivity_source':
+            elif term == 'positivity_potential':
                 if isinstance(strength, (tuple, list)):
                     raise ValueError("You can only specify one regularization "
                                      "strength for positivity constraint")
-                self._pos_src_lambda = float(strength)
+                self._pos_pot_lambda = float(strength)
 
         # build the composite function (sum of regularization terms)
         self._log_regul = lambda kw: sum([func(kw) for func in regul_func_list])
@@ -182,7 +191,6 @@ class Loss(object):
         return - jnp.mean((self._data - model)**2 / noise_var)
 
     def _log_likelihood_l2(self, model):
-        model /= self._image.Data.pixel_width**2 # TEMP!
         return - 0.5 * jnp.sum((self._data - model)**2)
 
     def _log_regul_l1_starlet_source(self, kwargs):
@@ -214,3 +222,7 @@ class Loss(object):
     def _log_regul_positivity_source(self, kwargs):
         source_model = kwargs['kwargs_source'][self._idx_pix_src]['image']
         return - self._pos_src_lambda * jnp.abs(jnp.sum(jnp.minimum(0., source_model)))
+
+    def _log_regul_positivity_potential(self, kwargs):
+        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['psi_grid']
+        return - self._pos_pot_lambda * jnp.abs(jnp.sum(jnp.minimum(0., psi_model)))
