@@ -25,11 +25,12 @@ The following dependencies will be installed automatically.
 - `jaxlib` (0.1.67)
 
 ##### Optional
-- `corner` (2.2.1), for corner plots
+- `optax` (0.7.1), for advanced gradient descent algorithms 
 - `numpyro` (0.7.1), for HMC sampling
 - `emcee` (3.0.2), for MCMC
 - `jaxns` (0.0.7), for `jax`-enabled nested sampling
 - `dynesty` (1.1), for nested sampling using Hamiltonian slice sampling
+- `corner` (2.2.1), for corner plots
 - `lenstronomy` (1.6.0), for particle swarm optimization (this might be removed in the future)
 
 To run the notebooks, `jupyter` is (of course) also necessary, along with `matplotlib` for plotting.
