@@ -19,6 +19,7 @@ class Noise(object):
         :param noise_map: int or array of size the data; joint noise sqrt(variance) of each individual pixel.
         Overwrites meaning of background_rms and exposure_time.
         """
+        self._background_rms = float(background_rms)
         if exposure_time is not None:
             # make sure no negative exposure values are present no dividing by zero
             if isinstance(exposure_time, int) or isinstance(exposure_time, float):
@@ -26,8 +27,9 @@ class Noise(object):
                     exposure_time = 10 ** (-10)
             else:
                 exposure_time[exposure_time <= 10 ** (-10)] = 10 ** (-10)
+        else:
+            noise_map = self._background_rms * np.ones((nx, ny))
         self._exp_map = exposure_time
-        self._background_rms = background_rms
         self._noise_map = noise_map
         if noise_map is not None:
             assert np.shape(noise_map) == (nx, ny)

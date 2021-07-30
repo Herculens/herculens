@@ -1,7 +1,7 @@
 from functools import partial
 import numpy as np
 import jax.numpy as jnp
-from jax import lax, jit
+from jax import lax
 
 
 __all__ = ['Parameters']
@@ -116,7 +116,6 @@ class Parameters(object):
         widths = widths_m + widths_s + widths_l
         return types, np.array(lowers), np.array(uppers), np.array(means), np.array(widths)
 
-    @partial(jit, static_argnums=(0,))
     def log_prior(self, args):
         logP = 0
         for i in range(self.num_parameters):
@@ -127,7 +126,6 @@ class Parameters(object):
             logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
         return logP
 
-    @partial(jit, static_argnums=(0,))
     def log_prior_gaussian(self, args):
         logP = 0
         for i in range(self.num_parameters):
@@ -135,7 +133,6 @@ class Parameters(object):
             logP += lax.cond(gaussian_prior, lambda _: - 0.5 * ((args[i] - self._means[i]) / self._widths[i]) ** 2, lambda _: 0., operand=None)
         return logP
 
-    @partial(jit, static_argnums=(0,))
     def log_prior_uniform(self, args):
         logP = 0
         for i in range(self.num_parameters):
@@ -152,6 +149,57 @@ class Parameters(object):
             elif self._prior_types[i] == 'uniform' and not (self._lowers[i] <= args[i] <= self._uppers[i]):
                 logP += - self._unif_prior_penalty
         return logP
+
+    @property
+    def pixelated_source_shape(self):
+        # TODO: should it be provided by the SourceModel class instead?
+        if not hasattr(self, '_pix_src_shape'):
+            idx = self.pixelated_source_index
+            if idx is not None:
+                kwargs_pixelated = self._kwargs_fixed['kwargs_source'][idx]
+                self._pix_src_shape = (len(kwargs_pixelated['x_coords']), len(kwargs_pixelated['y_coords']))
+            else:
+                self._pix_src_shape = None
+        return self._pix_src_shape
+
+    @property
+    def pixelated_source_index(self):
+        # TODO: should it be provided by the SourceModel class instead?
+        if not hasattr(self, '_pix_src_idx'):
+            source_model_list = self._kwargs_model['source_model_list']
+            if 'PIXELATED' in source_model_list or 'PIXELATED_BICUBIC' in source_model_list:
+                try:
+                    idx = source_model_list.index('PIXELATED')
+                except IndexError:
+                    idx = source_model_list.index('PIXELATED_BICUBIC')
+                self._pix_src_idx = idx
+            else:
+                self._pix_src_idx = None
+        return self._pix_src_idx
+
+    @property
+    def pixelated_potential_shape(self):
+        # TODO: should it be provided by the LensModel class instead?
+        if not hasattr(self, '_pix_pot_shape'):
+            idx = self.pixelated_potential_index
+            if idx is not None:
+                kwargs_pixelated = self._kwargs_fixed['kwargs_lens'][idx]
+                self._pix_pot_shape = (len(kwargs_pixelated['x_coords']), len(kwargs_pixelated['y_coords']))
+            else:
+                self._pix_pot_shape = None
+        return self._pix_pot_shape
+
+    @property
+    def pixelated_potential_index(self):
+        # TODO: should it be provided by the LensModel class instead?
+        if not hasattr(self, '_pix_pot_idx'):
+            lens_model_list = self._kwargs_model['lens_model_list']
+            if 'PIXELATED' in lens_model_list:
+                idx = lens_model_list.index('PIXELATED')
+                self._pix_pot_idx = idx
+            else:
+                self._pix_pot_idx = None
+        return self._pix_pot_idx
 
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
         kwargs_list = []
@@ -189,7 +237,7 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    if model in ['PIXELATED']:
+                    if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                         if name in ['x_coords', 'y_coords']:
                             raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
                         else:
@@ -220,7 +268,7 @@ class Parameters(object):
                     else:
                         prior_type = kwargs_profile[name][0]
                         if prior_type == 'uniform':
-                            if model in ['PIXELATED']:
+                            if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                                 if name in ['x_coords', 'y_coords']:
                                     raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
                                 if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
@@ -250,7 +298,7 @@ class Parameters(object):
                                 widths.append(np.nan)
 
                         elif prior_type == 'gaussian':
-                            if model in ['PIXELATED']:
+                            if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                                 raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
                             else:
                                 types.append(prior_type)
@@ -275,9 +323,12 @@ class Parameters(object):
             elif model == 'SERSIC_ELLIPSE':
                 from jaxtronomy.LightModel.Profiles.sersic import SersicElliptic
                 profile_class = SersicElliptic
-            elif model == 'PIXELATED':
-                from jaxtronomy.LightModel.Profiles.pixelated import PixelatedSource
-                profile_class = PixelatedSource
+            elif model == 'UNIFORM':
+                from jaxtronomy.LightModel.Profiles.uniform import Uniform
+                profile_class = Uniform
+            elif model in ['PIXELATED', 'PIXELATED_BICUBIC']:
+                from jaxtronomy.LightModel.Profiles.pixelated import Pixelated
+                profile_class = Pixelated
         elif kwargs_key == 'kwargs_lens':
             if model == 'SIE':
                 from jaxtronomy.LensModel.Profiles.sie import SIE
@@ -300,7 +351,7 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed:
-                    if model in ['PIXELATED']:
+                    if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                         n_pix_x = len(kwargs_fixed['x_coords'])
                         n_pix_y = len(kwargs_fixed['y_coords'])
                         num_param = int(n_pix_x * n_pix_y)

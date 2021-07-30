@@ -30,7 +30,7 @@ The following dependencies will be installed automatically.
 - `emcee` (3.0.2), for MCMC
 - `jaxns` (0.0.7), for `jax`-enabled nested sampling
 - `dynesty` (1.1), for nested sampling using Hamiltonian slice sampling
-- `lenstronomy` (1.6.0), for particle swarm optimization
+- `lenstronomy` (1.6.0), for particle swarm optimization (this might be removed in the future)
 
 To run the notebooks, `jupyter` is (of course) also necessary, along with `matplotlib` for plotting.
 

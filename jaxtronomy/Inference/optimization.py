@@ -1,6 +1,5 @@
 import time
 from scipy import optimize
-from jax import jit
 import numpy as np
 from scipy.optimize import Bounds
 

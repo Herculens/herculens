@@ -1,6 +1,7 @@
 import functools
-from jax import jit
 import jax.numpy as np
+from functools import partial
+from jax import jit
 from jaxtronomy.LensImage.Numerics.numerics_subframe import NumericsSubFrame
 from jaxtronomy.LensImage.image2source_mapping import Image2SourceMapping
 from jaxtronomy.LensModel.lens_model import LensModel
@@ -12,12 +13,12 @@ __all__ = ['ImageModel']
 
 class LensImage(object):
     """Generate lensed images from source light and lens mass/light models."""
-    def __init__(self, data_class, psf_class, 
+    def __init__(self, grid_class, psf_class, 
                  noise_class=None, lens_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
                  kwargs_numerics=None):
         """
-        :param data_class: instance of ImageData() or PixelGrid() class
+        :param grid_class: instance of PixelGrid() class
         :param psf_class: instance of PSF() class
         :param lens_model_class: instance of LensModel() class
         :param source_model_class: instance of LightModel() class describing the source parameters
@@ -30,11 +31,11 @@ class LensImage(object):
         self.num_bands = 1
         self.PSF = psf_class
         self.Noise = noise_class
-        self.Data = data_class
-        self.PSF.set_pixel_size(self.Data.pixel_width)
+        self.Grid = grid_class
+        self.PSF.set_pixel_size(self.Grid.pixel_width)
         if kwargs_numerics is None:
             kwargs_numerics = {}
-        self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Data, psf=self.PSF, **kwargs_numerics)
+        self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
         if lens_model_class is None:
             lens_model_class = LensModel(lens_model_list=[])
         self.LensModel = lens_model_class
@@ -58,12 +59,11 @@ class LensImage(object):
         :return: no return. Class is updated.
         """
         self.PSF = psf_class
-        self.PSF.set_pixel_size(self.Data.pixel_width)
-        self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Data, psf=self.PSF, **self._kwargs_numerics)
-
+        self.PSF.set_pixel_size(self.Grid.pixel_width)
+        self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Grid, psf=self.PSF, **self._kwargs_numerics)
+    
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
-                                  unconvolved=False, de_lensed=False, k=None,
-                                  update_pixelbased_mapping=True):
+                                  unconvolved=False, de_lensed=False, k=None):
         """
 
         computes the source surface brightness distribution
@@ -77,7 +77,7 @@ class LensImage(object):
         :return: 2d array of surface brightness pixels
         """
         if len(self.SourceModel.profile_type_list) == 0:
-            return np.zeros((self.Data.num_pixel_axes))
+            return np.zeros((self.Grid.num_pixel_axes))
         ra_grid, dec_grid = self.ImageNumerics.coordinates_evaluate
         if de_lensed is True:
             source_light = self.SourceModel.surface_brightness(ra_grid, dec_grid, kwargs_source, k=k)
@@ -100,7 +100,7 @@ class LensImage(object):
         lens_light_final = self.ImageNumerics.re_size_convolve(lens_light, unconvolved=unconvolved)
         return lens_light_final
 
-    @functools.partial(jit, static_argnums=(0,))
+    @partial(jit, static_argnums=(0))
     def model(self, kwargs_lens=None, kwargs_source=None,
               kwargs_lens_light=None, unconvolved=False, source_add=True,
               lens_light_add=True):
@@ -118,7 +118,7 @@ class LensImage(object):
         :param point_source_add: if True, add point sources, otherwise without
         :return: 2d array of surface brightness pixels of the simulation
         """
-        model = np.zeros((self.Data.num_pixel_axes))
+        model = np.zeros((self.Grid.num_pixel_axes))
         if source_add is True:
             model += self.source_surface_brightness(kwargs_source, kwargs_lens, unconvolved=unconvolved)
         if lens_light_add is True:
