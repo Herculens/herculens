@@ -1,3 +1,4 @@
+import jax.numpy as jnp
 from jaxtronomy.Util.jax_util import BilinearInterpolator, BicubicInterpolator
 
 
@@ -28,8 +29,11 @@ class Pixelated(object):
             Interpolation method, either 'bilinear' or 'bicubic'.
 
         """
+        # Warning: assuming same pixel size across all the image! 
+        pixel_area = (x_coords[0]-x_coords[1]) * (y_coords[0]-y_coords[1])
         if self._method == 'bilinear':
             interp = BilinearInterpolator(x_coords, y_coords, image)
         else:
             interp = BicubicInterpolator(x_coords, y_coords, image)
-        return interp(x, y).T
+        # we normalize the interpolated array for correct units when evaluated by LensImage methods
+        return interp(y, x).T / pixel_area
