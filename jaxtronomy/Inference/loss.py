@@ -16,13 +16,14 @@ class Loss(object):
     - likelihood_type [default: 'chi2']: single choice among
         'chi2', 'l2_norm'
     - regularization_terms [default: None]: a list containing choices among
-        'l1_starlet_source', 'l1_battle_source', 'l1_starlet_potential', 'l1_battle_potential'
+        - for a 'PIXELATED' source: 'l1_starlet_source', 'l1_battle_source'
+        - for a 'PIXELATED' lens potential: 'l1_starlet_potential', 'l1_battle_potential'
     - prior_terms [default: None]: a list containing choices among
         'uniform', 'gaussian'
     """
 
     _supported_ll = ('chi2', 'l2_norm')
-    _supported_regul_source = ('l1_starlet_source', 'l1_battle_source')
+    _supported_regul_source = ('l1_starlet_source', 'l1_battle_source', 'positivity_source')
     _supported_regul_lens = ('l1_starlet_potential', 'l1_battle_potential')
     _supported_prior = ('uniform', 'gaussian')
 
@@ -97,7 +98,8 @@ class Loss(object):
         # TODO: generalise this for Poisson noise!
         data_noise_map = self._image.Noise.background_rms
 
-        self._idx_pix_pot = self._param
+        self._idx_pix_src = self._param.pixelated_source_index
+        self._idx_pix_pot = self._param.pixelated_potential_index
 
         regul_func_list = []
         for term, strength in zip(regularization_terms, regularization_strengths):
@@ -118,7 +120,6 @@ class Loss(object):
                                          "strength values at maximum")
                     self._st_src_lambda_hf = float(strength[0])
                     self._st_src_lambda = float(strength[1])
-                self._idx_pix_src = self._param.pixelated_source_index
 
             elif term == 'l1_battle_source':
                 n_scales = 1  # maximum allowed number of scales
@@ -126,10 +127,9 @@ class Loss(object):
                 wavelet_norm = self._battle_src.scale_norms[0]  # consider only first scale
                 self._bt_src_weights = data_noise_map * wavelet_norm   # <<-- not full noise sigma !
                 if isinstance(strength, (tuple, list)):
-                    raise ValueError("You can only specify one starlet regularization "
-                                     "strength for Battle-Lemarie wavelet")
+                    raise ValueError("You can only specify one regularization "
+                                     "strength for Battle-Lemarie regularization")
                 self._bt_src_lambda = float(strength)
-                self._idx_pix_src = self._param.pixelated_source_index
 
             elif term == 'l1_starlet_potential':
                 n_pix_pot = min(*self._param.pixelated_potential_shape)
@@ -145,7 +145,6 @@ class Loss(object):
                                          "strength values at maximum")
                     self._st_pot_lambda_hf = float(strength[0])
                     self._st_pot_lambda = float(strength[1])
-                self._idx_pix_pot = self._param.pixelated_potential_index
 
             elif term == 'l1_battle_potential':
                 n_scales = 1  # maximum allowed number of scales
@@ -153,10 +152,15 @@ class Loss(object):
                 wavelet_norm = self._battle_pot.scale_norms[0]  # consider only first scale
                 self._bt_pot_weights = potential_noise_map * wavelet_norm   # <<-- not full noise sigma !
                 if isinstance(strength, (tuple, list)):
-                    raise ValueError("You can only specify one starlet regularization "
-                                     "strength for Battle-Lemarie wavelet")
+                    raise ValueError("You can only specify one regularization "
+                                     "strength for Battle-Lemarie regularization")
                 self._bt_pot_lambda = float(strength)
-                self._idx_pix_pot = self._param.pixelated_potential_index
+
+            elif term == 'positivity_source':
+                if isinstance(strength, (tuple, list)):
+                    raise ValueError("You can only specify one regularization "
+                                     "strength for positivity constraint")
+                self._pos_src_lambda = float(strength)
 
         # build the composite function (sum of regularization terms)
         self._log_regul = lambda kw: sum([func(kw) for func in regul_func_list])
@@ -188,12 +192,6 @@ class Loss(object):
         st_weighted_l1 = jnp.sum(self._st_src_weights[1:] * jnp.abs(st[1:]))  # other scales
         return - (self._st_src_lambda_hf * st_weighted_l1_hf + self._st_src_lambda * st_weighted_l1)
 
-    def _log_regul_l1_battle_source(self, kwargs):
-        source_model = kwargs['kwargs_source'][self._idx_pix_src]['image']
-        bt = self._battle_src.decompose(source_model)[0]  # consider only first scale
-        bt_weighted_l1 = jnp.sum(self._bt_src_weights * jnp.abs(bt))
-        return - self._bt_src_lambda * bt_weighted_l1
-
     def _log_regul_l1_starlet_potential(self, kwargs):
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['psi_grid']
         st = self._starlet_pot.decompose(psi_model)[:-1]  # ignore coarsest scale
@@ -201,8 +199,18 @@ class Loss(object):
         st_weighted_l1 = jnp.sum(self._st_pot_weights[1:] * jnp.abs(st[1:]))  # other scales
         return - (self._st_pot_lambda_hf * st_weighted_l1_hf + self._st_pot_lambda * st_weighted_l1)
 
+    def _log_regul_l1_battle_source(self, kwargs):
+        source_model = kwargs['kwargs_source'][self._idx_pix_src]['image']
+        bt = self._battle_src.decompose(source_model)[0]  # consider only first scale
+        bt_weighted_l1 = jnp.sum(self._bt_src_weights * jnp.abs(bt))
+        return - self._bt_src_lambda * bt_weighted_l1
+
     def _log_regul_l1_battle_potential(self, kwargs):
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['psi_grid']
         bt = self._battle_pot.decompose(psi_model)[0]  # consider only first scale
         bt_weighted_l1 = jnp.sum(self._bt_pot_weights * jnp.abs(bt))
         return - self._bt_pot_lambda * bt_weighted_l1
+
+    def _log_regul_positivity_source(self, kwargs):
+        source_model = kwargs['kwargs_source'][self._idx_pix_src]['image']
+        return - self._pos_src_lambda * jnp.abs(jnp.sum(jnp.minimum(0., source_model)))
