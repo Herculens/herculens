@@ -2,7 +2,6 @@ import time
 import numpy as np
 from functools import partial
 from jax.random import PRNGKey
-from jax import jit
 from numpyro.infer import MCMC, HMC, NUTS
 #from numpyro.infer.util import ParamInfo
 

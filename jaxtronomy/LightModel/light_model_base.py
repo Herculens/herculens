@@ -33,7 +33,9 @@ class LightModelBase(object):
             elif profile_type == 'UNIFORM':
                 func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
-                func_list.append(pixelated.PixelatedSource())
+                func_list.append(pixelated.Pixelated(method='bilinear'))
+            elif profile_type == 'PIXELATED_BICUBIC':
+                func_list.append(pixelated.Pixelated(method='bicubic'))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
                            f"Supported types are: {_SUPPORTED_MODELS}")
