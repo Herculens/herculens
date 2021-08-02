@@ -25,7 +25,7 @@ The following dependencies will be installed automatically.
 - `jaxlib` (0.1.67)
 
 ##### Optional
-- `optax` (0.7.1), for advanced gradient descent algorithms 
+- `optax` (0.0.9), for advanced gradient descent algorithms 
 - `numpyro` (0.7.1), for HMC sampling
 - `emcee` (3.0.2), for MCMC
 - `jaxns` (0.0.7), for `jax`-enabled nested sampling
