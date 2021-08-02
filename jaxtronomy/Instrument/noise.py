@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import jax.numpy as jnp
 from jaxtronomy.Util import image_util
@@ -36,8 +37,8 @@ class Noise(object):
         else:
             if background_rms is not None and exposure_time is not None:
                 if background_rms * np.max(exposure_time) < 1 and verbose is True:
-                    print("WARNING! sigma_b*f %s < 1 count may introduce unstable error estimates with a Gaussian"
-                          " error function for a Poisson distribution with mean < 1." % (
+                    warnings.warn("sigma_b*f %s < 1 count may introduce unstable error estimates with a Gaussian "
+                                  "error function for a Poisson distribution with mean < 1." % (
                         background_rms * np.max(exposure_time)))
         self._nx, self._ny = nx, ny
         self._data = None
@@ -49,7 +50,7 @@ class Noise(object):
 
     def compute_noise_map_from_model(self, model):
         if self._noise_map is not None:
-            print("Warning: previous noise map will be replaced with new estimate from a model")
+            warnings.warn("Previous noise map will be replaced with new estimate from a model")
             self._noise_map = None
             #raise ValueError("A noise map has already been set!")
         noise_map = np.sqrt(self.C_D_model(model))

@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 from functools import partial
 import jax.numpy as jnp
@@ -62,8 +63,8 @@ class Loss(object):
                     raise ValueError(f"Prior term '{term}' is not supported")
         if regularization_terms is not None:
             if likelihood_type == 'chi2':
-                print(f"WARNING: likelihood type is '{likelihood_type}', which might "
-                      "cause issues with some regularization choices")
+                warnings.warn(f"WARNING: likelihood type is '{likelihood_type}', which might "
+                              "cause issues with some regularization choices")
             for term in regularization_terms:
                 if term not in self._supported_regul_source + self._supported_regul_lens:
                     raise ValueError(f"Regularization term '{term}' is not supported")
