@@ -27,7 +27,7 @@ class Noise(object):
                     exposure_time = 10 ** (-10)
             else:
                 exposure_time[exposure_time <= 10 ** (-10)] = 10 ** (-10)
-        else:
+        elif noise_map is None:
             noise_map = self._background_rms * np.ones((nx, ny))
         self._exp_map = exposure_time
         self._noise_map = noise_map
