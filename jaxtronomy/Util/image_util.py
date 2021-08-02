@@ -1,9 +1,10 @@
 import numpy as np
 # import jax.numpy as np
 # from jax import random
-# from scipy import ndimage, interpolate
+from scipy import interpolate #, ndimage
 from scipy.ndimage import interpolation as interp
 # import jaxtronomy.Util.util as util
+# from jaxtronomy.Util.jax_util import BilinearInterpolator
 
 
 def add_layer2image(grid2d, x_pos, y_pos, kernel, order=1):
@@ -163,3 +164,19 @@ def re_size(image, factor=1):
         return small
     else:
         raise ValueError("scaling with factor %s is not possible with grid size %s, %s" %(f, nx, ny))
+
+def re_size_array(x_in, y_in, input_values, x_out, y_out):
+    """
+    resizes 2d array (i.e. image) to new coordinates. So far only works with square output aligned with coordinate axis.
+    :param x_in:
+    :param y_in:
+    :param input_values:
+    :param x_out:
+    :param y_out:
+    :return:
+    """
+    interp_2d = interpolate.interp2d(x_in, y_in, input_values, kind='linear')
+    out_values = interp_2d.__call__(x_out, y_out)
+    # interp_2d = BilinearInterpolator(x_in, y_in, input_values)
+    # out_values = interp_2d(x_out, y_out)
+    return out_values
