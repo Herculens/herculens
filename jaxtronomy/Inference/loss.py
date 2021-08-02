@@ -34,7 +34,7 @@ class Loss(object):
         self._data  = data
         self._image = image_class
         self._param = param_class
-            
+        
         self._check_choices(likelihood_type, prior_terms, regularization_terms, regularization_strengths)
         self._initialize_likelihood(likelihood_type)
         self._initialize_regularizations(regularization_terms, regularization_strengths,
@@ -89,7 +89,7 @@ class Loss(object):
             self._global_norm = 1.
         elif likelihood_type == 'l2_norm':
             self._log_likelihood = self._log_likelihood_l2
-            self._global_norm = 0.5 * self._image.Data.num_pixel * np.mean(self._image.Noise.C_D)
+            self._global_norm = 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
 
     def _initialize_regularizations(self, regularization_terms, regularization_strengths, 
                                     potential_noise_map):
