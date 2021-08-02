@@ -30,8 +30,8 @@ class InferenceBase(object):
         return self._loss(args)
 
     @partial(jit, static_argnums=(0,))
-    def jacobian(self, args):
-        """jacobian (first derivative) of the loss function"""
+    def gradient(self, args):
+        """gradient (first derivative) of the loss function"""
         return grad(self.loss)(args)
 
     @partial(jit, static_argnums=(0,))
