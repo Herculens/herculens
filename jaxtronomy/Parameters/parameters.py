@@ -338,7 +338,7 @@ class Parameters(object):
                 profile_class = Shear
             elif model == 'SHEAR_GAMMA_PSI':
                 from jaxtronomy.LensModel.Profiles.shear import ShearGammaPsi
-                profile_class = Shear
+                profile_class = ShearGammaPsi
             elif model == 'PIXELATED':
                 from jaxtronomy.LensModel.Profiles.pixelated import PixelatedPotential
                 profile_class = PixelatedPotential
