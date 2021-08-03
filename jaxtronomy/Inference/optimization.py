@@ -32,7 +32,7 @@ class Optimizer(InferenceBase):
 
     def minimize(self, method='BFGS', maxiter=None, restart_from_init=False, use_exact_hessian_if_allowed=False):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
-        init_params = self._param.initial_values(as_kwargs=False, original=restart_from_init)
+        init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
         self._metrics = MinimizeMetrics(self.loss, method)
         start = time.time()
         best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, maxiter, self._metrics,
@@ -85,7 +85,7 @@ class Optimizer(InferenceBase):
         )
 
         # Initialise optimizer state
-        params = self._param.initial_values(as_kwargs=False, original=restart_from_init)
+        params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
         opt_state = optim.init(params)
 
         # Gradient descent loop
@@ -110,7 +110,7 @@ class Optimizer(InferenceBase):
             raise ValueError("PSO needs lower and upper bounds, i.e. prior distributions with a finite support")
         optimizer = ParticleSwarmOptimizer(self.log_likelihood, 
                                            lowers, uppers, n_particles, pool=pool)
-        init_params = self._param.initial_values(as_kwargs=False, original=restart_from_init)
+        init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
         optimizer.set_global_best(init_params, [0]*len(init_params), - self.loss(init_params))
         start = time.time()
         best_fit, [chi2_list, pos_list, vel_list] = optimizer.optimize(n_iterations)

@@ -1,7 +1,6 @@
 import numpy as np
 import jaxtronomy.Util.kernel_util as kernel_util
 import jaxtronomy.Util.util as util
-# import warnings
 
 __all__ = ['PSF']
 
@@ -128,8 +127,8 @@ class PSF(object):
                 if n_new % 2 == 0:
                     n_new -= 1
                 if hasattr(self, '_kernel_point_source_supersampled'):
-                    warnings.warn("Super-sampled point source kernel over-written due to different subsampling"
-                                  " size requested.", Warning)
+                    UserWarning("Super-sampled point source kernel over-written due to different subsampling "
+                                "size requested.", Warning)
                 kernel_point_source_supersampled = kernel_util.cut_psf(kernel, psf_size=n_new)
             elif self.psf_type == 'NONE':
                 kernel_point_source_supersampled = self._kernel_point_source

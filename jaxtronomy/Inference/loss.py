@@ -1,4 +1,3 @@
-import warnings
 import numpy as np
 from functools import partial
 import jax.numpy as jnp
@@ -63,8 +62,8 @@ class Loss(object):
                     raise ValueError(f"Prior term '{term}' is not supported")
         if regularization_terms is not None:
             if likelihood_type == 'chi2':
-                warnings.warn(f"WARNING: likelihood type is '{likelihood_type}', which might "
-                              "cause issues with some regularization choices")
+                UserWarning(f"Likelihood type is '{likelihood_type}', which might "
+                            "cause issues with some regularization choices")
             for term in regularization_terms:
                 if term not in self._supported_regul_source + self._supported_regul_lens:
                     raise ValueError(f"Regularization term '{term}' is not supported")
@@ -90,6 +89,7 @@ class Loss(object):
             self._global_norm = 1.
         elif likelihood_type == 'l2_norm':
             self._log_likelihood = self._log_likelihood_l2
+            # here the global norm is such that l2_norm has same order of magnitude as a chi2
             self._global_norm = 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
 
     def _initialize_regularizations(self, regularization_terms, regularization_strengths, 
