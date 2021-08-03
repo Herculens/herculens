@@ -88,29 +88,6 @@ class Parameters(object):
         self._kwargs_fixed.update(kwargs_fixed)
         self._update_base()
 
-    def _update_base(self):
-        self._prior_types, self._lowers, self._uppers, self._means, self._widths \
-            = self.kwargs2args_prior(self._kwargs_prior)
-        self._init_values  = self.kwargs2args(self._kwargs_init)
-        self._num_params = len(self._init_values)
-        if self.optimized:
-            self._map_values = self.kwargs2args(self._kwargs_map)
-        if hasattr(self, '_name'):
-            delattr(self, '_names')
-        if hasattr(self, '_symbols'):
-            delattr(self, '_symbols')
-
-    def _set_params_update_fixed(self, kwargs_fixed, kwargs_model_key, kwargs_key):
-        for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
-            kwargs_fixed_k_old = self._kwargs_fixed[kwargs_key][k]
-            kwargs_fixed_k_new = kwargs_fixed
-            param_names = self._get_param_names_for_model(kwargs_key, model)
-            for name in param_names:
-                if name in kwargs_fixed_k_old and name not in kwargs_fixed_k_new:
-                    self._kwargs_init[kwargs_key][k][name] = copy.deepcopy(kwargs_fixed_k_old[name])
-                    if self.optimized:
-                        self._kwargs_map[kwargs_key][k][name] = copy.deepcopy(kwargs_fixed_k_old[name])
-
     def args2kwargs(self, args):
         i = 0
         args = jnp.atleast_1d(args)
@@ -222,6 +199,18 @@ class Parameters(object):
                 self._pix_pot_idx = None
         return self._pix_pot_idx
 
+    def _update_base(self):
+        self._prior_types, self._lowers, self._uppers, self._means, self._widths \
+            = self.kwargs2args_prior(self._kwargs_prior)
+        self._init_values  = self.kwargs2args(self._kwargs_init)
+        self._num_params = len(self._init_values)
+        if self.optimized:
+            self._map_values = self.kwargs2args(self._kwargs_map)
+        if hasattr(self, '_name'):
+            delattr(self, '_names')
+        if hasattr(self, '_symbols'):
+            delattr(self, '_symbols')
+
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
         kwargs_list = []
         for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
@@ -331,6 +320,17 @@ class Parameters(object):
                         else:
                             raise ValueError(f"Prior type '{prior_type}' is not supported")
         return types, lowers, uppers, means, widths
+
+    def _set_params_update_fixed(self, kwargs_fixed, kwargs_model_key, kwargs_key):
+        for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
+            kwargs_fixed_k_old = self._kwargs_fixed[kwargs_key][k]
+            kwargs_fixed_k_new = kwargs_fixed
+            param_names = self._get_param_names_for_model(kwargs_key, model)
+            for name in param_names:
+                if name in kwargs_fixed_k_old and name not in kwargs_fixed_k_new:
+                    self._kwargs_init[kwargs_key][k][name] = copy.deepcopy(kwargs_fixed_k_old[name])
+                    if self.optimized:
+                        self._kwargs_map[kwargs_key][k][name] = copy.deepcopy(kwargs_fixed_k_old[name])
 
     @staticmethod
     def _get_param_names_for_model(kwargs_key, model):
