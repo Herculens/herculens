@@ -168,7 +168,7 @@ class Parameters(object):
             if 'PIXELATED' in source_model_list or 'PIXELATED_BICUBIC' in source_model_list:
                 try:
                     idx = source_model_list.index('PIXELATED')
-                except IndexError:
+                except ValueError:
                     idx = source_model_list.index('PIXELATED_BICUBIC')
                 self._pix_src_idx = idx
             else:
