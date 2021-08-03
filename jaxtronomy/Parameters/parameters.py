@@ -1,4 +1,4 @@
-from functools import partial
+import copy
 import numpy as np
 import jax.numpy as jnp
 from jax import lax
@@ -23,15 +23,14 @@ class Parameters(object):
         self._kwargs_init  = kwargs_init
         self._kwargs_prior = kwargs_prior
         self._kwargs_fixed = kwargs_fixed
-        
-        self._init_values  = self.kwargs2args(self._kwargs_init)
-        self._prior_types, self._lowers, self._uppers, self._means, self._widths \
-            = self.kwargs2args_prior(self._kwargs_prior)
-
-        self._num_params = len(self._init_values)
+        self._update_base()
 
         # TODO: write function that checks that no fields are missing
         # and fill those with default values if needed
+
+    @property
+    def optimized(self):
+        return hasattr(self, '_kwargs_map')
 
     @property
     def num_parameters(self):
@@ -59,36 +58,58 @@ class Parameters(object):
             self._symbols = self._name2latex(self.names)
         return self._symbols
 
-    def initial_values(self, as_kwargs=False, original=False):
-        if hasattr(self, '_ml_values') and original is False:
-            return self.ML_values(as_kwargs=as_kwargs)
+    def initial_values(self, as_kwargs=False):
         return self._kwargs_init if as_kwargs else self._init_values
 
+    def current_values(self, as_kwargs=False, restart=False):
+        if restart is True or not self.optimized:
+            return self.initial_values(as_kwargs=as_kwargs)
+        return self.best_fit_values(as_kwargs=as_kwargs)
+
     def best_fit_values(self, as_kwargs=False):
-        """Maximum-likelhood estimate"""
-        return self.ML_values(as_kwargs=as_kwargs)
-
-    def ML_values(self, as_kwargs=False):
-        """Maximum-likelhood estimate"""
-        if not hasattr(self, '_kwargs_ml') and as_kwargs is True:
-            self._kwargs_ml = self.args2kwargs(self._ml_values)
-        return self._kwargs_ml if as_kwargs else self._ml_values
-
-    def MAP_values(self, as_kwargs=False):
         """Maximum-a-postriori estimate"""
-        if not hasattr(self, '_kwargs_map') and as_kwargs is True:
-            self._kwargs_map = self.args2kwargs(self._map_values)
         return self._kwargs_map if as_kwargs else self._map_values
 
     def set_best_fit(self, args):
-        self._ml_values = args
-        if hasattr(self, '_kwargs_ml'):
-            delattr(self, '_kwargs_ml')
+        self._map_values = args
+        self._kwargs_map = self.args2kwargs(self._map_values)
     
-    def set_samples(self, samples):
-        self._map_values = np.median(samples, axis=0)  # maximum a-posteriori values
-        if hasattr(self, '_kwargs_map'):
-            delattr(self, '_kwargs_map')
+    def set_posterior(self, samples):
+        self._map_values = np.median(samples, axis=0)
+        self._kwargs_map = self.args2kwargs(self._map_values)
+
+    def update_fixed(self, kwargs_fixed):
+        # TODO: fill current and init values with values that were previously fixed, if needed
+        self._set_params_update_fixed(kwargs_fixed, 'lens_model_list', 'kwargs_lens')
+        self._set_params_update_fixed(kwargs_fixed, 'source_model_list', 'kwargs_source')
+        self._set_params_update_fixed(kwargs_fixed, 'lens_light_model_list', 'kwargs_lens_light')
+
+        # update fixed settings and everything that depends on it
+        self._kwargs_fixed.update(kwargs_fixed)
+        self._update_base()
+
+    def _update_base(self):
+        self._prior_types, self._lowers, self._uppers, self._means, self._widths \
+            = self.kwargs2args_prior(self._kwargs_prior)
+        self._init_values  = self.kwargs2args(self._kwargs_init)
+        self._num_params = len(self._init_values)
+        if self.optimized:
+            self._map_values = self.kwargs2args(self._kwargs_map)
+        if hasattr(self, '_name'):
+            delattr(self, '_names')
+        if hasattr(self, '_symbols'):
+            delattr(self, '_symbols')
+
+    def _set_params_update_fixed(self, kwargs_fixed, kwargs_model_key, kwargs_key):
+        for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
+            kwargs_fixed_k_old = self._kwargs_fixed[kwargs_key][k]
+            kwargs_fixed_k_new = kwargs_fixed
+            param_names = self._get_param_names_for_model(kwargs_key, model)
+            for name in param_names:
+                if name in kwargs_fixed_k_old and name not in kwargs_fixed_k_new:
+                    self._kwargs_init[kwargs_key][k][name] = copy.deepcopy(kwargs_fixed_k_old[name])
+                    if self.optimized:
+                        self._kwargs_map[kwargs_key][k][name] = copy.deepcopy(kwargs_fixed_k_old[name])
 
     def args2kwargs(self, args):
         i = 0
@@ -205,15 +226,15 @@ class Parameters(object):
         kwargs_list = []
         for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
             kwargs = {}
-            kwargs_fixed = self._kwargs_fixed[kwargs_key][k]
+            kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
-                if not name in kwargs_fixed:
+                if not name in kwargs_fixed_k:
                     if model in ['PIXELATED']:
-                        if 'x_coords' not in kwargs_fixed or 'y_coords' not in kwargs_fixed:
+                        if 'x_coords' not in kwargs_fixed_k or 'y_coords' not in kwargs_fixed_k:
                             raise ValueError(f"'x_coords' and 'y_coords' all need to be fixed for '{model}' models")
-                        n_pix_x = len(kwargs_fixed['x_coords'])
-                        n_pix_y = len(kwargs_fixed['y_coords'])
+                        n_pix_x = len(kwargs_fixed_k['x_coords'])
+                        n_pix_y = len(kwargs_fixed_k['y_coords'])
                         num_param = int(n_pix_x * n_pix_y)
                         if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
                             pixels = 'image'
@@ -225,7 +246,7 @@ class Parameters(object):
                         kwargs[name] = args[i]
                     i += num_param
                 else:
-                    kwargs[name] = kwargs_fixed[name]
+                    kwargs[name] = kwargs_fixed_k[name]
             kwargs_list.append(kwargs)
         return kwargs_list, i
 
@@ -233,10 +254,10 @@ class Parameters(object):
         args = []
         for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
             kwargs_profile = kwargs[kwargs_key][k]
-            kwargs_fixed = self._kwargs_fixed[kwargs_key][k]
+            kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
-                if not name in kwargs_fixed:
+                if not name in kwargs_fixed_k:
                     if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
                         if name in ['x_coords', 'y_coords']:
                             raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
@@ -254,10 +275,10 @@ class Parameters(object):
         types, lowers, uppers, means, widths = [], [], [], [], []
         for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
             kwargs_profile = kwargs[kwargs_key][k]
-            kwargs_fixed = self._kwargs_fixed[kwargs_key][k]
+            kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
-                if not name in kwargs_fixed:
+                if not name in kwargs_fixed_k:
                     if name not in kwargs_profile:
                         types.append(None)
                         lowers.append(-np.inf)
@@ -275,8 +296,8 @@ class Parameters(object):
                                     pixels = 'image'
                                 elif kwargs_key == 'kwargs_lens':
                                     pixels = 'psi_grid'
-                                n_pix_x = len(kwargs_fixed['x_coords'])
-                                n_pix_y = len(kwargs_fixed['y_coords'])
+                                n_pix_x = len(kwargs_fixed_k['x_coords'])
+                                n_pix_y = len(kwargs_fixed_k['y_coords'])
                                 num_param = int(n_pix_x * n_pix_y)
                                 types  += [prior_type]*num_param
                                 lowers_tmp, uppers_tmp = kwargs_profile[pixels][1], kwargs_profile[pixels][2]
@@ -347,13 +368,13 @@ class Parameters(object):
     def _set_names(self, kwargs_model_key, kwargs_key):
         names = []
         for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
-            kwargs_fixed = self._kwargs_fixed[kwargs_key][k]
+            kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
-                if not name in kwargs_fixed:
+                if not name in kwargs_fixed_k:
                     if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
-                        n_pix_x = len(kwargs_fixed['x_coords'])
-                        n_pix_y = len(kwargs_fixed['y_coords'])
+                        n_pix_x = len(kwargs_fixed_k['x_coords'])
+                        n_pix_y = len(kwargs_fixed_k['y_coords'])
                         num_param = int(n_pix_x * n_pix_y)
                         if kwargs_key == 'kwargs_lens_light':
                             names += [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
