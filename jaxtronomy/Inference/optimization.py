@@ -69,24 +69,24 @@ class Optimizer(InferenceBase):
                 extra_fields[key] = getattr(res, key)
         return res.x, extra_fields
 
-    def optax(self, max_iterations, init_learning_rate, restart_from_init=False):
+    def optax(self, max_iterations=100, init_learning_rate=1e-2, restart_from_init=False):
         # Exponential decay of the learning rate
         scheduler = optax.exponential_decay(
             init_value=init_learning_rate, 
-            transition_steps=max_iterations,
-            decay_rate=0.99)
+            decay_rate=0.99, # TODO: this has never been fine-tuned (taken from optax examples)
+            transition_steps=max_iterations)
 
         # Combining gradient transforms using `optax.chain`
         optim = optax.chain(
             #optax.clip_by_global_norm(1.0),  # clip by the gradient by the global norm
-            optax.scale_by_belief(),  # use the updates from AdaBelief optimizer
+            optax.scale_by_belief(),  # use the updates from AdaBelief optimizer  # TODO: add support for a couple of other algorithms
             optax.scale_by_schedule(scheduler),  # Use the learning rate from the scheduler
             optax.scale(-1.)  # because gradient *descent*
         )
 
         # Initialise optimizer state
-        init_params = self._param.initial_values(as_kwargs=False, original=restart_from_init)
-        opt_state = optim.init(init_params)
+        params = self._param.initial_values(as_kwargs=False, original=restart_from_init)
+        opt_state = optim.init(params)
 
         # Gradient descent loop
         start_time = time.time()
@@ -96,7 +96,8 @@ class Optimizer(InferenceBase):
         runtime = time.time() - start_time
         best_fit = params
         logL_best_fit = self.loss(best_fit)
-        extra_fields = {}
+        extra_fields = {}  # TODO: use optax.second_order module to compute diagonal of Hessian?
+        self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 
     def pso(self, n_particles=100, n_iterations=100, restart_from_init=False, n_threads=1):
