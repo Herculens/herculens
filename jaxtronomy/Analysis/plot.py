@@ -6,6 +6,7 @@ from scipy import ndimage
 from matplotlib.colors import LogNorm
 
 from jaxtronomy.Util.plot_util import nice_colorbar, nice_colorbar_residuals
+from jaxtronomy.Util import image_util
 
 # Some general default for plotting
 plt.rc('image', interpolation='none', origin='lower')  # imshow
@@ -81,15 +82,34 @@ class Plotter(object):
         if show_source:
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
             src_idx = lens_image.SourceModel.pixelated_index
-            if src_idx is not None:
+            source_is_pixelated = (src_idx is not None)
+            if source_is_pixelated:
                 # we need to make sure it's jax.numpy array for source_surface_brightness when using PIXELATED source profile
-                kwargs_source[src_idx]['image'] = jnp.asarray(kwargs_source[src_idx]['image'])
-            source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
-            
+                #kwargs_source[src_idx]['pixels'] = jnp.asarray(kwargs_source[src_idx]['pixels'])
+                # we extract the right coordinate arrays
+                #x_coords_src, y_coords_src = np.meshgrid(*lens_image.SourceModel.pixelated_coordinates)
+                #source_model = lens_image.SourceModel.surface_brightness(x_coords_src, y_coords_src, kwargs_source) * lens_image.Grid.pixel_area
+                source_model = kwargs_source[src_idx]['pixels'] # / lens_image.Grid.pixel_area
+            else:
+                source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
+
             if hasattr(self, '_true_source'):
                 true_source = self._true_source
             else:
                 true_source = np.zeros_like(source_model)
+
+            if source_model.size != true_source.size:
+                npix_true = len(true_source)
+                x_coords_true = np.linspace(extent[0], extent[1], npix_true)
+                y_coords_true = np.linspace(extent[2], extent[3], npix_true)
+                if source_is_pixelated:
+                    x_coords_src, y_coords_src = lens_image.SourceModel.pixelated_coordinates
+                else:
+                    npix_src = len(source_model)
+                    x_coords_src = np.linspace(extent[0], extent[1], npix_src)
+                    y_coords_src = np.linspace(extent[2], extent[3], npix_src)
+                true_source = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords_src, y_coords_src)
+                print("True source array has been interpolated to match model array")
 
         if show_lens_mass:
             # TODO: check that there is indeed a pixelated potential profile in the model
@@ -100,9 +120,9 @@ class Plotter(object):
                                                           kwargs_result['kwargs_lens'], k=pot_idx)
             kappa = lens_image.LensModel.kappa(x_grid_lens, y_grid_lens, 
                                                kwargs_result['kwargs_lens'], k=pot_idx)
-            # potential_model = np.copy(kwargs_result['kwargs_lens'][pot_idx]['psi_grid'])
-            potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
-                                                             kwargs_result['kwargs_lens'], k=pot_idx)
+            potential_model = np.copy(kwargs_result['kwargs_lens'][pot_idx]['pixels'])
+            #potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
+            #                                                 kwargs_result['kwargs_lens'], k=pot_idx)
 
             if potential_mask is None:
                 potential_mask = np.ones_like(potential_model)
