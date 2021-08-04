@@ -75,7 +75,7 @@ class LinearBasis(LightModelBase):
             if model in ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM']:
                 n_list += [1]
             elif model == 'PIXELATED':
-                n_list += [kwargs['image'].size]
+                n_list += [kwargs['pixels'].size]
             else:
                 raise ValueError(f"Model type {model} is not valid!")
         return n_list

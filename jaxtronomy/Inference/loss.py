@@ -198,35 +198,35 @@ class Loss(object):
         return - 0.5 * jnp.sum((self._data - model)**2)
 
     def _log_regul_l1_starlet_source(self, kwargs):
-        source_model = kwargs['kwargs_source'][self._idx_pix_src]['image']
+        source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
         st = self._starlet_src.decompose(source_model)[:-1]  # ignore coarsest scale
         st_weighted_l1_hf = jnp.sum(self._st_src_weights[0] * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
         st_weighted_l1 = jnp.sum(self._st_src_weights[1:] * jnp.abs(st[1:]))  # other scales
         return - (self._st_src_lambda_hf * st_weighted_l1_hf + self._st_src_lambda * st_weighted_l1)
 
     def _log_regul_l1_starlet_potential(self, kwargs):
-        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['psi_grid']
+        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
         st = self._starlet_pot.decompose(psi_model)[:-1]  # ignore coarsest scale
         st_weighted_l1_hf = jnp.sum(self._st_pot_weights[0] * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
         st_weighted_l1 = jnp.sum(self._st_pot_weights[1:] * jnp.abs(st[1:]))  # other scales
         return - (self._st_pot_lambda_hf * st_weighted_l1_hf + self._st_pot_lambda * st_weighted_l1)
 
     def _log_regul_l1_battle_source(self, kwargs):
-        source_model = kwargs['kwargs_source'][self._idx_pix_src]['image']
+        source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
         bt = self._battle_src.decompose(source_model)[0]  # consider only first scale
         bt_weighted_l1 = jnp.sum(self._bt_src_weights * jnp.abs(bt))
         return - self._bt_src_lambda * bt_weighted_l1
 
     def _log_regul_l1_battle_potential(self, kwargs):
-        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['psi_grid']
+        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
         bt = self._battle_pot.decompose(psi_model)[0]  # consider only first scale
         bt_weighted_l1 = jnp.sum(self._bt_pot_weights * jnp.abs(bt))
         return - self._bt_pot_lambda * bt_weighted_l1
 
     def _log_regul_positivity_source(self, kwargs):
-        source_model = kwargs['kwargs_source'][self._idx_pix_src]['image']
+        source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
         return - self._pos_src_lambda * jnp.abs(jnp.sum(jnp.minimum(0., source_model)))
 
     def _log_regul_positivity_potential(self, kwargs):
-        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['psi_grid']
+        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
         return - self._pos_pot_lambda * jnp.abs(jnp.sum(jnp.minimum(0., psi_model)))

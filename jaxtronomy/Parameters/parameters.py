@@ -179,16 +179,13 @@ class Parameters(object):
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
                         if kwargs_key == 'kwargs_lens':
-                            pixels = 'psi_grid'
                             n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
                         elif kwargs_key == 'kwargs_source':
-                            pixels = 'image'
                             n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                         elif kwargs_key == 'kwargs_lens_light':
-                            pixels = 'image'
                             n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                         num_param = int(n_pix_x * n_pix_y)
-                        kwargs[pixels] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
+                        kwargs['pixels'] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
                     else:
                         num_param = 1
                         kwargs[name] = args[i]
@@ -207,11 +204,7 @@ class Parameters(object):
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
-                        if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
-                            pixels = 'image'
-                        elif kwargs_key == 'kwargs_lens':
-                            pixels = 'psi_grid'
-                        args += kwargs_profile[pixels].flatten().tolist()
+                        args += kwargs_profile['pixels'].flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
         return args
@@ -236,17 +229,14 @@ class Parameters(object):
                         if prior_type == 'uniform':
                             if model == 'PIXELATED':
                                 if kwargs_key == 'kwargs_lens':
-                                    pixels = 'psi_grid'
                                     n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
                                 elif kwargs_key == 'kwargs_source':
-                                    pixels = 'image'
                                     n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                                 elif kwargs_key == 'kwargs_lens_light':
-                                    pixels = 'image'
                                     n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                                 num_param = int(n_pix_x * n_pix_y)
                                 types  += [prior_type]*num_param
-                                lowers_tmp, uppers_tmp = kwargs_profile[pixels][1], kwargs_profile[pixels][2]
+                                lowers_tmp, uppers_tmp = kwargs_profile['pixels'][1], kwargs_profile['pixels'][2]
                                 # those bounds can either be whole array (values per pixel)
                                 if isinstance(lowers_tmp, (np.ndarray, jnp.ndarray)):
                                     lowers += lowers_tmp.flatten().tolist()
