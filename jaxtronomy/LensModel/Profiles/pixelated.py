@@ -7,10 +7,6 @@ class PixelatedPotential(LensProfileBase):
 
     def __init__(self, x_coords, y_coords):
         """Lensing potential on a fixed coordinate grid."""
-        # self.x_coords = x_coords
-        # self.y_coords = y_coords
-        # npix = len(self.x_coords)
-        # self.interp = RectBivariateSpline(x_coords, y_coords, np.zeros((npix, npix)))
         super(PixelatedPotential, self).__init__()
         self._x_coords, self._y_coords = x_coords, y_coords
 

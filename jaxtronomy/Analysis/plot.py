@@ -44,7 +44,16 @@ class Plotter(object):
         else:
             self.norm_flux = None
 
-    def model_summary(self, data, lens_image, kwargs_result, true_source=None, true_potential=None,
+    def set_data(self, data):
+        self._data = data
+
+    def set_true_source(self, true_source):
+        self._true_source = true_source
+
+    def set_true_potential_perturbations(self, true_potential):
+        self._true_pot_perturb = true_potential
+
+    def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, show_lens_mass=False,
                       shift_potential='min', with_mask=False,
                       data_mask=None, potential_mask=None):
@@ -64,13 +73,22 @@ class Plotter(object):
             model = lens_image.model(**kwargs_result)
             noise_var = lens_image.Noise.C_D
 
+        if hasattr(self, '_data'):
+            data = self._data
+        else:
+            data = np.zeros_like(model)
+
         if show_source:
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
-            if 'image' in kwargs_source[0]:
+            src_idx = lens_image.SourceModel.pixelated_index
+            if src_idx is not None:
                 # we need to make sure it's jax.numpy array for source_surface_brightness when using PIXELATED source profile
-                kwargs_source[0]['image'] = jnp.asarray(kwargs_source[0]['image'])
+                kwargs_source[src_idx]['image'] = jnp.asarray(kwargs_source[src_idx]['image'])
             source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
-            if true_source is None:
+            
+            if hasattr(self, '_true_source'):
+                true_source = self._true_source
+            else:
                 true_source = np.zeros_like(source_model)
 
         if show_lens_mass:
@@ -86,9 +104,15 @@ class Plotter(object):
             potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
                                                              kwargs_result['kwargs_lens'], k=pot_idx)
 
+            if potential_mask is None:
+                potential_mask = np.ones_like(potential_model)
+
             # here we know that there are no perturbations in the true potential
-            if true_potential is None:
+            if hasattr(self, '_true_pot_perturb'):
+                true_potential = self._true_pot_perturb
+            else:
                 true_potential = np.zeros_like(potential_model)
+            
             if shift_potential == 'min':
                 min_in_mask = (potential_model * potential_mask).min()
                 potential_model = potential_model - min_in_mask
@@ -97,7 +121,7 @@ class Plotter(object):
                 mean_in_mask = (potential_model * potential_mask).mean()
                 true_mean_in_mask = (true_potential * potential_mask).mean()
                 potential_model = potential_model - mean_in_mask + true_mean_in_mask
-                print("delta_psi shift & normalization by mean:", mean_in_mask, true_mean_in_mask)
+                print("delta_psi shift by mean values:", mean_in_mask, true_mean_in_mask)
             
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows*5))
         if len(axes.shape) == 1:
