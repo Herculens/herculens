@@ -127,3 +127,14 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# macos cache files
+.DS_Store
+**/.DS_Store
+
+# Sublime Text files
+*.sublime-project
+*.sublime-workspace
+
+# Illustrator files
+**.ai

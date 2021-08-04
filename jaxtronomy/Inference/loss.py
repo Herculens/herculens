@@ -27,7 +27,7 @@ class Loss(object):
 
     _supported_ll = ('chi2', 'l2_norm')
     _supported_regul_source = ('l1_starlet_source', 'l1_battle_source', 'positivity_source')
-    _supported_regul_lens = ('l1_starlet_potential', 'l1_battle_potential')
+    _supported_regul_lens = ('l1_starlet_potential', 'l1_battle_potential', 'positivity_potential')
     _supported_prior = ('uniform', 'gaussian')
 
     def __init__(self, data, image_class, param_class, 
