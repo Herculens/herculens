@@ -44,6 +44,7 @@ class LensImage(object):
         if source_model_class is None:
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
+        self.SourceModel.set_pixel_area(self.Grid.pixel_area)
         if lens_light_model_class is None:
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class

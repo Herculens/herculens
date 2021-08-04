@@ -35,7 +35,7 @@ class LightModelBase(object):
             elif profile_type == 'UNIFORM':
                 func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
-                func_list.append(pixelated.Pixelated(self._pixel_x_coords, self._pixel_y_coords, 
+                func_list.append(pixelated.Pixelated(self._pixel_x_coords, self._pixel_y_coords,
                                                      method=pixel_interpol))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
@@ -66,6 +66,11 @@ class LightModelBase(object):
                 flux += func.function(x, y, **kwargs_list[i])
         return flux
 
+    def set_pixel_area(self, pixel_area):
+        for i, func in enumerate(self.func_list):
+            if self.profile_type_list[i] == 'PIXELATED':
+                func.set_data_pixel_area(pixel_area)
+
     @property
     def pixelated_index(self):
         if not hasattr(self, '_pix_idx'):
@@ -87,3 +92,7 @@ class LightModelBase(object):
             else:
                 self._pix_shape = None
         return self._pix_shape
+
+    @property
+    def pixelated_coordinates(self):
+        return self._pixel_x_coords, self._pixel_y_coords
