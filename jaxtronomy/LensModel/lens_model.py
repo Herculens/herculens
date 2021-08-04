@@ -10,7 +10,7 @@ __all__ = ['LensModel']
 
 class LensModel(object):
     """An arbitrary list of lens models."""
-    def __init__(self, lens_model_list):
+    def __init__(self, lens_model_list, pixel_x_coords=None, pixel_y_coords=None):
         """Create a LensModel object.
 
         Parameters
@@ -26,6 +26,7 @@ class LensModel(object):
 
         """
         self.lens_model_list = lens_model_list
+
         # self.z_lens = z_lens
         # if z_source_convention is None:
         #     z_source_convention = z_source
@@ -46,7 +47,8 @@ class LensModel(object):
                                          observed_convention_index=observed_convention_index)
         else:
             self.lens_model = SinglePlane(self.lens_model_list,
-                                          self.redshift_list)
+                                          self.redshift_list,
+                                          pixel_x_coords=pixel_x_coords, pixel_y_coords=pixel_y_coords)
         # if z_lens is not None and z_source is not None:
         #     self._lensCosmo = LensCosmo(z_lens, z_source, cosmo=cosmo)
 
@@ -213,3 +215,15 @@ class LensModel(object):
         f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k, diff=diff, diff_method=diff_method)
         det_A = (1 - f_xx) * (1 - f_yy) - f_xy * f_yx
         return 1. / det_A  # attention, if dividing by zero
+
+    @property
+    def pixelated_index(self):
+        return self.lens_model.pixelated_index
+
+    @property
+    def pixelated_shape(self):
+        return self.lens_model.pixelated_shape
+
+    @property
+    def pixelated_coordinates(self):
+        return self.lens_model.pixelated_coordinates

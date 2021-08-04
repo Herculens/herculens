@@ -40,7 +40,7 @@ class Optimizer(InferenceBase):
         runtime = time.time() - start
         if self._metrics.loss_history == []:
             raise ValueError("The loss history does not contain any value")
-        logL_best_fit = - float(self._metrics.loss_history[-1])
+        logL_best_fit = float(self._metrics.loss_history[-1])
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 

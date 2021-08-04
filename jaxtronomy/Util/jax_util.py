@@ -204,9 +204,9 @@ class BilinearInterpolator(object):
     is MUCH SLOWER as well.
 
     """
-    def __init__(self, x_coords, y_coords, z):
-        self.x_coords = x_coords
-        self.y_coords = y_coords
+    def __init__(self, x, y, z):
+        self.x = jnp.array(x)
+        self.y = jnp.array(y)
         self.z = z
 
     def __call__(self, x, y, dx=0, dy=0):
@@ -238,16 +238,16 @@ class BilinearInterpolator(object):
         # Find the pixel that the point (x, y) falls in
         # x_ind = jnp.digitize(x, self.x_padded) - 1
         # y_ind = jnp.digitize(y, self.y_padded) - 1
-        x_ind = jnp.searchsorted(self.x_coords, x, side='right') - 1
-        x_ind = jnp.clip(x_ind, a_min=0, a_max=(len(self.x_coords) - 2))
-        y_ind = jnp.searchsorted(self.y_coords, y, side='right') - 1
-        y_ind = jnp.clip(y_ind, a_min=0, a_max=(len(self.y_coords) - 2))
+        x_ind = jnp.searchsorted(self.x, x, side='right') - 1
+        x_ind = jnp.clip(x_ind, a_min=0, a_max=(len(self.x) - 2))
+        y_ind = jnp.searchsorted(self.y, y, side='right') - 1
+        y_ind = jnp.clip(y_ind, a_min=0, a_max=(len(self.y) - 2))
 
         # Determine the coordinates and dimensions of this pixel
-        x1 = self.x_coords[x_ind]
-        x2 = self.x_coords[x_ind + 1]
-        y1 = self.y_coords[y_ind]
-        y2 = self.y_coords[y_ind + 1]
+        x1 = self.x[x_ind]
+        x2 = self.x[x_ind + 1]
+        y1 = self.y[y_ind]
+        y2 = self.y[y_ind + 1]
         area = (x2 - x1) * (y2 - y1)
 
         # Compute function values at the four corners

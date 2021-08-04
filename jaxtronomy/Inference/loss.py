@@ -106,7 +106,7 @@ class Loss(object):
         data_noise_map = self._image.Noise.background_rms
 
         self._idx_pix_src = self._image.SourceModel.pixelated_index
-        self._idx_pix_pot = self._param.pixelated_potential_index
+        self._idx_pix_pot = self._image.LensModel.pixelated_index
 
         regul_func_list = []
         for term, strength in zip(regularization_terms, regularization_strengths):
@@ -145,7 +145,7 @@ class Loss(object):
                 self._pos_src_lambda = float(strength)
 
             elif term == 'l1_starlet_potential':
-                n_pix_pot = min(*self._param.pixelated_potential_shape)
+                n_pix_pot = min(*self._image.LensModel.pixelated_shape)
                 n_scales = int(np.log2(n_pix_pot))  # maximum allowed number of scales
                 self._starlet_pot = WaveletTransform(n_scales, wavelet_type='starlet')
                 wavelet_norms = self._starlet_pot.scale_norms[:-1]  # ignore coarsest scale

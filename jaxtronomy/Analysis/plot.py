@@ -76,8 +76,8 @@ class Plotter(object):
         if show_lens_mass:
             # TODO: check that there is indeed a pixelated potential profile in the model
             pot_idx = -1  # here we assume the last lens profile is 'PIXELATED'
-            x_grid_lens, y_grid_lens = np.meshgrid(kwargs_result['kwargs_lens'][pot_idx]['x_coords'], 
-                                                   kwargs_result['kwargs_lens'][pot_idx]['y_coords'])
+            x_coords_pot, y_coords_pot = lens_image.LensModel.pixelated_coordinates
+            x_grid_lens, y_grid_lens = np.meshgrid(x_coords_pot, y_coords_pot)
             alpha_x, alpha_y = lens_image.LensModel.alpha(x_grid_lens, y_grid_lens, 
                                                           kwargs_result['kwargs_lens'], k=pot_idx)
             kappa = lens_image.LensModel.kappa(x_grid_lens, y_grid_lens, 

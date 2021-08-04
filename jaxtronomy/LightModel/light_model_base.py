@@ -67,6 +67,15 @@ class LightModelBase(object):
         return flux
 
     @property
+    def pixelated_index(self):
+        if not hasattr(self, '_pix_idx'):
+            try:
+                self._pix_idx = self.profile_type_list.index('PIXELATED')
+            except ValueError:
+                self._pix_idx = None
+        return self._pix_idx
+
+    @property
     def pixelated_shape(self):
         if not hasattr(self, '_pix_shape'):
             idx = self.pixelated_index
@@ -78,12 +87,3 @@ class LightModelBase(object):
             else:
                 self._pix_shape = None
         return self._pix_shape
-
-    @property
-    def pixelated_index(self):
-        if not hasattr(self, '_pix_idx'):
-            try:
-                self._pix_idx = self.profile_type_list.index('PIXELATED')
-            except ValueError:
-                self._pix_idx = None
-        return self._pix_idx

@@ -8,7 +8,8 @@ _SUPPORTED_MODELS = ['SHEAR', 'SHEAR_GAMMA_PSI', 'SIE', 'PIXELATED']
 
 class ProfileListBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, lens_redshift_list=None):
+    def __init__(self, lens_model_list, lens_redshift_list=None,
+                 pixel_x_coords=None, pixel_y_coords=None):
         """Create a ProfileListBase object.
 
         Parameters
@@ -19,6 +20,7 @@ class ProfileListBase(object):
             Lens redshifts corresponding to the profiles in `lens_model_list`.
 
         """
+        self._pixel_x_coords, self._pixel_y_coords = pixel_x_coords, pixel_y_coords
         self.func_list = self._load_model_instances(lens_model_list, lens_redshift_list)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
@@ -31,7 +33,7 @@ class ProfileListBase(object):
         for lens_type in lens_model_list:
             # These models require a new instance per profile as certain pre-computations
             # are relevant per individual profile
-            if lens_type in ('PIXELATED',):
+            if lens_type in ['PIXELATED']:
                 lensmodel_class = self._import_class(lens_type)
             else:
                 if lens_type not in imported_classes.keys():
@@ -42,8 +44,7 @@ class ProfileListBase(object):
             func_list.append(lensmodel_class)
         return func_list
 
-    @staticmethod
-    def _import_class(lens_type):
+    def _import_class(self, lens_type):
         """Get the lens profile class of the corresponding type."""
         if lens_type == 'SHEAR':
             return shear.Shear()
@@ -52,7 +53,7 @@ class ProfileListBase(object):
         elif lens_type == 'SIE':
             return sie.SIE()
         elif lens_type == 'PIXELATED':
-            return pixelated.PixelatedPotential()
+            return pixelated.PixelatedPotential(self._pixel_x_coords, self._pixel_y_coords)
         else:
             err_msg = (f"{lens_type} is not a valid lens model. " +
                        f"Supported types are {_SUPPORTED_MODELS}")
@@ -77,3 +78,29 @@ class ProfileListBase(object):
         """
         for func in self.func_list:
             func.set_dynamic()
+
+    @property
+    def pixelated_index(self):
+        if not hasattr(self, '_pix_idx'):
+            try:
+                self._pix_idx = self._model_list.index('PIXELATED')
+            except ValueError:
+                self._pix_idx = None
+        return self._pix_idx
+
+    @property
+    def pixelated_shape(self):
+        if not hasattr(self, '_pix_shape'):
+            idx = self.pixelated_index
+            if idx is not None:
+                if self._pixel_x_coords is None or self._pixel_y_coords is None:
+                    raise RuntimeError("There is a 'PIXELATED' light profile but "
+                                       "no coordinate arrays have been provided")
+                self._pix_shape = (len(self._pixel_x_coords), len(self._pixel_y_coords))
+            else:
+                self._pix_shape = None
+        return self._pix_shape
+
+    @property
+    def pixelated_coordinates(self):
+        return self._pixel_x_coords, self._pixel_y_coords

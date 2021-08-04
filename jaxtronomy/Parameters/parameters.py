@@ -18,13 +18,12 @@ class Parameters(object):
 
     _unif_prior_penalty = 1e10
 
-    def __init__(self, lens_image, kwargs_model, kwargs_init, kwargs_prior, kwargs_fixed):
+    def __init__(self, lens_image, kwargs_init, kwargs_prior, kwargs_fixed):
         self._image = lens_image
-        self._kwargs_model = kwargs_model
         self._kwargs_init  = kwargs_init
         self._kwargs_prior = kwargs_prior
         self._kwargs_fixed = kwargs_fixed
-        self._update_base()
+        self._update_arrays()
 
         # TODO: write function that checks that no fields are missing
         # and fill those with default values if needed
@@ -59,6 +58,15 @@ class Parameters(object):
             self._symbols = self._name2latex(self.names)
         return self._symbols
 
+    @property
+    def kwargs_model(self):
+        # TODO: intermediate step, this might be suppressed in the future
+        if not hasattr(self, '_kwargs_model'):
+            self._kwargs_model = dict(lens_model_list=self._image.LensModel.lens_model_list,
+                                      source_model_list=self._image.SourceModel.profile_type_list,
+                                      lens_light_model_list=self._image.LensLightModel.profile_type_list)
+        return self._kwargs_model
+
     def initial_values(self, as_kwargs=False):
         return self._kwargs_init if as_kwargs else self._init_values
 
@@ -87,7 +95,7 @@ class Parameters(object):
 
         # update fixed settings and everything that depends on it
         self._kwargs_fixed.update(kwargs_fixed)
-        self._update_base()
+        self._update_arrays()
 
     def args2kwargs(self, args):
         i = 0
@@ -149,31 +157,7 @@ class Parameters(object):
                 logP += - self._unif_prior_penalty
         return logP
 
-    @property
-    def pixelated_potential_shape(self):
-        # TODO: should it be provided by the LensModel class instead?
-        if not hasattr(self, '_pix_pot_shape'):
-            idx = self.pixelated_potential_index
-            if idx is not None:
-                kwargs_pixelated = self._kwargs_fixed['kwargs_lens'][idx]
-                self._pix_pot_shape = (len(kwargs_pixelated['x_coords']), len(kwargs_pixelated['y_coords']))
-            else:
-                self._pix_pot_shape = None
-        return self._pix_pot_shape
-
-    @property
-    def pixelated_potential_index(self):
-        # TODO: should it be provided by the LensModel class instead?
-        if not hasattr(self, '_pix_pot_idx'):
-            lens_model_list = self._kwargs_model['lens_model_list']
-            if 'PIXELATED' in lens_model_list:
-                idx = lens_model_list.index('PIXELATED')
-                self._pix_pot_idx = idx
-            else:
-                self._pix_pot_idx = None
-        return self._pix_pot_idx
-
-    def _update_base(self):
+    def _update_arrays(self):
         self._prior_types, self._lowers, self._uppers, self._means, self._widths \
             = self.kwargs2args_prior(self._kwargs_prior)
         self._init_values  = self.kwargs2args(self._kwargs_init)
@@ -187,23 +171,23 @@ class Parameters(object):
 
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
         kwargs_list = []
-        for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
+        for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs = {}
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
-                        # if 'x_coords' not in kwargs_fixed_k or 'y_coords' not in kwargs_fixed_k:
-                        #     raise ValueError(f"'x_coords' and 'y_coords' all need to be fixed for '{model}' models")
-                        # n_pix_x = len(kwargs_fixed_k['x_coords'])
-                        # n_pix_y = len(kwargs_fixed_k['y_coords'])
-                        n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
-                        num_param = int(n_pix_x * n_pix_y)
-                        if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
-                            pixels = 'image'
-                        elif kwargs_key == 'kwargs_lens':
+                        if kwargs_key == 'kwargs_lens':
                             pixels = 'psi_grid'
+                            n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                        elif kwargs_key == 'kwargs_source':
+                            pixels = 'image'
+                            n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
+                        elif kwargs_key == 'kwargs_lens_light':
+                            pixels = 'image'
+                            n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
+                        num_param = int(n_pix_x * n_pix_y)
                         kwargs[pixels] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
                     else:
                         num_param = 1
@@ -216,21 +200,13 @@ class Parameters(object):
 
     def _set_params(self, kwargs, kwargs_model_key, kwargs_key):
         args = []
-        for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
+        for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_profile = kwargs[kwargs_key][k]
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
-                    if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
-                        # if name in ['x_coords', 'y_coords']:
-                        #     raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
-                        # else:
-                        #     if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
-                        #         pixels = 'image'
-                        #     elif kwargs_key == 'kwargs_lens':
-                        #         pixels = 'psi_grid'
-                            # args += kwargs_profile[pixels].flatten().tolist()
+                    if model == 'PIXELATED':
                         if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
                             pixels = 'image'
                         elif kwargs_key == 'kwargs_lens':
@@ -242,7 +218,7 @@ class Parameters(object):
 
     def _set_params_prior(self, kwargs, kwargs_model_key, kwargs_key):
         types, lowers, uppers, means, widths = [], [], [], [], []
-        for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
+        for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_profile = kwargs[kwargs_key][k]
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self._get_param_names_for_model(kwargs_key, model)
@@ -258,16 +234,16 @@ class Parameters(object):
                     else:
                         prior_type = kwargs_profile[name][0]
                         if prior_type == 'uniform':
-                            if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
-                                # if name in ['x_coords', 'y_coords']:
-                                #     raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
-                                if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
-                                    pixels = 'image'
-                                elif kwargs_key == 'kwargs_lens':
+                            if model == 'PIXELATED':
+                                if kwargs_key == 'kwargs_lens':
                                     pixels = 'psi_grid'
-                                # n_pix_x = len(kwargs_fixed_k['x_coords'])
-                                # n_pix_y = len(kwargs_fixed_k['y_coords'])
-                                n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
+                                    n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                                elif kwargs_key == 'kwargs_source':
+                                    pixels = 'image'
+                                    n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
+                                elif kwargs_key == 'kwargs_lens_light':
+                                    pixels = 'image'
+                                    n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                                 num_param = int(n_pix_x * n_pix_y)
                                 types  += [prior_type]*num_param
                                 lowers_tmp, uppers_tmp = kwargs_profile[pixels][1], kwargs_profile[pixels][2]
@@ -289,7 +265,7 @@ class Parameters(object):
                                 widths.append(np.nan)
 
                         elif prior_type == 'gaussian':
-                            if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
+                            if model == 'PIXELATED':
                                 raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
                             else:
                                 types.append(prior_type)
@@ -303,7 +279,7 @@ class Parameters(object):
         return types, lowers, uppers, means, widths
 
     def _set_params_update_fixed(self, kwargs_fixed, kwargs_model_key, kwargs_key):
-        for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
+        for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_fixed_k_old = self._kwargs_fixed[kwargs_key][k]
             kwargs_fixed_k_new = kwargs_fixed
             param_names = self._get_param_names_for_model(kwargs_key, model)
@@ -328,7 +304,7 @@ class Parameters(object):
             elif model == 'UNIFORM':
                 from jaxtronomy.LightModel.Profiles.uniform import Uniform
                 profile_class = Uniform
-            elif model in ['PIXELATED', 'PIXELATED_BICUBIC']:
+            elif model == 'PIXELATED':
                 from jaxtronomy.LightModel.Profiles.pixelated import Pixelated
                 profile_class = Pixelated
         elif kwargs_key == 'kwargs_lens':
@@ -348,21 +324,23 @@ class Parameters(object):
 
     def _set_names(self, kwargs_model_key, kwargs_key):
         names = []
-        for k, model in enumerate(self._kwargs_model[kwargs_model_key]):
+        for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
-                        # n_pix_x = len(kwargs_fixed_k['x_coords'])
-                        # n_pix_y = len(kwargs_fixed_k['y_coords'])
-                        n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
-                        num_param = int(n_pix_x * n_pix_y)
-                        if kwargs_key == 'kwargs_lens_light':
+                        if kwargs_key == 'kwargs_lens':
+                            n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                            num_param = int(n_pix_x * n_pix_y)
                             names += [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
                         elif kwargs_key == 'kwargs_source':
+                            n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
+                            num_param = int(n_pix_x * n_pix_y)
                             names += [f"s_{i}" for i in range(num_param)]  # 's' for source
                         elif kwargs_key == 'kwargs_lens':
+                            n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
+                            num_param = int(n_pix_x * n_pix_y)
                             names += [f"dpsi_{i}" for i in range(num_param)]  # 'dpsi' for potential corrections
                     else:
                         names.append(name)
