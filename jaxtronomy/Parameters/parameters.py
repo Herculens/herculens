@@ -18,7 +18,8 @@ class Parameters(object):
 
     _unif_prior_penalty = 1e10
 
-    def __init__(self, kwargs_model, kwargs_init, kwargs_prior, kwargs_fixed):
+    def __init__(self, lens_image, kwargs_model, kwargs_init, kwargs_prior, kwargs_fixed):
+        self._image = lens_image
         self._kwargs_model = kwargs_model
         self._kwargs_init  = kwargs_init
         self._kwargs_prior = kwargs_prior
@@ -149,33 +150,6 @@ class Parameters(object):
         return logP
 
     @property
-    def pixelated_source_shape(self):
-        # TODO: should it be provided by the SourceModel class instead?
-        if not hasattr(self, '_pix_src_shape'):
-            idx = self.pixelated_source_index
-            if idx is not None:
-                kwargs_pixelated = self._kwargs_fixed['kwargs_source'][idx]
-                self._pix_src_shape = (len(kwargs_pixelated['x_coords']), len(kwargs_pixelated['y_coords']))
-            else:
-                self._pix_src_shape = None
-        return self._pix_src_shape
-
-    @property
-    def pixelated_source_index(self):
-        # TODO: should it be provided by the SourceModel class instead?
-        if not hasattr(self, '_pix_src_idx'):
-            source_model_list = self._kwargs_model['source_model_list']
-            if 'PIXELATED' in source_model_list or 'PIXELATED_BICUBIC' in source_model_list:
-                try:
-                    idx = source_model_list.index('PIXELATED')
-                except ValueError:
-                    idx = source_model_list.index('PIXELATED_BICUBIC')
-                self._pix_src_idx = idx
-            else:
-                self._pix_src_idx = None
-        return self._pix_src_idx
-
-    @property
     def pixelated_potential_shape(self):
         # TODO: should it be provided by the LensModel class instead?
         if not hasattr(self, '_pix_pot_shape'):
@@ -219,11 +193,12 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
-                    if model in ['PIXELATED']:
-                        if 'x_coords' not in kwargs_fixed_k or 'y_coords' not in kwargs_fixed_k:
-                            raise ValueError(f"'x_coords' and 'y_coords' all need to be fixed for '{model}' models")
-                        n_pix_x = len(kwargs_fixed_k['x_coords'])
-                        n_pix_y = len(kwargs_fixed_k['y_coords'])
+                    if model == 'PIXELATED':
+                        # if 'x_coords' not in kwargs_fixed_k or 'y_coords' not in kwargs_fixed_k:
+                        #     raise ValueError(f"'x_coords' and 'y_coords' all need to be fixed for '{model}' models")
+                        # n_pix_x = len(kwargs_fixed_k['x_coords'])
+                        # n_pix_y = len(kwargs_fixed_k['y_coords'])
+                        n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                         num_param = int(n_pix_x * n_pix_y)
                         if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
                             pixels = 'image'
@@ -248,14 +223,19 @@ class Parameters(object):
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
-                        if name in ['x_coords', 'y_coords']:
-                            raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
-                        else:
-                            if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
-                                pixels = 'image'
-                            elif kwargs_key == 'kwargs_lens':
-                                pixels = 'psi_grid'
-                            args += kwargs_profile[pixels].flatten().tolist()
+                        # if name in ['x_coords', 'y_coords']:
+                        #     raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
+                        # else:
+                        #     if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+                        #         pixels = 'image'
+                        #     elif kwargs_key == 'kwargs_lens':
+                        #         pixels = 'psi_grid'
+                            # args += kwargs_profile[pixels].flatten().tolist()
+                        if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+                            pixels = 'image'
+                        elif kwargs_key == 'kwargs_lens':
+                            pixels = 'psi_grid'
+                        args += kwargs_profile[pixels].flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
         return args
@@ -279,14 +259,15 @@ class Parameters(object):
                         prior_type = kwargs_profile[name][0]
                         if prior_type == 'uniform':
                             if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
-                                if name in ['x_coords', 'y_coords']:
-                                    raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
+                                # if name in ['x_coords', 'y_coords']:
+                                #     raise ValueError(f"'{name}' must be a fixed keyword argument for 'PIXELATED' models")
                                 if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
                                     pixels = 'image'
                                 elif kwargs_key == 'kwargs_lens':
                                     pixels = 'psi_grid'
-                                n_pix_x = len(kwargs_fixed_k['x_coords'])
-                                n_pix_y = len(kwargs_fixed_k['y_coords'])
+                                # n_pix_x = len(kwargs_fixed_k['x_coords'])
+                                # n_pix_y = len(kwargs_fixed_k['y_coords'])
+                                n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                                 num_param = int(n_pix_x * n_pix_y)
                                 types  += [prior_type]*num_param
                                 lowers_tmp, uppers_tmp = kwargs_profile[pixels][1], kwargs_profile[pixels][2]
@@ -372,9 +353,10 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
-                    if model in ['PIXELATED', 'PIXELATED_BICUBIC']:
-                        n_pix_x = len(kwargs_fixed_k['x_coords'])
-                        n_pix_y = len(kwargs_fixed_k['y_coords'])
+                    if model == 'PIXELATED':
+                        # n_pix_x = len(kwargs_fixed_k['x_coords'])
+                        # n_pix_y = len(kwargs_fixed_k['y_coords'])
+                        n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                         num_param = int(n_pix_x * n_pix_y)
                         if kwargs_key == 'kwargs_lens_light':
                             names += [f"d_{i}" for i in range(num_param)]  # 'd' for deflector

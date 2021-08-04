@@ -10,7 +10,8 @@ _SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXE
 
 class LightModelBase(object):
     """Base class for source and lens light models."""
-    def __init__(self, light_model_list, smoothing=0.001):
+    def __init__(self, light_model_list, smoothing=0.001,
+                 pixel_x_coords=None, pixel_y_coords=None, pixel_interpol='bilinear'):
         """Create a LightModelBase object.
 
         Parameters
@@ -22,6 +23,7 @@ class LightModelBase(object):
 
         """
         self.profile_type_list = light_model_list
+        self._pixel_x_coords, self._pixel_y_coords = pixel_x_coords, pixel_y_coords
         func_list = []
         for profile_type in light_model_list:
             if profile_type == 'SERSIC':
@@ -33,9 +35,8 @@ class LightModelBase(object):
             elif profile_type == 'UNIFORM':
                 func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
-                func_list.append(pixelated.Pixelated(method='bilinear'))
-            elif profile_type == 'PIXELATED_BICUBIC':
-                func_list.append(pixelated.Pixelated(method='bicubic'))
+                func_list.append(pixelated.Pixelated(self._pixel_x_coords, self._pixel_y_coords, 
+                                                     method=pixel_interpol))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
                            f"Supported types are: {_SUPPORTED_MODELS}")
@@ -64,3 +65,25 @@ class LightModelBase(object):
             if bool_list[i]:
                 flux += func.function(x, y, **kwargs_list[i])
         return flux
+
+    @property
+    def pixelated_shape(self):
+        if not hasattr(self, '_pix_shape'):
+            idx = self.pixelated_index
+            if idx is not None:
+                if self._pixel_x_coords is None or self._pixel_y_coords is None:
+                    raise RuntimeError("There is a 'PIXELATED' light profile but "
+                                       "no coordinate arrays have been provided")
+                self._pix_shape = (len(self._pixel_x_coords), len(self._pixel_y_coords))
+            else:
+                self._pix_shape = None
+        return self._pix_shape
+
+    @property
+    def pixelated_index(self):
+        if not hasattr(self, '_pix_idx'):
+            try:
+                self._pix_idx = self.profile_type_list.index('PIXELATED')
+            except ValueError:
+                self._pix_idx = None
+        return self._pix_idx

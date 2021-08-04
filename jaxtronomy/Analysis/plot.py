@@ -68,8 +68,6 @@ class Plotter(object):
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
             if 'image' in kwargs_source[0]:
                 # we need to make sure it's jax.numpy array for source_surface_brightness when using PIXELATED source profile
-                kwargs_source[0]['x_coords'] = jnp.asarray(kwargs_source[0]['x_coords'])
-                kwargs_source[0]['y_coords'] = jnp.asarray(kwargs_source[0]['y_coords'])
                 kwargs_source[0]['image'] = jnp.asarray(kwargs_source[0]['image'])
             source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
             if true_source is None:
@@ -84,7 +82,9 @@ class Plotter(object):
                                                           kwargs_result['kwargs_lens'], k=pot_idx)
             kappa = lens_image.LensModel.kappa(x_grid_lens, y_grid_lens, 
                                                kwargs_result['kwargs_lens'], k=pot_idx)
-            potential_model = np.copy(kwargs_result['kwargs_lens'][pot_idx]['psi_grid'])
+            # potential_model = np.copy(kwargs_result['kwargs_lens'][pot_idx]['psi_grid'])
+            potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
+                                                             kwargs_result['kwargs_lens'], k=pot_idx)
 
             # here we know that there are no perturbations in the true potential
             if true_potential is None:
@@ -118,10 +118,9 @@ class Plotter(object):
             nice_colorbar(im)
             ax = axes[i_row, 2]
             norm_res = (data - model) / np.sqrt(noise_var)
+            red_chi2 = np.mean(norm_res**2)
             im = ax.imshow(norm_res, cmap=self.cmap_resid, vmin=-4, vmax=4, extent=extent)
-            ax.set_title("Normalised residuals", fontsize=self._base_fs)
-            red_chi2 = np.mean((data - model)**2 / noise_var)
-            ax.set_xlabel(r"$\chi^2$" + f" = {red_chi2:.2f}")
+            ax.set_title("Normalised residuals ("+r"$\chi^2$"+f"={red_chi2:.2f})", fontsize=self._base_fs)
             nice_colorbar_residuals(im, norm_res, vmin=-4, vmax=4)
             i_row += 1
 
@@ -141,7 +140,7 @@ class Plotter(object):
             vmax_diff = true_source.max() / 10.
             im = ax.imshow(diff, extent=extent, 
                            cmap=self.cmap_resid, vmin=-vmax_diff, vmax=vmax_diff)
-            ax.set_title("Absolute error", fontsize=self._base_fs)
+            ax.set_title("Residuals", fontsize=self._base_fs)
             nice_colorbar_residuals(im, diff, vmin=-vmax_diff, vmax=vmax_diff)
             i_row += 1
 
@@ -166,9 +165,9 @@ class Plotter(object):
             pot_abs_res_show = (true_potential - potential_model)
             if with_mask:
                 pot_abs_res_show *= potential_mask
-            vmax = np.max(np.abs(pot_abs_res_show))
+            vmax = np.max(np.abs(true_potential)) / 2.
             im = ax.imshow(pot_abs_res_show, cmap=self.cmap_resid, vmin=-vmax, vmax=vmax, extent=extent)
-            ax.set_title("Absolute residuals", fontsize=self._base_fs)
+            ax.set_title("Residuals", fontsize=self._base_fs)
             nice_colorbar_residuals(im, pot_abs_res_show, vmin=-vmax, vmax=vmax)
             i_row += 1
 

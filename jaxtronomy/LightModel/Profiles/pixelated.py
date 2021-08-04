@@ -2,17 +2,25 @@ import jax.numpy as jnp
 from jaxtronomy.Util.jax_util import BilinearInterpolator, BicubicInterpolator
 
 
+import numpy as np
+
+
 class Pixelated(object):
     """Source brightness defined on a fixed coordinate grid."""
-    param_names = ['x_coords', 'y_coords', 'image']
+    param_names = ['image']
     method_options = ['bilinear', 'bicubic']
 
-    def __init__(self, method='bilinear'):
-        self._method = method
+    def __init__(self, x_coords, y_coords, method='bilinear'):
         error_msg = "Invalid method. Must be either 'bilinear' or 'bicubic'."
-        assert self._method in self.method_options, error_msg
+        assert method in self.method_options, error_msg
+        if method == 'bilinear':
+            self._interp_class = BilinearInterpolator
+        else:
+            self._interp_class = BicubicInterpolator
+        self._x_coords, self._y_coords = x_coords, y_coords
+        self._pixel_area = (self._x_coords[0]-self._x_coords[1]) * (self._y_coords[0]-self._y_coords[1])
 
-    def function(self, x, y, x_coords, y_coords, image):
+    def function(self, x, y, image):
         """Interpolated evaluation of a pixelated source.
 
         Parameters
@@ -30,10 +38,8 @@ class Pixelated(object):
 
         """
         # Warning: assuming same pixel size across all the image! 
-        pixel_area = (x_coords[0]-x_coords[1]) * (y_coords[0]-y_coords[1])
-        if self._method == 'bilinear':
-            interp = BilinearInterpolator(x_coords, y_coords, image)
-        else:
-            interp = BicubicInterpolator(x_coords, y_coords, image)
+        
+        interp = self._interp_class(self._x_coords, self._y_coords, image)
         # we normalize the interpolated array for correct units when evaluated by LensImage methods
-        return interp(y, x).T / pixel_area
+        return interp(y, x).T / self._pixel_area
+    

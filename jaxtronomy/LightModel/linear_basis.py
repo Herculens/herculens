@@ -5,8 +5,12 @@ __all__ = ['LinearBasis']
 
 
 class LinearBasis(LightModelBase):
+
+    # TODO: remove this class (not necessary for auto-diff)
+
     """Base class for light models inheriting from LightModelBase."""
-    def __init__(self, light_model_list, smoothing=0.0000001):
+    def __init__(self, light_model_list, smoothing=0.0000001,
+                 pixel_x_coords=None, pixel_y_coords=None, pixel_interpol='bilinear'):
         """Create a LinearBasis object.
 
         Parameters
@@ -17,7 +21,8 @@ class LinearBasis(LightModelBase):
             Smoothing factor for some models (deprecated).
 
         """
-        super(LinearBasis, self).__init__(light_model_list, smoothing)
+        super(LinearBasis, self).__init__(light_model_list, smoothing,
+                                          pixel_x_coords, pixel_y_coords, pixel_interpol)
 
     @property
     def param_name_list(self):

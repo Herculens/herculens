@@ -6,6 +6,9 @@ from jaxtronomy.Util.jax_util import WaveletTransform
 
 
 class Loss(object):
+
+    # TODO: creates subclasses Likelihood, Regularization and Prior to abstract out some of the methods here
+
     """
     Class that manages the (auto-differentiable) loss function, defined as:
     L = - log(likelihood) - log(prior) - log(regularization)
@@ -102,7 +105,7 @@ class Loss(object):
         # TODO: generalise this for Poisson noise!
         data_noise_map = self._image.Noise.background_rms
 
-        self._idx_pix_src = self._param.pixelated_source_index
+        self._idx_pix_src = self._image.SourceModel.pixelated_index
         self._idx_pix_pot = self._param.pixelated_potential_index
 
         regul_func_list = []
@@ -111,7 +114,7 @@ class Loss(object):
             regul_func_list.append(getattr(self, '_log_regul_'+term))
 
             if term == 'l1_starlet_source':
-                n_pix_src = min(*self._param.pixelated_source_shape)
+                n_pix_src = min(*self._image.SourceModel.pixelated_shape)
                 n_scales = int(np.log2(n_pix_src))  # maximum allowed number of scales
                 self._starlet_src = WaveletTransform(n_scales, wavelet_type='starlet')
                 wavelet_norms = self._starlet_src.scale_norms[:-1]  # ignore coarsest scale

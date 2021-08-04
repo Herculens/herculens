@@ -16,8 +16,10 @@ class LightModel(LinearBasis):
 
     """
     def __init__(self, light_model_list, deflection_scaling_list=None,
-                 source_redshift_list=None, smoothing=0.001):
+                 source_redshift_list=None, smoothing=0.001,
+                 pixel_x_coords=None, pixel_y_coords=None, pixel_interpol='bilinear'):
         """Create a LightModel object."""
-        super(LightModel, self).__init__(light_model_list, smoothing)
+        super(LightModel, self).__init__(light_model_list, smoothing, 
+                                         pixel_x_coords, pixel_y_coords, pixel_interpol)
         self.deflection_scaling_list = deflection_scaling_list
         self.redshift_list = source_redshift_list
