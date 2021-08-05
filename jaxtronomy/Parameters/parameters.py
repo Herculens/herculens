@@ -204,7 +204,16 @@ class Parameters(object):
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
-                        args += kwargs_profile['pixels'].flatten().tolist()
+                        pixels = kwargs_profile['pixels']
+                        if isinstance(pixels, (int, float)):
+                            if kwargs_key == 'kwargs_lens':
+                                n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                            elif kwargs_key == 'kwargs_source':
+                                n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
+                            elif kwargs_key == 'kwargs_lens_light':
+                                n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
+                            pixels = pixels * np.ones((n_pix_x, n_pix_y))
+                        args += pixels.flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
         return args
