@@ -122,59 +122,6 @@ class Image2SourceMapping(object):
                     z_start = z_stop
             return flux
 
-    def image_flux_split(self, x, y, kwargs_lens, kwargs_source):
-        """
-
-        :param x: coordinate in image plane
-        :param y: coordinate in image plane
-        :param kwargs_lens: lens model kwargs list
-        :param kwargs_source: source model kwargs list
-        :return: list of responses of every single basis component with default amplitude amp=1, in the same order as the light_model_list
-        """
-        if not self._multi_source_plane:
-            x_source, y_source = self._lensModel.ray_shooting(x, y, kwargs_lens)
-            return self._lightModel.functions_split(x_source, y_source, kwargs_source)
-        else:
-            response = []
-            n = 0
-            if not self._multi_lens_plane:
-                x_alpha, y_alpha = self._lensModel.alpha(x, y, kwargs_lens)
-                for i in range(len(self._deflection_scaling_list)):
-                    scale_factor = self._deflection_scaling_list[i]
-                    x_source = x - x_alpha * scale_factor
-                    y_source = y - y_alpha * scale_factor
-                    response_i, n_i = self._lightModel.functions_split(x_source, y_source, kwargs_source, k=i)
-                    response += response_i
-                    n += n_i
-            else:
-                n_i_list = []
-                x_comov = np.zeros_like(x)
-                y_comov = np.zeros_like(y)
-                alpha_x, alpha_y = x, y
-                x_source, y_source = alpha_x, alpha_y
-                z_start = 0
-                for i, index_source in enumerate(self._sorted_source_redshift_index):
-                    z_stop = self._source_redshift_list[index_source]
-                    if z_stop > z_start:
-                        T_ij_start = self._T_ij_start_list[i]
-                        T_ij_end = self._T_ij_end_list[i]
-                        x_comov, y_comov, alpha_x, alpha_y = self._lensModel.lens_model.ray_shooting_partial(x_comov,
-                                                                y_comov, alpha_x, alpha_y, z_start, z_stop, kwargs_lens,
-                                                                include_z_start=False, T_ij_start=T_ij_start,
-                                                                T_ij_end=T_ij_end)
-                        T_z = self._T0z_list[index_source]
-                        x_source = x_comov / T_z
-                        y_source = y_comov / T_z
-                    response_i, n_i = self._lightModel.functions_split(x_source, y_source, kwargs_source, k=index_source)
-                    n_i_list.append(n_i)
-                    response += response_i
-                    n += n_i
-                    z_start = z_stop
-                n_list = self._lightModel.num_param_linear_list(kwargs_source)
-                response = self._re_order_split(response, n_list)
-
-            return response, n
-
     @staticmethod
     def _index_ordering(redshift_list):
         """

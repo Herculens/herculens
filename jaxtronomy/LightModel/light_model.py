@@ -1,9 +1,9 @@
-from jaxtronomy.LightModel.linear_basis import LinearBasis
+from jaxtronomy.LightModel.light_model_base import LightModelBase
 
 __all__ = ['LightModel']
 
 
-class LightModel(LinearBasis):
+class LightModel(LightModelBase):
     """Model extended surface brightness profiles of sources and lenses.
 
     Notes

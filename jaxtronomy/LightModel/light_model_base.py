@@ -44,6 +44,11 @@ class LightModelBase(object):
         self.func_list = func_list
         self._num_func = len(self.func_list)
 
+    @property
+    def param_name_list(self):
+        """Get parameter names as a list of strings for each light model."""
+        return [func.param_names for func in self.func_list]
+
     def surface_brightness(self, x, y, kwargs_list, k=None):
         """Total source flux at a given position.
 

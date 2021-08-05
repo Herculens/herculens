@@ -40,7 +40,6 @@ class LensImage(object):
             lens_model_class = LensModel(lens_model_list=[])
         self.LensModel = lens_model_class
         self._psf_error_map = self.PSF.psf_error_map_bool
-
         if source_model_class is None:
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
