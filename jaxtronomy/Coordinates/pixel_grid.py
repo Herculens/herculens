@@ -93,6 +93,8 @@ class PixelGrid(Coordinates):
 
         :return: RA coords, DEC coords
         """
+        if self._model_grids[name] is None:
+            return None
         return self._model_grids[name][0], self._model_grids[name][1]
 
     def model_pixel_axes(self, name):
@@ -100,12 +102,14 @@ class PixelGrid(Coordinates):
 
         :return: RA coords, DEC coords
         """
+        if self._model_grids[name] is None:
+            return None
         return self._model_grids[name][2], self._model_grids[name][3]
 
     def create_model_grid(self, factor, name='none', mode='supersampling'):
         if factor is None:
             # avoid unnecessary computations
-            self._model_grids[name] = (None, None, None, None)
+            self._model_grids[name] = None
             return
         if factor < 1:
             raise ValueError(f"{mode}-sampling factor must be equal to or greater than 1")

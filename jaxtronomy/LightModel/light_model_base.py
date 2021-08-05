@@ -41,10 +41,14 @@ class LightModelBase(object):
                 raise ValueError(err_msg)
         self.func_list = func_list
         self._num_func = len(self.func_list)
-        if 'PIXELATED' in self.profile_type_list and pixel_supersampling_factor is None:
+        if self.has_pixels and pixel_supersampling_factor is None:
             self._pixel_supersampling_factor = 1
         else:
             self._pixel_supersampling_factor = pixel_supersampling_factor
+
+    @property
+    def has_pixels(self):
+        return ('PIXELATED' in self.profile_type_list)
 
     @property
     def param_name_list(self):

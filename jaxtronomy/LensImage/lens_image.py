@@ -41,22 +41,25 @@ class LensImage(object):
         if lens_model_class is None:
             lens_model_class = LensModel(lens_model_list=[])
         self.LensModel = lens_model_class
-        self.Grid.create_model_grid(self.LensModel.pixel_undersampling_factor,
-                                    name='lens', mode='undersampling')
-        self.LensModel.set_pixel_grid(self.Grid.model_pixel_axes('lens'))
+        if self.LensModel.has_pixels:
+            self.Grid.create_model_grid(self.LensModel.pixel_undersampling_factor,
+                                        name='lens', mode='undersampling')
+            self.LensModel.set_pixel_grid(self.Grid.model_pixel_axes('lens'))
         self._psf_error_map = self.PSF.psf_error_map_bool
         if source_model_class is None:
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
-        self.Grid.create_model_grid(self.SourceModel.pixel_supersampling_factor,
-                                    name='source', mode='supersampling')
-        self.SourceModel.set_pixel_grid(self.Grid.model_pixel_axes('source'), self.Grid.pixel_area)
+        if self.SourceModel.has_pixels:
+            self.Grid.create_model_grid(self.SourceModel.pixel_supersampling_factor,
+                                        name='source', mode='supersampling')
+            self.SourceModel.set_pixel_grid(self.Grid.model_pixel_axes('source'), self.Grid.pixel_area)
         if lens_light_model_class is None:
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class
-        self.Grid.create_model_grid(self.LensLightModel.pixel_supersampling_factor,
-                                    name='lens_light', mode='supersampling')
-        self.LensLightModel.set_pixel_grid(self.Grid.model_pixel_axes('lens_light'), self.Grid.pixel_area)
+        if self.LensLightModel.has_pixels:
+            self.Grid.create_model_grid(self.LensLightModel.pixel_supersampling_factor,
+                                        name='lens_light', mode='supersampling')
+            self.LensLightModel.set_pixel_grid(self.Grid.model_pixel_axes('lens_light'), self.Grid.pixel_area)
         self._kwargs_numerics = kwargs_numerics
         self.source_mapping = Image2SourceMapping(lens_model_class, source_model_class)
 

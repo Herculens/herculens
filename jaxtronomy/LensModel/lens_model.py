@@ -216,6 +216,10 @@ class LensModel(object):
         det_A = (1 - f_xx) * (1 - f_yy) - f_xy * f_yx
         return 1. / det_A  # attention, if dividing by zero
 
+    @property
+    def has_pixels(self):
+        return self.lens_model.has_pixels
+
     def set_pixel_grid(self, pixel_axes):
         self.lens_model.set_pixel_grid(pixel_axes)
 

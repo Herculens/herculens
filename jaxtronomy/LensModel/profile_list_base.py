@@ -23,10 +23,14 @@ class ProfileListBase(object):
         self.func_list = self._load_model_instances(lens_model_list, lens_redshift_list)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
-        if 'PIXELATED' in self._model_list and pixel_undersampling_factor is None:
+        if self.has_pixels and pixel_undersampling_factor is None:
             self._pixel_undersampling_factor = 1
         else:
             self._pixel_undersampling_factor = pixel_undersampling_factor
+
+    @property
+    def has_pixels(self):
+        return ('PIXELATED' in self._model_list)
 
     def _load_model_instances(self, lens_model_list, lens_redshift_list=None):
         if lens_redshift_list is None:
