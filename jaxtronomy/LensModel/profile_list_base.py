@@ -9,7 +9,7 @@ _SUPPORTED_MODELS = ['SHEAR', 'SHEAR_GAMMA_PSI', 'SIE', 'PIXELATED']
 class ProfileListBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
     def __init__(self, lens_model_list, lens_redshift_list=None,
-                 pixel_x_coords=None, pixel_y_coords=None):
+                 pixel_undersampling_factor=None):
         """Create a ProfileListBase object.
 
         Parameters
@@ -20,10 +20,13 @@ class ProfileListBase(object):
             Lens redshifts corresponding to the profiles in `lens_model_list`.
 
         """
-        self._pixel_x_coords, self._pixel_y_coords = pixel_x_coords, pixel_y_coords
         self.func_list = self._load_model_instances(lens_model_list, lens_redshift_list)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
+        if 'PIXELATED' in self._model_list and pixel_undersampling_factor is None:
+            self._pixel_undersampling_factor = 1
+        else:
+            self._pixel_undersampling_factor = pixel_undersampling_factor
 
     def _load_model_instances(self, lens_model_list, lens_redshift_list=None):
         if lens_redshift_list is None:
@@ -53,7 +56,7 @@ class ProfileListBase(object):
         elif lens_type == 'SIE':
             return sie.SIE()
         elif lens_type == 'PIXELATED':
-            return pixelated.PixelatedPotential(self._pixel_x_coords, self._pixel_y_coords)
+            return pixelated.PixelatedPotential()
         else:
             err_msg = (f"{lens_type} is not a valid lens model. " +
                        f"Supported types are {_SUPPORTED_MODELS}")
@@ -79,6 +82,15 @@ class ProfileListBase(object):
         for func in self.func_list:
             func.set_dynamic()
 
+    def set_pixel_grid(self, pixel_axes):
+        for i, func in enumerate(self.func_list):
+            if self._model_list[i] == 'PIXELATED':
+                func.set_data_pixel_grid(pixel_axes)
+
+    @property
+    def pixel_undersampling_factor(self):
+        return self._pixel_undersampling_factor
+
     @property
     def pixelated_index(self):
         if not hasattr(self, '_pix_idx'):
@@ -89,18 +101,16 @@ class ProfileListBase(object):
         return self._pix_idx
 
     @property
-    def pixelated_shape(self):
-        if not hasattr(self, '_pix_shape'):
-            idx = self.pixelated_index
-            if idx is not None:
-                if self._pixel_x_coords is None or self._pixel_y_coords is None:
-                    raise RuntimeError("There is a 'PIXELATED' light profile but "
-                                       "no coordinate arrays have been provided")
-                self._pix_shape = (len(self._pixel_x_coords), len(self._pixel_y_coords))
-            else:
-                self._pix_shape = None
-        return self._pix_shape
+    def pixelated_coordinates(self):
+        idx = self.pixelated_index
+        if idx is None:
+            return None, None
+        return self.func_list[idx].x_coords, self.func_list[idx].y_coords
 
     @property
-    def pixelated_coordinates(self):
-        return self._pixel_x_coords, self._pixel_y_coords
+    def pixelated_shape(self):
+        x_coords, y_coords = self.pixelated_coordinates
+        if x_coords is None:
+            return None
+        else:
+            return (len(x_coords), len(y_coords))

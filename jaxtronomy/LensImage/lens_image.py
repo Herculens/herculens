@@ -1,4 +1,5 @@
 import functools
+import copy
 import jax.numpy as np
 from functools import partial
 from jax import jit
@@ -31,7 +32,8 @@ class LensImage(object):
         self.num_bands = 1
         self.PSF = psf_class
         self.Noise = noise_class
-        self.Grid = grid_class
+        # here we deep-copy the class to prevent issues with model grid creations below
+        self.Grid = copy.deepcopy(grid_class)
         self.PSF.set_pixel_size(self.Grid.pixel_width)
         if kwargs_numerics is None:
             kwargs_numerics = {}
@@ -39,14 +41,22 @@ class LensImage(object):
         if lens_model_class is None:
             lens_model_class = LensModel(lens_model_list=[])
         self.LensModel = lens_model_class
+        self.Grid.create_model_grid(self.LensModel.pixel_undersampling_factor,
+                                    name='lens', mode='undersampling')
+        self.LensModel.set_pixel_grid(self.Grid.model_pixel_axes('lens'))
         self._psf_error_map = self.PSF.psf_error_map_bool
         if source_model_class is None:
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
-        self.SourceModel.set_pixel_area(self.Grid.pixel_area)
+        self.Grid.create_model_grid(self.SourceModel.pixel_supersampling_factor,
+                                    name='source', mode='supersampling')
+        self.SourceModel.set_pixel_grid(self.Grid.model_pixel_axes('source'), self.Grid.pixel_area)
         if lens_light_model_class is None:
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class
+        self.Grid.create_model_grid(self.LensLightModel.pixel_supersampling_factor,
+                                    name='lens_light', mode='supersampling')
+        self.LensLightModel.set_pixel_grid(self.Grid.model_pixel_axes('lens_light'), self.Grid.pixel_area)
         self._kwargs_numerics = kwargs_numerics
         self.source_mapping = Image2SourceMapping(lens_model_class, source_model_class)
 

@@ -11,7 +11,7 @@ _SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXE
 class LightModelBase(object):
     """Base class for source and lens light models."""
     def __init__(self, light_model_list, smoothing=0.001,
-                 pixel_x_coords=None, pixel_y_coords=None, pixel_interpol='bilinear'):
+                 pixel_supersampling_factor=None, pixel_interpol='bilinear'):
         """Create a LightModelBase object.
 
         Parameters
@@ -23,7 +23,6 @@ class LightModelBase(object):
 
         """
         self.profile_type_list = light_model_list
-        self._pixel_x_coords, self._pixel_y_coords = pixel_x_coords, pixel_y_coords
         func_list = []
         for profile_type in light_model_list:
             if profile_type == 'SERSIC':
@@ -35,14 +34,17 @@ class LightModelBase(object):
             elif profile_type == 'UNIFORM':
                 func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
-                func_list.append(pixelated.Pixelated(self._pixel_x_coords, self._pixel_y_coords,
-                                                     method=pixel_interpol))
+                func_list.append(pixelated.Pixelated(method=pixel_interpol))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
                            f"Supported types are: {_SUPPORTED_MODELS}")
                 raise ValueError(err_msg)
         self.func_list = func_list
         self._num_func = len(self.func_list)
+        if 'PIXELATED' in self.profile_type_list and pixel_supersampling_factor is None:
+            self._pixel_supersampling_factor = 1
+        else:
+            self._pixel_supersampling_factor = pixel_supersampling_factor
 
     @property
     def param_name_list(self):
@@ -71,10 +73,14 @@ class LightModelBase(object):
                 flux += func.function(x, y, **kwargs_list[i])
         return flux
 
-    def set_pixel_area(self, pixel_area):
+    def set_pixel_grid(self, pixel_axes, data_pixel_area):
         for i, func in enumerate(self.func_list):
             if self.profile_type_list[i] == 'PIXELATED':
-                func.set_data_pixel_area(pixel_area)
+                func.set_data_pixel_grid(pixel_axes, data_pixel_area)
+
+    @property
+    def pixel_supersampling_factor(self):
+        return self._pixel_supersampling_factor
 
     @property
     def pixelated_index(self):
@@ -86,18 +92,16 @@ class LightModelBase(object):
         return self._pix_idx
 
     @property
-    def pixelated_shape(self):
-        if not hasattr(self, '_pix_shape'):
-            idx = self.pixelated_index
-            if idx is not None:
-                if self._pixel_x_coords is None or self._pixel_y_coords is None:
-                    raise RuntimeError("There is a 'PIXELATED' light profile but "
-                                       "no coordinate arrays have been provided")
-                self._pix_shape = (len(self._pixel_x_coords), len(self._pixel_y_coords))
-            else:
-                self._pix_shape = None
-        return self._pix_shape
+    def pixelated_coordinates(self):
+        idx = self.pixelated_index
+        if idx is None:
+            return None, None
+        return self.func_list[idx].x_coords, self.func_list[idx].y_coords
 
     @property
-    def pixelated_coordinates(self):
-        return self._pixel_x_coords, self._pixel_y_coords
+    def pixelated_shape(self):
+        x_coords, y_coords = self.pixelated_coordinates
+        if x_coords is None:
+            return None
+        else:
+            return (len(x_coords), len(y_coords))

@@ -1,16 +1,14 @@
-# from __future__ import print_function, division, absolute_import, unicode_literals
 from jaxtronomy.LensModel.single_plane import SinglePlane
 # from jaxtronomy.LensModel.multi_plane import MultiPlane
 # from jaxtronomy.Cosmo.lens_cosmo import LensCosmo
 # from astropy.cosmology import default_cosmology
-# from jaxtronomy.Util import constants as const
 
 __all__ = ['LensModel']
 
 
 class LensModel(object):
     """An arbitrary list of lens models."""
-    def __init__(self, lens_model_list, pixel_x_coords=None, pixel_y_coords=None):
+    def __init__(self, lens_model_list, pixel_undersampling_factor=None):
         """Create a LensModel object.
 
         Parameters
@@ -39,16 +37,18 @@ class LensModel(object):
         # self.cosmo = cosmo
         self.multi_plane = False  # multi_plane
         if self.multi_plane:
-            if z_source is None:
-                raise ValueError('z_source needs to be set for multi-plane lens modelling.')
+            raise NotImplementedError("Multi-plane lensing is currently not supported")
 
-            self.lens_model = MultiPlane(z_source, lens_model_list,
-                                         lens_redshift_list, cosmo=cosmo,
-                                         observed_convention_index=observed_convention_index)
+            # if z_source is None:
+            #     raise ValueError('z_source needs to be set for multi-plane lens modelling.')
+
+            # self.lens_model = MultiPlane(z_source, lens_model_list,
+            #                              lens_redshift_list, cosmo=cosmo,
+            #                              observed_convention_index=observed_convention_index)
         else:
             self.lens_model = SinglePlane(self.lens_model_list,
                                           self.redshift_list,
-                                          pixel_x_coords=pixel_x_coords, pixel_y_coords=pixel_y_coords)
+                                          pixel_undersampling_factor=pixel_undersampling_factor)
         # if z_lens is not None and z_source is not None:
         #     self._lensCosmo = LensCosmo(z_lens, z_source, cosmo=cosmo)
 
@@ -215,6 +215,13 @@ class LensModel(object):
         f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k, diff=diff, diff_method=diff_method)
         det_A = (1 - f_xx) * (1 - f_yy) - f_xy * f_yx
         return 1. / det_A  # attention, if dividing by zero
+
+    def set_pixel_grid(self, pixel_axes):
+        self.lens_model.set_pixel_grid(pixel_axes)
+
+    @property
+    def pixel_undersampling_factor(self):
+        return self.lens_model.pixel_undersampling_factor
 
     @property
     def pixelated_index(self):

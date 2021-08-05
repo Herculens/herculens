@@ -22,6 +22,7 @@ class PixelGrid(Coordinates):
         self._nx = nx
         self._ny = ny
         self._x_grid, self._y_grid = self.coordinate_grid(nx, ny)
+        self._model_grids = {}
 
     @property
     def num_pixel(self):
@@ -73,3 +74,54 @@ class PixelGrid(Coordinates):
         :return: RA coords, DEC coords
         """
         return self._x_grid, self._y_grid
+
+    @property
+    def pixel_axes(self):
+        """
+
+        :return: RA coords, DEC coords
+        """
+        return self._x_grid[0, :], self._y_grid[:, 0]
+
+    @property
+    def extent(self):
+        x_coords, y_coords = self.pixel_axes
+        return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
+
+    def model_pixel_coordinates(self, name):
+        """
+
+        :return: RA coords, DEC coords
+        """
+        return self._model_grids[name][0], self._model_grids[name][1]
+
+    def model_pixel_axes(self, name):
+        """
+
+        :return: RA coords, DEC coords
+        """
+        return self._model_grids[name][2], self._model_grids[name][3]
+
+    def create_model_grid(self, factor, name='none', mode='supersampling'):
+        if factor is None:
+            # avoid unnecessary computations
+            self._model_grids[name] = (None, None, None, None)
+            return
+        if factor < 1:
+            raise ValueError(f"{mode}-sampling factor must be equal to or greater than 1")
+        if factor == 1:
+            x_grid = np.copy(self._x_grid)
+            y_grid = np.copy(self._y_grid)
+            x_coords, y_coords = x_grid[0, :], y_grid[:, 0]
+        else:
+            if mode == 'supersampling':
+                nx = self._nx * int(factor)
+                ny = self._ny * int(factor)
+            else:
+                nx = self._nx // int(factor)
+                ny = self._ny // int(factor)
+            extent = self.extent
+            x_coords = np.linspace(extent[0], extent[1], nx)
+            y_coords = np.linspace(extent[2], extent[3], ny)
+            x_grid, y_grid = np.meshgrid(x_coords, y_coords)
+        self._model_grids[name] = (x_grid, y_grid, x_coords, y_coords)

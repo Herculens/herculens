@@ -10,14 +10,15 @@ class Pixelated(object):
     param_names = ['pixels']
     method_options = ['bilinear', 'bicubic']
 
-    def __init__(self, x_coords, y_coords, method='bilinear'):
+    def __init__(self, method='bilinear'):
         error_msg = "Invalid method. Must be either 'bilinear' or 'bicubic'."
         assert method in self.method_options, error_msg
         if method == 'bilinear':
             self._interp_class = BilinearInterpolator
         else:
             self._interp_class = BicubicInterpolator
-        self._x_coords, self._y_coords = x_coords, y_coords
+        self.data_pixel_area = None
+        self.x_coords, self.y_coords = None, None
 
     def function(self, x, y, pixels):
         """Interpolated evaluation of a pixelated source.
@@ -37,9 +38,10 @@ class Pixelated(object):
 
         """
         # Warning: assuming same pixel size across all the image!
-        interp = self._interp_class(self._x_coords, self._y_coords, pixels)
+        interp = self._interp_class(self.x_coords, self.y_coords, pixels)
         # we normalize the interpolated array for correct units when evaluated by LensImage methods
-        return interp(y, x).T / self._data_pixel_area
+        return interp(y, x).T / self.data_pixel_area
     
-    def set_data_pixel_area(self, pixel_area):
-        self._data_pixel_area = pixel_area
+    def set_data_pixel_grid(self, pixel_axes, data_pixel_area):
+        self.data_pixel_area = data_pixel_area
+        self.x_coords, self.y_coords = pixel_axes
