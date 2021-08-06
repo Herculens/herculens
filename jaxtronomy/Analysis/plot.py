@@ -1,4 +1,5 @@
 import copy
+import warnings
 import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -108,7 +109,7 @@ class Plotter(object):
                     x_coords_src = np.linspace(extent[0], extent[1], npix_src)
                     y_coords_src = np.linspace(extent[2], extent[3], npix_src)
                 true_source = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords_src, y_coords_src)
-                print("True source array has been interpolated to match model array")
+                warnings.warn("True source array has been interpolated to match model array")
 
         if show_lens_mass:
             # TODO: check that there is indeed a pixelated potential profile in the model
@@ -146,7 +147,6 @@ class Plotter(object):
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows*5))
         if len(axes.shape) == 1:
             axes.reshape((n_rows, n_cols))
-
         i_row = 0
 
         if show_image:
@@ -177,6 +177,7 @@ class Plotter(object):
             ax.set_title("True source", fontsize=self._base_fs)
             ax = axes[i_row, 1]
             im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+            #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
             nice_colorbar(im)
             ax.set_title("Source model", fontsize=self._base_fs)
             ax = axes[i_row, 2]
@@ -204,7 +205,7 @@ class Plotter(object):
             vmax = np.max(np.abs(true_potential)) / 2.
             im = ax.imshow(pot_abs_res, cmap=self.cmap_resid, vmin=-vmax, vmax=vmax, extent=extent)
             ax.set_title("Residuals", fontsize=self._base_fs)
-            nice_colorbar_residuals(im, pot_abs_res_show, vmin=-vmax, vmax=vmax)
+            nice_colorbar_residuals(im, pot_abs_res, vmin=-vmax, vmax=vmax)
             i_row += 1
 
             ##### DEFLECTION ANGLES AND SURFACE MASS DENSITY #####

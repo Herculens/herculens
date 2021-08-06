@@ -11,7 +11,8 @@ _SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXE
 class LightModelBase(object):
     """Base class for source and lens light models."""
     def __init__(self, light_model_list, smoothing=0.001,
-                 pixel_supersampling_factor=None, pixel_interpol='bilinear'):
+                 pixel_interpol='bilinear', pixel_supersampling_factor=None,
+                 pixel_window_size=None, pixel_window_center=None, pixel_scale_factor=None):
         """Create a LightModelBase object.
 
         Parameters
@@ -45,6 +46,9 @@ class LightModelBase(object):
             self._pixel_supersampling_factor = 1
         else:
             self._pixel_supersampling_factor = pixel_supersampling_factor
+            self._pixel_window_size = pixel_window_size
+            self._pixel_window_center = pixel_window_center
+            self._pixel_scale_factor = pixel_scale_factor
 
     @property
     def has_pixels(self):
