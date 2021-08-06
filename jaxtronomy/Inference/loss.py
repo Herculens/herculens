@@ -19,8 +19,8 @@ class Loss(object):
     - likelihood_type [default: 'chi2']: single choice among
         'chi2', 'l2_norm'
     - regularization_terms [default: None]: a list containing choices among
-        - for a 'PIXELATED' source: 'l1_starlet_source', 'l1_battle_source'
-        - for a 'PIXELATED' lens potential: 'l1_starlet_potential', 'l1_battle_potential'
+        - for a 'PIXELATED' source: 'l1_starlet_source', 'l1_battle_source', 'positivity_source'
+        - for a 'PIXELATED' lens potential: 'l1_starlet_potential', 'l1_battle_potential', 'positivity_potential'
     - prior_terms [default: None]: a list containing choices among
         'uniform', 'gaussian'
     """
@@ -59,6 +59,10 @@ class Loss(object):
     @property
     def likelihood_data_points(self):
         return self._ll_num_data_points
+
+    @property
+    def likelihood_mask(self):
+        return self._ll_mask
 
     def _check_choices(self, likelihood_type, prior_terms, regularization_terms, regularization_strengths):
         if likelihood_type not in self._supported_ll:
@@ -109,12 +113,9 @@ class Loss(object):
             self._log_regul = lambda kwargs: 0.  # no regularization
             return
 
-        # pre-compute some quantities required for the chosen regularizations
-        # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
-        data_noise_map = self._image.Noise.background_rms
-
         self._idx_pix_src = self._image.SourceModel.pixelated_index
         self._idx_pix_pot = self._image.LensModel.pixelated_index
+        self._noise_map_pot = potential_noise_map
 
         regul_func_list = []
         for term, strength in zip(regularization_terms, regularization_strengths):
@@ -126,7 +127,7 @@ class Loss(object):
                 n_scales = int(np.log2(n_pix_src))  # maximum allowed number of scales
                 self._starlet_src = WaveletTransform(n_scales, wavelet_type='starlet')
                 wavelet_norms = self._starlet_src.scale_norms[:-1]  # ignore coarsest scale
-                self._st_src_weights = data_noise_map * jnp.expand_dims(wavelet_norms, (1, 2))   # <<-- not full noise sigma !
+                self._st_src_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if isinstance(strength, (int, float)):
                     self._st_src_lambda = self._st_src_lambda_hf = float(strength)
                 elif isinstance(strength, (tuple, list)):
@@ -139,8 +140,7 @@ class Loss(object):
             elif term == 'l1_battle_source':
                 n_scales = 1  # maximum allowed number of scales
                 self._battle_src = WaveletTransform(n_scales, wavelet_type='battle-lemarie-3')
-                wavelet_norm = self._battle_src.scale_norms[0]  # consider only first scale
-                self._bt_src_weights = data_noise_map * wavelet_norm   # <<-- not full noise sigma !
+                self._bt_src_norm = self._battle_src.scale_norms[0]  # consider only first scale
                 if isinstance(strength, (tuple, list)):
                     raise ValueError("You can only specify one regularization "
                                      "strength for Battle-Lemarie regularization")
@@ -157,7 +157,7 @@ class Loss(object):
                 n_scales = int(np.log2(n_pix_pot))  # maximum allowed number of scales
                 self._starlet_pot = WaveletTransform(n_scales, wavelet_type='starlet')
                 wavelet_norms = self._starlet_pot.scale_norms[:-1]  # ignore coarsest scale
-                self._st_pot_weights = potential_noise_map * jnp.expand_dims(wavelet_norms, (1, 2))   # <<-- not full noise sigma !
+                self._st_pot_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if isinstance(strength, (int, float)):
                     self._st_pot_lambda = self._st_pot_lambda_hf = float(strength)
                 elif isinstance(strength, (tuple, list)):
@@ -170,8 +170,7 @@ class Loss(object):
             elif term == 'l1_battle_potential':
                 n_scales = 1  # maximum allowed number of scales
                 self._battle_pot = WaveletTransform(n_scales, wavelet_type='battle-lemarie-3')
-                wavelet_norm = self._battle_pot.scale_norms[0]  # consider only first scale
-                self._bt_pot_weights = potential_noise_map * wavelet_norm   # <<-- not full noise sigma !
+                self._bt_pot_norm = self._battle_pot.scale_norms[0]  # consider only first scale
                 if isinstance(strength, (tuple, list)):
                     raise ValueError("You can only specify one regularization "
                                      "strength for Battle-Lemarie regularization")
@@ -200,38 +199,44 @@ class Loss(object):
     def _log_likelihood_chi2(self, model):
         #noise_var = self._image.Noise.C_D_model(model)  # TODO: use this?
         noise_var = self._image.Noise.C_D
-        residuals = (self._data - model) * self._ll_mask
-        return - jnp.sum(residuals**2 / noise_var) / self._ll_num_data_points
+        residuals = (self._data - model) * self.likelihood_mask
+        return - jnp.sum(residuals**2 / noise_var) / self.likelihood_data_points
 
     def _log_likelihood_l2(self, model):
         # TODO: check that mask here does not mess up with the balance between l2-norm and wavelet regularization
-        residuals = (self._data - model) * self._ll_mask
+        residuals = (self._data - model) * self.likelihood_mask
         return - 0.5 * jnp.sum(residuals**2)
 
     def _log_regul_l1_starlet_source(self, kwargs):
+        # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
+        noise_map = np.mean(np.sqrt(self._image.Noise.C_D))
         source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
         st = self._starlet_src.decompose(source_model)[:-1]  # ignore coarsest scale
-        st_weighted_l1_hf = jnp.sum(self._st_src_weights[0] * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
-        st_weighted_l1 = jnp.sum(self._st_src_weights[1:] * jnp.abs(st[1:]))  # other scales
+        st_weighted_l1_hf = jnp.sum(self._st_src_norms[0] * noise_map * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
+        st_weighted_l1 = jnp.sum(self._st_src_norms[1:] * noise_map * jnp.abs(st[1:]))  # other scales
         return - (self._st_src_lambda_hf * st_weighted_l1_hf + self._st_src_lambda * st_weighted_l1)
 
     def _log_regul_l1_starlet_potential(self, kwargs):
+        noise_map = self._noise_map_pot
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
         st = self._starlet_pot.decompose(psi_model)[:-1]  # ignore coarsest scale
-        st_weighted_l1_hf = jnp.sum(self._st_pot_weights[0] * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
-        st_weighted_l1 = jnp.sum(self._st_pot_weights[1:] * jnp.abs(st[1:]))  # other scales
+        st_weighted_l1_hf = jnp.sum(self._st_pot_norms[0] * noise_map * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
+        st_weighted_l1 = jnp.sum(self._st_pot_norms[1:] * noise_map * jnp.abs(st[1:]))  # other scales
         return - (self._st_pot_lambda_hf * st_weighted_l1_hf + self._st_pot_lambda * st_weighted_l1)
 
     def _log_regul_l1_battle_source(self, kwargs):
+        # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
+        noise_map = np.mean(np.sqrt(self._image.Noise.C_D))
         source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
         bt = self._battle_src.decompose(source_model)[0]  # consider only first scale
-        bt_weighted_l1 = jnp.sum(self._bt_src_weights * jnp.abs(bt))
+        bt_weighted_l1 = jnp.sum(self._bt_src_norm * noise_map * jnp.abs(bt))
         return - self._bt_src_lambda * bt_weighted_l1
 
     def _log_regul_l1_battle_potential(self, kwargs):
+        noise_map = self._noise_map_pot
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
         bt = self._battle_pot.decompose(psi_model)[0]  # consider only first scale
-        bt_weighted_l1 = jnp.sum(self._bt_pot_weights * jnp.abs(bt))
+        bt_weighted_l1 = jnp.sum(self._bt_pot_norm * noise_map * jnp.abs(bt))
         return - self._bt_pot_lambda * bt_weighted_l1
 
     def _log_regul_positivity_source(self, kwargs):
