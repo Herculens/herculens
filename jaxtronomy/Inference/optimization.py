@@ -100,6 +100,22 @@ class Optimizer(InferenceBase):
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 
+    def gradient_descent(self, num_iterations=100, step_size=1e-2, restart_from_init=False):
+        import jax.numpy as jnp
+        # Initialise optimizer state
+        params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
+        
+        # Gradient descent loop
+        start_time = time.time()
+        for _ in range(num_iterations):
+            params -= step_size * self.gradient(params)
+        runtime = time.time() - start_time
+        best_fit = params
+        logL_best_fit = self.loss(best_fit)
+        extra_fields = {}  # TODO: use optax.second_order module to compute diagonal of Hessian?
+        self._param.set_best_fit(best_fit)
+        return best_fit, logL_best_fit, extra_fields, runtime
+
     def pso(self, n_particles=100, n_iterations=100, restart_from_init=False, n_threads=1):
         """legacy optimization method from lenstronomy, mainly for comparison"""
         from lenstronomy.Sampling.Samplers.pso import ParticleSwarmOptimizer
