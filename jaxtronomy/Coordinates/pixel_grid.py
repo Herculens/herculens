@@ -121,9 +121,11 @@ class PixelGrid(Coordinates):
             if mode == 'supersampling':
                 nx = self._nx * int(factor)
                 ny = self._ny * int(factor)
-            else:
+            elif mode == 'undersampling':
                 nx = self._nx // int(factor)
                 ny = self._ny // int(factor)
+            else:
+                raise ValueError(f"Mode '{mode}' for creating new coordinate grid is not supported")
             extent = self.extent
             x_coords = np.linspace(extent[0], extent[1], nx)
             y_coords = np.linspace(extent[2], extent[3], ny)

@@ -56,11 +56,8 @@ class Plotter(object):
 
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, show_lens_mass=False,
-                      shift_potential='min', with_mask=False,
-                      data_mask=None, potential_mask=None):
-        if data_mask is not None:
-            raise NotImplementedError("Data mask not yet supported")
-
+                      shift_potential='min',
+                      likelihood_mask=None, potential_mask=None):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_mass, show_lens_mass])
         
@@ -70,14 +67,16 @@ class Plotter(object):
         extent = [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
 
         if show_image:
+            if hasattr(self, '_data'):
+                data = self._data
+            else:
+                data = np.zeros_like(model)
+
             # create the resulting model image
             model = lens_image.model(**kwargs_result)
             noise_var = lens_image.Noise.C_D
-
-        if hasattr(self, '_data'):
-            data = self._data
-        else:
-            data = np.zeros_like(model)
+            if likelihood_mask is None:
+                likelihood_mask = np.ones_like(model)
 
         if show_source:
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
@@ -124,9 +123,6 @@ class Plotter(object):
             #potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
             #                                                 kwargs_result['kwargs_lens'], k=pot_idx)
 
-            if potential_mask is None:
-                potential_mask = np.ones_like(potential_model)
-
             # here we know that there are no perturbations in the true potential
             if hasattr(self, '_true_pot_perturb'):
                 true_potential = self._true_pot_perturb
@@ -142,7 +138,11 @@ class Plotter(object):
                 true_mean_in_mask = (true_potential * potential_mask).mean()
                 potential_model = potential_model - mean_in_mask + true_mean_in_mask
                 print("delta_psi shift by mean values:", mean_in_mask, true_mean_in_mask)
-            
+
+            if potential_mask is None:
+                # TODO: compute potential mask based on undersampled likelihood_mask
+                potential_mask = np.ones_like(potential_model)
+
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows*5))
         if len(axes.shape) == 1:
             axes.reshape((n_rows, n_cols))
@@ -153,7 +153,7 @@ class Plotter(object):
 
             ##### IMAGING DATA AND MODEL IMAGE #####
             ax = axes[i_row, 0]
-            im = ax.imshow(data, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
+            im = ax.imshow(data * likelihood_mask, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
             ax.set_title("Data", fontsize=self._base_fs)
             nice_colorbar(im)
             ax = axes[i_row, 1]
@@ -161,10 +161,10 @@ class Plotter(object):
             ax.set_title("Model", fontsize=self._base_fs)
             nice_colorbar(im)
             ax = axes[i_row, 2]
-            norm_res = (data - model) / np.sqrt(noise_var)
-            red_chi2 = np.mean(norm_res**2)
-            im = ax.imshow(norm_res, cmap=self.cmap_resid, vmin=-4, vmax=4, extent=extent)
-            ax.set_title("Normalised residuals ("+r"$\chi^2$"+f"={red_chi2:.2f})", fontsize=self._base_fs)
+            norm_res = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
+            red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
+            im = ax.imshow(norm_res * likelihood_mask, cmap=self.cmap_resid, vmin=-4, vmax=4, extent=extent)
+            ax.set_title("Norm. residuals ("+r"$\chi^2$"+f"={red_chi2:.2f})", fontsize=self._base_fs)
             nice_colorbar_residuals(im, norm_res, vmin=-4, vmax=4)
             i_row += 1
 
@@ -192,51 +192,35 @@ class Plotter(object):
 
             ##### PIXELATED POTENTIAL PERTURBATIONS #####
             ax = axes[i_row, 0]
-            true_pot_show = true_potential
-            if with_mask:
-                true_pot_show *= potential_mask
-            im = ax.imshow(true_pot_show, cmap=self.cmap_default, extent=extent)
+            im = ax.imshow(true_potential * potential_mask, cmap=self.cmap_default, extent=extent)
             ax.set_title("True $\delta\psi$", fontsize=self._base_fs)
             nice_colorbar(im)
             ax = axes[i_row, 1]
-            pot_model_show = potential_model
-            if with_mask:
-                pot_model_show *= potential_mask
-            im = ax.imshow(pot_model_show, cmap=self.cmap_default, extent=extent)
+            im = ax.imshow(potential_model * potential_mask, cmap=self.cmap_default, extent=extent)
             ax.set_title("$\delta\psi$ model", fontsize=self._base_fs)
             nice_colorbar(im)
             ax = axes[i_row, 2]
-            pot_abs_res_show = (true_potential - potential_model)
-            if with_mask:
-                pot_abs_res_show *= potential_mask
+            pot_abs_res = (true_potential - potential_model) * potential_mask
             vmax = np.max(np.abs(true_potential)) / 2.
-            im = ax.imshow(pot_abs_res_show, cmap=self.cmap_resid, vmin=-vmax, vmax=vmax, extent=extent)
+            im = ax.imshow(pot_abs_res, cmap=self.cmap_resid, vmin=-vmax, vmax=vmax, extent=extent)
             ax.set_title("Residuals", fontsize=self._base_fs)
             nice_colorbar_residuals(im, pot_abs_res_show, vmin=-vmax, vmax=vmax)
             i_row += 1
 
             ##### DEFLECTION ANGLES AND SURFACE MASS DENSITY #####
             ax = axes[i_row, 0]
-            alpha_x_show = alpha_x
-            if with_mask:
-                alpha_x_show *= potential_mask
             ax.set_title(r"$\delta\alpha_x$ model", fontsize=self._base_fs)
-            im = ax.imshow(alpha_x_show, cmap=self.cmap_deriv1, alpha=1, extent=extent)
+            im = ax.imshow(alpha_x * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
             nice_colorbar(im)
             ax = axes[i_row, 1]
             alpha_y_show = alpha_y
-            if with_mask:
-                alpha_y_show *= potential_mask
             ax.set_title(r"$\delta\alpha_y$ model", fontsize=self._base_fs)
-            im = ax.imshow(alpha_y_show, cmap=self.cmap_deriv1, alpha=1, extent=extent)
+            im = ax.imshow(alpha_y * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
             nice_colorbar(im)
             ax = axes[i_row, 2]
-            #kappa_show = kappa
-            kappa_show = ndimage.gaussian_filter(kappa, 1)
-            if with_mask:
-                kappa_show *= potential_mask
+            kappa_smoothed = ndimage.gaussian_filter(kappa, 1)
             ax.set_title(r"$\delta\kappa$ model (smoothed)", fontsize=self._base_fs)
-            im = ax.imshow(kappa_show, cmap=self.cmap_deriv2, alpha=1, extent=extent) #, vmin=0)
+            im = ax.imshow(kappa_smoothed * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent) #, vmin=0)
             nice_colorbar(im)
         
         plt.show()

@@ -154,3 +154,17 @@ class LensImage(object):
         if compute_true_noise_map is True:
             self.Noise.compute_noise_map_from_model(model)
         return simu
+
+    def normalized_residuals(self, data, model, mask=None):
+        if mask is None:
+            mask = np.ones(self.Grid.num_pixel_axes)
+        #noise_var = self.Noise.C_D_model(model)
+        noise_var = self.Noise.C_D
+        norm_res = (model - data) / np.sqrt(noise_var) * mask
+        return norm_res
+
+    def reduced_chi2(self, data, model, mask=None):
+        norm_res = self.normalized_residuals(data, model, mask=mask)
+        num_data_points = np.count_nonzero(mask)
+        return np.sum(norm_res**2) / num_data_points
+        
