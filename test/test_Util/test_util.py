@@ -63,6 +63,17 @@ def test_image2array2image():
     image_new = util.array2image(array, nx, ny)
     assert image_new[1, 2] == image[1, 2]
 
+def test_make_grid_transform():
+    numPix = 11
+    theta = np.pi / 2
+    deltaPix = 0.05
+    Mpix2coord = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]) * deltaPix
+    ra_coord, dec_coord = util.make_grid_transformed(numPix, Mpix2coord)
+    ra2d = util.array2image(ra_coord)
+    assert ra2d[5, 5] == 0
+    assert ra2d[4, 5] == deltaPix
+    npt.assert_almost_equal(ra2d[5, 4], 0, decimal=10)
+
 def test_make_subgrid():
     numPix = 101
     deltapix = 1

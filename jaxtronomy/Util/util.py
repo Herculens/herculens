@@ -111,6 +111,17 @@ def make_grid(numPix, deltapix, subgrid_res=1, left_lower=False):
 
     return x_grid - shift[0], y_grid - shift[1]
 
+def make_grid_transformed(numPix, Mpix2Angle):
+    """
+    returns grid with linear transformation (deltaPix and rotation)
+    :param numPix: number of Pixels
+    :param Mpix2Angle: 2-by-2 matrix to mat a pixel to a coordinate
+    :return: coordinate grid
+    """
+    x_grid, y_grid = make_grid(numPix, deltapix=1)
+    ra_grid, dec_grid = map_coord2pix(x_grid, y_grid, 0, 0, Mpix2Angle)
+    return ra_grid, dec_grid
+
 def grid_from_coordinate_transform(nx, ny, Mpix2coord, ra_at_xy_0, dec_at_xy_0):
     """Return x and y coordinate grids that satisfy the coordinate system.
 
