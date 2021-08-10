@@ -62,11 +62,12 @@ class Plotter(object):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_mass, show_lens_mass])
         
-        x_grid, y_grid = lens_image.Grid.pixel_coordinates
-        x_coords = x_grid[0, :]
-        y_coords = y_grid[:, 0]
-        extent = [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
-
+        extent = lens_image.Grid.extent
+        if lens_image.SourceModel.has_pixels:
+            src_extent = lens_image.Grid.model_pixel_extent('source')
+        else:
+            src_extent = extent
+            
         if show_image:
             if hasattr(self, '_data'):
                 data = self._data
@@ -172,18 +173,18 @@ class Plotter(object):
 
             ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
             ax = axes[i_row, 0]
-            im = ax.imshow(true_source, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+            im = ax.imshow(true_source, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
             nice_colorbar(im)
             ax.set_title("True source", fontsize=self._base_fs)
             ax = axes[i_row, 1]
-            im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+            im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
             #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
             nice_colorbar(im)
             ax.set_title("Source model", fontsize=self._base_fs)
             ax = axes[i_row, 2]
             diff = true_source - source_model
             vmax_diff = true_source.max() / 10.
-            im = ax.imshow(diff, extent=extent, 
+            im = ax.imshow(diff, extent=src_extent, 
                            cmap=self.cmap_resid, vmin=-vmax_diff, vmax=vmax_diff)
             ax.set_title("Residuals", fontsize=self._base_fs)
             nice_colorbar_residuals(im, diff, vmin=-vmax_diff, vmax=vmax_diff)
