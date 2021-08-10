@@ -9,7 +9,6 @@ def rotate(xcoords, ycoords, angle):
     new_y = -xcoords * jnp.sin(angle) + ycoords * jnp.cos(angle)
     return new_x, new_y
 
-
 def map_coord2pix(ra, dec, x_0, y_0, M):
     """Perform a linear transformation between two coordinate systems.
 
@@ -23,7 +22,6 @@ def map_coord2pix(ra, dec, x_0, y_0, M):
     """
     x, y = M.dot(np.array([ra, dec]))
     return x + x_0, y + y_0
-
 
 def array2image(array, nx=0, ny=0):
     """Convert a 1d array into a 2d array.
@@ -46,7 +44,6 @@ def array2image(array, nx=0, ny=0):
     image = array.reshape(int(nx), int(ny))
     return image
 
-
 def image2array(image):
     """Convert a 2d array into a 1d array.
 
@@ -59,7 +56,6 @@ def image2array(image):
     # imgh = np.reshape(image, nx * ny)  # change the shape to be 1d
     # return imgh
     return image.ravel()
-
 
 def make_grid(numPix, deltapix, subgrid_res=1, left_lower=False):
     """
@@ -115,7 +111,6 @@ def make_grid(numPix, deltapix, subgrid_res=1, left_lower=False):
 
     return x_grid - shift[0], y_grid - shift[1]
 
-
 def grid_from_coordinate_transform(nx, ny, Mpix2coord, ra_at_xy_0, dec_at_xy_0):
     """Return x and y coordinate grids that satisfy the coordinate system.
 
@@ -135,7 +130,6 @@ def grid_from_coordinate_transform(nx, ny, Mpix2coord, ra_at_xy_0, dec_at_xy_0):
     dec_grid = x_grid * Mpix2coord[1, 0] + y_grid * Mpix2coord[1, 1] + dec_at_xy_0
     return ra_grid, dec_grid
 
-
 def averaging(grid, numGrid, numPix):
     """
     resize 2d pixel grid with numGrid to numPix and averages over the pixels
@@ -150,7 +144,6 @@ def averaging(grid, numGrid, numPix):
     small = grid.reshape([int(Nsmall), int(Nbig / Nsmall), int(Nsmall), int(Nbig / Nsmall)]).mean(3).mean(1)
     return small
 
-
 def fwhm2sigma(fwhm):
     """
 
@@ -160,6 +153,14 @@ def fwhm2sigma(fwhm):
     sigma = fwhm / (2 * np.sqrt(2 * np.log(2)))
     return sigma
 
+def sigma2fwhm(sigma):
+    """
+
+    :param sigma:
+    :return:
+    """
+    fwhm = sigma * (2 * np.sqrt(2 * np.log(2)))
+    return fwhm
 
 def make_subgrid(ra_coord, dec_coord, subgrid_res=2):
     """
@@ -183,7 +184,6 @@ def make_subgrid(ra_coord, dec_coord, subgrid_res=2):
 
     ra_subgrid, dec_subgrid = np.meshgrid(ra_new, dec_new)
     return image2array(ra_subgrid), image2array(dec_subgrid)
-
 
 def convert_bool_list(n, k=None):
     """

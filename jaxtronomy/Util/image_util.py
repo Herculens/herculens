@@ -1,9 +1,6 @@
 import numpy as np
-# import jax.numpy as np
-# from jax import random
 from scipy import interpolate #, ndimage
 from scipy.ndimage import interpolation as interp
-# import jaxtronomy.Util.util as util
 # from jaxtronomy.Util.jax_util import BilinearInterpolator
 
 
@@ -24,7 +21,6 @@ def add_layer2image(grid2d, x_pos, y_pos, kernel, order=1):
     shift_y = y_int - y_pos
     kernel_shifted = interp.shift(kernel, [-shift_y, -shift_x], order=order)
     return add_layer2image_int(grid2d, x_int, y_int, kernel_shifted)
-
 
 def add_layer2image_int(grid2d, x_pos, y_pos, kernel):
     """
@@ -63,7 +59,6 @@ def add_layer2image_int(grid2d, x_pos, y_pos, kernel):
     new[min_y:max_y, min_x:max_x] += kernel_re_sized
     return new
 
-
 def add_background(image, sigma_bkd):
     """
     adds background noise to image
@@ -78,7 +73,6 @@ def add_background(image, sigma_bkd):
     nx, ny = np.shape(image)
     background = np.random.randn(nx, ny) * sigma_bkd
     return background
-
 
 def add_poisson(image, exp_time):
     """
@@ -100,7 +94,6 @@ def add_poisson(image, exp_time):
     nx, ny = np.shape(image)
     poisson = np.random.randn(nx, ny) * sigma
     return poisson
-
 
 def cut_edges(image, numPix):
     """
@@ -127,7 +120,6 @@ def cut_edges(image, numPix):
     # return copy.deepcopy(resized)
     return resized  # No need to copy, since JAX returns a new DeviceArray
 
-
 def radial_profile(data, center=[0, 0]):
     """
     computes radial profile
@@ -144,7 +136,6 @@ def radial_profile(data, center=[0, 0]):
     nr = np.bincount(r.ravel())
     radialprofile = tbin / nr
     return radialprofile
-
 
 def re_size(image, factor=1):
     """

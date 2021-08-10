@@ -4,7 +4,6 @@ import numpy as np
 import jaxtronomy.Util.util as util
 from jaxtronomy.Util import image_util
 from jaxtronomy.LightModel.Profiles.gaussian import Gaussian
-# import lenstronomy.Util.multi_gauss_expansion as mge
 
 
 def kernel_norm(kernel):
@@ -13,10 +12,7 @@ def kernel_norm(kernel):
     :param kernel:
     :return: normalisation of the psf kernel
     """
-    norm = np.sum(np.array(kernel))
-    kernel /= norm
-    return kernel
-
+    return kernel / np.sum(kernel)
 
 def subgrid_kernel(kernel, subgrid_res, odd=False, num_iter=100):
     """
@@ -133,7 +129,6 @@ def cut_psf(psf_data, psf_size):
     kernel = kernel_norm(kernel)
     return kernel
 
-
 def pixel_kernel(point_source_kernel, subgrid_res=7):
     """
     converts a pixelised kernel of a point source to a kernel representing a uniform extended pixel
@@ -153,7 +148,6 @@ def pixel_kernel(point_source_kernel, subgrid_res=7):
     kernel_pixel = util.averaging(kernel_pixel, numGrid=kernel_size*subgrid_res, numPix=kernel_size)
     return kernel_norm(kernel_pixel)
 
-
 def kernel_gaussian(kernel_numPix, deltaPix, fwhm):
     sigma = util.fwhm2sigma(fwhm)
     #if kernel_numPix % 2 == 0:
@@ -164,7 +158,6 @@ def kernel_gaussian(kernel_numPix, deltaPix, fwhm):
     kernel /= np.sum(kernel)
     kernel = util.array2image(kernel)
     return kernel
-
 
 def split_kernel(kernel_super, supersampling_kernel_size, supersampling_factor, normalized=True):
     """
@@ -205,7 +198,6 @@ def split_kernel(kernel_super, supersampling_kernel_size, supersampling_factor, 
         kernel_hole_resized /= supersampling_factor ** 2
     return kernel_hole_resized, kernel_subgrid_cut
 
-
 def degrade_kernel(kernel_super, degrading_factor):
     """
 
@@ -230,7 +222,6 @@ def degrade_kernel(kernel_super, degrading_factor):
         kernel_low_res = util.averaging(kernel_super_, numGrid=n_high, numPix=numPix) * degrading_factor**2  # multiplicative factor added when providing flux conservation
     return kernel_low_res
 
-
 def fwhm_kernel(kernel):
     """
 
@@ -250,28 +241,3 @@ def fwhm_kernel(kernel):
             fwhm_2 = (I_2 - I_r[i - 1]) / (I_r[i] - I_r[i - 1]) + r[i - 1]
             return fwhm_2 * 2
     raise ValueError('The kernel did not drop to half the max value - fwhm not determined!')
-
-
-def estimate_amp(data, x_pos, y_pos, psf_kernel):
-    """
-    estimates the amplitude of a point source located at x_pos, y_pos
-    :param data:
-    :param x_pos:
-    :param y_pos:
-    :param deltaPix:
-    :return:
-    """
-    numPix_x, numPix_y = np.shape(data)
-    #data_center = int((numPix-1.)/2)
-    x_int = int(round(x_pos-0.49999))#+data_center
-    y_int = int(round(y_pos-0.49999))#+data_center
-    # TODO: make amplitude estimate not sucecible to rounding effects on which pixels to chose to estimate the amplitude
-    if x_int > 2 and x_int < numPix_x-2 and y_int > 2 and y_int < numPix_y-2:
-        mean_image = max(np.sum(data[y_int - 2:y_int+3, x_int-2:x_int+3]), 0)
-        num = len(psf_kernel)
-        center = int((num-0.5)/2)
-        mean_kernel = np.sum(psf_kernel[center-2:center+3, center-2:center+3])
-        amp_estimated = mean_image/mean_kernel
-    else:
-        amp_estimated = 0
-    return amp_estimated
