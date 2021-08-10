@@ -8,13 +8,14 @@ __all__ = ['LensModel']
 
 class LensModel(object):
     """An arbitrary list of lens models."""
-    def __init__(self, lens_model_list, pixel_undersampling_factor=None):
+    def __init__(self, lens_model_list, kwargs_pixelated={}):
         """Create a LensModel object.
 
         Parameters
         ----------
         lens_model_list : list of str
             Lens model profile names.
+        kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
 
         Notes
         -----
@@ -48,7 +49,7 @@ class LensModel(object):
         else:
             self.lens_model = SinglePlane(self.lens_model_list,
                                           self.redshift_list,
-                                          pixel_undersampling_factor=pixel_undersampling_factor)
+                                          kwargs_pixelated=kwargs_pixelated)
         # if z_lens is not None and z_source is not None:
         #     self._lensCosmo = LensCosmo(z_lens, z_source, cosmo=cosmo)
 
@@ -220,12 +221,12 @@ class LensModel(object):
     def has_pixels(self):
         return self.lens_model.has_pixels
 
+    @property
+    def pixel_grid_settings(self):
+        return self.lens_model.pixel_grid_settings
+
     def set_pixel_grid(self, pixel_axes):
         self.lens_model.set_pixel_grid(pixel_axes)
-
-    @property
-    def pixel_undersampling_factor(self):
-        return self.lens_model.pixel_undersampling_factor
 
     @property
     def pixelated_index(self):

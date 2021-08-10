@@ -17,9 +17,10 @@ class LightModel(LightModelBase):
     """
     def __init__(self, light_model_list, deflection_scaling_list=None,
                  source_redshift_list=None, smoothing=0.001,
-                 pixel_supersampling_factor=None, pixel_interpol='bilinear'):
+                 pixel_interpol='bilinear', kwargs_pixelated={}):
         """Create a LightModel object."""
         super(LightModel, self).__init__(light_model_list, smoothing, 
-                                         pixel_supersampling_factor, pixel_interpol)
+                                         pixel_interpol=pixel_interpol, 
+                                         kwargs_pixelated=kwargs_pixelated)
         self.deflection_scaling_list = deflection_scaling_list
         self.redshift_list = source_redshift_list

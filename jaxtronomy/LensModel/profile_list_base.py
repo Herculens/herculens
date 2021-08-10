@@ -8,8 +8,7 @@ _SUPPORTED_MODELS = ['SHEAR', 'SHEAR_GAMMA_PSI', 'SIE', 'PIXELATED']
 
 class ProfileListBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, lens_redshift_list=None,
-                 pixel_undersampling_factor=None):
+    def __init__(self, lens_model_list, lens_redshift_list=None, kwargs_pixelated={}):
         """Create a ProfileListBase object.
 
         Parameters
@@ -23,14 +22,7 @@ class ProfileListBase(object):
         self.func_list = self._load_model_instances(lens_model_list, lens_redshift_list)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
-        if self.has_pixels and pixel_undersampling_factor is None:
-            self._pixel_undersampling_factor = 1
-        else:
-            self._pixel_undersampling_factor = pixel_undersampling_factor
-
-    @property
-    def has_pixels(self):
-        return ('PIXELATED' in self._model_list)
+        self._kwargs_pixelated = kwargs_pixelated
 
     def _load_model_instances(self, lens_model_list, lens_redshift_list=None):
         if lens_redshift_list is None:
@@ -86,14 +78,18 @@ class ProfileListBase(object):
         for func in self.func_list:
             func.set_dynamic()
 
+    @property
+    def has_pixels(self):
+        return ('PIXELATED' in self._model_list)
+
+    @property
+    def pixel_grid_settings(self):
+        return self._kwargs_pixelated
+
     def set_pixel_grid(self, pixel_axes):
         for i, func in enumerate(self.func_list):
             if self._model_list[i] == 'PIXELATED':
                 func.set_data_pixel_grid(pixel_axes)
-
-    @property
-    def pixel_undersampling_factor(self):
-        return self._pixel_undersampling_factor
 
     @property
     def pixelated_index(self):

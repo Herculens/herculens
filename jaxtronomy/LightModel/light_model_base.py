@@ -11,8 +11,7 @@ _SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXE
 class LightModelBase(object):
     """Base class for source and lens light models."""
     def __init__(self, light_model_list, smoothing=0.001,
-                 pixel_interpol='bilinear', pixel_supersampling_factor=None,
-                 pixel_window_size=None, pixel_window_center=None, pixel_scale_factor=None):
+                 pixel_interpol='bilinear', kwargs_pixelated={}):
         """Create a LightModelBase object.
 
         Parameters
@@ -42,17 +41,7 @@ class LightModelBase(object):
                 raise ValueError(err_msg)
         self.func_list = func_list
         self._num_func = len(self.func_list)
-        if self.has_pixels and pixel_supersampling_factor is None:
-            self._pixel_supersampling_factor = 1
-        else:
-            self._pixel_supersampling_factor = pixel_supersampling_factor
-            self._pixel_window_size = pixel_window_size
-            self._pixel_window_center = pixel_window_center
-            self._pixel_scale_factor = pixel_scale_factor
-
-    @property
-    def has_pixels(self):
-        return ('PIXELATED' in self.profile_type_list)
+        self._kwargs_pixelated = kwargs_pixelated
 
     @property
     def param_name_list(self):
@@ -81,14 +70,18 @@ class LightModelBase(object):
                 flux += func.function(x, y, **kwargs_list[i])
         return flux
 
+    @property
+    def has_pixels(self):
+        return ('PIXELATED' in self.profile_type_list)
+
+    @property
+    def pixel_grid_settings(self):
+        return self._kwargs_pixelated
+
     def set_pixel_grid(self, pixel_axes, data_pixel_area):
         for i, func in enumerate(self.func_list):
             if self.profile_type_list[i] == 'PIXELATED':
                 func.set_data_pixel_grid(pixel_axes, data_pixel_area)
-
-    @property
-    def pixel_supersampling_factor(self):
-        return self._pixel_supersampling_factor
 
     @property
     def pixelated_index(self):

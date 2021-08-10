@@ -117,7 +117,7 @@ class PixelGrid(Coordinates):
         x_coords, y_coords = self.model_pixel_axes(name)
         return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
 
-    def create_model_grid_from_sampling(self, factor, name='none', mode='supersampling'):
+    def create_model_grid_old(self, factor, name='none', mode='supersampling'):
         if factor is None:
             # avoid unnecessary computations
             self._model_grids[name] = None
@@ -142,31 +142,56 @@ class PixelGrid(Coordinates):
             x_grid, y_grid = np.meshgrid(x_coords, y_coords)
         self._model_grids[name] = (x_grid, y_grid)
 
-    def create_model_grid_from_region(self, center=None, window_size=None, pixel_width=None,
-                                      name='none'):
+    def create_model_grid(self, center=None, window_size=None, 
+                          scale_factor=None, conserve_extent=True,
+                          name='none'):
+        """
+        :param center: 2-tuple (center_x, center_y) with grid center in physical units
+        If None, defaults to the original grid center. 
+        :param window_size: 2-tuple (width, height) window size in physical units
+        If None, defaults to the original windo size.
+        :param scale_factor: multiplicative factor to go from original pixel width to new pixel width.
+        If None, defaults to the 1.
+        :param conserve_extent: if True, make sure the 'extent' of created grid is the same as
+        the original data grid, i.e. (if center=None) the min and max values of the coordinate axes are
+        equal to their values for the original data grid. 
+        Otherwise, the extent will be computed based on the final pixel width.
+        :param name: unique string for identifying the created grid.
+        """
+        if name in self._model_grids:
+            raise ValueError(f"Grid name '{name}' is already used for another grid")
         unchanged_count = 0
-        if center is None:
+        if center is None or center == self.center:
             center = self.center
             unchanged_count += 1
-        if window_size is None:
+        if window_size is None or window_size == self.width:
             window_size = self.width
             unchanged_count += 1
-        if pixel_width is None:
-            pixel_width = self.pixel_width
+        if scale_factor is None or scale_factor == 1:
+            scale_factor = 1
             unchanged_count += 1
-        center_x, center_y = center
-        width, height = window_size
-        extent = [
-            center_x - (width - pixel_width)/2., center_x + (width - pixel_width)/2.,
-            center_y - (height - pixel_width)/2., center_y + (height - pixel_width)/2.
-        ]
-        if unchanged_count == 3: # basically it's the same window as the base coordinate grid
+        if unchanged_count == 3:
+            # basically it's the same region as the base coordinate grid
             x_grid = np.copy(self._x_grid)
             y_grid = np.copy(self._y_grid)
+            self._model_grids[name] = (x_grid, y_grid)
+            return
+        pixel_width = self.pixel_width * scale_factor
+        center_x, center_y = center
+        width, height = window_size
+        if conserve_extent is True:
+            semi_width  = (width - self.pixel_width)/2.
+            semi_height = (height - self.pixel_width)/2.
         else:
-            nx = int(width / pixel_width)
-            ny = int(height / pixel_width)
-            x_coords = np.linspace(extent[0], extent[1], nx)
-            y_coords = np.linspace(extent[2], extent[3], ny)
-            x_grid, y_grid = np.meshgrid(x_coords, y_coords)
+            semi_width  = (width - pixel_width)/2.
+            semi_height = (height - pixel_width)/2.
+        extent = [
+            center_x - semi_width,  center_x + semi_width,
+            center_y - semi_height, center_y + semi_height,
+        ]
+        nx = int(width / pixel_width)
+        ny = int(height / pixel_width)
+        x_coords = np.linspace(extent[0], extent[1], nx)
+        y_coords = np.linspace(extent[2], extent[3], ny)
+        x_grid, y_grid = np.meshgrid(x_coords, y_coords)
         self._model_grids[name] = (x_grid, y_grid)
