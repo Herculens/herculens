@@ -160,7 +160,7 @@ class Parameters(object):
     def _update_arrays(self):
         self._prior_types, self._lowers, self._uppers, self._means, self._widths \
             = self.kwargs2args_prior(self._kwargs_prior)
-        self._init_values  = self.kwargs2args(self._kwargs_init)
+        self._init_values = self.kwargs2args(self._kwargs_init)
         self._num_params = len(self._init_values)
         if self.optimized:
             self._map_values = self.kwargs2args(self._kwargs_map)
@@ -205,14 +205,16 @@ class Parameters(object):
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
                         pixels = kwargs_profile['pixels']
+                        if kwargs_key == 'kwargs_lens':
+                            n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                        elif kwargs_key == 'kwargs_source':
+                            n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
+                        elif kwargs_key == 'kwargs_lens_light':
+                            n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                         if isinstance(pixels, (int, float)):
-                            if kwargs_key == 'kwargs_lens':
-                                n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
-                            elif kwargs_key == 'kwargs_source':
-                                n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
-                            elif kwargs_key == 'kwargs_lens_light':
-                                n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                             pixels = pixels * np.ones((n_pix_x, n_pix_y))
+                        elif pixels.shape != (n_pix_x, n_pix_y):
+                            raise ValueError("Pixelated array not consistent with pixelated grid")
                         args += pixels.flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
