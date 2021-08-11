@@ -66,6 +66,7 @@ class PixelGrid(Coordinates):
         """
         self._shift_coordinates(x_shift, y_shift, pixel_unit=pixel_unit)
         self._x_grid, self._y_grid = self.coordinate_grid(self._nx, self._ny)
+        # TODO: also shift self._model_grids?
 
     @property
     def pixel_coordinates(self):
@@ -143,7 +144,7 @@ class PixelGrid(Coordinates):
         self._model_grids[name] = (x_grid, y_grid)
 
     def create_model_grid(self, center=None, window_size=None, 
-                          scale_factor=None, conserve_extent=True,
+                          scale_factor=None, conserve_extent=False,
                           name='none'):
         """
         :param center: 2-tuple (center_x, center_y) with grid center in physical units
@@ -153,45 +154,57 @@ class PixelGrid(Coordinates):
         :param scale_factor: multiplicative factor to go from original pixel width to new pixel width.
         If None, defaults to the 1.
         :param conserve_extent: if True, make sure the 'extent' of created grid is the same as
-        the original data grid, i.e. (if center=None) the min and max values of the coordinate axes are
-        equal to their values for the original data grid. 
+        the original data grid, i.e. the min and max values of the coordinate axes are
+        equal to their values for the original data grid (only relevant when center=None). 
         Otherwise, the extent will be computed based on the final pixel width.
         :param name: unique string for identifying the created grid.
         """
         if name in self._model_grids:
             raise ValueError(f"Grid name '{name}' is already used for another grid")
+        
         unchanged_count = 0
         if center is None or center == self.center:
-            center = self.center
+            center_ = self.center
             unchanged_count += 1
+        else:
+            center_ = center
         if window_size is None or window_size == self.width:
-            window_size = self.width
+            window_size_ = self.width
             unchanged_count += 1
+        else:
+            window_size_ = window_size
         if scale_factor is None or scale_factor == 1:
-            scale_factor = 1
+            scale_factor_ = 1
             unchanged_count += 1
+        else:
+            scale_factor_ = scale_factor
+
+        # in case it's the same region as the base coordinate grid
         if unchanged_count == 3:
-            # basically it's the same region as the base coordinate grid
             x_grid = np.copy(self._x_grid)
             y_grid = np.copy(self._y_grid)
             self._model_grids[name] = (x_grid, y_grid)
             return
-        pixel_width = self.pixel_width * scale_factor
-        center_x, center_y = center
-        width, height = window_size
+
+        pixel_width = self.pixel_width * float(scale_factor_)
+        center_x, center_y = center_
+        width, height = window_size_
+
         if conserve_extent is True:
             semi_width  = (width - self.pixel_width)/2.
             semi_height = (height - self.pixel_width)/2.
         else:
             semi_width  = (width - pixel_width)/2.
             semi_height = (height - pixel_width)/2.
+        x_sign = np.sign(self.transform_pix2angle[0, 0])
+        y_sign = np.sign(self.transform_pix2angle[1, 1])
         extent = [
-            center_x - semi_width,  center_x + semi_width,
-            center_y - semi_height, center_y + semi_height,
+            center_x - x_sign * semi_width,  center_x + x_sign * semi_width,
+            center_y - y_sign * semi_height, center_y + y_sign * semi_height,
         ]
         nx = int(width / pixel_width)
         ny = int(height / pixel_width)
-        x_coords = np.linspace(extent[0], extent[1], nx)
-        y_coords = np.linspace(extent[2], extent[3], ny)
+        x_coords = np.linspace(extent[0], extent[1], nx) # * x_sign
+        y_coords = np.linspace(extent[2], extent[3], ny) # * y_sign
         x_grid, y_grid = np.meshgrid(x_coords, y_coords)
         self._model_grids[name] = (x_grid, y_grid)
