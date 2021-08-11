@@ -209,17 +209,13 @@ class BilinearInterpolator(object):
         self.z = z
         if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
             self.x = jnp.array(x)
-            self.x_sign = 1.
         else:
             self.x = jnp.array(np.sort(x))
-            self.x_sign = -1.
             self.z = jnp.flip(self.z, axis=1)
         if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
             self.y = jnp.array(y)
-            self.y_sign = 1.
         else:
             self.y = jnp.array(np.sort(y))
-            self.y_sign = -1.
             self.z = jnp.flip(self.z, axis=0)
 
     def __call__(self, x, y, dx=0, dy=0):
@@ -300,9 +296,17 @@ class BicubicInterpolator(object):
 
     """
     def __init__(self, x, y, z, zx=None, zy=None, zxy=None):
-        self.x = jnp.array(x)
-        self.y = jnp.array(y)
         self.z = jnp.array(z)
+        if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
+            self.x = jnp.array(x)
+        else:
+            self.x = jnp.array(np.sort(x))
+            self.z = jnp.flip(self.z, axis=1)
+        if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
+            self.y = jnp.array(y)
+        else:
+            self.y = jnp.array(np.sort(y))
+            self.z = jnp.flip(self.z, axis=0)
 
         # Assume uniform coordinate spacing
         self.dx = self.x[1] - self.x[0]

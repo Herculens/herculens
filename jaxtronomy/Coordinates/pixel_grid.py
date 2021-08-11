@@ -118,31 +118,6 @@ class PixelGrid(Coordinates):
         x_coords, y_coords = self.model_pixel_axes(name)
         return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
 
-    def create_model_grid_old(self, factor, name='none', mode='supersampling'):
-        if factor is None:
-            # avoid unnecessary computations
-            self._model_grids[name] = None
-            return
-        if factor < 1:
-            raise ValueError(f"{mode}-sampling factor must be equal to or greater than 1")
-        if factor == 1:
-            x_grid = np.copy(self._x_grid)
-            y_grid = np.copy(self._y_grid)
-        else:
-            if mode == 'supersampling':
-                nx = int(self._nx * factor)
-                ny = int(self._ny * factor)
-            elif mode == 'undersampling':
-                nx = int(self._nx / factor)
-                ny = int(self._ny / factor)
-            else:
-                raise ValueError(f"Mode '{mode}' for creating new coordinate grid is not supported")
-            extent = self.extent
-            x_coords = np.linspace(extent[0], extent[1], nx)
-            y_coords = np.linspace(extent[2], extent[3], ny)
-            x_grid, y_grid = np.meshgrid(x_coords, y_coords)
-        self._model_grids[name] = (x_grid, y_grid)
-
     def create_model_grid(self, center=None, window_size=None, 
                           scale_factor=None, conserve_extent=False,
                           name='none'):
@@ -207,4 +182,29 @@ class PixelGrid(Coordinates):
         x_coords = np.linspace(extent[0], extent[1], nx) # * x_sign
         y_coords = np.linspace(extent[2], extent[3], ny) # * y_sign
         x_grid, y_grid = np.meshgrid(x_coords, y_coords)
+        self._model_grids[name] = (x_grid, y_grid)
+
+    def create_model_grid_old(self, factor, name='none', mode='supersampling'):
+        if factor is None:
+            # avoid unnecessary computations
+            self._model_grids[name] = None
+            return
+        if factor < 1:
+            raise ValueError(f"{mode}-sampling factor must be equal to or greater than 1")
+        if factor == 1:
+            x_grid = np.copy(self._x_grid)
+            y_grid = np.copy(self._y_grid)
+        else:
+            if mode == 'supersampling':
+                nx = int(self._nx * factor)
+                ny = int(self._ny * factor)
+            elif mode == 'undersampling':
+                nx = int(self._nx / factor)
+                ny = int(self._ny / factor)
+            else:
+                raise ValueError(f"Mode '{mode}' for creating new coordinate grid is not supported")
+            extent = self.extent
+            x_coords = np.linspace(extent[0], extent[1], nx)
+            y_coords = np.linspace(extent[2], extent[3], ny)
+            x_grid, y_grid = np.meshgrid(x_coords, y_coords)
         self._model_grids[name] = (x_grid, y_grid)
