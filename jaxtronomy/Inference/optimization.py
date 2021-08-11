@@ -69,20 +69,36 @@ class Optimizer(InferenceBase):
                 extra_fields[key] = getattr(res, key)
         return res.x, extra_fields
 
-    def optax(self, max_iterations=100, init_learning_rate=1e-2, restart_from_init=False):
-        # Exponential decay of the learning rate
-        scheduler = optax.exponential_decay(
-            init_value=init_learning_rate, 
-            decay_rate=0.99, # TODO: this has never been fine-tuned (taken from optax examples)
-            transition_steps=max_iterations)
+    def optax(self, algorithm='adabelief', max_iterations=100, init_learning_rate=1e-2, 
+              restart_from_init=False, schedule_learning_rate=True):
+        if schedule_learning_rate is True:
+            # Exponential decay of the learning rate
+            scheduler = optax.exponential_decay(
+                init_value=init_learning_rate, 
+                decay_rate=0.99, # TODO: this has never been fine-tuned (taken from optax examples)
+                transition_steps=max_iterations)
 
-        # Combining gradient transforms using `optax.chain`
-        optim = optax.chain(
-            #optax.clip_by_global_norm(1.0),  # clip by the gradient by the global norm
-            optax.scale_by_belief(),  # use the updates from AdaBelief optimizer  # TODO: add support for a couple of other algorithms
-            optax.scale_by_schedule(scheduler),  # Use the learning rate from the scheduler
-            optax.scale(-1.)  # because gradient *descent*
-        )
+            if algorithm.lower() == 'adabelief':
+                scale_algo = optax.scale_by_belief()
+            elif algorithm.lower() == 'adam':
+                scale_algo = optax.scale_by_adam()
+            else:
+                raise ValueError(f"Optax algorithm '{algorithm}' is not supported")
+
+            # Combining gradient transforms using `optax.chain`
+            optim = optax.chain(
+                #optax.clip_by_global_norm(1.0),  # clip by the gradient by the global norm # TODO: what is this used for?
+                scale_algo,  # use the updates from the chosen optimizer
+                optax.scale_by_schedule(scheduler),  # Use the learning rate from the scheduler
+                optax.scale(-1.)  # because gradient *descent*
+            )
+        else:
+            if algorithm.lower() == 'adabelief':
+                optim = optax.adabelief(init_learning_rate)
+            elif algorithm.lower() == 'adam':
+                optim = optax.adam(init_learning_rate)
+            else:
+                raise ValueError(f"Optax algorithm '{algorithm}' is not supported")
 
         # Initialise optimizer state
         params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
