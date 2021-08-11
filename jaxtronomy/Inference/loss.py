@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax import jit
 
 from jaxtronomy.Util.jax_util import WaveletTransform
-from jaxtronomy.Util import util
+from jaxtronomy.Util import model_util
 
 
 class Loss(object):
@@ -101,7 +101,7 @@ class Loss(object):
             # here the global norm is such that l2_norm has same order of magnitude as a chi2
             self._global_norm = 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
         if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
-            self._ll_mask = util.build_mask_from_pixelated_source(self._image, self._param)
+            self._ll_mask = model_util.mask_from_pixelated_source(self._image, self._param)
         elif likelihood_mask is None:
             self._ll_mask = np.ones_like(self._data)
         else:
@@ -210,11 +210,12 @@ class Loss(object):
 
     def _log_regul_l1_starlet_source(self, kwargs):
         # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
-        noise_map = np.mean(np.sqrt(self._image.Noise.C_D))
+        noise_map = np.sqrt(self._image.Noise.C_D)
+        noise_level = np.mean(noise_map[self.likelihood_mask == 1])
         source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
         st = self._starlet_src.decompose(source_model)[:-1]  # ignore coarsest scale
-        st_weighted_l1_hf = jnp.sum(self._st_src_norms[0] * noise_map * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
-        st_weighted_l1 = jnp.sum(self._st_src_norms[1:] * noise_map * jnp.abs(st[1:]))  # other scales
+        st_weighted_l1_hf = jnp.sum(self._st_src_norms[0] * noise_level * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
+        st_weighted_l1 = jnp.sum(self._st_src_norms[1:] * noise_level * jnp.abs(st[1:]))  # other scales
         return - (self._st_src_lambda_hf * st_weighted_l1_hf + self._st_src_lambda * st_weighted_l1)
 
     def _log_regul_l1_starlet_potential(self, kwargs):
@@ -227,10 +228,11 @@ class Loss(object):
 
     def _log_regul_l1_battle_source(self, kwargs):
         # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
-        noise_map = np.mean(np.sqrt(self._image.Noise.C_D))
+        noise_map = np.sqrt(self._image.Noise.C_D)
+        noise_level = np.mean(noise_map[self.likelihood_mask == 1])
         source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
         bt = self._battle_src.decompose(source_model)[0]  # consider only first scale
-        bt_weighted_l1 = jnp.sum(self._bt_src_norm * noise_map * jnp.abs(bt))
+        bt_weighted_l1 = jnp.sum(self._bt_src_norm * noise_level * jnp.abs(bt))
         return - self._bt_src_lambda * bt_weighted_l1
 
     def _log_regul_l1_battle_potential(self, kwargs):
