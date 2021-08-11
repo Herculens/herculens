@@ -161,6 +161,7 @@ class Parameters(object):
         self._prior_types, self._lowers, self._uppers, self._means, self._widths \
             = self.kwargs2args_prior(self._kwargs_prior)
         self._init_values = self.kwargs2args(self._kwargs_init)
+        self._kwargs_init = self.args2kwargs(self._init_values)  # for updating missing fields
         self._num_params = len(self._init_values)
         if self.optimized:
             self._map_values = self.kwargs2args(self._kwargs_map)

@@ -2,7 +2,9 @@ import numpy as np
 from functools import partial
 import jax.numpy as jnp
 from jax import jit
+
 from jaxtronomy.Util.jax_util import WaveletTransform
+from jaxtronomy.Util import util
 
 
 class Loss(object):
@@ -31,7 +33,7 @@ class Loss(object):
     _supported_prior = ('uniform', 'gaussian')
 
     def __init__(self, data, image_class, param_class, 
-                 likelihood_type='chi2', likelihood_mask=None,
+                 likelihood_type='chi2', likelihood_mask=None, mask_from_source_plane=False,
                  regularization_terms=None, regularization_strengths=None,
                  potential_noise_map=None, prior_terms=None):
         self._data  = data
@@ -39,10 +41,9 @@ class Loss(object):
         self._param = param_class
         
         self._check_choices(likelihood_type, prior_terms, regularization_terms, regularization_strengths)
-        self._initialize_likelihood(likelihood_type, likelihood_mask)
-        self._initialize_regularizations(regularization_terms, regularization_strengths,
-                                         potential_noise_map)
-        self._initialize_priors(prior_terms)
+        self._init_likelihood(likelihood_type, likelihood_mask, mask_from_source_plane)
+        self._init_regularizations(regularization_terms, regularization_strengths, potential_noise_map)
+        self._init_priors(prior_terms)
 
     @partial(jit, static_argnums=(0,))
     def __call__(self, args):
@@ -57,7 +58,7 @@ class Loss(object):
         return neg_log
 
     @property
-    def likelihood_data_points(self):
+    def likelihood_num_data_points(self):
         return self._ll_num_data_points
 
     @property
@@ -81,20 +82,17 @@ class Loss(object):
                 # TODO: if any regularization terms are not dependent on PIXELATED profiles, update this check
                 source_profile_list = self._image.SourceModel.profile_type_list
                 lens_profile_list = self._image.LensModel.lens_model_list
-                if (term in self._supported_regul_source 
-                    and 'PIXELATED' not in source_profile_list
-                    and 'PIXELATED_BICUBIC' not in source_profile_list):
+                if term in self._supported_regul_source and 'PIXELATED' not in source_profile_list:
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' source light profile")
                 
-                elif (term in self._supported_regul_lens
-                      and 'PIXELATED' not in lens_profile_list):
+                elif term in self._supported_regul_lens and 'PIXELATED' not in lens_profile_list:
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' lens profile")
             if len(regularization_terms) != len(regularization_strengths):
                 raise ValueError(f"There should be one choice of regularization strength per regularization term")
 
-    def _initialize_likelihood(self, likelihood_type, likelihood_mask):
+    def _init_likelihood(self, likelihood_type, likelihood_mask, mask_from_source_plane):
         if likelihood_type == 'chi2':
             self._log_likelihood = self._log_likelihood_chi2
             self._global_norm = 1.
@@ -102,13 +100,16 @@ class Loss(object):
             self._log_likelihood = self._log_likelihood_l2
             # here the global norm is such that l2_norm has same order of magnitude as a chi2
             self._global_norm = 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
-        if likelihood_mask is None:
-            likelihood_mask = np.ones_like(self._data)
-        self._ll_mask = likelihood_mask
+        if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
+            self._ll_mask = util.build_mask_from_pixelated_source(self._image, self._param)
+        elif likelihood_mask is None:
+            self._ll_mask = np.ones_like(self._data)
+        else:
+            self._ll_mask = np.copy(likelihood_mask).astype(float)
         self._ll_num_data_points = np.count_nonzero(self._ll_mask)
 
-    def _initialize_regularizations(self, regularization_terms, regularization_strengths, 
-                                    potential_noise_map):
+    def _init_regularizations(self, regularization_terms, regularization_strengths, 
+                              potential_noise_map):
         if regularization_terms is None:
             self._log_regul = lambda kwargs: 0.  # no regularization
             return
@@ -185,7 +186,7 @@ class Loss(object):
         # build the composite function (sum of regularization terms)
         self._log_regul = lambda kw: sum([func(kw) for func in regul_func_list])
 
-    def _initialize_priors(self, prior_terms):
+    def _init_priors(self, prior_terms):
         if prior_terms is None:
             self._log_prior = lambda args: 0.
             return
@@ -200,7 +201,7 @@ class Loss(object):
         #noise_var = self._image.Noise.C_D_model(model)  # TODO: use this?
         noise_var = self._image.Noise.C_D
         residuals = (self._data - model) * self.likelihood_mask
-        return - jnp.sum(residuals**2 / noise_var) / self.likelihood_data_points
+        return - jnp.sum(residuals**2 / noise_var) / self.likelihood_num_data_points
 
     def _log_likelihood_l2(self, model):
         # TODO: check that mask here does not mess up with the balance between l2-norm and wavelet regularization
