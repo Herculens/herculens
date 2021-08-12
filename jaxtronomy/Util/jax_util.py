@@ -211,12 +211,12 @@ class BilinearInterpolator(object):
             self.x = jnp.array(x)
         else:
             self.x = jnp.array(np.sort(x))
-            self.z = jnp.flip(self.z, axis=1)
+            self.z = jnp.flip(self.z, axis=0)
         if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
             self.y = jnp.array(y)
         else:
             self.y = jnp.array(np.sort(y))
-            self.z = jnp.flip(self.z, axis=0)
+            self.z = jnp.flip(self.z, axis=1)
         self._extrapol_bool = allow_extrapolation
 
     def __call__(self, x, y, dx=0, dy=0):

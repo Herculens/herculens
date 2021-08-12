@@ -113,4 +113,4 @@ class ProfileListBase(object):
         if x_coords is None:
             return None
         else:
-            return (len(x_coords), len(y_coords))
+            return (len(y_coords), len(x_coords))

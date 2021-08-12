@@ -39,11 +39,11 @@ class Pixelated(object):
 
         """
         # Warning: assuming same pixel size across all the image!
-        interp = self._interp_class(self.x_coords, self.y_coords, pixels,
+        interp = self._interp_class(self.y_coords, self.x_coords, pixels,
                                     allow_extrapolation=self._extrapol_bool)
         # we normalize the interpolated array for correct units when evaluated by LensImage methods
-        return interp(y, x).T / self.data_pixel_area
+        return interp(y, x) / self.data_pixel_area
     
     def set_data_pixel_grid(self, pixel_axes, data_pixel_area):
         self.data_pixel_area = data_pixel_area
-        self.y_coords, self.x_coords = pixel_axes
+        self.x_coords, self.y_coords = pixel_axes

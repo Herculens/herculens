@@ -21,6 +21,13 @@ class LightModelBase(object):
             Light model types.
         smoothing : float
             Smoothing factor for some models (deprecated).
+        pixel_interpol : string
+            Type of interpolation for 'PIXELATED' profiles: 'bilinear' or 'bicubic'
+        pixel_allow_extrapolation : bool
+            For 'PIXELATED' profiles, wether or not to extrapolate flux values outside the chosen region
+            otherwise force values to be zero.
+        kwargs_pixelated : dict
+            Settings related to the creation of the pixelated grid. See jaxtronomy.PixelGrid.create_model_grid for details 
 
         """
         self.profile_type_list = light_model_list
@@ -64,7 +71,8 @@ class LightModelBase(object):
         """
         x = jnp.array(x, dtype=float)
         y = jnp.array(y, dtype=float)
-        flux = jnp.zeros_like(x)
+        # flux = jnp.zeros_like(x)
+        flux = 0.
         bool_list = convert_bool_list(self._num_func, k=k)
         for i, func in enumerate(self.func_list):
             if bool_list[i]:
@@ -86,6 +94,7 @@ class LightModelBase(object):
 
     @property
     def pixelated_index(self):
+        # TODO: what if there are more than one PIXELATED profiles?
         if not hasattr(self, '_pix_idx'):
             try:
                 self._pix_idx = self.profile_type_list.index('PIXELATED')
@@ -106,4 +115,4 @@ class LightModelBase(object):
         if x_coords is None:
             return None
         else:
-            return (len(x_coords), len(y_coords))
+            return (len(y_coords), len(x_coords))
