@@ -1,4 +1,4 @@
-import copy
+from copy import deepcopy
 import numpy as np
 import jax.numpy as jnp
 from jax import lax
@@ -67,17 +67,23 @@ class Parameters(object):
                                       lens_light_model_list=self._image.LensLightModel.profile_type_list)
         return self._kwargs_model
 
-    def initial_values(self, as_kwargs=False):
-        return self._kwargs_init if as_kwargs else self._init_values
+    def initial_values(self, as_kwargs=False, copy=False):
+        if as_kwargs:
+            return deepcopy(self._kwargs_init) if copy else self._kwargs_init
+        else:
+            return deepcopy(self._init_values) if copy else self._init_values
 
-    def current_values(self, as_kwargs=False, restart=False):
+    def current_values(self, as_kwargs=False, restart=False, copy=False):
         if restart is True or not self.optimized:
-            return self.initial_values(as_kwargs=as_kwargs)
-        return self.best_fit_values(as_kwargs=as_kwargs)
+            return self.initial_values(as_kwargs=as_kwargs, copy=copy)
+        return self.best_fit_values(as_kwargs=as_kwargs, copy=copy)
 
-    def best_fit_values(self, as_kwargs=False):
+    def best_fit_values(self, as_kwargs=False, copy=False):
         """Maximum-a-postriori estimate"""
-        return self._kwargs_map if as_kwargs else self._map_values
+        if as_kwargs:
+            return deepcopy(self._kwargs_map) if copy else self._kwargs_map
+        else:
+            return deepcopy(self._map_values) if copy else self._map_values
 
     def set_best_fit(self, args):
         self._map_values = args
@@ -287,9 +293,9 @@ class Parameters(object):
             param_names = self._get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if name in kwargs_fixed_k_old and name not in kwargs_fixed_k_new:
-                    self._kwargs_init[kwargs_key][k][name] = copy.deepcopy(kwargs_fixed_k_old[name])
+                    self._kwargs_init[kwargs_key][k][name] = deepcopy(kwargs_fixed_k_old[name])
                     if self.optimized:
-                        self._kwargs_map[kwargs_key][k][name] = copy.deepcopy(kwargs_fixed_k_old[name])
+                        self._kwargs_map[kwargs_key][k][name] = deepcopy(kwargs_fixed_k_old[name])
 
     @staticmethod
     def _get_param_names_for_model(kwargs_key, model):

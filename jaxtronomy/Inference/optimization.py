@@ -32,7 +32,7 @@ class Optimizer(InferenceBase):
 
     def minimize(self, method='BFGS', maxiter=None, restart_from_init=False, use_exact_hessian_if_allowed=False):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
-        init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
+        init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         self._metrics = MinimizeMetrics(self.loss, method)
         start = time.time()
         best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, maxiter, self._metrics,
@@ -101,7 +101,7 @@ class Optimizer(InferenceBase):
                 raise ValueError(f"Optax algorithm '{algorithm}' is not supported")
 
         # Initialise optimizer state
-        params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
+        params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         opt_state = optim.init(params)
 
         # Gradient descent loop
@@ -119,7 +119,7 @@ class Optimizer(InferenceBase):
     def gradient_descent(self, num_iterations=100, step_size=1e-2, restart_from_init=False):
         import jax.numpy as jnp
         # Initialise optimizer state
-        params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
+        params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         
         # Gradient descent loop
         start_time = time.time()
