@@ -44,4 +44,4 @@ class Pixelated(object):
     
     def set_data_pixel_grid(self, pixel_axes, data_pixel_area):
         self.data_pixel_area = data_pixel_area
-        self.x_coords, self.y_coords = pixel_axes
+        self.y_coords, self.x_coords = pixel_axes

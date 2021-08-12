@@ -71,4 +71,4 @@ class PixelatedPotential(LensProfileBase):
         return psi_xx, psi_yy, psi_xy
 
     def set_data_pixel_grid(self, pixel_axes):
-        self.x_coords, self.y_coords = pixel_axes
+        self.y_coords, self.x_coords = pixel_axes
