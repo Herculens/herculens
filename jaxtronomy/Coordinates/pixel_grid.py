@@ -118,15 +118,15 @@ class PixelGrid(Coordinates):
         x_coords, y_coords = self.model_pixel_axes(name)
         return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
 
-    def create_model_grid(self, center=None, window_size=None, 
-                          scale_factor=None, conserve_extent=False,
+    def create_model_grid(self, grid_center=None, grid_shape=None, 
+                          pixel_scale_factor=None, conserve_extent=False,
                           name='none'):
         """
-        :param center: 2-tuple (center_x, center_y) with grid center in physical units
+        :param grid_center: 2-tuple (center_x, center_y) with grid center in physical units
         If None, defaults to the original grid center. 
-        :param window_size: 2-tuple (width, height) window size in physical units
+        :param grid_shape: 2-tuple (width, height) window size in physical units
         If None, defaults to the original windo size.
-        :param scale_factor: multiplicative factor to go from original pixel width to new pixel width.
+        :param pixel_scale_factor: multiplicative factor to go from original pixel width to new pixel width.
         If None, defaults to the 1.
         :param conserve_extent: if True, make sure the 'extent' of created grid is the same as
         the original data grid, i.e. the min and max values of the coordinate axes are
@@ -138,21 +138,21 @@ class PixelGrid(Coordinates):
             raise ValueError(f"Grid name '{name}' is already used for another grid")
         
         unchanged_count = 0
-        if center is None or center == self.center:
-            center_ = self.center
+        if grid_center is None or grid_center == self.center:
+            grid_center_ = self.center
             unchanged_count += 1
         else:
-            center_ = center
-        if window_size is None or window_size == self.width:
-            window_size_ = self.width
+            grid_center_ = grid_center
+        if grid_shape is None or grid_shape == self.width:
+            grid_shape_ = self.width
             unchanged_count += 1
         else:
-            window_size_ = window_size
-        if scale_factor is None or scale_factor == 1:
-            scale_factor_ = 1
+            grid_shape_ = grid_shape
+        if pixel_scale_factor is None or pixel_scale_factor == 1:
+            pixel_scale_factor_ = 1
             unchanged_count += 1
         else:
-            scale_factor_ = scale_factor
+            pixel_scale_factor_ = pixel_scale_factor
 
         # in case it's the same region as the base coordinate grid
         if unchanged_count == 3:
@@ -161,9 +161,9 @@ class PixelGrid(Coordinates):
             self._model_grids[name] = (x_grid, y_grid)
             return
 
-        pixel_width = self.pixel_width * float(scale_factor_)
-        center_x, center_y = center_
-        width, height = window_size_
+        pixel_width = self.pixel_width * float(pixel_scale_factor_)
+        center_x, center_y = grid_center_
+        width, height = grid_shape_
 
         if conserve_extent is True:
             semi_width  = (width - self.pixel_width)/2.

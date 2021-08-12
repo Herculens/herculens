@@ -10,7 +10,7 @@ class Pixelated(object):
     param_names = ['pixels']
     method_options = ['bilinear', 'bicubic']
 
-    def __init__(self, method='bilinear'):
+    def __init__(self, method='bilinear', allow_extrapolation=True):
         error_msg = "Invalid method. Must be either 'bilinear' or 'bicubic'."
         assert method in self.method_options, error_msg
         if method == 'bilinear':
@@ -19,6 +19,7 @@ class Pixelated(object):
             self._interp_class = BicubicInterpolator
         self.data_pixel_area = None
         self.x_coords, self.y_coords = None, None
+        self._extrapol_bool = allow_extrapolation
 
     def function(self, x, y, pixels):
         """Interpolated evaluation of a pixelated source.
@@ -38,7 +39,8 @@ class Pixelated(object):
 
         """
         # Warning: assuming same pixel size across all the image!
-        interp = self._interp_class(self.x_coords, self.y_coords, pixels)
+        interp = self._interp_class(self.x_coords, self.y_coords, pixels,
+                                    allow_extrapolation=self._extrapol_bool)
         # we normalize the interpolated array for correct units when evaluated by LensImage methods
         return interp(y, x).T / self.data_pixel_area
     

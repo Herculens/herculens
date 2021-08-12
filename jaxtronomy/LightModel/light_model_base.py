@@ -11,7 +11,8 @@ _SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXE
 class LightModelBase(object):
     """Base class for source and lens light models."""
     def __init__(self, light_model_list, smoothing=0.001,
-                 pixel_interpol='bilinear', kwargs_pixelated={}):
+                 pixel_interpol='bilinear', pixel_allow_extrapolation=False,
+                 kwargs_pixelated={}):
         """Create a LightModelBase object.
 
         Parameters
@@ -34,7 +35,7 @@ class LightModelBase(object):
             elif profile_type == 'UNIFORM':
                 func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
-                func_list.append(pixelated.Pixelated(method=pixel_interpol))
+                func_list.append(pixelated.Pixelated(method=pixel_interpol, allow_extrapolation=pixel_allow_extrapolation))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
                            f"Supported types are: {_SUPPORTED_MODELS}")
