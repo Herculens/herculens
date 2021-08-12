@@ -57,7 +57,7 @@ class Plotter(object):
 
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, show_lens_mass=False,
-                      shift_potential='min',
+                      reproject_pixelated_models=False, shift_potential_model='min',
                       likelihood_mask=None, potential_mask=None):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_mass, show_lens_mass])
@@ -82,15 +82,17 @@ class Plotter(object):
 
         if show_source:
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
-            src_idx = lens_image.SourceModel.pixelated_index
-            source_is_pixelated = (src_idx is not None)
-            if source_is_pixelated:
-                # we need to make sure it's jax.numpy array for source_surface_brightness when using PIXELATED source profile
-                #kwargs_source[src_idx]['pixels'] = jnp.asarray(kwargs_source[src_idx]['pixels'])
-                # we extract the right coordinate arrays
-                #x_coords_src, y_coords_src = np.meshgrid(*lens_image.SourceModel.pixelated_coordinates)
-                #source_model = lens_image.SourceModel.surface_brightness(x_coords_src, y_coords_src, kwargs_source) * lens_image.Grid.pixel_area
-                source_model = kwargs_source[src_idx]['pixels'] # / lens_image.Grid.pixel_area
+            if lens_image.SourceModel.has_pixels:
+                src_idx = lens_image.SourceModel.pixelated_index
+                if reproject_pixelated_models:
+                    # we need to make sure it's jax.numpy array for source_surface_brightness when using PIXELATED source profile
+                    kwargs_source[src_idx]['pixels'] = jnp.asarray(kwargs_source[src_idx]['pixels'])
+                    # we extract the right coordinate arrays
+                    x_grid_src, y_grid_src = lens_image.Grid.model_pixel_coordinates('source')
+                    source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
+                    source_model *= lens_image.Grid.pixel_area
+                else:
+                    source_model = kwargs_source[src_idx]['pixels']
             else:
                 source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
 
@@ -103,8 +105,8 @@ class Plotter(object):
                 npix_true = len(true_source)
                 x_coords_true = np.linspace(extent[0], extent[1], npix_true)
                 y_coords_true = np.linspace(extent[2], extent[3], npix_true)
-                if source_is_pixelated:
-                    x_coords_src, y_coords_src = lens_image.SourceModel.pixelated_coordinates
+                if lens_image.SourceModel.has_pixels:
+                    x_coords_src, y_coords_src = lens_image.Grid.model_pixel_axes('source')
                 else:
                     npix_src = len(source_model)
                     x_coords_src = np.linspace(extent[0], extent[1], npix_src)
@@ -113,7 +115,7 @@ class Plotter(object):
                 warnings.warn("True source array has been interpolated to match model array")
 
         if show_lens_mass:
-            # TODO: check that there is indeed a pixelated potential profile in the model
+            # TODO: update those lines to be consistent with source model above
             pot_idx = -1  # here we assume the last lens profile is 'PIXELATED'
             x_coords_pot, y_coords_pot = lens_image.LensModel.pixelated_coordinates
             x_grid_lens, y_grid_lens = np.meshgrid(x_coords_pot, y_coords_pot)
@@ -131,11 +133,11 @@ class Plotter(object):
             else:
                 true_potential = np.zeros_like(potential_model)
             
-            if shift_potential == 'min':
+            if shift_potential_model == 'min':
                 min_in_mask = (potential_model * potential_mask).min()
                 potential_model = potential_model - min_in_mask
                 print("delta_psi shift by min:", min_in_mask)
-            elif shift_potential == 'mean':
+            elif shift_potential_model == 'mean':
                 mean_in_mask = (potential_model * potential_mask).mean()
                 true_mean_in_mask = (true_potential * potential_mask).mean()
                 potential_model = potential_model - mean_in_mask + true_mean_in_mask
