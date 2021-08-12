@@ -3,6 +3,8 @@ import numpy as np
 import jax.numpy as jnp
 from scipy.ndimage import morphology
 
+from jaxtronomy.Util import param_util
+
 
 def mask_from_pixelated_source(lens_image, parameters):
     src_idx = lens_image.SourceModel.pixelated_index
@@ -20,3 +22,31 @@ def mask_from_pixelated_source(lens_image, parameters):
     model_mask = morphology.binary_opening(model_mask, iterations=10)
     model_mask = morphology.binary_dilation(model_mask, iterations=3)
     return model_mask
+
+def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
+                                 min_width=1.0, min_height=1.0):
+    # TODO: support arbitrary smooth source profile
+    c_x = kwargs_sersic['center_x']
+    c_y = kwargs_sersic['center_y']
+    r_eff = kwargs_sersic['R_sersic']
+    if 'e1' in kwargs_sersic:
+        e1 = kwargs_sersic['e1']
+        e2 = kwargs_sersic['e2']
+    else:
+        e1 = e2 = 0.
+    phi, q = param_util.ellipticity2phi_q(e1, e2)
+    a = r_eff / np.sqrt(q)
+    if use_major_axis:
+        width = 2. * a * np.abs(np.cos(phi))
+        height = 2. * a * np.abs(np.sin(phi))
+    else:
+        width = 2. * r_eff * np.abs(np.cos(phi))
+        height = 2. * r_eff * np.abs(np.sin(phi))
+    width = max(min_width, width)
+    height = max(min_height, height)
+    # the following dict follows arguments of PixelGrid.create_model_grid()
+    kwargs_pixelated_grid = {
+        'grid_center': [float(c_x), float(c_y)],
+        'grid_shape': [float(width), float(height)],
+    }
+    return kwargs_pixelated_grid
