@@ -4,3 +4,4 @@ jax
 jaxlib
 matplotlib
 # -e git://github.com/aymgal/IMD#egg=imd  # for some notebooks
+# palettable  # for nicer colormaps
