@@ -1,9 +1,9 @@
+import copy
 import numpy as np
 # import scipy.ndimage.interpolation as interp
 import jaxtronomy.Util.util as util
-# import lenstronomy.Util.image_util as image_util
+from jaxtronomy.Util import image_util
 from jaxtronomy.LightModel.Profiles.gaussian import Gaussian
-# import lenstronomy.Util.multi_gauss_expansion as mge
 
 
 def kernel_norm(kernel):
@@ -12,10 +12,7 @@ def kernel_norm(kernel):
     :param kernel:
     :return: normalisation of the psf kernel
     """
-    norm = np.sum(np.array(kernel))
-    kernel /= norm
-    return kernel
-
+    return kernel / np.sum(kernel)
 
 def subgrid_kernel(kernel, subgrid_res, odd=False, num_iter=100):
     """
@@ -76,6 +73,50 @@ def subgrid_kernel(kernel, subgrid_res, odd=False, num_iter=100):
     delta_kernel_sub = np.kron(delta_kernel, id)/subgrid_res**2
     return kernel_norm(kernel_subgrid - delta_kernel_sub)
 
+def averaging_even_kernel(kernel_high_res, subgrid_res):
+    """
+    makes a lower resolution kernel based on the kernel_high_res (odd numbers) and the subgrid_res (even number), both
+    meant to be centered.
+
+    :param kernel_high_res: high resolution kernel with even subsampling resolution, centered
+    :param subgrid_res: subsampling resolution (even number)
+    :return: averaged undersampling kernel
+    """
+    n_kernel_high_res = len(kernel_high_res)
+    n_low = int(round(n_kernel_high_res / subgrid_res + 0.5))
+    if n_low % 2 == 0:
+        n_low += 1
+    n_high = int(n_low * subgrid_res - 1)
+    assert n_high % 2 == 1
+    if n_high == n_kernel_high_res:
+        kernel_high_res_edges = kernel_high_res
+    else:
+        i_start = int((n_high - n_kernel_high_res) / 2)
+        kernel_high_res_edges = np.zeros((n_high, n_high))
+        kernel_high_res_edges[i_start:-i_start, i_start:-i_start] = kernel_high_res
+    kernel_low_res = np.zeros((n_low, n_low))
+    # adding pixels that are fully within a single re-binned pixel
+    for i in range(subgrid_res-1):
+        for j in range(subgrid_res-1):
+            kernel_low_res += kernel_high_res_edges[i::subgrid_res, j::subgrid_res]
+    # adding half of a pixel that has over-lap with two pixels
+    i = subgrid_res - 1
+    for j in range(subgrid_res - 1):
+        kernel_low_res[1:, :] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
+        kernel_low_res[:-1, :] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
+    j = subgrid_res - 1
+    for i in range(subgrid_res - 1):
+        kernel_low_res[:, 1:] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
+        kernel_low_res[:, :-1] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
+    # adding a quarter of a pixel value that is at the boarder of four pixels
+    i = subgrid_res - 1
+    j = subgrid_res - 1
+    kernel_edge = kernel_high_res_edges[i::subgrid_res, j::subgrid_res]
+    kernel_low_res[1:, 1:] += kernel_edge / 4
+    kernel_low_res[:-1, 1:] += kernel_edge / 4
+    kernel_low_res[1:, :-1] += kernel_edge / 4
+    kernel_low_res[:-1, :-1] += kernel_edge / 4
+    return kernel_low_res
 
 def cut_psf(psf_data, psf_size):
     """
@@ -87,7 +128,6 @@ def cut_psf(psf_data, psf_size):
     kernel = image_util.cut_edges(psf_data, psf_size)
     kernel = kernel_norm(kernel)
     return kernel
-
 
 def pixel_kernel(point_source_kernel, subgrid_res=7):
     """
@@ -108,7 +148,6 @@ def pixel_kernel(point_source_kernel, subgrid_res=7):
     kernel_pixel = util.averaging(kernel_pixel, numGrid=kernel_size*subgrid_res, numPix=kernel_size)
     return kernel_norm(kernel_pixel)
 
-
 def kernel_gaussian(kernel_numPix, deltaPix, fwhm):
     sigma = util.fwhm2sigma(fwhm)
     #if kernel_numPix % 2 == 0:
@@ -119,7 +158,6 @@ def kernel_gaussian(kernel_numPix, deltaPix, fwhm):
     kernel /= np.sum(kernel)
     kernel = util.array2image(kernel)
     return kernel
-
 
 def split_kernel(kernel_super, supersampling_kernel_size, supersampling_factor, normalized=True):
     """
@@ -160,7 +198,6 @@ def split_kernel(kernel_super, supersampling_kernel_size, supersampling_factor, 
         kernel_hole_resized /= supersampling_factor ** 2
     return kernel_hole_resized, kernel_subgrid_cut
 
-
 def degrade_kernel(kernel_super, degrading_factor):
     """
 
@@ -185,7 +222,6 @@ def degrade_kernel(kernel_super, degrading_factor):
         kernel_low_res = util.averaging(kernel_super_, numGrid=n_high, numPix=numPix) * degrading_factor**2  # multiplicative factor added when providing flux conservation
     return kernel_low_res
 
-
 def fwhm_kernel(kernel):
     """
 
@@ -205,28 +241,3 @@ def fwhm_kernel(kernel):
             fwhm_2 = (I_2 - I_r[i - 1]) / (I_r[i] - I_r[i - 1]) + r[i - 1]
             return fwhm_2 * 2
     raise ValueError('The kernel did not drop to half the max value - fwhm not determined!')
-
-
-def estimate_amp(data, x_pos, y_pos, psf_kernel):
-    """
-    estimates the amplitude of a point source located at x_pos, y_pos
-    :param data:
-    :param x_pos:
-    :param y_pos:
-    :param deltaPix:
-    :return:
-    """
-    numPix_x, numPix_y = np.shape(data)
-    #data_center = int((numPix-1.)/2)
-    x_int = int(round(x_pos-0.49999))#+data_center
-    y_int = int(round(y_pos-0.49999))#+data_center
-    # TODO: make amplitude estimate not sucecible to rounding effects on which pixels to chose to estimate the amplitude
-    if x_int > 2 and x_int < numPix_x-2 and y_int > 2 and y_int < numPix_y-2:
-        mean_image = max(np.sum(data[y_int - 2:y_int+3, x_int-2:x_int+3]), 0)
-        num = len(psf_kernel)
-        center = int((num-0.5)/2)
-        mean_kernel = np.sum(psf_kernel[center-2:center+3, center-2:center+3])
-        amp_estimated = mean_image/mean_kernel
-    else:
-        amp_estimated = 0
-    return amp_estimated

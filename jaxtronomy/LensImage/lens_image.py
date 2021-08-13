@@ -1,4 +1,5 @@
 import functools
+import copy
 import jax.numpy as np
 from functools import partial
 from jax import jit
@@ -31,7 +32,8 @@ class LensImage(object):
         self.num_bands = 1
         self.PSF = psf_class
         self.Noise = noise_class
-        self.Grid = grid_class
+        # here we deep-copy the class to prevent issues with model grid creations below
+        self.Grid = copy.deepcopy(grid_class)
         self.PSF.set_pixel_size(self.Grid.pixel_width)
         if kwargs_numerics is None:
             kwargs_numerics = {}
@@ -39,14 +41,22 @@ class LensImage(object):
         if lens_model_class is None:
             lens_model_class = LensModel(lens_model_list=[])
         self.LensModel = lens_model_class
+        if self.LensModel.has_pixels:
+            self.Grid.create_model_grid(**self.LensModel.pixel_grid_settings, name='lens')
+            self.LensModel.set_pixel_grid(self.Grid.model_pixel_axes('lens'))
         self._psf_error_map = self.PSF.psf_error_map_bool
-
         if source_model_class is None:
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
+        if self.SourceModel.has_pixels:
+            self.Grid.create_model_grid(**self.SourceModel.pixel_grid_settings, name='source')
+            self.SourceModel.set_pixel_grid(self.Grid.model_pixel_axes('source'), self.Grid.pixel_area)
         if lens_light_model_class is None:
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class
+        if self.LensLightModel.has_pixels:
+            self.Grid.create_model_grid(**self.LensLightModel.pixel_grid_settings, name='lens_light')
+            self.LensLightModel.set_pixel_grid(self.Grid.model_pixel_axes('lens_light'), self.Grid.pixel_area)
         self._kwargs_numerics = kwargs_numerics
         self.source_mapping = Image2SourceMapping(lens_model_class, source_model_class)
 
@@ -141,3 +151,17 @@ class LensImage(object):
         if compute_true_noise_map is True:
             self.Noise.compute_noise_map_from_model(model)
         return simu
+
+    def normalized_residuals(self, data, model, mask=None):
+        if mask is None:
+            mask = np.ones(self.Grid.num_pixel_axes)
+        #noise_var = self.Noise.C_D_model(model)
+        noise_var = self.Noise.C_D
+        norm_res = (model - data) / np.sqrt(noise_var) * mask
+        return norm_res
+
+    def reduced_chi2(self, data, model, mask=None):
+        norm_res = self.normalized_residuals(data, model, mask=mask)
+        num_data_points = np.count_nonzero(mask)
+        return np.sum(norm_res**2) / num_data_points
+        

@@ -2,17 +2,26 @@ import jax.numpy as jnp
 from jaxtronomy.Util.jax_util import BilinearInterpolator, BicubicInterpolator
 
 
+import numpy as np
+
+
 class Pixelated(object):
     """Source brightness defined on a fixed coordinate grid."""
-    param_names = ['x_coords', 'y_coords', 'image']
+    param_names = ['pixels']
     method_options = ['bilinear', 'bicubic']
 
-    def __init__(self, method='bilinear'):
-        self._method = method
+    def __init__(self, method='bilinear', allow_extrapolation=True):
         error_msg = "Invalid method. Must be either 'bilinear' or 'bicubic'."
-        assert self._method in self.method_options, error_msg
+        assert method in self.method_options, error_msg
+        if method == 'bilinear':
+            self._interp_class = BilinearInterpolator
+        else:
+            self._interp_class = BicubicInterpolator
+        self.data_pixel_area = None
+        self.x_coords, self.y_coords = None, None
+        self._extrapol_bool = allow_extrapolation
 
-    def function(self, x, y, x_coords, y_coords, image):
+    def function(self, x, y, pixels):
         """Interpolated evaluation of a pixelated source.
 
         Parameters
@@ -23,17 +32,18 @@ class Pixelated(object):
             Rectangular x-coordinate grid values.
         y_coords : 1D array
             Rectangular y-coordinate grid values.
-        image : 2D array
+        pixels : 2D array
             Source brightness at fixed coordinate grid positions.
         method : str
             Interpolation method, either 'bilinear' or 'bicubic'.
 
         """
-        # Warning: assuming same pixel size across all the image! 
-        pixel_area = (x_coords[0]-x_coords[1]) * (y_coords[0]-y_coords[1])
-        if self._method == 'bilinear':
-            interp = BilinearInterpolator(x_coords, y_coords, image)
-        else:
-            interp = BicubicInterpolator(x_coords, y_coords, image)
+        # Warning: assuming same pixel size across all the image!
+        interp = self._interp_class(self.y_coords, self.x_coords, pixels,
+                                    allow_extrapolation=self._extrapol_bool)
         # we normalize the interpolated array for correct units when evaluated by LensImage methods
-        return interp(y, x).T / pixel_area
+        return interp(y, x) / self.data_pixel_area
+    
+    def set_data_pixel_grid(self, pixel_axes, data_pixel_area):
+        self.data_pixel_area = data_pixel_area
+        self.x_coords, self.y_coords = pixel_axes

@@ -1,22 +1,21 @@
-# from __future__ import print_function, division, absolute_import, unicode_literals
 from jaxtronomy.LensModel.single_plane import SinglePlane
 # from jaxtronomy.LensModel.multi_plane import MultiPlane
 # from jaxtronomy.Cosmo.lens_cosmo import LensCosmo
 # from astropy.cosmology import default_cosmology
-# from jaxtronomy.Util import constants as const
 
 __all__ = ['LensModel']
 
 
 class LensModel(object):
     """An arbitrary list of lens models."""
-    def __init__(self, lens_model_list):
+    def __init__(self, lens_model_list, kwargs_pixelated={}):
         """Create a LensModel object.
 
         Parameters
         ----------
         lens_model_list : list of str
             Lens model profile names.
+        kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
 
         Notes
         -----
@@ -26,6 +25,7 @@ class LensModel(object):
 
         """
         self.lens_model_list = lens_model_list
+
         # self.z_lens = z_lens
         # if z_source_convention is None:
         #     z_source_convention = z_source
@@ -38,15 +38,18 @@ class LensModel(object):
         # self.cosmo = cosmo
         self.multi_plane = False  # multi_plane
         if self.multi_plane:
-            if z_source is None:
-                raise ValueError('z_source needs to be set for multi-plane lens modelling.')
+            raise NotImplementedError("Multi-plane lensing is currently not supported")
 
-            self.lens_model = MultiPlane(z_source, lens_model_list,
-                                         lens_redshift_list, cosmo=cosmo,
-                                         observed_convention_index=observed_convention_index)
+            # if z_source is None:
+            #     raise ValueError('z_source needs to be set for multi-plane lens modelling.')
+
+            # self.lens_model = MultiPlane(z_source, lens_model_list,
+            #                              lens_redshift_list, cosmo=cosmo,
+            #                              observed_convention_index=observed_convention_index)
         else:
             self.lens_model = SinglePlane(self.lens_model_list,
-                                          self.redshift_list)
+                                          self.redshift_list,
+                                          kwargs_pixelated=kwargs_pixelated)
         # if z_lens is not None and z_source is not None:
         #     self._lensCosmo = LensCosmo(z_lens, z_source, cosmo=cosmo)
 
@@ -213,3 +216,26 @@ class LensModel(object):
         f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k, diff=diff, diff_method=diff_method)
         det_A = (1 - f_xx) * (1 - f_yy) - f_xy * f_yx
         return 1. / det_A  # attention, if dividing by zero
+
+    @property
+    def has_pixels(self):
+        return self.lens_model.has_pixels
+
+    @property
+    def pixel_grid_settings(self):
+        return self.lens_model.pixel_grid_settings
+
+    def set_pixel_grid(self, pixel_axes):
+        self.lens_model.set_pixel_grid(pixel_axes)
+
+    @property
+    def pixelated_index(self):
+        return self.lens_model.pixelated_index
+
+    @property
+    def pixelated_shape(self):
+        return self.lens_model.pixelated_shape
+
+    @property
+    def pixelated_coordinates(self):
+        return self.lens_model.pixelated_coordinates

@@ -1,9 +1,9 @@
-from jaxtronomy.LightModel.linear_basis import LinearBasis
+from jaxtronomy.LightModel.light_model_base import LightModelBase
 
 __all__ = ['LightModel']
 
 
-class LightModel(LinearBasis):
+class LightModel(LightModelBase):
     """Model extended surface brightness profiles of sources and lenses.
 
     Notes
@@ -16,8 +16,12 @@ class LightModel(LinearBasis):
 
     """
     def __init__(self, light_model_list, deflection_scaling_list=None,
-                 source_redshift_list=None, smoothing=0.001):
+                 source_redshift_list=None, smoothing=0.001,
+                 pixel_interpol='bilinear', pixel_allow_extrapolation=False, kwargs_pixelated={}):
         """Create a LightModel object."""
-        super(LightModel, self).__init__(light_model_list, smoothing)
+        super(LightModel, self).__init__(light_model_list, smoothing, 
+                                         pixel_interpol=pixel_interpol, 
+                                         pixel_allow_extrapolation=pixel_allow_extrapolation,
+                                         kwargs_pixelated=kwargs_pixelated)
         self.deflection_scaling_list = deflection_scaling_list
         self.redshift_list = source_redshift_list

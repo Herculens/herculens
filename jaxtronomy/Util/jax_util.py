@@ -1,6 +1,7 @@
-import functools
+from functools import partial
+import numpy as np
 import jax.numpy as jnp
-from jax import jit, vmap
+from jax import jit, vmap, lax
 from jax.scipy.special import gammaln
 from jax.scipy.signal import convolve2d
 from jax.scipy.stats import norm
@@ -74,7 +75,7 @@ class GaussianFilter(object):
 
         return kernel
 
-    @functools.partial(jit, static_argnums=(0,))
+    @partial(jit, static_argnums=(0,))
     def __call__(self, image):
         """Jit-compiled convolution an image by a gaussian filter.
 
@@ -142,7 +143,7 @@ class WaveletTransform(object):
             self._norms = jnp.sqrt(jnp.sum(wt_dirac**2, axis=(1, 2,)))
         return self._norms
 
-    @functools.partial(jit, static_argnums=(0,))
+    @partial(jit, static_argnums=(0,))
     def decompose(self, image):
         """Decompose an image into the chosen wavelet basis"""
         # Validate input
@@ -187,7 +188,7 @@ class WaveletTransform(object):
         result = jnp.concatenate((result, cj[:,:,:,0]), axis=0)
         return result
 
-    @functools.partial(jit, static_argnums=(0,))
+    @partial(jit, static_argnums=(0,))
     def reconstruct(self, coeffs):
         """Reconstruct an image from wavelet decomposition coefficients"""
         return jnp.sum(coeffs, axis=0)
@@ -204,10 +205,19 @@ class BilinearInterpolator(object):
     is MUCH SLOWER as well.
 
     """
-    def __init__(self, x_coords, y_coords, z):
-        self.x_coords = x_coords
-        self.y_coords = y_coords
+    def __init__(self, x, y, z, allow_extrapolation=True):
         self.z = z
+        if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
+            self.x = jnp.array(x)
+        else:
+            self.x = jnp.array(np.sort(x))
+            self.z = jnp.flip(self.z, axis=0)
+        if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
+            self.y = jnp.array(y)
+        else:
+            self.y = jnp.array(np.sort(y))
+            self.z = jnp.flip(self.z, axis=1)
+        self._extrapol_bool = allow_extrapolation
 
     def __call__(self, x, y, dx=0, dy=0):
         """Vectorized evaluation of the interpolation or its derivatives.
@@ -233,21 +243,21 @@ class BilinearInterpolator(object):
 
         return vmap(self._evaluate, in_axes=(0, 0, None, None))(x, y, dx, dy)
 
-    # @functools.partial(jit, static_argnums=(0,))
+    # @partial(jit, static_argnums=(0,))
     def _compute_coeffs(self, x, y):
         # Find the pixel that the point (x, y) falls in
         # x_ind = jnp.digitize(x, self.x_padded) - 1
         # y_ind = jnp.digitize(y, self.y_padded) - 1
-        x_ind = jnp.searchsorted(self.x_coords, x, side='right') - 1
-        x_ind = jnp.clip(x_ind, a_min=0, a_max=(len(self.x_coords) - 2))
-        y_ind = jnp.searchsorted(self.y_coords, y, side='right') - 1
-        y_ind = jnp.clip(y_ind, a_min=0, a_max=(len(self.y_coords) - 2))
+        x_ind = jnp.searchsorted(self.x, x, side='right') - 1
+        x_ind = jnp.clip(x_ind, a_min=0, a_max=(len(self.x) - 2))
+        y_ind = jnp.searchsorted(self.y, y, side='right') - 1
+        y_ind = jnp.clip(y_ind, a_min=0, a_max=(len(self.y) - 2))
 
         # Determine the coordinates and dimensions of this pixel
-        x1 = self.x_coords[x_ind]
-        x2 = self.x_coords[x_ind + 1]
-        y1 = self.y_coords[y_ind]
-        y2 = self.y_coords[y_ind + 1]
+        x1 = self.x[x_ind]
+        x2 = self.x[x_ind + 1]
+        y1 = self.y[y_ind]
+        y2 = self.y[y_ind + 1]
         area = (x2 - x1) * (y2 - y1)
 
         # Compute function values at the four corners
@@ -268,14 +278,17 @@ class BilinearInterpolator(object):
     def _evaluate(self, x, y, dx=0, dy=0):
         """Single-point evaluation of the interpolation."""
         a0, a1, a2, a3 = self._compute_coeffs(x, y)
-
         if (dx, dy) == (0, 0):
             result = a0 + a1 * x + a2 * y + a3 * x * y
         elif (dx, dy) == (1, 0):
             result = a1 + a3 * y
         else:
             result = a2 + a3 * x
-
+        # if extrapolation is not allowed, then we mask out values outside the original bounding box
+        result = lax.cond(self._extrapol_bool, 
+                          lambda _: result, 
+                          lambda _: result * (x >= self.x[0]) * (x <= self.x[-1]) * (y >= self.y[0]) * (y <= self.y[-1]), 
+                          operand=None)
         return result
 
 
@@ -286,10 +299,18 @@ class BicubicInterpolator(object):
     when `kx` and `ky` are both equal to 3.
 
     """
-    def __init__(self, x, y, z, zx=None, zy=None, zxy=None):
-        self.x = jnp.array(x)
-        self.y = jnp.array(y)
+    def __init__(self, x, y, z, zx=None, zy=None, zxy=None, allow_extrapolation=True):
         self.z = jnp.array(z)
+        if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
+            self.x = jnp.array(x)
+        else:
+            self.x = jnp.array(np.sort(x))
+            self.z = jnp.flip(self.z, axis=1)
+        if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
+            self.y = jnp.array(y)
+        else:
+            self.y = jnp.array(np.sort(y))
+            self.z = jnp.flip(self.z, axis=0)
 
         # Assume uniform coordinate spacing
         self.dx = self.x[1] - self.x[0]
@@ -327,6 +348,8 @@ class BicubicInterpolator(object):
         self._m = jnp.array([row0, row1, row2, row3])
 
         self._m = jnp.transpose(self._m, axes=(2, 3, 0, 1))
+
+        self._extrapol_bool = allow_extrapolation
 
     def __call__(self, x, y, dx=0, dy=0):
         """Vectorized evaluation of the interpolation or its derivatives.
@@ -375,5 +398,11 @@ class BicubicInterpolator(object):
             vv = jnp.asarray([0., 1., 2. * v, 3. * v**2]) / self.dy
         if dy == 2:
             vv = jnp.asarray([0., 0., 2., 6. * v]) / self.dy**2
+        result = jnp.dot(uu, jnp.dot(a, vv))
 
-        return jnp.dot(uu, jnp.dot(a, vv))
+        # if extrapolation is not allowed, then we mask out values outside the original bounding box
+        result = lax.cond(self._extrapol_bool, 
+                          lambda _: result, 
+                          lambda _: result * (x >= self.x[0]) * (x <= self.x[-1]) * (y >= self.y[0]) * (y <= self.y[-1]), 
+                          operand=None)
+        return result

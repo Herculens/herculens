@@ -8,7 +8,7 @@ _SUPPORTED_MODELS = ['SHEAR', 'SHEAR_GAMMA_PSI', 'SIE', 'PIXELATED']
 
 class ProfileListBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, lens_redshift_list=None):
+    def __init__(self, lens_model_list, lens_redshift_list=None, kwargs_pixelated={}):
         """Create a ProfileListBase object.
 
         Parameters
@@ -22,6 +22,7 @@ class ProfileListBase(object):
         self.func_list = self._load_model_instances(lens_model_list, lens_redshift_list)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
+        self._kwargs_pixelated = kwargs_pixelated
 
     def _load_model_instances(self, lens_model_list, lens_redshift_list=None):
         if lens_redshift_list is None:
@@ -31,7 +32,7 @@ class ProfileListBase(object):
         for lens_type in lens_model_list:
             # These models require a new instance per profile as certain pre-computations
             # are relevant per individual profile
-            if lens_type in ('PIXELATED',):
+            if lens_type in ['PIXELATED']:
                 lensmodel_class = self._import_class(lens_type)
             else:
                 if lens_type not in imported_classes.keys():
@@ -42,8 +43,7 @@ class ProfileListBase(object):
             func_list.append(lensmodel_class)
         return func_list
 
-    @staticmethod
-    def _import_class(lens_type):
+    def _import_class(self, lens_type):
         """Get the lens profile class of the corresponding type."""
         if lens_type == 'SHEAR':
             return shear.Shear()
@@ -77,3 +77,40 @@ class ProfileListBase(object):
         """
         for func in self.func_list:
             func.set_dynamic()
+
+    @property
+    def has_pixels(self):
+        return ('PIXELATED' in self._model_list)
+
+    @property
+    def pixel_grid_settings(self):
+        return self._kwargs_pixelated
+
+    def set_pixel_grid(self, pixel_axes):
+        for i, func in enumerate(self.func_list):
+            if self._model_list[i] == 'PIXELATED':
+                func.set_data_pixel_grid(pixel_axes)
+
+    @property
+    def pixelated_index(self):
+        if not hasattr(self, '_pix_idx'):
+            try:
+                self._pix_idx = self._model_list.index('PIXELATED')
+            except ValueError:
+                self._pix_idx = None
+        return self._pix_idx
+
+    @property
+    def pixelated_coordinates(self):
+        idx = self.pixelated_index
+        if idx is None:
+            return None, None
+        return self.func_list[idx].x_coords, self.func_list[idx].y_coords
+
+    @property
+    def pixelated_shape(self):
+        x_coords, y_coords = self.pixelated_coordinates
+        if x_coords is None:
+            return None
+        else:
+            return (len(y_coords), len(x_coords))

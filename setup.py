@@ -26,6 +26,6 @@ setuptools.setup(
     description=release_info['__about__'],
     long_description=long_description,
     long_description_content_type='text/markdown',
-    # setup_requires=release_info['__setup_requires__'],
-    # tests_require=release_info['__tests_require__']
+    setup_requires=release_info['__setup_requires__'],
+    tests_require=release_info['__tests_require__']
 )

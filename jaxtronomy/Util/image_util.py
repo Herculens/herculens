@@ -1,9 +1,7 @@
 import numpy as np
-# import jax.numpy as np
-# from jax import random
-# from scipy import ndimage, interpolate
+from scipy import interpolate #, ndimage
 from scipy.ndimage import interpolation as interp
-# import jaxtronomy.Util.util as util
+# from jaxtronomy.Util.jax_util import BilinearInterpolator
 
 
 def add_layer2image(grid2d, x_pos, y_pos, kernel, order=1):
@@ -23,7 +21,6 @@ def add_layer2image(grid2d, x_pos, y_pos, kernel, order=1):
     shift_y = y_int - y_pos
     kernel_shifted = interp.shift(kernel, [-shift_y, -shift_x], order=order)
     return add_layer2image_int(grid2d, x_int, y_int, kernel_shifted)
-
 
 def add_layer2image_int(grid2d, x_pos, y_pos, kernel):
     """
@@ -62,7 +59,6 @@ def add_layer2image_int(grid2d, x_pos, y_pos, kernel):
     new[min_y:max_y, min_x:max_x] += kernel_re_sized
     return new
 
-
 def add_background(image, sigma_bkd):
     """
     adds background noise to image
@@ -77,7 +73,6 @@ def add_background(image, sigma_bkd):
     nx, ny = np.shape(image)
     background = np.random.randn(nx, ny) * sigma_bkd
     return background
-
 
 def add_poisson(image, exp_time):
     """
@@ -99,7 +94,6 @@ def add_poisson(image, exp_time):
     nx, ny = np.shape(image)
     poisson = np.random.randn(nx, ny) * sigma
     return poisson
-
 
 def cut_edges(image, numPix):
     """
@@ -126,7 +120,6 @@ def cut_edges(image, numPix):
     # return copy.deepcopy(resized)
     return resized  # No need to copy, since JAX returns a new DeviceArray
 
-
 def radial_profile(data, center=[0, 0]):
     """
     computes radial profile
@@ -137,13 +130,12 @@ def radial_profile(data, center=[0, 0]):
     """
     y, x = np.indices((data.shape))
     r = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-    r = r.astype(np.int)
+    r = r.astype(int)
 
     tbin = np.bincount(r.ravel(), data.ravel())
     nr = np.bincount(r.ravel())
     radialprofile = tbin / nr
     return radialprofile
-
 
 def re_size(image, factor=1):
     """
@@ -163,3 +155,19 @@ def re_size(image, factor=1):
         return small
     else:
         raise ValueError("scaling with factor %s is not possible with grid size %s, %s" %(f, nx, ny))
+
+def re_size_array(x_in, y_in, input_values, x_out, y_out):
+    """
+    resizes 2d array (i.e. image) to new coordinates. So far only works with square output aligned with coordinate axis.
+    :param x_in:
+    :param y_in:
+    :param input_values:
+    :param x_out:
+    :param y_out:
+    :return:
+    """
+    interp_2d = interpolate.interp2d(x_in, y_in, input_values, kind='linear')
+    out_values = interp_2d.__call__(x_out, y_out)
+    # interp_2d = BilinearInterpolator(x_in, y_in, input_values)
+    # out_values = interp_2d(x_out, y_out)
+    return out_values
