@@ -32,6 +32,7 @@ The following dependencies will be installed automatically.
 - `dynesty` (1.1), for nested sampling using Hamiltonian slice sampling
 - `corner` (2.2.1), for corner plots
 - `lenstronomy` (1.6.0), for particle swarm optimization (this might be removed in the future)
+- `palettable` (3.3.0), for nicer colormaps for plots
 
 To run the notebooks, `jupyter` is (of course) also necessary, along with `matplotlib` for plotting.
 
