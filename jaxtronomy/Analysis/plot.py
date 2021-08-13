@@ -38,7 +38,7 @@ class Plotter(object):
     cmap_deriv1 = plt.get_cmap('cividis')
     cmap_deriv2 = plt.get_cmap('inferno')
 
-    def __init__(self, base_fontsize=18, flux_log_scale=True, 
+    def __init__(self, base_fontsize=0.28, flux_log_scale=True, 
                  flux_vmin=None, flux_vmax=None):
         self._base_fs = base_fontsize
         if flux_log_scale is True:
@@ -87,7 +87,6 @@ class Plotter(object):
                 if reproject_pixelated_models:
                     # we need to make sure it's jax.numpy array for source_surface_brightness when using PIXELATED source profile
                     kwargs_source[src_idx]['pixels'] = jnp.asarray(kwargs_source[src_idx]['pixels'])
-                    # we extract the right coordinate arrays
                     x_grid_src, y_grid_src = lens_image.Grid.model_pixel_coordinates('source')
                     source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
                     source_model *= lens_image.Grid.pixel_area
@@ -115,18 +114,20 @@ class Plotter(object):
                 warnings.warn("True source array has been interpolated to match model array")
 
         if show_lens_mass:
-            # TODO: update those lines to be consistent with source model above
-            pot_idx = -1  # here we assume the last lens profile is 'PIXELATED'
-            x_coords_pot, y_coords_pot = lens_image.LensModel.pixelated_coordinates
-            x_grid_lens, y_grid_lens = np.meshgrid(x_coords_pot, y_coords_pot)
+            kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
+            pot_idx = lens_image.LensModel.pixelated_index
+            x_grid_lens, y_grid_lens = lens_image.Grid.model_pixel_coordinates('lens')
             alpha_x, alpha_y = lens_image.LensModel.alpha(x_grid_lens, y_grid_lens, 
-                                                          kwargs_result['kwargs_lens'], k=pot_idx)
+                                                          kwargs_lens, k=pot_idx)
             kappa = lens_image.LensModel.kappa(x_grid_lens, y_grid_lens, 
-                                               kwargs_result['kwargs_lens'], k=pot_idx)
-            potential_model = np.copy(kwargs_result['kwargs_lens'][pot_idx]['pixels'])
-            #potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
-            #                                                 kwargs_result['kwargs_lens'], k=pot_idx)
-
+                                               kwargs_lens, k=pot_idx)
+            kappa_smoothed = ndimage.gaussian_filter(kappa, 1)
+            if reproject_pixelated_models:
+                potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
+                                                                 kwargs_lens, k=pot_idx)
+            else:
+                potential_model = kwargs_lens[pot_idx]['pixels']
+            
             # here we know that there are no perturbations in the true potential
             if hasattr(self, '_true_pot_perturb'):
                 true_potential = self._true_pot_perturb
@@ -157,18 +158,26 @@ class Plotter(object):
             ##### IMAGING DATA AND MODEL IMAGE #####
             ax = axes[i_row, 0]
             im = ax.imshow(data * likelihood_mask, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
-            ax.set_title("Data", fontsize=self._base_fs)
-            nice_colorbar(im)
+            ax.set_title("data", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
             im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
-            ax.set_title("Model", fontsize=self._base_fs)
-            nice_colorbar(im)
+            ax.set_title("model", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
             norm_res = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
             red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
             im = ax.imshow(norm_res * likelihood_mask, cmap=self.cmap_resid, vmin=-4, vmax=4, extent=extent)
-            ax.set_title("Norm. residuals ("+r"$\chi^2$"+f"={red_chi2:.2f})", fontsize=self._base_fs)
-            nice_colorbar_residuals(im, norm_res, vmin=-4, vmax=4)
+            ax.set_title(r"(f${}_{\rm model}$ - f${}_{\rm data})/\sigma$", fontsize=self._base_fs)
+            nice_colorbar_residuals(im, norm_res, position='top', pad=0.4, size=0.2, 
+                                    vmin=-4, vmax=4,
+                                    colorbar_kwargs={'orientation': 'horizontal'})
+            text = r"$\chi^2={:.2f}$".format(red_chi2)
+            ax.text(0.05, 0.05, text, color='black', # fontsize=, 
+                    horizontalalignment='left', verticalalignment='bottom',
+                    transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
             i_row += 1
 
         if show_source:
@@ -176,20 +185,28 @@ class Plotter(object):
             ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
             ax = axes[i_row, 0]
             im = ax.imshow(true_source, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
-            nice_colorbar(im)
-            ax.set_title("True source", fontsize=self._base_fs)
+            ax.set_title("true source", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
             im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
             #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
-            nice_colorbar(im)
-            ax.set_title("Source model", fontsize=self._base_fs)
+            ax.set_title("model source", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            diff = true_source - source_model
-            vmax_diff = true_source.max() / 10.
+            if np.count_nonzero(true_source) == 0:
+                diff = np.zeros_like(true_source)
+                vmax_diff = 1
+            else:
+                diff = source_model - true_source
+                vmax_diff = true_source.max() / 10.
             im = ax.imshow(diff, extent=src_extent, 
                            cmap=self.cmap_resid, vmin=-vmax_diff, vmax=vmax_diff)
-            ax.set_title("Residuals", fontsize=self._base_fs)
-            nice_colorbar_residuals(im, diff, vmin=-vmax_diff, vmax=vmax_diff)
+            ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm truth}$", fontsize=self._base_fs)
+            nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
+                                    vmin=-vmax_diff, vmax=vmax_diff,
+                                    colorbar_kwargs={'orientation': 'horizontal'})
             i_row += 1
 
         if show_lens_mass:
@@ -197,34 +214,39 @@ class Plotter(object):
             ##### PIXELATED POTENTIAL PERTURBATIONS #####
             ax = axes[i_row, 0]
             im = ax.imshow(true_potential * potential_mask, cmap=self.cmap_default, extent=extent)
-            ax.set_title("True $\delta\psi$", fontsize=self._base_fs)
-            nice_colorbar(im)
+            ax.set_title(r"$\delta\psi_{\rm truth}$", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
             im = ax.imshow(potential_model * potential_mask, cmap=self.cmap_default, extent=extent)
-            ax.set_title("$\delta\psi$ model", fontsize=self._base_fs)
-            nice_colorbar(im)
+            ax.set_title(r"$\delta\psi_{\rm model}$", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
             pot_abs_res = (true_potential - potential_model) * potential_mask
             vmax = np.max(np.abs(true_potential)) / 2.
             im = ax.imshow(pot_abs_res, cmap=self.cmap_resid, vmin=-vmax, vmax=vmax, extent=extent)
-            ax.set_title("Residuals", fontsize=self._base_fs)
-            nice_colorbar_residuals(im, pot_abs_res, vmin=-vmax, vmax=vmax)
+            ax.set_title(r"$\delta\psi_{\rm model}$ - $\delta\psi_{\rm truth}$", fontsize=self._base_fs)
+            nice_colorbar_residuals(im, pot_abs_res, position='top', pad=0.4, size=0.2, 
+                                    vmin=-vmax, vmax=vmax,
+                                    colorbar_kwargs={'orientation': 'horizontal'})
             i_row += 1
 
             ##### DEFLECTION ANGLES AND SURFACE MASS DENSITY #####
             ax = axes[i_row, 0]
-            ax.set_title(r"$\delta\alpha_x$ model", fontsize=self._base_fs)
             im = ax.imshow(alpha_x * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
-            nice_colorbar(im)
+            ax.set_title(r"$\delta\alpha_{x,\rm model}$", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
-            alpha_y_show = alpha_y
-            ax.set_title(r"$\delta\alpha_y$ model", fontsize=self._base_fs)
             im = ax.imshow(alpha_y * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
-            nice_colorbar(im)
+            ax.set_title(r"$\delta\alpha_{y,\rm model}$", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            kappa_smoothed = ndimage.gaussian_filter(kappa, 1)
-            ax.set_title(r"$\delta\kappa$ model (smoothed)", fontsize=self._base_fs)
-            im = ax.imshow(kappa_smoothed * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent) #, vmin=0)
-            nice_colorbar(im)
-        
+            im = ax.imshow(kappa_smoothed * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent)
+            ax.set_title(r"$\delta\kappa_{\rm model}$ (smoothed)", fontsize=self._base_fs)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
+
         plt.show()

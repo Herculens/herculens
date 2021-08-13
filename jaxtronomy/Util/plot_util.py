@@ -36,10 +36,13 @@ def nice_colorbar(mappable, position='right', pad=0.1, size='5%', label=None, fo
     if label is not None:
         colorbar_kwargs.pop('label', None)
         cb.set_label(label, fontsize=fontsize, **label_kwargs)
+    if position == 'top':
+        cax.xaxis.set_ticks_position('top')
     return cb
 
 def nice_colorbar_residuals(mappable, res_map, vmin, vmax, position='right', pad=0.1, size='5%', 
-                            invisible=False, label=None, fontsize=16):
+                            invisible=False, label=None, fontsize=12,
+                            divider_kwargs={}, colorbar_kwargs={}, label_kwargs={}):
     if res_map.min() < vmin and res_map.max() > vmax:
         cb_extend = 'both'
     elif res_map.min() < vmin:
@@ -48,5 +51,7 @@ def nice_colorbar_residuals(mappable, res_map, vmin, vmax, position='right', pad
         cb_extend = 'max'
     else:
         cb_extend = 'neither'
+    colorbar_kwargs.update({'extend': cb_extend})
     nice_colorbar(mappable, position=position, pad=pad, size=size, label=label, fontsize=fontsize,
-                  invisible=invisible, colorbar_kwargs={'extend': cb_extend})
+                  invisible=invisible, colorbar_kwargs=colorbar_kwargs, label_kwargs=label_kwargs,
+                  divider_kwargs=divider_kwargs)
