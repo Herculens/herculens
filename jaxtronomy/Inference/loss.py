@@ -105,7 +105,7 @@ class Loss(object):
         elif likelihood_mask is None:
             self._ll_mask = np.ones_like(self._data)
         else:
-            self._ll_mask = np.copy(likelihood_mask).astype(float)
+            self._ll_mask = likelihood_mask.astype(float)
         self._ll_num_data_points = np.count_nonzero(self._ll_mask)
 
     def _init_regularizations(self, regularization_terms, regularization_strengths, 

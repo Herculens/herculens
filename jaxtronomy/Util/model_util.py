@@ -24,7 +24,7 @@ def mask_from_pixelated_source(lens_image, parameters):
     return model_mask
 
 def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
-                                 min_width=1.0, min_height=1.0):
+                                 min_width=1.0, min_height=1.0, scaling=1.0):
     # TODO: support arbitrary smooth source profile
     c_x = kwargs_sersic['center_x']
     c_y = kwargs_sersic['center_y']
@@ -35,16 +35,15 @@ def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
     else:
         e1 = e2 = 0.
     phi, q = param_util.ellipticity2phi_q(e1, e2)
-    a = r_eff / np.sqrt(q)
-    if use_major_axis:
-        width = 2. * a * np.abs(np.cos(phi))
-        height = 2. * a * np.abs(np.sin(phi))
-    else:
-        width = 2. * r_eff * np.abs(np.cos(phi))
-        height = 2. * r_eff * np.abs(np.sin(phi))
+    a = r_eff / np.sqrt(q)  # semi-major axis
+    r = r_eff * np.sqrt(q)  # product average radius
+    print(f"r_eff={r_eff:.2f}, r={r:.2f}, a={a:.2f}")
+    diameter = 2*a if use_major_axis else 2*r
+    width = diameter * np.abs(np.cos(phi)) * scaling
+    height = diameter * np.abs(np.sin(phi)) * scaling
     width = max(min_width, width)
     height = max(min_height, height)
-    # the following dict follows arguments of PixelGrid.create_model_grid()
+    # the following dict is consistent with arguments of PixelGrid.create_model_grid()
     kwargs_pixelated_grid = {
         'grid_center': [float(c_x), float(c_y)],
         'grid_shape': [float(width), float(height)],

@@ -61,10 +61,9 @@ class Parameters(object):
     @property
     def kwargs_model(self):
         # TODO: intermediate step, this might be suppressed in the future
-        if not hasattr(self, '_kwargs_model'):
-            self._kwargs_model = dict(lens_model_list=self._image.LensModel.lens_model_list,
-                                      source_model_list=self._image.SourceModel.profile_type_list,
-                                      lens_light_model_list=self._image.LensLightModel.profile_type_list)
+        self._kwargs_model = dict(lens_model_list=self._image.LensModel.lens_model_list,
+                                  source_model_list=self._image.SourceModel.profile_type_list,
+                                  lens_light_model_list=self._image.LensLightModel.profile_type_list)
         return self._kwargs_model
 
     def initial_values(self, as_kwargs=False, copy=False):
