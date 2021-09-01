@@ -4,13 +4,13 @@ import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from scipy import ndimage
-from matplotlib.colors import LogNorm
+from matplotlib.colors import Normalize, LogNorm
 
 from jaxtronomy.Util.plot_util import nice_colorbar, nice_colorbar_residuals
 from jaxtronomy.Util import image_util
 
 # Some general default for plotting
-plt.rc('image', interpolation='none', origin='lower')  # imshow
+plt.rc('image', interpolation='none', origin='lower')  # for imshow
 
 
 class Plotter(object):
@@ -32,19 +32,20 @@ class Plotter(object):
     cmap_flux = copy.copy(cmap_base)
     cmap_flux.set_bad(color='black')
     cmap_flux_alt = copy.copy(cmap_base)
-    cmap_flux_alt.set_bad(color='#222222')  # emphasize e.g. non-positive pixels in log scale
+    cmap_flux_alt.set_bad(color='#222222')  # to emphasize non-positive pixels in log scale
     cmap_resid = plt.get_cmap('RdBu_r')
     cmap_default = plt.get_cmap('viridis')
     cmap_deriv1 = plt.get_cmap('cividis')
     cmap_deriv2 = plt.get_cmap('inferno')
 
     def __init__(self, base_fontsize=0.28, flux_log_scale=True, 
-                 flux_vmin=None, flux_vmax=None):
+                 flux_vmin=None, flux_vmax=None, res_vmax=6):
         self._base_fs = base_fontsize
         if flux_log_scale is True:
             self.norm_flux = LogNorm(flux_vmin, flux_vmax)
         else:
             self.norm_flux = None
+        self.norm_res = Normalize(-res_vmax, res_vmax)
 
     def set_data(self, data):
         self._data = data
@@ -167,12 +168,12 @@ class Plotter(object):
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            norm_res = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
+            residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
             red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
-            im = ax.imshow(norm_res * likelihood_mask, cmap=self.cmap_resid, vmin=-4, vmax=4, extent=extent)
+            im = ax.imshow(residuals * likelihood_mask, cmap=self.cmap_resid, extent=extent, norm=self.norm_res)
             ax.set_title(r"(f${}_{\rm model}$ - f${}_{\rm data})/\sigma$", fontsize=self._base_fs)
-            nice_colorbar_residuals(im, norm_res, position='top', pad=0.4, size=0.2, 
-                                    vmin=-4, vmax=4,
+            nice_colorbar_residuals(im, residuals, position='top', pad=0.4, size=0.2, 
+                                    vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                     colorbar_kwargs={'orientation': 'horizontal'})
             text = r"$\chi^2={:.2f}$".format(red_chi2)
             ax.text(0.05, 0.05, text, color='black', # fontsize=, 
@@ -202,7 +203,7 @@ class Plotter(object):
                 diff = source_model - true_source
                 vmax_diff = true_source.max() / 10.
             im = ax.imshow(diff, extent=src_extent, 
-                           cmap=self.cmap_resid, vmin=-vmax_diff, vmax=vmax_diff)
+                           cmap=self.cmap_resid, norm=Normalize(-vmax_diff, vmax_diff))
             ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm truth}$", fontsize=self._base_fs)
             nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
                                     vmin=-vmax_diff, vmax=vmax_diff,

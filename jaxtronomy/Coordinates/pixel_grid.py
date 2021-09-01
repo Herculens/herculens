@@ -120,7 +120,7 @@ class PixelGrid(Coordinates):
 
     def create_model_grid(self, grid_center=None, grid_shape=None, 
                           pixel_scale_factor=None, conserve_extent=False,
-                          name='none'):
+                          name='none', overwrite=False):
         """
         :param grid_center: 2-tuple (center_x, center_y) with grid center in physical units
         If None, defaults to the original grid center. 
@@ -134,7 +134,7 @@ class PixelGrid(Coordinates):
         Otherwise, the extent will be computed based on the final pixel width.
         :param name: unique string for identifying the created grid.
         """
-        if name in self._model_grids:
+        if not overwrite and name in self._model_grids:
             raise ValueError(f"Grid name '{name}' is already used for another grid")
         
         unchanged_count = 0
