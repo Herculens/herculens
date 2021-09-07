@@ -4,9 +4,11 @@ import jax.numpy as jnp
 from jax import lax
 
 from jaxtronomy.LensModel.Profiles import pixelated as pixelated_lens
-from jaxtronomy.LensModel.Profiles import sie, nie, shear
+from jaxtronomy.LensModel.Profiles import sie, nie, shear, gaussian_potential
 from jaxtronomy.LightModel.Profiles import pixelated as pixelated_light
 from jaxtronomy.LightModel.Profiles import gaussian, sersic, uniform
+from jaxtronomy.LensModel.profile_list_base import SUPPORTED_MODELS as LENS_MODELS
+from jaxtronomy.LightModel.light_model_base import SUPPORTED_MODELS as LIGHT_MODELS
 
 __all__ = ['Parameters']
 
@@ -168,19 +170,28 @@ class Parameters(object):
 
     @staticmethod
     def get_class_for_model(kwargs_key, model):
+        profile_class = None
         if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+            if model not in LIGHT_MODELS:
+                raise ValueError("'{model}' is not supported.")
             if model == 'GAUSSIAN':
                 profile_class = gaussian.Gaussian
             elif model == 'SERSIC':
                 profile_class = sersic.Sersic
             elif model == 'SERSIC_ELLIPSE':
                 profile_class = sersic.SersicElliptic
+            elif model == 'CORE_SERSIC':
+                profile_class = sersic.CoreSersic
             elif model == 'UNIFORM':
                 profile_class = uniform.Uniform
             elif model == 'PIXELATED':
                 profile_class = pixelated_light.Pixelated
         elif kwargs_key == 'kwargs_lens':
-            if model == 'SIE':
+            if model not in LENS_MODELS:
+                raise ValueError("'{model}' is not supported.")
+            if model == 'GAUSSIAN':
+                profile_class = gaussian_potential.Gaussian
+            elif model == 'SIE':
                 profile_class = sie.SIE
             if model == 'NIE':
                 profile_class = nie.NIE
@@ -190,6 +201,8 @@ class Parameters(object):
                 profile_class = shear.ShearGammaPsi
             elif model == 'PIXELATED':
                 profile_class = pixelated_lens.PixelatedPotential
+        if profile_class is None:
+            raise ValueError(f"Could not find the model class for '{model}'")
         return profile_class
 
     @staticmethod
@@ -354,44 +367,54 @@ class Parameters(object):
                         names.append(name)
         return names
 
+    @staticmethod
+    def name2latex(name):
+        # pixelated models
+        if name[:2] == 'd_':  
+            latex = r"$d_{" + r"{}".format(int(name[2:])) + r"}$"
+        elif name[:2] == 's_':  
+            latex = r"$s_{" + r"{}".format(int(name[2:])) + r"}$"
+        elif name[:5] == 'dpsi_':  
+            latex = r"$\delta\psi_{" + r"{}".format(int(name[5:])) + r"}$"
+        # other parametric models
+        elif name == 'theta_E':
+            latex = r"$\theta_{\rm E}$"
+        elif name == 'gamma':
+            latex = r"$\gamma'$"
+        elif name == 'gamma_ext':
+            latex = r"$\gamma_{\rm ext}$"
+        elif name == 'psi_ext':
+            latex = r"$\psi_{\rm ext}$"
+        elif name == 'gamma1':
+            latex = r"$\gamma_{\rm 1, ext}$"
+        elif name == 'gamma2':
+            latex = r"$\gamma_{\rm 2, ext}$"
+        elif name == 'amp':
+            latex = r"$A$"
+        elif name == 'R_sersic':
+            latex = r"$R_{\rm Sersic}$"
+        elif name == 'n_sersic':
+            latex = r"$n_{\rm Sersic}$"
+        elif name == 'e1':
+            latex = r"$e_1$"
+        elif name == 'e2':
+            latex = r"$e_2$"
+        elif name == 'center_x':
+            latex = r"$x_0$"
+        elif name == 'center_y':
+            latex = r"$y_0$"
+        elif name == 'ra_0':
+            latex = r"$x_0$"
+        elif name == 'dec_0':
+            latex = r"$y_0$"
+        elif name == 'pixels':
+            latex = r"{\rm pixels}"
+        else:
+            raise ValueError("latex symbol for variable '{}' is unknown".format(name))
+        return latex
+
     def _name2latex(self, names):
         latexs = []
         for name in names:
-            # pixelated models
-            if name[:2] == 'd_':  
-                latex = r"$d_{" + r"{}".format(int(name[2:])) + r"}$"
-            elif name[:2] == 's_':  
-                latex = r"$s_{" + r"{}".format(int(name[2:])) + r"}$"
-            elif name[:5] == 'dpsi_':  
-                latex = r"$\delta\psi_{" + r"{}".format(int(name[5:])) + r"}$"
-            # other parametric models
-            elif name == 'theta_E':
-                latex = r"$\theta_{\rm E}$"
-            elif name == 'gamma':
-                latex = r"$\gamma'$"
-            elif name == 'gamma_ext':
-                latex = r"$\gamma_{\rm ext}$"
-            elif name == 'psi_ext':
-                latex = r"$\psi_{\rm ext}$"
-            elif name == 'gamma1':
-                latex = r"$\gamma_{\rm 1, ext}$"
-            elif name == 'gamma2':
-                latex = r"$\gamma_{\rm 2, ext}$"
-            elif name == 'amp':
-                latex = r"$A$"
-            elif name == 'R_sersic':
-                latex = r"$R_{\rm Sersic}$"
-            elif name == 'n_sersic':
-                latex = r"$n_{\rm Sersic}$"
-            elif name == 'e1':
-                latex = r"$e_1$"
-            elif name == 'e2':
-                latex = r"$e_2$"
-            elif name == 'center_x':
-                latex = r"$c_{x,0}$"
-            elif name == 'center_y':
-                latex = r"$c_{y,0}$"
-            else:
-                raise ValueError("latex symbol for variable '{}' is unknown".format(name))
-            latexs.append(latex)
+            latexs.append(self.name2latex(name))
         return latexs
