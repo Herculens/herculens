@@ -8,6 +8,9 @@ import numpy as np
 class Pixelated(object):
     """Source brightness defined on a fixed coordinate grid."""
     param_names = ['pixels']
+    lower_limit_default = {'pixels': -1e10}
+    upper_limit_default = {'pixels': 1e10}
+    fixed_default = {key: False for key in param_names}
     method_options = ['bilinear', 'bicubic']
 
     def __init__(self, method='bilinear', allow_extrapolation=True):

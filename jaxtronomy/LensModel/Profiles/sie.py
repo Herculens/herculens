@@ -10,7 +10,8 @@ class SIE(LensProfileBase):
     param_names = ['theta_E', 'e1', 'e2', 'center_x', 'center_y']
     lower_limit_default = {'theta_E': 0, 'e1': -0.5, 'e2': -0.5, 'center_x': -100, 'center_y': -100}
     upper_limit_default = {'theta_E': 100, 'e1': 0.5, 'e2': 0.5, 'center_x': 100, 'center_y': 100}
-
+    fixed_default = {key: False for key in param_names}
+    
     def __init__(self):
         self.profile = NIE()
         self._s_scale = 0.0000000001

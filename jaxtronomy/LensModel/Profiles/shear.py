@@ -10,6 +10,7 @@ class Shear(LensProfileBase):
     param_names = ['gamma1', 'gamma2', 'ra_0', 'dec_0']
     lower_limit_default = {'gamma1': -0.5, 'gamma2': -0.5, 'ra_0': -100, 'dec_0': -100}
     upper_limit_default = {'gamma1': 0.5, 'gamma2': 0.5, 'ra_0': 100, 'dec_0': 100}
+    fixed_default = {'gamma1': False, 'gamma2': False, 'ra_0': True, 'dec_0': True}
 
     def function(self, x, y, gamma1, gamma2, ra_0=0, dec_0=0):
         """
@@ -69,7 +70,8 @@ class ShearGammaPsi(LensProfileBase):
     param_names = ['gamma_ext', 'psi_ext', 'ra_0', 'dec_0']
     lower_limit_default = {'gamma_ext': 0, 'psi_ext': -np.pi, 'ra_0': -100, 'dec_0': -100}
     upper_limit_default = {'gamma_ext': 1, 'psi_ext': np.pi, 'ra_0': 100, 'dec_0': 100}
-
+    fixed_default = {'gamma_ext': False, 'psi_ext': False, 'ra_0': True, 'dec_0': True}
+    
     def __init__(self):
         self._shear_e1e2 = Shear()
         super(ShearGammaPsi, self).__init__()

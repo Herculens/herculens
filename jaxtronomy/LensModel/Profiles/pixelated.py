@@ -4,6 +4,9 @@ from jaxtronomy.Util.jax_util import BicubicInterpolator
 
 class PixelatedPotential(LensProfileBase):
     param_names = ['pixels']
+    lower_limit_default = {'pixels': -1e10}
+    upper_limit_default = {'pixels': 1e10}
+    fixed_default = {key: False for key in param_names}
 
     def __init__(self):
         """Lensing potential on a fixed coordinate grid."""

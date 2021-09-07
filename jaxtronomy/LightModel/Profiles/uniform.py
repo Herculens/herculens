@@ -10,6 +10,7 @@ class Uniform(object):
     param_names = ['amp']
     lower_limit_default = {'amp': -100}
     upper_limit_default = {'amp': 100}
+    fixed_default = {key: False for key in param_names}
 
     def __init__(self):
         pass

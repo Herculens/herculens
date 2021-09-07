@@ -9,10 +9,10 @@ class Gaussian(object):
 
     profile name in LightModel module: 'GAUSSIAN'
     """
-    def __init__(self):
-        self.param_names = ['amp', 'sigma', 'center_x', 'center_y']
-        self.lower_limit_default = {'amp': 0, 'sigma': 0, 'center_x': -100, 'center_y': -100}
-        self.upper_limit_default = {'amp': 1000, 'sigma': 100, 'center_x': 100, 'center_y': 100}
+    param_names = ['amp', 'sigma', 'center_x', 'center_y']
+    lower_limit_default = {'amp': 0, 'sigma': 0, 'center_x': -100, 'center_y': -100}
+    upper_limit_default = {'amp': 1000, 'sigma': 100, 'center_x': 100, 'center_y': 100}
+    fixed_default = {key: False for key in param_names}
 
     def function(self, x, y, amp, sigma, center_x=0, center_y=0):
         """
