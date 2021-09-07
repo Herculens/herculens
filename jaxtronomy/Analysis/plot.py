@@ -14,6 +14,9 @@ plt.rc('image', interpolation='none', origin='lower')  # for imshow
 
 
 class Plotter(object):
+    """
+    Utility class for easy plotting of optimisation results in summary panels.
+    """
 
     # Define some custom colormaps
     try:
@@ -55,6 +58,15 @@ class Plotter(object):
 
     def set_true_potential_perturbations(self, true_potential):
         self._true_pot_perturb = true_potential
+
+    def plot_flux(self, image, title=None):
+        fig, ax = plt.subplots(1, 1)
+        im = ax.imshow(image, extent=None, cmap=self.cmap_flux, norm=self.norm_flux)
+        if title is not None:
+            ax.set_title(title, fontsize=self._base_fs)
+        nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                      colorbar_kwargs={'orientation': 'horizontal'})
+        return fig
 
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, show_lens_mass=False,
