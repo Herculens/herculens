@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 
 
 class Gaussian(object):
@@ -27,7 +28,7 @@ class Gaussian(object):
         """
         c = amp / (2 * np.pi * sigma**2)
         R2 = (x - center_x) ** 2 / sigma**2 + (y - center_y) ** 2 / sigma**2
-        return c * np.exp(-R2 / 2.)
+        return c * jnp.exp(-R2 / 2.)
 
     def total_flux(self, amp, sigma, center_x=0, center_y=0):
         """

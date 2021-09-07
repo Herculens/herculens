@@ -1,11 +1,11 @@
 import jax.numpy as jnp
-from jaxtronomy.LightModel.Profiles import sersic, pixelated, uniform
+from jaxtronomy.LightModel.Profiles import sersic, pixelated, uniform, gaussian
 from jaxtronomy.Util.util import convert_bool_list
 
 __all__ = ['LightModelBase']
 
 
-_SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXELATED']
+SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXELATED']
 
 
 class LightModelBase(object):
@@ -33,7 +33,9 @@ class LightModelBase(object):
         self.profile_type_list = light_model_list
         func_list = []
         for profile_type in light_model_list:
-            if profile_type == 'SERSIC':
+            if profile_type == 'GAUSSIAN':
+                self.func_list.append(gaussian.Gaussian())
+            elif profile_type == 'SERSIC':
                 func_list.append(sersic.Sersic(smoothing))
             elif profile_type == 'SERSIC_ELLIPSE':
                 func_list.append(sersic.SersicElliptic(smoothing))
@@ -45,7 +47,7 @@ class LightModelBase(object):
                 func_list.append(pixelated.Pixelated(method=pixel_interpol, allow_extrapolation=pixel_allow_extrapolation))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
-                           f"Supported types are: {_SUPPORTED_MODELS}")
+                           f"Supported types are: {SUPPORTED_MODELS}")
                 raise ValueError(err_msg)
         self.func_list = func_list
         self._num_func = len(self.func_list)

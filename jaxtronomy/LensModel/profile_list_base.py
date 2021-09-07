@@ -1,9 +1,10 @@
-from jaxtronomy.LensModel.Profiles import shear, sie, pixelated
+from jaxtronomy.LensModel.Profiles import (gaussian_potential,
+                                           shear, sie, nie, pixelated)
 from jaxtronomy.Util.util import convert_bool_list
 
 __all__ = ['ProfileListBase']
 
-_SUPPORTED_MODELS = ['SHEAR', 'SHEAR_GAMMA_PSI', 'SIE', 'PIXELATED']
+SUPPORTED_MODELS = ['NIE', 'SIE', 'GAUSSIAN', 'SHEAR', 'SHEAR_GAMMA_PSI', 'PIXELATED']
 
 
 class ProfileListBase(object):
@@ -45,17 +46,21 @@ class ProfileListBase(object):
 
     def _import_class(self, lens_type):
         """Get the lens profile class of the corresponding type."""
-        if lens_type == 'SHEAR':
+        if lens_type == 'GAUSSIAN':
+            return gaussian_potential.Gaussian()
+        elif lens_type == 'SHEAR':
             return shear.Shear()
         elif lens_type == 'SHEAR_GAMMA_PSI':
             return shear.ShearGammaPsi()
+        elif lens_type == 'NIE':
+            return nie.NIE()
         elif lens_type == 'SIE':
             return sie.SIE()
         elif lens_type == 'PIXELATED':
             return pixelated.PixelatedPotential()
         else:
             err_msg = (f"{lens_type} is not a valid lens model. " +
-                       f"Supported types are {_SUPPORTED_MODELS}")
+                       f"Supported types are {SUPPORTED_MODELS}")
             raise ValueError(err_msg)
 
     def _bool_list(self, k=None):
