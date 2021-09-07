@@ -3,6 +3,10 @@ import numpy as np
 import jax.numpy as jnp
 from jax import lax
 
+from jaxtronomy.LensModel.Profiles import pixelated as pixelated_lens
+from jaxtronomy.LensModel.Profiles import sie, nie, shear
+from jaxtronomy.LightModel.Profiles import pixelated as pixelated_light
+from jaxtronomy.LightModel.Profiles import gaussian, sersic, uniform
 
 __all__ = ['Parameters']
 
@@ -162,6 +166,36 @@ class Parameters(object):
                 logP += - self._unif_prior_penalty
         return logP
 
+    @staticmethod
+    def get_class_for_model(kwargs_key, model):
+        if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
+            if model == 'GAUSSIAN':
+                profile_class = gaussian.Gaussian
+            elif model == 'SERSIC':
+                profile_class = sersic.Sersic
+            elif model == 'SERSIC_ELLIPSE':
+                profile_class = sersic.SersicElliptic
+            elif model == 'UNIFORM':
+                profile_class = uniform.Uniform
+            elif model == 'PIXELATED':
+                profile_class = pixelated_light.Pixelated
+        elif kwargs_key == 'kwargs_lens':
+            if model == 'SIE':
+                profile_class = sie.SIE
+            if model == 'NIE':
+                profile_class = nie.NIE
+            elif model == 'SHEAR':
+                profile_class = shear.Shear
+            elif model == 'SHEAR_GAMMA_PSI':
+                profile_class = shear.ShearGammaPsi
+            elif model == 'PIXELATED':
+                profile_class = pixelated_lens.PixelatedPotential
+        return profile_class
+
+    @staticmethod
+    def get_param_names_for_model(kwargs_key, model):
+        return Parameters.get_class_for_model(kwargs_key, model).param_names
+
     def _update_arrays(self):
         self._prior_types, self._lowers, self._uppers, self._means, self._widths \
             = self.kwargs2args_prior(self._kwargs_prior)
@@ -180,7 +214,7 @@ class Parameters(object):
         for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs = {}
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
-            param_names = self._get_param_names_for_model(kwargs_key, model)
+            param_names = self.get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
@@ -206,7 +240,7 @@ class Parameters(object):
         for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_profile = kwargs[kwargs_key][k]
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
-            param_names = self._get_param_names_for_model(kwargs_key, model)
+            param_names = self.get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
@@ -231,7 +265,7 @@ class Parameters(object):
         for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_profile = kwargs[kwargs_key][k]
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
-            param_names = self._get_param_names_for_model(kwargs_key, model)
+            param_names = self.get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if name not in kwargs_profile:
@@ -289,51 +323,18 @@ class Parameters(object):
         for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_fixed_k_old = self._kwargs_fixed[kwargs_key][k]
             kwargs_fixed_k_new = kwargs_fixed
-            param_names = self._get_param_names_for_model(kwargs_key, model)
+            param_names = self.get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if name in kwargs_fixed_k_old and name not in kwargs_fixed_k_new:
                     self._kwargs_init[kwargs_key][k][name] = deepcopy(kwargs_fixed_k_old[name])
                     if self.optimized:
                         self._kwargs_map[kwargs_key][k][name] = deepcopy(kwargs_fixed_k_old[name])
 
-    @staticmethod
-    def _get_param_names_for_model(kwargs_key, model):
-        if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
-            if model == 'GAUSSIAN':
-                from jaxtronomy.LightModel.Profiles.gaussian import Gaussian
-                profile_class = Gaussian
-            elif model == 'SERSIC':
-                from jaxtronomy.LightModel.Profiles.sersic import Sersic
-                profile_class = Sersic
-            elif model == 'SERSIC_ELLIPSE':
-                from jaxtronomy.LightModel.Profiles.sersic import SersicElliptic
-                profile_class = SersicElliptic
-            elif model == 'UNIFORM':
-                from jaxtronomy.LightModel.Profiles.uniform import Uniform
-                profile_class = Uniform
-            elif model == 'PIXELATED':
-                from jaxtronomy.LightModel.Profiles.pixelated import Pixelated
-                profile_class = Pixelated
-        elif kwargs_key == 'kwargs_lens':
-            if model == 'SIE':
-                from jaxtronomy.LensModel.Profiles.sie import SIE
-                profile_class = SIE
-            elif model == 'SHEAR':
-                from jaxtronomy.LensModel.Profiles.shear import Shear
-                profile_class = Shear
-            elif model == 'SHEAR_GAMMA_PSI':
-                from jaxtronomy.LensModel.Profiles.shear import ShearGammaPsi
-                profile_class = ShearGammaPsi
-            elif model == 'PIXELATED':
-                from jaxtronomy.LensModel.Profiles.pixelated import PixelatedPotential
-                profile_class = PixelatedPotential
-        return profile_class.param_names
-
     def _set_names(self, kwargs_model_key, kwargs_key):
         names = []
         for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
-            param_names = self._get_param_names_for_model(kwargs_key, model)
+            param_names = self.get_param_names_for_model(kwargs_key, model)
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
