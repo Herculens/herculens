@@ -3,6 +3,8 @@ import numpy as np
 import jax.numpy as jnp
 from scipy.ndimage import morphology
 
+from jaxtronomy.LightModel.light_model import LightModel
+from jaxtronomy.LensImage.lens_image import LensImage
 from jaxtronomy.Util import param_util
 
 
@@ -22,6 +24,34 @@ def mask_from_pixelated_source(lens_image, parameters):
     model_mask = morphology.binary_opening(model_mask, iterations=10)
     model_mask = morphology.binary_dilation(model_mask, iterations=3)
     return model_mask
+
+
+def mask_from_smooth_source(lens_image, parameters, threshold=0.1):
+    kwargs_param = parameters.current_values(as_kwargs=True)
+    source_model = lens_image.source_surface_brightness(kwargs_param['kwargs_source'], de_lensed=True, unconvolved=True)
+    source_model = np.array(source_model)
+    binary_source = source_model / source_model.max()
+    binary_source[binary_source < threshold] = 0.
+    binary_source[binary_source >= threshold] = 1.
+    lens_image_pixel = LensImage(lens_image.Grid, lens_image.PSF, 
+                                 noise_class=lens_image.Noise,
+                                 lens_model_class=lens_image.LensModel,
+                                 source_model_class=LightModel(['PIXELATED']),
+                                 lens_light_model_class=lens_image.LensLightModel,
+                                 kwargs_numerics=lens_image._kwargs_numerics)
+
+    kwargs_param_mask = copy.deepcopy(kwargs_param)
+    kwargs_param_mask['kwargs_source'] = [{'pixels': jnp.array(binary_source)}]
+    model_mask = lens_image_pixel.source_surface_brightness(kwargs_param_mask['kwargs_source'], 
+                                                      kwargs_lens=kwargs_param_mask['kwargs_lens'],
+                                                      unconvolved=True, de_lensed=False)
+    model_mask = np.array(model_mask)
+    model_mask[model_mask < 0.1] = 0.
+    model_mask[model_mask >= 0.1] = 1.
+    #model_mask = morphology.binary_opening(model_mask, iterations=10)
+    #model_mask = morphology.binary_dilation(model_mask, iterations=3)
+    return model_mask, binary_source
+
 
 def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
                                  min_width=1.0, min_height=1.0, scaling=1.0):
