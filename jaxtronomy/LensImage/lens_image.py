@@ -3,10 +3,9 @@ import copy
 import jax.numpy as np
 from functools import partial
 from jax import jit
+
 from jaxtronomy.LensImage.Numerics.numerics_subframe import NumericsSubFrame
 from jaxtronomy.LensImage.image2source_mapping import Image2SourceMapping
-from jaxtronomy.LensModel.lens_model import LensModel
-from jaxtronomy.LightModel.light_model import LightModel
 from jaxtronomy.Util import util
 
 __all__ = ['ImageModel']
@@ -39,6 +38,7 @@ class LensImage(object):
             kwargs_numerics = {}
         self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
         if lens_model_class is None:
+            from jaxtronomy.LensModel.lens_model import LensModel
             lens_model_class = LensModel(lens_model_list=[])
         self.LensModel = lens_model_class
         if self.LensModel.has_pixels:
@@ -46,12 +46,14 @@ class LensImage(object):
             self.LensModel.set_pixel_grid(self.Grid.model_pixel_axes('lens'))
         self._psf_error_map = self.PSF.psf_error_map_bool
         if source_model_class is None:
+            from jaxtronomy.LightModel.light_model import LightModel
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
         if self.SourceModel.has_pixels:
             self.Grid.create_model_grid(**self.SourceModel.pixel_grid_settings, name='source')
             self.SourceModel.set_pixel_grid(self.Grid.model_pixel_axes('source'), self.Grid.pixel_area)
         if lens_light_model_class is None:
+            from jaxtronomy.LightModel.light_model import LightModel
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class
         if self.LensLightModel.has_pixels:
