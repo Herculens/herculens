@@ -13,7 +13,7 @@ def mask_from_pixelated_source(lens_image, parameters):
     pixels = np.zeros_like(pixels)
     pixels[3:-3, 3:-3] = 1.  # so the source plane is ones except in a small margin all around
     kwargs_param_mask['kwargs_source'][src_idx]['pixels'] = jnp.array(pixels)
-    model_mask = lens_image.source_surface_brightness(kwargs_param_mask['kwargs_source'], 
+    model_mask = lens_image.source_surface_brightness(kwargs_param_mask['kwargs_source'],
                                                       kwargs_lens=kwargs_param_mask['kwargs_lens'],
                                                       unconvolved=True, de_lensed=False)
     model_mask = np.array(model_mask)
@@ -49,3 +49,38 @@ def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
         'grid_shape': [float(width), float(height)],
     }
     return kwargs_pixelated_grid
+
+def R_omega(z, t, q, nmax):
+    """Angular dependency of the deflection angle in the EPL lens profile.
+
+    The computation follows Eqs. (22)-(29) in Tessore & Metcalf (2015), where
+    z = R * e^(i * phi) is a position vector in the lens plane,
+    t = gamma - 1 is the logarithmic slope of the profile, and
+    q is the axis ratio.
+
+    This iterative implementation is necessary, since the usual hypergeometric
+    function `hyp2f1` provided in `scipy.special` has not yet been implemented
+    in an autodiff way in JAX.
+
+    Note that the value returned includes an extra factor R multiplying Eq. (23)
+    for omega(phi).
+
+    """
+    # Set the maximum number of iterations
+    # nmax = 10
+    
+    # Compute constant factors
+    f = (1. - q) / (1. + q)
+    ei2phi = z / z.conjugate()
+    # Set the first term of the series
+    omega_i = z  # jnp.array(np.copy(z))  # Avoid overwriting z ?
+    partial_sum = omega_i
+
+    for i in range(1, nmax):
+        # Iteration-dependent factor
+        ratio = (2. * i - (2. - t)) / (2. * i + (2 - t))
+        # Current Omega term proportional to the previous term
+        omega_i = -f * ratio * ei2phi * omega_i
+        # Update the partial sum
+        partial_sum += omega_i
+    return partial_sum
