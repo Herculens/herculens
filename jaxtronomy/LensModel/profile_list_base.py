@@ -1,10 +1,10 @@
 from jaxtronomy.LensModel.Profiles import (gaussian_potential,
-                                           shear, sie, nie, pixelated)
+                                           shear, sie, nie, epl, pixelated)
 from jaxtronomy.Util.util import convert_bool_list
 
 __all__ = ['ProfileListBase']
 
-SUPPORTED_MODELS = ['NIE', 'SIE', 'GAUSSIAN', 'SHEAR', 'SHEAR_GAMMA_PSI', 'PIXELATED']
+SUPPORTED_MODELS = ['EPL', 'NIE', 'SIE', 'GAUSSIAN', 'SHEAR', 'SHEAR_GAMMA_PSI', 'PIXELATED']
 
 
 class ProfileListBase(object):
@@ -56,6 +56,8 @@ class ProfileListBase(object):
             return nie.NIE()
         elif lens_type == 'SIE':
             return sie.SIE()
+        elif lens_type == 'EPL':
+            return epl.EPL()
         elif lens_type == 'PIXELATED':
             return pixelated.PixelatedPotential()
         else:
