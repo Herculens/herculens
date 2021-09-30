@@ -12,10 +12,11 @@ class EPL(LensProfileBase):
     kappa = (2-t)/2*(b/r)^t
     where t = gamma - 1
     """
-    param_names = ['theta_E', 'e1', 'e2', 'gamma', 'center_x', 'center_y']
-    lower_limit_default = {'theta_E': 0, 'e1': -0.5, 'e2': -0.5, 'gamma': 0, 'center_x': -100, 'center_y': -100}
-    upper_limit_default = {'theta_E': 10, 'e1': 0.5, 'e2': 0.5, 'gamma': 2, 'center_x': 100, 'center_y': 100}
-
+    param_names = ['gamma', 'theta_E', 'e1', 'e2', 'center_x', 'center_y']
+    lower_limit_default = {'gamma': 1, 'theta_E': 0, 'e1': -0.5, 'e2': -0.5, 'center_x': -100, 'center_y': -100}
+    upper_limit_default = {'gamma': 3, 'theta_E': 10, 'e1': 0.5, 'e2': 0.5, 'center_x': 100, 'center_y': 100}
+    fixed_default = {key: False for key in param_names}
+    
     def __init__(self):
         self.epl_major_axis = EPLMajorAxis()
         super(EPL, self).__init__()

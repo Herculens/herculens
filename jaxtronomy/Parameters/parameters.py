@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax import lax
 
 from jaxtronomy.LensModel.Profiles import pixelated as pixelated_lens
-from jaxtronomy.LensModel.Profiles import sie, nie, shear, gaussian_potential
+from jaxtronomy.LensModel.Profiles import epl, sie, nie, shear, gaussian_potential
 from jaxtronomy.LightModel.Profiles import pixelated as pixelated_light
 from jaxtronomy.LightModel.Profiles import gaussian, sersic, uniform
 from jaxtronomy.LensModel.profile_list_base import SUPPORTED_MODELS as LENS_MODELS
@@ -191,6 +191,8 @@ class Parameters(object):
                 raise ValueError("'{model}' is not supported.")
             if model == 'GAUSSIAN':
                 profile_class = gaussian_potential.Gaussian
+            elif model == 'EPL':
+                profile_class = epl.EPL
             elif model == 'SIE':
                 profile_class = sie.SIE
             if model == 'NIE':
