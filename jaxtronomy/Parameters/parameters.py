@@ -116,9 +116,10 @@ class Parameters(object):
         kwargs_source, i = self._get_params(args, i, 'source_model_list', 'kwargs_source')
         kwargs_lens_light, i = self._get_params(args, i, 'lens_light_model_list', 'kwargs_lens_light')
         # apply joint param rules
-        kwargs_lens = self._join_params(kwargs_lens, kwargs_lens, self._kwargs_joint['kwargs_lens'])
-        kwargs_source = self._join_params(kwargs_source, kwargs_source, self._kwargs_joint['kwargs_source'])
-        kwargs_lens_light = self._join_params(kwargs_lens_light, kwargs_lens_light, self._kwargs_joint['kwargs_lens_light'])
+        kwargs_lens = self._join_params(kwargs_lens, kwargs_lens, self._kwargs_joint['lens_with_lens'])
+        kwargs_source = self._join_params(kwargs_source, kwargs_source, self._kwargs_joint['source_with_source'])
+        kwargs_lens_light = self._join_params(kwargs_lens_light, kwargs_lens_light, self._kwargs_joint['lens_light_with_lens_light'])
+        kwargs_lens = self._join_params(kwargs_lens_light, kwargs_lens, self._kwargs_joint['lens_with_lens_light'])
         # wrap-up
         kwargs = {'kwargs_lens': kwargs_lens, 'kwargs_source': kwargs_source, 'kwargs_lens_light': kwargs_lens_light}
         return kwargs
@@ -244,15 +245,16 @@ class Parameters(object):
             delattr(self, '_symbols')
 
     def _update_fixed_with_joint(self, kwargs_fixed, kwargs_joint):
-        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens')
-        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_source')
-        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens_light')
+        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens', 'lens_with_lens')
+        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_source', 'source_with_source')
+        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens_light', 'lens_light_with_lens_light')
+        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens', 'lens_with_lens_light')
         return kwargs_fixed
 
     @staticmethod
-    def _update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, kwargs_key):
+    def _update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, kwargs_key, joint_key):
         kwargs_fixed_updt = deepcopy(kwargs_fixed)
-        joint_setting_list = kwargs_joint[kwargs_key]
+        joint_setting_list = kwargs_joint[joint_key]
         for setting in joint_setting_list:
             (i_1, k_2), param_list = setting
             for param_names in param_list:
