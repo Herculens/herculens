@@ -41,9 +41,10 @@ class Plotter(object):
     cmap_deriv1 = plt.get_cmap('cividis')
     cmap_deriv2 = plt.get_cmap('inferno')
 
-    def __init__(self, base_fontsize=0.28, flux_log_scale=True, 
+    def __init__(self, data_name=None, base_fontsize=0.28, flux_log_scale=True, 
                  flux_vmin=None, flux_vmax=None, res_vmax=6):
-        self._base_fs = base_fontsize
+        self.data_name = data_name
+        self.base_fontsize = base_fontsize
         if flux_log_scale is True:
             self.norm_flux = LogNorm(flux_vmin, flux_vmax)
         else:
@@ -63,7 +64,7 @@ class Plotter(object):
         fig, ax = plt.subplots(1, 1)
         im = ax.imshow(image, extent=None, cmap=self.cmap_flux, norm=self.norm_flux)
         if title is not None:
-            ax.set_title(title, fontsize=self._base_fs)
+            ax.set_title(title, fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
         return fig
@@ -82,16 +83,16 @@ class Plotter(object):
             src_extent = extent
             
         if show_image:
-            if hasattr(self, '_data'):
-                data = self._data
-            else:
-                data = np.zeros_like(model)
-
             # create the resulting model image
             model = lens_image.model(**kwargs_result)
             noise_var = lens_image.Noise.C_D
             if likelihood_mask is None:
                 likelihood_mask = np.ones_like(model)
+
+            if hasattr(self, '_data'):
+                data = self._data
+            else:
+                data = np.zeros_like(model)
 
         if show_source:
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
@@ -110,21 +111,20 @@ class Plotter(object):
 
             if hasattr(self, '_true_source'):
                 true_source = self._true_source
+                if source_model.size != true_source.size:
+                    npix_true = len(true_source)
+                    x_coords_true = np.linspace(extent[0], extent[1], npix_true)
+                    y_coords_true = np.linspace(extent[2], extent[3], npix_true)
+                    if lens_image.SourceModel.has_pixels:
+                        x_coords_src, y_coords_src = lens_image.Grid.model_pixel_axes('source')
+                    else:
+                        npix_src = len(source_model)
+                        x_coords_src = np.linspace(extent[0], extent[1], npix_src)
+                        y_coords_src = np.linspace(extent[2], extent[3], npix_src)
+                    true_source = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords_src, y_coords_src)
+                    warnings.warn("True source array has been interpolated to match model array")
             else:
-                true_source = np.zeros_like(source_model)
-
-            if source_model.size != true_source.size:
-                npix_true = len(true_source)
-                x_coords_true = np.linspace(extent[0], extent[1], npix_true)
-                y_coords_true = np.linspace(extent[2], extent[3], npix_true)
-                if lens_image.SourceModel.has_pixels:
-                    x_coords_src, y_coords_src = lens_image.Grid.model_pixel_axes('source')
-                else:
-                    npix_src = len(source_model)
-                    x_coords_src = np.linspace(extent[0], extent[1], npix_src)
-                    y_coords_src = np.linspace(extent[2], extent[3], npix_src)
-                true_source = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords_src, y_coords_src)
-                warnings.warn("True source array has been interpolated to match model array")
+                true_source = None
 
         if show_lens_mass:
             kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
@@ -144,18 +144,18 @@ class Plotter(object):
             # here we know that there are no perturbations in the true potential
             if hasattr(self, '_true_pot_perturb'):
                 true_potential = self._true_pot_perturb
-            else:
-                true_potential = np.zeros_like(potential_model)
             
-            if shift_potential_model == 'min':
-                min_in_mask = (potential_model * potential_mask).min()
-                potential_model = potential_model - min_in_mask
-                print("delta_psi shift by min:", min_in_mask)
-            elif shift_potential_model == 'mean':
-                mean_in_mask = (potential_model * potential_mask).mean()
-                true_mean_in_mask = (true_potential * potential_mask).mean()
-                potential_model = potential_model - mean_in_mask + true_mean_in_mask
-                print("delta_psi shift by mean values:", mean_in_mask, true_mean_in_mask)
+                if shift_potential_model == 'min':
+                    min_in_mask = (potential_model * potential_mask).min()
+                    potential_model = potential_model - min_in_mask
+                    print("delta_psi shift by min:", min_in_mask)
+                elif shift_potential_model == 'mean':
+                    mean_in_mask = (potential_model * potential_mask).mean()
+                    true_mean_in_mask = (true_potential * potential_mask).mean()
+                    potential_model = potential_model - mean_in_mask + true_mean_in_mask
+                    print("delta_psi shift by mean values:", mean_in_mask, true_mean_in_mask)
+            else:
+                true_potential = None
 
             if potential_mask is None:
                 # TODO: compute potential mask based on undersampled likelihood_mask
@@ -171,19 +171,20 @@ class Plotter(object):
             ##### IMAGING DATA AND MODEL IMAGE #####
             ax = axes[i_row, 0]
             im = ax.imshow(data * likelihood_mask, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
-            ax.set_title("data", fontsize=self._base_fs)
+            data_title = self.data_name if self.data_name is not None else "data"
+            ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
             im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
-            ax.set_title("model", fontsize=self._base_fs)
+            ax.set_title("model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
             residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
             red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
             im = ax.imshow(residuals * likelihood_mask, cmap=self.cmap_resid, extent=extent, norm=self.norm_res)
-            ax.set_title(r"(f${}_{\rm model}$ - f${}_{\rm data})/\sigma$", fontsize=self._base_fs)
+            ax.set_title(r"(f${}_{\rm model}$ - f${}_{\rm data})/\sigma$", fontsize=self.base_fontsize)
             nice_colorbar_residuals(im, residuals, position='top', pad=0.4, size=0.2, 
                                     vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                     colorbar_kwargs={'orientation': 'horizontal'})
@@ -197,68 +198,76 @@ class Plotter(object):
 
             ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
             ax = axes[i_row, 0]
-            im = ax.imshow(true_source, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
-            ax.set_title("true source", fontsize=self._base_fs)
-            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
-                          colorbar_kwargs={'orientation': 'horizontal'})
+            if true_source is not None:
+                im = ax.imshow(true_source, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+                ax.set_title("true source", fontsize=self.base_fontsize)
+                nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                              colorbar_kwargs={'orientation': 'horizontal'})
+            else:
+                ax.axis('off')
             ax = axes[i_row, 1]
             im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
             #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
-            ax.set_title("model source", fontsize=self._base_fs)
+            ax.set_title("model source", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            if np.count_nonzero(true_source) == 0:
-                diff = np.zeros_like(true_source)
-                vmax_diff = 1
-            else:
+            if true_source is not None:
                 diff = source_model - true_source
                 vmax_diff = true_source.max() / 10.
-            im = ax.imshow(diff, extent=src_extent, 
-                           cmap=self.cmap_resid, norm=Normalize(-vmax_diff, vmax_diff))
-            ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm truth}$", fontsize=self._base_fs)
-            nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
-                                    vmin=-vmax_diff, vmax=vmax_diff,
-                                    colorbar_kwargs={'orientation': 'horizontal'})
+                im = ax.imshow(diff, extent=src_extent, 
+                               cmap=self.cmap_resid, norm=Normalize(-vmax_diff, vmax_diff))
+                ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm truth}$", fontsize=self.base_fontsize)
+                nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
+                                        vmin=-vmax_diff, vmax=vmax_diff,
+                                        colorbar_kwargs={'orientation': 'horizontal'})
+            else:
+                ax.axis('off')
             i_row += 1
 
         if show_lens_mass:
 
             ##### PIXELATED POTENTIAL PERTURBATIONS #####
             ax = axes[i_row, 0]
-            im = ax.imshow(true_potential * potential_mask, cmap=self.cmap_default, extent=extent)
-            ax.set_title(r"$\delta\psi_{\rm truth}$", fontsize=self._base_fs)
-            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
-                          colorbar_kwargs={'orientation': 'horizontal'})
+            if true_potential is not None:
+                im = ax.imshow(true_potential * potential_mask, cmap=self.cmap_default, extent=extent)
+                ax.set_title(r"$\delta\psi_{\rm truth}$", fontsize=self.base_fontsize)
+                nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                              colorbar_kwargs={'orientation': 'horizontal'})
+            else:
+                ax.axis('off')
             ax = axes[i_row, 1]
             im = ax.imshow(potential_model * potential_mask, cmap=self.cmap_default, extent=extent)
-            ax.set_title(r"$\delta\psi_{\rm model}$", fontsize=self._base_fs)
+            ax.set_title(r"$\delta\psi_{\rm model}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            pot_abs_res = (true_potential - potential_model) * potential_mask
-            vmax = np.max(np.abs(true_potential)) / 2.
-            im = ax.imshow(pot_abs_res, cmap=self.cmap_resid, vmin=-vmax, vmax=vmax, extent=extent)
-            ax.set_title(r"$\delta\psi_{\rm model}$ - $\delta\psi_{\rm truth}$", fontsize=self._base_fs)
-            nice_colorbar_residuals(im, pot_abs_res, position='top', pad=0.4, size=0.2, 
-                                    vmin=-vmax, vmax=vmax,
-                                    colorbar_kwargs={'orientation': 'horizontal'})
+            if true_potential is not None:
+                pot_abs_res = (true_potential - potential_model) * potential_mask
+                vmax = np.max(np.abs(true_potential)) / 2.
+                im = ax.imshow(pot_abs_res, cmap=self.cmap_resid, vmin=-vmax, vmax=vmax, extent=extent)
+                ax.set_title(r"$\delta\psi_{\rm model}$ - $\delta\psi_{\rm truth}$", fontsize=self.base_fontsize)
+                nice_colorbar_residuals(im, pot_abs_res, position='top', pad=0.4, size=0.2, 
+                                        vmin=-vmax, vmax=vmax,
+                                        colorbar_kwargs={'orientation': 'horizontal'})
+            else:
+                ax.axis('off')
             i_row += 1
 
             ##### DEFLECTION ANGLES AND SURFACE MASS DENSITY #####
             ax = axes[i_row, 0]
             im = ax.imshow(alpha_x * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
-            ax.set_title(r"$\delta\alpha_{x,\rm model}$", fontsize=self._base_fs)
+            ax.set_title(r"$\delta\alpha_{x,\rm model}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
             im = ax.imshow(alpha_y * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
-            ax.set_title(r"$\delta\alpha_{y,\rm model}$", fontsize=self._base_fs)
+            ax.set_title(r"$\delta\alpha_{y,\rm model}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
             im = ax.imshow(kappa_smoothed * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent)
-            ax.set_title(r"$\delta\kappa_{\rm model}$ (smoothed)", fontsize=self._base_fs)
+            ax.set_title(r"$\delta\kappa_{\rm model}$ (smoothed)", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
 
