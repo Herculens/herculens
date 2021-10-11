@@ -24,11 +24,12 @@ class Parameters(object):
 
     _unif_prior_penalty = 1e10
 
-    def __init__(self, lens_image, kwargs_init, kwargs_prior, kwargs_fixed):
+    def __init__(self, lens_image, kwargs_init, kwargs_prior, kwargs_fixed, kwargs_joint):
         self._image = lens_image
         self._kwargs_init  = kwargs_init
         self._kwargs_prior = kwargs_prior
         self._kwargs_fixed = kwargs_fixed
+        self._kwargs_joint = kwargs_joint
         self._update_arrays()
 
         # TODO: write function that checks that no fields are missing
@@ -114,8 +115,25 @@ class Parameters(object):
         kwargs_lens, i = self._get_params(args, i, 'lens_model_list', 'kwargs_lens')
         kwargs_source, i = self._get_params(args, i, 'source_model_list', 'kwargs_source')
         kwargs_lens_light, i = self._get_params(args, i, 'lens_light_model_list', 'kwargs_lens_light')
+        # apply joint param rules
+        kwargs_lens = self._join_params(kwargs_lens, kwargs_lens, self._kwargs_joint['kwargs_lens'])
+        kwargs_source = self._join_params(kwargs_source, kwargs_source, self._kwargs_joint['kwargs_source'])
+        kwargs_lens_light = self._join_params(kwargs_lens_light, kwargs_lens_light, self._kwargs_joint['kwargs_lens_light'])
+        # wrap-up
         kwargs = {'kwargs_lens': kwargs_lens, 'kwargs_source': kwargs_source, 'kwargs_lens_light': kwargs_lens_light}
         return kwargs
+
+    @staticmethod
+    def _join_params(kwargs_list_1, kwargs_list_2, joint_setting_list):
+        for setting in joint_setting_list:
+            (i_1, k_2), param_list = setting
+            for param_names in param_list:
+                if isinstance(param_names, (tuple, list)) and len(param_names) > 1:
+                    param_name_1, param_name_2 = param_names
+                else:
+                    param_name_1 = param_name_2 = param_names
+                kwargs_list_2[k_2][param_name_2] = kwargs_list_1[i_1][param_name_1]
+        return kwargs_list_2
 
     def kwargs2args(self, kwargs):
         args = self._set_params(kwargs, 'lens_model_list', 'kwargs_lens')
@@ -212,6 +230,7 @@ class Parameters(object):
         return Parameters.get_class_for_model(kwargs_key, model).param_names
 
     def _update_arrays(self):
+        self._kwargs_fixed = self._update_fixed_with_joint(self._kwargs_fixed, self._kwargs_joint)
         self._prior_types, self._lowers, self._uppers, self._means, self._widths \
             = self.kwargs2args_prior(self._kwargs_prior)
         self._init_values = self.kwargs2args(self._kwargs_init)
@@ -223,6 +242,26 @@ class Parameters(object):
             delattr(self, '_names')
         if hasattr(self, '_symbols'):
             delattr(self, '_symbols')
+
+    def _update_fixed_with_joint(self, kwargs_fixed, kwargs_joint):
+        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens')
+        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_source')
+        kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens_light')
+        return kwargs_fixed
+
+    @staticmethod
+    def _update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, kwargs_key):
+        kwargs_fixed_updt = deepcopy(kwargs_fixed)
+        joint_setting_list = kwargs_joint[kwargs_key]
+        for setting in joint_setting_list:
+            (i_1, k_2), param_list = setting
+            for param_names in param_list:
+                if isinstance(param_names, (tuple, list)) and len(param_names) > 1:
+                    param_name_1, param_name_2 = param_names
+                else:
+                    param_name_1 = param_name_2 = param_names
+                kwargs_fixed_updt[kwargs_key][k_2][param_name_2] = 0
+        return kwargs_fixed_updt
 
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
         kwargs_list = []
