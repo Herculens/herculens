@@ -1,6 +1,25 @@
+import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+
+def plot_minimize_history(parameters, optimizer):
+    fig, axes = plt.subplots(1, 2, figsize=(10, 6))
+    ax = axes[0]
+    ax.plot(range(len(optimizer.loss_history)), optimizer.loss_history)
+    ax.set_ylabel("Loss")
+    ax.set_xlabel("Iteration")
+    ax = axes[1]
+    param_history = np.array(optimizer.param_history)
+    for i in range(len(parameters.names)):
+        ax.plot(range(len(optimizer.loss_history)), 
+                (param_history[:, i] - param_history[-1, i]) / param_history[-1, i], 
+                label=parameters.symbols[i])
+    ax.set_ylabel("Parameter trace")
+    ax.set_xlabel("Iteration")
+    ax.legend(loc='upper right')
+    fig.tight_layout()
+    plt.show()
 
 def std_colorbar(mappable, label=None, fontsize=12, label_kwargs={}, **colorbar_kwargs):
     cb = plt.colorbar(mappable, **colorbar_kwargs)
