@@ -24,12 +24,21 @@ class Parameters(object):
 
     _unif_prior_penalty = 1e10
 
-    def __init__(self, lens_image, kwargs_init, kwargs_prior, 
-                 kwargs_fixed, kwargs_joint=None):
+    def __init__(self, lens_image, kwargs_init, kwargs_fixed, 
+                 kwargs_prior=None, kwargs_joint=None):
         self._image = lens_image
         self._kwargs_init  = kwargs_init
-        self._kwargs_prior = kwargs_prior
         self._kwargs_fixed = kwargs_fixed
+        if kwargs_prior is None:
+            num_lens_profiles = len(self._image.LensModel.lens_model_list)
+            num_source_profiles = len(self._image.SourceModel.profile_type_list)
+            num_lens_light_profiles = len(self._image.LensLightModel.profile_type_list)
+            kwargs_prior = {
+                'kwargs_lens': [{} for _ in range(num_lens_profiles)],
+                'kwargs_source': [{} for _ in range(num_source_profiles)],
+                'kwargs_lens_light': [{} for _ in range(num_lens_light_profiles)],
+            }
+        self._kwargs_prior = kwargs_prior
         if kwargs_joint is None:
             kwargs_joint = {
                 'lens_with_lens': [],
