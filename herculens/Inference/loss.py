@@ -65,6 +65,10 @@ class Loss(object):
     def likelihood_mask(self):
         return self._ll_mask
 
+    @property
+    def data(self):
+        return self._data
+
     def _check_choices(self, likelihood_type, prior_terms, regularization_terms, regularization_strengths):
         if likelihood_type not in self._supported_ll:
             raise ValueError(f"Likelihood term '{likelihood_type}' is not supported")

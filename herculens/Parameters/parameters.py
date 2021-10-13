@@ -39,14 +39,15 @@ class Parameters(object):
                 'kwargs_lens_light': [{} for _ in range(num_lens_light_profiles)],
             }
         self._kwargs_prior = kwargs_prior
-        if kwargs_joint is None:
-            kwargs_joint = {
+        kwargs_joint_tmp = {
                 'lens_with_lens': [],
                 'source_with_source': [],
                 'lens_light_with_lens_light': [],
                 'lens_with_lens_light': [],
             }
-        self._kwargs_joint = kwargs_joint
+        if kwargs_joint is not None:
+            kwargs_joint_tmp.update(kwargs_joint)
+        self._kwargs_joint = kwargs_joint_tmp
         self._update_arrays()
 
         # TODO: write function that checks that no fields are missing
