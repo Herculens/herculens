@@ -24,11 +24,19 @@ class Parameters(object):
 
     _unif_prior_penalty = 1e10
 
-    def __init__(self, lens_image, kwargs_init, kwargs_prior, kwargs_fixed, kwargs_joint):
+    def __init__(self, lens_image, kwargs_init, kwargs_prior, 
+                 kwargs_fixed, kwargs_joint=None):
         self._image = lens_image
         self._kwargs_init  = kwargs_init
         self._kwargs_prior = kwargs_prior
         self._kwargs_fixed = kwargs_fixed
+        if kwargs_joint is None:
+            kwargs_joint = {
+                'lens_with_lens': [],
+                'source_with_source': [],
+                'lens_light_with_lens_light': [],
+                'lens_with_lens_light': [],
+            }
         self._kwargs_joint = kwargs_joint
         self._update_arrays()
 
