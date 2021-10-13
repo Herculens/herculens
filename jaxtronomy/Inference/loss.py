@@ -29,7 +29,7 @@ class Loss(object):
 
     _supported_ll = ('chi2', 'l2_norm')
     _supported_regul_source = ('l1_starlet_source', 'l1_battle_source', 'positivity_source')
-    _supported_regul_lens = ('l1_starlet_potential', 'l1_battle_potential', 'positivity_potential')
+    _supported_regul_lens = ('l1_starlet_potential', 'l1_battle_potential', 'positivity_potential', 'positivity_convergence')
     _supported_prior = ('uniform', 'gaussian')
 
     def __init__(self, data, image_class, param_class, 
@@ -183,6 +183,13 @@ class Loss(object):
                                      "strength for positivity constraint")
                 self._pos_pot_lambda = float(strength)
 
+            elif term == 'positivity_convergence':
+                if isinstance(strength, (tuple, list)):
+                    raise ValueError("You can only specify one regularization "
+                                     "strength for positivity constraint")
+                self._pos_conv_lambda = float(strength)
+                self._x_lens, self._y_lens = self._image.Grid.model_pixel_coordinates('lens')
+
         # build the composite function (sum of regularization terms)
         self._log_regul = lambda kw: sum([func(kw) for func in regul_func_list])
 
@@ -249,3 +256,10 @@ class Loss(object):
     def _log_regul_positivity_potential(self, kwargs):
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
         return - self._pos_pot_lambda * jnp.abs(jnp.sum(jnp.minimum(0., psi_model)))
+
+    def _log_regul_positivity_convergence(self, kwargs):
+        kappa_model = self._image.LensModel.kappa(self._x_lens, 
+                                                  self._y_lens,
+                                                  kwargs['kwargs_lens'], 
+                                                  k=self._idx_pix_pot)
+        return - self._pos_conv_lambda * jnp.abs(jnp.sum(jnp.minimum(0., kappa_model)))
