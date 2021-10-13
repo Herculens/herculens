@@ -72,7 +72,9 @@ class Plotter(object):
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, show_lens_mass=False,
                       reproject_pixelated_models=False, shift_potential_model='min',
-                      likelihood_mask=None, potential_mask=None):
+                      likelihood_mask=None, potential_mask=None,
+                      vmin_pot=None, vmax_pot=None,  # TEMP
+                      ):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_mass, show_lens_mass])
         
@@ -134,7 +136,7 @@ class Plotter(object):
                                                           kwargs_lens, k=pot_idx)
             kappa = lens_image.LensModel.kappa(x_grid_lens, y_grid_lens, 
                                                kwargs_lens, k=pot_idx)
-            kappa_smoothed = ndimage.gaussian_filter(kappa, 1)
+            #kappa = ndimage.gaussian_filter(kappa, 1)
             if reproject_pixelated_models:
                 potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
                                                                  kwargs_lens, k=pot_idx)
@@ -230,14 +232,18 @@ class Plotter(object):
             ##### PIXELATED POTENTIAL PERTURBATIONS #####
             ax = axes[i_row, 0]
             if true_potential is not None:
-                im = ax.imshow(true_potential * potential_mask, cmap=self.cmap_default, extent=extent)
+                im = ax.imshow(true_potential * potential_mask, 
+                               cmap=self.cmap_default, extent=extent,
+                               vmin=vmin_pot, vmax=vmax_pot)
                 ax.set_title(r"$\delta\psi_{\rm truth}$", fontsize=self.base_fontsize)
                 nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                               colorbar_kwargs={'orientation': 'horizontal'})
             else:
                 ax.axis('off')
             ax = axes[i_row, 1]
-            im = ax.imshow(potential_model * potential_mask, cmap=self.cmap_default, extent=extent)
+            im = ax.imshow(potential_model * potential_mask, 
+                           cmap=self.cmap_default, extent=extent,
+                           vmin=vmin_pot, vmax=vmax_pot)
             ax.set_title(r"$\delta\psi_{\rm model}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
@@ -266,8 +272,8 @@ class Plotter(object):
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            im = ax.imshow(kappa_smoothed * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent)
-            ax.set_title(r"$\delta\kappa_{\rm model}$ (smoothed)", fontsize=self.base_fontsize)
+            im = ax.imshow(kappa * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent)
+            ax.set_title(r"$\delta\kappa_{\rm model}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
 
