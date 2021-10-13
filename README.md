@@ -1,4 +1,4 @@
-# Hercu__lens__
+# Herculens
 
 ## JAX-enabled autodifferentiable strong lens modelling
 
