@@ -1,4 +1,4 @@
-# jax-strong-lensing
+# Hercu__lens__
 
 ## JAX-enabled autodifferentiable strong lens modelling
 
@@ -11,7 +11,7 @@ conda create -n jax-strong-lensing python=3.7
 conda activate jax-strong-lensing
 ```
 
-Then pip install (develop) the local `jaxtronomy` package.
+Then pip install (develop) the local `herculens` package.
 ```sh
 pip install (-e) .
 ```
@@ -37,5 +37,5 @@ The following dependencies will be installed automatically.
 To run the notebooks, `jupyter` is (of course) also necessary, along with `matplotlib` for plotting.
 
 ### Notes
-The foundation of the `jaxtronomy` package implemented here comes from [`lenstronomy`](https://github.com/sibirrer/lenstronomy), a popular strong
+The foundation of the `herculens` package implemented here comes from [`lenstronomy`](https://github.com/sibirrer/lenstronomy), a popular strong
 gravitational lens modelling software. The original code has been trimmed to the minimum necessary for our purposes. Modifications have been made throughout, primarily to allow JAX autodiff to operate through the workflow. Many stylistic changes have been made as well. The basic module structure, however, remains largely the same.

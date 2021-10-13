@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 import numpy.testing as npt
 
-from jaxtronomy.Util import util
-import jaxtronomy.Util.param_util as param_util
+from herculens.Util import util
+import herculens.Util.param_util as param_util
 
 
 def test_phi_q2_ellipticity():

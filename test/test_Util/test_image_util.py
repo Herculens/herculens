@@ -2,7 +2,7 @@ import pytest
 import unittest
 import numpy as np
 import numpy.testing as npt
-from jaxtronomy.Util import util, image_util
+from herculens.Util import util, image_util
 
 
 def test_add_layer2image_odd_odd():

@@ -1,7 +1,7 @@
 import setuptools
 import os
 
-__name__ = 'jaxtronomy'
+__name__ = 'herculens'
 
 release_info = {}
 infopath = os.path.abspath(os.path.join(os.path.dirname(__file__),
