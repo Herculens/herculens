@@ -4,8 +4,8 @@ import numpy as np
 import numpy.testing as npt
 import scipy.ndimage.interpolation as interp
 
-from jaxtronomy.Util import util, image_util, kernel_util
-from jaxtronomy.LightModel.Profiles.gaussian import Gaussian
+from herculens.Util import util, image_util, kernel_util
+from herculens.LightModel.Profiles.gaussian import Gaussian
 gaussian = Gaussian()
 
 

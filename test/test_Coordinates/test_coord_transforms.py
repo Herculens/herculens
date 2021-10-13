@@ -3,8 +3,8 @@ import numpy as np
 import numpy.testing as npt
 import numpy.linalg as linalg
 
-from jaxtronomy.Coordinates.coord_transforms import Coordinates
-from jaxtronomy.Util import util
+from herculens.Coordinates.coord_transforms import Coordinates
+from herculens.Util import util
 
 
 class TestCoordinates(object):

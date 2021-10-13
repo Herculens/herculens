@@ -3,7 +3,7 @@ import pytest
 import numpy.testing as npt
 import unittest
 
-from jaxtronomy.Util import util
+from herculens.Util import util
 
 
 def test_map_coord2pix():
