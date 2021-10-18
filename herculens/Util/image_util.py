@@ -1,6 +1,8 @@
 import numpy as np
 from scipy import interpolate #, ndimage
 from scipy.ndimage import interpolation as interp
+from jax import random
+
 # from herculens.Util.jax_util import BilinearInterpolator
 
 
@@ -59,22 +61,21 @@ def add_layer2image_int(grid2d, x_pos, y_pos, kernel):
     new[min_y:max_y, min_x:max_x] += kernel_re_sized
     return new
 
-def add_background(image, sigma_bkd):
+def add_background(image, sigma_bkd, seed):
     """
     adds background noise to image
     :param image: pixel values of image
     :param sigma_bkd: background noise (sigma)
     :return: a realisation of Gaussian noise of the same size as image
     """
-    # # JAX pseudo-random number generator key
-    # key, subkey = random.split(random.PRNGKey(42))
-    # background = random.normal(subkey, shape=np.shape(image)) * sigma_bkd
-    # return background
-    nx, ny = np.shape(image)
-    background = np.random.randn(nx, ny) * sigma_bkd
+    background = random.normal(seed, shape=np.shape(image)) * sigma_bkd
+    
+    # without JAX:
+    # nx, ny = 
+    # background = np.random.randn(*image.shape) * sigma_bkd
     return background
 
-def add_poisson(image, exp_time):
+def add_poisson(image, exp_time, seed):
     """
     adds a poison (or Gaussian) distributed noise with mean given by surface brightness
     :param image: pixel values (photon counts per unit exposure time)
@@ -84,15 +85,12 @@ def add_poisson(image, exp_time):
     """
     adds a poison (or Gaussian) distributed noise with mean given by surface brightness
     """
-
-    # sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
-    # # JAX pseudo-random number generator key
-    # key, subkey = random.split(random.PRNGKey(42))
-    # poisson = random.normal(subkey, shape=np.shape(image)) * sigma
-    # return poisson
     sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
-    nx, ny = np.shape(image)
-    poisson = np.random.randn(nx, ny) * sigma
+    poisson = random.normal(seed, shape=np.shape(image)) * sigma
+    
+    # without JAX:
+    # sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
+    # poisson = np.random.randn(*image.shape) * sigma
     return poisson
 
 def cut_edges(image, numPix):

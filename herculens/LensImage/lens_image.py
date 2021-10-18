@@ -6,7 +6,7 @@ from jax import jit
 
 from herculens.LensImage.Numerics.numerics_subframe import NumericsSubFrame
 from herculens.LensImage.image2source_mapping import Image2SourceMapping
-from herculens.Util import util
+
 
 __all__ = ['ImageModel']
 
@@ -137,7 +137,9 @@ class LensImage(object):
             model += self.lens_surface_brightness(kwargs_lens_light, unconvolved=unconvolved)
         return model
 
-    def simulation(self, add_poisson=True, add_gaussian=True, compute_true_noise_map=True, **model_kwargs):
+    def simulation(self, add_poisson=True, add_gaussian=True, 
+                   compute_true_noise_map=True, noise_seed=18, 
+                   **model_kwargs):
         """
         same as model() but with noise added
 
@@ -147,7 +149,7 @@ class LensImage(object):
         if self.Noise is None:
             raise ValueError("Impossible to generate noise realisation because no noise class has been set")
         model = self.model(**model_kwargs)
-        noise = self.Noise.realisation(model, add_poisson=add_poisson, add_gaussian=add_gaussian)
+        noise = self.Noise.realisation(model, noise_seed, add_poisson=add_poisson, add_gaussian=add_gaussian)
         simu = model + noise
         self.Noise.set_data(simu)
         if compute_true_noise_map is True:
