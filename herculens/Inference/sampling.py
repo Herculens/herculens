@@ -64,9 +64,6 @@ class Sampler(InferenceBase):
             )
             # reset number of samples so we don't warmup again in the final inference
             num_warmup = 0
-
-        if num_chains > 1:
-            init_positions = np.repeat(np.expand_dims(init_positions, axis=0), num_chains, axis=0)
         
         if sampler_type.lower() == 'hmc':
             new_state_func = blackjax_hmc.new_state
@@ -77,19 +74,24 @@ class Sampler(InferenceBase):
         else:
             raise ValueError(f"Sampler/kernel type '{sampler_type}' is not supported ('NUTS' or 'HMC' only).")
 
-        init_states = jax.vmap(new_state_func, in_axes=(0, None))(init_positions, logprob)
-        states, infos = self._inference_loop_multiple_chains(
+        if num_chains == 1:
+            init_states = new_state_func(init_positions, logprob)
+        else:
+            init_positions = np.repeat(np.expand_dims(init_positions, axis=0), num_chains, axis=0)
+            init_states = jax.vmap(new_state_func, in_axes=(0, None))(init_positions, logprob)
+        # run the inference
+        states, infos = self._run_blackjax_inference(
             rng_key, kernel, init_states, num_warmup + num_samples, num_chains
         )
         samples = states.position.block_until_ready()
         logL = infos.energy
-        if len(samples.shape) == 3:
+        runtime = time.time() - start
+
+        if len(samples.shape) == 3:  # basically if num_chains > 1
             # flatten the multiple chains
             s0, s1, s2 = samples.shape
             samples = samples.reshape(s0*s1, s2)
             logL = logL.flatten()
-
-        runtime = time.time() - start
 
         self._param.set_posterior(samples)
         extra_fields = {
@@ -102,15 +104,21 @@ class Sampler(InferenceBase):
         return samples, logL, extra_fields, runtime
 
     @staticmethod
-    def _inference_loop_multiple_chains(rng_key, kernel, initial_state, 
-                                        num_samples, num_chains):
-        def one_step(states, rng_key):
+    def _run_blackjax_inference(rng_key, kernel, initial_state, 
+                                     num_samples, num_chains):
+        def one_step_single_chain(state, rng_key):
+            state, info = kernel(rng_key, state)
+            return state, (state, info)
+        def one_step_multi_chains(states, rng_key):
             keys = jax.random.split(rng_key, num_chains)
             states, infos = jax.vmap(kernel)(keys, states)
             return states, (states, infos)
 
         keys = jax.random.split(rng_key, num_samples)
-        _, (states, infos) = jax.lax.scan(one_step, initial_state, keys)
+        if num_chains == 1:
+            _, (states, infos) = jax.lax.scan(one_step_single_chain, initial_state, keys)
+        else:
+            _, (states, infos) = jax.lax.scan(one_step_multi_chains, initial_state, keys)
         return states, infos
 
     def hmc_numpyro(self, num_warmup=100, num_samples=100, num_chains=1, 
@@ -132,8 +140,8 @@ class Sampler(InferenceBase):
         #init_params = ParamInfo(init_params, potential_fn(init_params), kinetic_fn(init_params))
         num_dims = len(init_params)
         start = time.time()
-        samples, extra_fields = self._run_numpyro_mcmc(kernel, init_params, rng_key, 
-                                                       num_warmup, num_samples, num_chains, progress_bar)
+        samples, extra_fields = self._run_numpyro_inference(kernel, init_params, rng_key, 
+                                                            num_warmup, num_samples, num_chains, progress_bar)
         runtime = time.time() - start
         logL = - extra_fields['potential_energy']
         samples = np.asarray(samples)
@@ -146,7 +154,7 @@ class Sampler(InferenceBase):
         return samples, logL, extra_fields, runtime
 
     @staticmethod
-    def _run_numpyro_mcmc(kernel, init_params, rng_key, num_warmup, num_samples, num_chains, progress_bar):
+    def _run_numpyro_inference(kernel, init_params, rng_key, num_warmup, num_samples, num_chains, progress_bar):
         # NOTE: disabling the progress-bar can speed up the sampling
         if num_chains > 1:
             init_params = np.repeat(np.expand_dims(init_params, axis=0), num_chains, axis=0)
