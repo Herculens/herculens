@@ -27,7 +27,8 @@ The following dependencies will be installed automatically.
 ##### Optional
 - `optax` (0.0.9), for advanced gradient descent algorithms 
 - `numpyro` (0.7.1), for HMC sampling
-- `emcee` (3.0.2), for MCMC
+- `blackjax` (0.7.1), for another implementation of HMC sampling integrated with `jax`
+- `emcee` (3.0.2), for Ensemble MCMC sampling
 - `jaxns` (0.0.7), for `jax`-enabled nested sampling
 - `dynesty` (1.1), for nested sampling using Hamiltonian slice sampling
 - `corner` (2.2.1), for corner plots
