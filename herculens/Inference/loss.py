@@ -273,7 +273,15 @@ class Loss(object):
     def _log_regul_l1_starlet_lens_light(self, kwargs):
         # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
         noise_map = np.sqrt(self._image.Noise.C_D)
-        noise_level = noise_map
+
+        # TEST reweight the noise map based on lensed source model
+        #lensed_source_model = self._image.source_surface_brightness(kwargs['kwargs_source'], 
+        #                                                            kwargs_lens=kwargs['kwargs_lens'],
+        #                                                            de_lensed=False, unconvolved=True)
+        #noise_level = noise_map # + lensed_source_model**3
+        noise_level = np.mean(noise_map[self.likelihood_mask == 1])
+        # end TEST
+
         model = kwargs['kwargs_lens_light'][self._idx_pix_ll]['pixels']
         st = self._starlet_ll.decompose(model)[:-1]  # ignore coarsest scale
         st_weighted_l1_hf = jnp.sum(self._st_ll_norms[0] * noise_level * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
@@ -300,7 +308,8 @@ class Loss(object):
     def _log_regul_l1_battle_lens_light(self, kwargs):
         # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
         noise_map = np.sqrt(self._image.Noise.C_D)
-        noise_level = noise_map
+        noise_level = np.mean(noise_map[self.likelihood_mask == 1])
+        #noise_level = noise_map
         model = kwargs['kwargs_lens_light'][self._idx_pix_ll]['pixels']
         bt = self._battle_ll.decompose(model)[0]  # consider only first scale
         bt_weighted_l1 = jnp.sum(self._bt_ll_norm * noise_level * jnp.abs(bt))

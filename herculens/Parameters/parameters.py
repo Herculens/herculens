@@ -328,7 +328,7 @@ class Parameters(object):
                         if isinstance(pixels, (int, float)):
                             pixels = pixels * np.ones((n_pix_x, n_pix_y))
                         elif pixels.shape != (n_pix_x, n_pix_y):
-                            raise ValueError("Pixelated array not consistent with pixelated grid")
+                            raise ValueError("Pixelated array is inconsistent with pixelated grid.")
                         args += pixels.flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
