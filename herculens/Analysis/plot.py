@@ -275,7 +275,7 @@ class Plotter(object):
                 vmax_diff = true_lens_light.max() / 10.
                 im = ax.imshow(diff, extent=extent, 
                                cmap=self.cmap_resid, norm=Normalize(-vmax_diff, vmax_diff))
-                ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm truth}$", fontsize=self.base_fontsize)
+                ax.set_title(r"l${}_{\rm model}$ - l${}_{\rm truth}$", fontsize=self.base_fontsize)
                 nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
                                         vmin=-vmax_diff, vmax=vmax_diff,
                                         colorbar_kwargs={'orientation': 'horizontal'})
