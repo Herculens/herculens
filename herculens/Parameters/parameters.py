@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax import lax
 
 from herculens.LensModel.Profiles import pixelated as pixelated_lens
-from herculens.LensModel.Profiles import epl, sie, nie, shear, gaussian_potential
+from herculens.LensModel.Profiles import epl, sie, nie, shear, point_mass, gaussian_potential
 from herculens.LightModel.Profiles import pixelated as pixelated_light
 from herculens.LightModel.Profiles import gaussian, sersic, uniform
 from herculens.LensModel.profile_list_base import SUPPORTED_MODELS as LENS_MODELS
@@ -210,7 +210,7 @@ class Parameters(object):
         profile_class = None
         if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
             if model not in LIGHT_MODELS:
-                raise ValueError("'{model}' is not supported.")
+                raise ValueError(f"'{model}' is not supported.")
             if model == 'GAUSSIAN':
                 profile_class = gaussian.Gaussian
             elif model == 'SERSIC':
@@ -226,20 +226,24 @@ class Parameters(object):
         elif kwargs_key == 'kwargs_lens':
             if model not in LENS_MODELS:
                 raise ValueError("'{model}' is not supported.")
-            if model == 'GAUSSIAN':
+            elif model == 'GAUSSIAN':
                 profile_class = gaussian_potential.Gaussian
             elif model == 'EPL':
                 profile_class = epl.EPL
             elif model == 'SIE':
                 profile_class = sie.SIE
-            if model == 'NIE':
+            elif model == 'NIE':
                 profile_class = nie.NIE
+            elif model == 'POINT_MASS':
+                profile_class = point_mass.PointMass
             elif model == 'SHEAR':
                 profile_class = shear.Shear
             elif model == 'SHEAR_GAMMA_PSI':
                 profile_class = shear.ShearGammaPsi
             elif model == 'PIXELATED':
                 profile_class = pixelated_lens.PixelatedPotential
+            elif model == 'PIXELATED_DIRAC':
+                profile_class = pixelated_lens.PixelatedPotentialDirac
         if profile_class is None:
             raise ValueError(f"Could not find the model class for '{model}'")
         return profile_class
