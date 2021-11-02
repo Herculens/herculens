@@ -112,10 +112,10 @@ class PixelatedPotentialDirac(LensProfileBase):
             center in y-coordinate
 
         """
-        return jnp.where((x >= center_x - self.ss) & 
-                         (x <= center_x + self.ss) & 
-                         (y >= center_y - self.ss) & 
-                         (y <= center_y + self.ss), 
+        return jnp.where((x >= center_x - self.hss) & 
+                         (x <= center_x + self.hss) & 
+                         (y >= center_y - self.hss) & 
+                         (y <= center_y + self.hss), 
                          value, 0.)
 
     def derivatives(self, x, y, value, center_x, center_y):
@@ -176,4 +176,4 @@ class PixelatedPotentialDirac(LensProfileBase):
     def set_data_pixel_grid(self, pixel_axes):
         self.pp.set_data_pixel_grid(pixel_axes)
         x_coords, y_coords = pixel_axes
-        self.ss = np.abs(x_coords[0] - x_coords[1])  # grid step size
+        self.hss = np.abs(x_coords[0] - x_coords[1]) / 2.  # half the grid step size
