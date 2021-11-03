@@ -25,10 +25,6 @@ class PixelatedPotential(LensProfileBase):
         ----------
         x, y : array-like
             Coordinates at which to evaluate the lensing potential.
-        x_coords : 1D array
-            Rectangular x-coordinate grid values.
-        y_coords : 1D array
-            Rectangular y-coordinate grid values.
         pixels : 2D array
             Values of the lensing potential at fixed coordinate grid positions.
 
@@ -45,10 +41,6 @@ class PixelatedPotential(LensProfileBase):
         ----------
         x, y : array-like
             Coordinates at which to evaluate the lensing potential derivatives.
-        x_coords : 1D array
-            Rectangular x-coordinate grid values.
-        y_coords : 1D array
-            Rectangular y-coordinate grid values.
         pixels : 2D array
             Values of the lensing potential at fixed coordinate grid positions.
 
@@ -63,10 +55,6 @@ class PixelatedPotential(LensProfileBase):
         ----------
         x, y : array-like
             Coordinates at which to evaluate the lensing potential derivatives.
-        x_coords : 1D array
-            Rectangular x-coordinate grid values.
-        y_coords : 1D array
-            Rectangular y-coordinate grid values.
         pixels : 2D array
             Values of the lensing potential at fixed coordinate grid positions.
 
@@ -83,28 +71,24 @@ class PixelatedPotential(LensProfileBase):
 
 
 class PixelatedPotentialDirac(LensProfileBase):
-    param_names = ['value', 'center_x', 'center_y']
-    lower_limit_default = {'value': -1e10, 'center_x': -100, 'center_y': -100}
-    upper_limit_default = {'value': 1e10, 'center_x': 100, 'center_y': 100}
+    param_names = ['psi', 'center_x', 'center_y']
+    lower_limit_default = {'psi': -1e10, 'center_x': -100, 'center_y': -100}
+    upper_limit_default = {'psi': 1e10, 'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
 
     def __init__(self):
-        """Lensing potential on a fixed coordinate grid."""
+        """Dirac impulse in potential on a fixed coordinate grid."""
         super(PixelatedPotentialDirac, self).__init__()
         self.pp = PixelatedPotential()
 
-    def function(self, x, y, value, center_x, center_y):
+    def function(self, x, y, psi, center_x, center_y):
         """Interpolated evaluation of the lensing potential.
 
         Parameters
         ----------
         x, y : array-like
             Coordinates at which to evaluate the lensing potential.
-        x_coords : 1D array
-            Rectangular x-coordinate grid values.
-        y_coords : 1D array
-            Rectangular y-coordinate grid values.
-        value : float
+        psi : float
             Value of the pixelated lensing potential at x, y
         center_x : float
             center in x-coordinate
@@ -112,24 +96,20 @@ class PixelatedPotentialDirac(LensProfileBase):
             center in y-coordinate
 
         """
-        return jnp.where((x >= center_x - self.hss) & 
-                         (x <= center_x + self.hss) & 
-                         (y >= center_y - self.hss) & 
-                         (y <= center_y + self.hss), 
-                         value, 0.)
+        return jnp.where((x >= center_x - self.hss_x) & 
+                         (x <= center_x + self.hss_x) & 
+                         (y >= center_y - self.hss_y) & 
+                         (y <= center_y + self.hss_y), 
+                         psi, 0.)
 
-    def derivatives(self, x, y, value, center_x, center_y):
+    def derivatives(self, x, y, psi, center_x, center_y):
         """Spatial first derivatives of the lensing potential.
 
         Parameters
         ----------
         x, y : array-like
             Coordinates at which to evaluate the lensing potential derivatives.
-        x_coords : 1D array
-            Rectangular x-coordinate grid values.
-        y_coords : 1D array
-            Rectangular y-coordinate grid values.
-        value : 2D array
+        psi : 2D array
             Values of the lensing potential at fixed coordinate grid positions.
         center_x : float
             center in x-coordinate
@@ -139,7 +119,7 @@ class PixelatedPotentialDirac(LensProfileBase):
         """
         # the following array is at the input (x, y) resolution
         rect_shape = int(np.sqrt(x.size)), int(np.sqrt(y.size))
-        pixels = self.function(x, y, value, center_x, center_y).reshape(rect_shape)
+        pixels = self.function(x, y, psi, center_x, center_y).reshape(rect_shape)
         # we the want to interpolate it to the resolution of the underlying pixelated grid
         # first, get the axes of from input coordinates
         x_coords, y_coords = np.reshape(x, rect_shape)[0, :], np.reshape(y, rect_shape)[:, 0]
@@ -152,18 +132,14 @@ class PixelatedPotentialDirac(LensProfileBase):
         # call the derivatives on the underlying pixelated profile
         return self.pp.derivatives(x, y, pixels_grid)
 
-    def hessian(self, x, y, pixels):
+    def hessian(self, x, y, psi, center_x, center_y):
         """Spatial second derivatives of the lensing potential.
 
         Parameters
         ----------
         x, y : array-like
             Coordinates at which to evaluate the lensing potential derivatives.
-        x_coords : 1D array
-            Rectangular x-coordinate grid values.
-        y_coords : 1D array
-            Rectangular y-coordinate grid values.
-        value : 2D array
+        psi : 2D array
             Values of the lensing potential at fixed coordinate grid positions.
         center_x : float
             center in x-coordinate
@@ -176,4 +152,6 @@ class PixelatedPotentialDirac(LensProfileBase):
     def set_data_pixel_grid(self, pixel_axes):
         self.pp.set_data_pixel_grid(pixel_axes)
         x_coords, y_coords = pixel_axes
-        self.hss = np.abs(x_coords[0] - x_coords[1]) / 2.  # half the grid step size
+        # save half the grid step size in y and y directions
+        self.hss_x = np.abs(x_coords[0] - x_coords[1]) / 2.
+        self.hss_y = np.abs(y_coords[0] - y_coords[1]) / 2.

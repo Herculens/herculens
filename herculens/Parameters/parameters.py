@@ -474,6 +474,8 @@ class Parameters(object):
             latex = r"$y_0$"
         elif name == 'pixels':
             latex = r"{\rm pixels}"
+        elif name == 'psi':
+            latex = r"\psi"
         else:
             raise ValueError("latex symbol for variable '{}' is unknown".format(name))
         return latex
