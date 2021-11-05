@@ -1,7 +1,5 @@
 import numpy as np
 import jax.numpy as jnp
-from jax import lax, jit
-from functools import partial
 
 from herculens.LensModel.Profiles.base_profile import LensProfileBase
 from herculens.Util.jax_util import BicubicInterpolator

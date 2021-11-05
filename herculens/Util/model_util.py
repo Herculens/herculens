@@ -2,10 +2,13 @@ import copy
 import numpy as np
 import jax.numpy as jnp
 from scipy.ndimage import morphology
+from scipy import sparse
+import findiff
 
 from herculens.LightModel.light_model import LightModel
 from herculens.LensImage.lens_image import LensImage
 from herculens.Util import param_util
+from herculens.Util.jax_util import BicubicInterpolator as Interpolator
 
 
 def mask_from_pixelated_source(lens_image, parameters):
@@ -114,3 +117,67 @@ def R_omega(z, t, q, nmax):
         # Update the partial sum
         partial_sum += omega_i
     return partial_sum
+
+def build_DsD_operator(smooth_lens_image, smooth_kwargs_params, hybrid_lens_image=None):
+    """this functions build the full operator from Koopmans 2005"""
+    # data grid
+    # x_coords, y_coords = smooth_lens_image.Grid.pixel_axes
+    x_grid, y_grid = smooth_lens_image.Grid.pixel_coordinates
+    num_pix_x, num_pix_y = smooth_lens_image.Grid.num_pixel_axes
+    pixel_width = smooth_lens_image.Grid.pixel_width
+
+    # pixelated lens model grid (TODO: implement interpolation on potential grid)
+    # x_coords_pot, y_coords_pot = hybrid_lens_image.Grid.model_pixel_axes('lens')
+    # x_grid_pot, y_grid_pot = hybrid_lens_image.Grid.model_pixel_coordinates('lens')
+
+    # numerics grid, for intermediate computation on a higher resolution grid
+    x_grid_num, y_grid_num = smooth_lens_image.ImageNumerics.coordinates_evaluate
+    shape_num = tuple([int(np.sqrt(x_grid_num.size))]*2)  # ASSUMES SQUARE GRID!
+    x_grid_num = x_grid_num.reshape(shape_num) # convert to 2D array
+    y_grid_num = y_grid_num.reshape(shape_num) # convert to 2D array
+    x_coords_num, y_coords_num = x_grid_num[0, :], y_grid_num[:, 0]
+    
+    # get the pixelated source in source plane,
+    # on the highest resolution grid possible (it will use )
+    smooth_source = smooth_lens_image.SourceModel.surface_brightness(
+        x_grid_num, y_grid_num, smooth_kwargs_params['kwargs_source'])
+    smooth_source *= pixel_width**2  # proper units
+    interp_source = Interpolator(y_coords_num, x_coords_num, smooth_source)
+
+    # compute its derivatives *on source plane*
+    grad_s_x_srcplane = interp_source(y_grid_num, x_grid_num, dy=1)
+    grad_s_y_srcplane = interp_source(y_grid_num, x_grid_num, dx=1)
+    grad_s_srcplane = np.sqrt(grad_s_x_srcplane**2+grad_s_y_srcplane**2)
+
+    # setup the Interpolator to read on data pixels
+    interp_grad_s_x = Interpolator(y_coords_num, x_coords_num, grad_s_x_srcplane)
+    interp_grad_s_y = Interpolator(y_coords_num, x_coords_num, grad_s_y_srcplane)
+
+    # use the lens equation to ray shoot the coordinates of the data grid
+    x_src, y_src = smooth_lens_image.LensModel.ray_shooting(
+        x_grid, y_grid, smooth_kwargs_params['kwargs_lens'])
+
+    # evaluate the resulting arrays on that grid
+    grad_s_x = interp_grad_s_x(y_src, x_src)
+    grad_s_y = interp_grad_s_y(y_src, x_src)
+    grad_s = np.sqrt(grad_s_x**2+grad_s_y**2)
+
+    # put them into sparse diagonal matrices
+    D_s_x = sparse.diags([grad_s_x.flatten()], [0])
+    D_s_y = sparse.diags([grad_s_y.flatten()], [0])
+
+    # compute the potential derivative operator as two matrices D_x, D_y
+    step_size = pixel_width # step size
+    order = 1 # first-order derivative
+    accuracy = 2 # accuracy of the finite difference scheme (2-points, 4-points, etc.)
+    d_dx_class = findiff.FinDiff(1, step_size, order, acc=accuracy)
+    d_dy_class = findiff.FinDiff(0, step_size, order, acc=accuracy)
+    D_x = d_dx_class.matrix((num_pix_x, num_pix_y))
+    D_y = d_dy_class.matrix((num_pix_x, num_pix_y))  # sparse matrices
+    
+    # join the source and potential derivatives operators
+    # through minus their 'scalar' product (Eq. A6 from Koopmans 2005)
+    DsD = - D_s_x.dot(D_x) - D_s_y.dot(D_y)
+
+    # we also return the gradient of the source after being ray-traced to the data grid
+    return DsD, grad_s_x, grad_s_y
