@@ -70,7 +70,8 @@ class Loss(object):
     def data(self):
         return self._data
 
-    def _check_choices(self, likelihood_type, prior_terms, regularization_terms, regularization_strengths):
+    def _check_choices(self, likelihood_type, prior_terms, 
+                       regularization_terms, regularization_strengths):
         if likelihood_type not in self._supported_ll:
             raise ValueError(f"Likelihood term '{likelihood_type}' is not supported")
         if prior_terms is not None:
@@ -78,6 +79,12 @@ class Loss(object):
                 if term not in self._supported_prior:
                     raise ValueError(f"Prior term '{term}' is not supported")
         if regularization_terms is not None:
+            if regularization_strengths is None:
+                # default regularization strength is 3, typically suitable for sparsity+wavelets priors 
+                regularization_strengths = [3.]*len(regularization_terms)
+            elif len(regularization_terms) != len(regularization_strengths):
+                raise ValueError(f"There should be at least one choice of "
+                                 "regularization strength per regularization term.")
             if likelihood_type == 'chi2':
                 UserWarning(f"Likelihood type is '{likelihood_type}', which might "
                             "cause issues with some regularization choices")
@@ -102,9 +109,6 @@ class Loss(object):
                     'PIXELATED' not in self._image.LensLightModel.profile_type_list):
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' lens profile")
-
-            if len(regularization_terms) != len(regularization_strengths):
-                raise ValueError(f"There should be one choice of regularization strength per regularization term")
 
     def _init_likelihood(self, likelihood_type, likelihood_mask, mask_from_source_plane):
         if likelihood_type == 'chi2':
