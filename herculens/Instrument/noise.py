@@ -53,17 +53,20 @@ class Noise(object):
             UserWarning("Previous noise map will be replaced with new estimate from a model")
             self._noise_map = None
             #raise ValueError("A noise map has already been set!")
-        noise_map = np.sqrt(self.C_D_model(model))
+        noise_map = jnp.sqrt(self.C_D_model(model))
         self._reset_cache()
         self._noise_map = noise_map
 
     def realisation(self, model, seed, add_gaussian=True, add_poisson=True):
         noise_real = 0.
         key1, key2 = random.split(random.PRNGKey(seed))
+
         if add_poisson and self._exp_map is not None:
             noise_real += image_util.add_poisson(model, self._exp_map, key1)
+
         if add_gaussian:
             noise_real += image_util.add_background(model, self._background_rms, key2)
+
         return noise_real
 
     @property

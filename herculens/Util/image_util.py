@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 from scipy import interpolate #, ndimage
 from scipy.ndimage import interpolation as interp
 from jax import random
@@ -61,7 +62,7 @@ def add_layer2image_int(grid2d, x_pos, y_pos, kernel):
     new[min_y:max_y, min_x:max_x] += kernel_re_sized
     return new
 
-def add_background(image, sigma_bkd, seed):
+def add_background(image,sigma_bkd, seed):
     """
     adds background noise to image
     :param image: pixel values of image
@@ -69,7 +70,8 @@ def add_background(image, sigma_bkd, seed):
     :return: a realisation of Gaussian noise of the same size as image
     """
     background = random.normal(seed, shape=np.shape(image)) * sigma_bkd
-    
+    #background = random.normal(seed, shape=image_shape) * sigma_bkd
+
     # without JAX:
     # nx, ny = 
     # background = np.random.randn(*image.shape) * sigma_bkd
@@ -85,9 +87,8 @@ def add_poisson(image, exp_time, seed):
     """
     adds a poison (or Gaussian) distributed noise with mean given by surface brightness
     """
-    sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
+    sigma = jnp.sqrt(jnp.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
     poisson = random.normal(seed, shape=np.shape(image)) * sigma
-    
     # without JAX:
     # sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
     # poisson = np.random.randn(*image.shape) * sigma

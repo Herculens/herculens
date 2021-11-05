@@ -168,4 +168,3 @@ class LensImage(object):
         norm_res = self.normalized_residuals(data, model, mask=mask)
         num_data_points = np.count_nonzero(mask)
         return np.sum(norm_res**2) / num_data_points
-        

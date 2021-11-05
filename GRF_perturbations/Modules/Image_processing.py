@@ -24,119 +24,111 @@ from scipy.optimize import minimize as scipy_minimize
 #parameters=get_parameters()
 
 def Radial_profile(image,image_shape):
-  '''
+    '''
 
-  Parameters
-  ----------
-  image: jnp.ndarray
+    Parameters
+    ----------
+    image: jnp.ndarray
         Image of shape (size_y,size_x)
-  image_shape: (size_y,size_x)
-        Shape of the image. If the shape is apriori known
+    image_shape: (size_y,size_x)
+        Shape of the image. Number of pixels is assumed to be even!!!
 
-  Returns
-  -------
-  Radial_profile: jnp.ndarray
+    Returns
+    -------
+    Radial_profile: jnp.ndarray
         Traced array of size np.minimum(size_y,size_x)
 
-  Explanation
-  -------
-  For a given image Radial_profile represents the dependence of axially averaged Flux on radius
-    The function is constructed in a way that for a given image shape it can be casted
-    to a pure function: Radial_profile_pure(image)
+    Explanation
+    -------
+    For a given image Radial_profile is mean value in a ring depending on the radius of the ring
+    The function is supposed to be casted into a pure one: Radial_profile_pure(image)
+    So the gradients of the function could be obtained at will
+    Examples
+    -------
+    >>>image_shape=(10,10)
+    >>>image=np.random.normal(size=(image_shape))
+    >>>Radial_profile_pure=jax.jit(lambda image: Radial_profile(image,image_shape))
+    >>>Radial_profile_pure(image)
+    DeviceArray([ 0.22578851, -0.26061518, -0.13495504,  0.16055809,-0.28665176], dtype=float64)
+    >>>jax.grad(lambda image: jnp.mean(Radial_profile_pure(image)))(image)
+    DeviceArray([[0., 0., 0., 0.00714286, ..., 0.00714286, 0., 0., 0.]], dtype=float64)
+    '''
 
-  Examples
-  -------
-  >>>image_shape=(10,15)
-  >>>image=np.random.normal(size=(image_shape))
-  >>>Radial_profile_pure=pure_function(Radial_profile,image_shape)
-  >>>Radial_profile_pure(image)
-  DeviceArray([ 0.64495406, -0.47196613,  0.47290311, -0.20336265,-0.01885612], dtype=float64)
-  '''
+    assert image_shape[0]%2==0
+    assert image_shape[1]%2==0
 
-  size_y,size_x=image_shape
-  #Needed to compute only below the smallest radius of the image
-  min_size=np.minimum(size_y,size_x)
+    y,x=np.indices(image_shape)
+    center=np.array(image_shape)/2-0.5
 
-  #Centered coordinates
-  x=np.arange(size_x)-size_x/2+0.5
-  y=np.arange(size_y)-size_y/2+0.5
-  X,Y=np.meshgrid(x,y)
+    R=np.sqrt((y-center[0])**2+(x-center[1])**2)
+    R=R.astype(int)
+    length_radial_profile=np.minimum(*image_shape)//2
 
-  #Matrix of radii
-  R=np.sqrt(np.power(X,2)+np.power(Y,2))
-  radius_size=math.ceil(min_size/2)
+    #Mask rings with increasing integer radius (in pixels)
+    Ring_masks=np.zeros((length_radial_profile,image_shape[0],image_shape[1]))
+    for i in range(length_radial_profile):
+        #Chose ring of given radius
+        Ring_masks[i]=np.logical_and(R>=i,R<i+1)
 
-  #We can not assign a value of traced array, but we can multiply it by something
-  #For given radius we multiply an image by a mask. For loop can be avoided using a high dimensional tensor.
-  R_mask_tensor=np.zeros((radius_size,size_y,size_x))
-  for i in range(radius_size):
-      #Chose ring of given radius
-      condition=(R>=i) & (R<i+1)
-      #Set the mask for this radius
-      R_mask_tensor[i]=np.where(condition,1,0)
+    #Number of pixels in ring
+    pix_in_bins=Ring_masks.sum(axis=(1,2))
 
-  #Number of pixels on given radius (to get mean from sum)
-  pixel_counter=R_mask_tensor.sum(axis=(1,2))
+    #Sum of image values in a ring with radius i
+    scan_func= lambda _,Ring_mask: (1,jnp.sum(image*Ring_mask))
+    #Differentiable loop over rings
+    sum_in_bins=jax.lax.scan(scan_func,0,Ring_masks)[1]
 
-  #Summary flux in ring with given radius
-  #If we multiply image with shape (x,y) by tensor with shape (r,x,y)
-  #and sum it up to receive an array with shape (r). It is a way to avoid for loop.
-  sum_in_rings=(image*R_mask_tensor).sum(axis=(1,2))
+    radial_profile=sum_in_bins/pix_in_bins
+    return radial_profile
 
-  #Average flux in ring with given radius
-  radial_profile=sum_in_rings/pixel_counter
-
-  return radial_profile
-
-def compute_radial_spectrum(image,mask,mask_spectral_cut_index):
-  '''
-  Parameters
-  ----------
-  image: jnp.ndarray
+def compute_radial_spectrum(image,annulus_mask,init_freq_index):
+    '''
+    Parameters
+    ----------
+    image: jnp.ndarray
         array of shape (size,size)
-  mask: np.ndarray
+    annulus_mask: np.ndarray
         mask of shape (size,size). Leaves only Einstein ring region
-  mask_spectral_cut_index: int -> indent of spectra from zero
-  (if we mask out a ring, than spectral frequencies refering to sizes larger than
-  the r_max-r_min do not make sense)
+    init_freq_index: int
+        indent of spectra from zero
+        spectral frequencies k<1/(rmax-rmin) refer to scales bigger than the ring, so don't make sense
 
-  Returns
-  -------
-  power_spectrum: jnp.ndarray
+    Returns
+    -------
+    power_spectrum: jnp.ndarray
         array with shape (size//2-mask_spectral_cut_index)
-  Explanation
-  -------
-  For a given image computes Power spectrum. Then computes radial profile of the power spectrum,
-  which is axially averaged spectrum.
-  Returns radial profile of the power spectrum, with indent from low frequencies that corresponds to the mask_spectral_cut_index
+    Explanation
+    -------
+    For a given image computes Power spectrum. Then computes radial profile of the power spectrum,
+    which is axially averaged spectrum.
+    Returns radial profile of the power spectrum, with indent from low frequencies that corresponds to the mask_spectral_cut_index
 
-  Examples
-  -------
-  >>> compute_radial_spectrum(resid0,Radial_profile,mask,0)
-  DeviceArray([2.75495046e+00, 7.38967978e+00, 9.19915373e+00,1.17016538e+01, 1.23753751e+01, ...], dtype=float64)
-  >>> compute_radial_spectrum_pure=purify_function(compute_radial_spectrum,Radial_profile,mask,4)
-  >>> compute_radial_spectrum_pure(resid0)
-  DeviceArray([1.23753751e+01, 1.02814510e+01, ...], dtype=float64)
-  '''
-  #Mask should be the same shape as image
-  #it should be square
-  assert mask.shape[0]==mask.shape[1]
+    Examples
+    -------
+    >>> compute_radial_spectrum(resid0,Radial_profile,mask,0)
+    DeviceArray([2.75495046e+00, 7.38967978e+00, 9.19915373e+00,1.17016538e+01, 1.23753751e+01, ...], dtype=float64)
+    >>> compute_radial_spectrum_pure=purify_function(compute_radial_spectrum,Radial_profile,mask,4)
+    >>> compute_radial_spectrum_pure(resid0)
+    DeviceArray([1.23753751e+01, 1.02814510e+01, ...], dtype=float64)
+    '''
+    #Mask should have the same shape as image
+    #it should be square
+    assert annulus_mask.shape[0]==annulus_mask.shape[1]
 
+    #Leave only region with Einstein ring
+    masked_image=image*annulus_mask
 
-  #Leave only region with Einstein ring
-  masked_image=image*mask
+    #Compute and center spectrum
+    spectrum=jnp.abs(jnp.fft.fft2(masked_image))**2
+    #unitary normalisation of the Fourier transform (look np.fft norm 'ortho')
+    normalized_spectrum=spectrum/annulus_mask.sum()
+    shift=annulus_mask.shape[0]//2
+    Centered_Spectrum=jnp.roll(normalized_spectrum,shift,axis=(0,1))
 
-  #Compute and center spectrum
-  spectrum=jnp.abs(jnp.fft.fft2(masked_image))**2
-  #unitary normalisation of the Fourier transform (look np.fft norm 'ortho')
-  normalized_spectrum=spectrum/mask.sum()
-  shift=mask.shape[0]//2
-  Centered_Spectrum=jnp.roll(normalized_spectrum,shift,axis=(0,1))
+    Radially_avg_spectrum=Radial_profile(Centered_Spectrum,annulus_mask.shape)
 
-  Radially_avg_spectrum=Radial_profile(Centered_Spectrum,mask.shape)
-
-  #Ignore frequencies, that are irrelevant for corresponding mask
-  return Radially_avg_spectrum[mask_spectral_cut_index:]
+    #Ignore frequencies corresponding to scales bigger than mask
+    return Radially_avg_spectrum[init_freq_index:]
 
 
 
