@@ -145,6 +145,8 @@ class LensImage(object):
 
         :param compute_true_noise_map: if True (default), define the noise map (diagonal covariance matrix)
         to be the 'true' one, i.e. based on the noiseless model image.
+        :param noise_seed: the seed that will be used by the PRNG from JAX to fix the noise realization.
+        The default is the arbtrary value 18, so it is the user task to change it for different realizations.
         """
         if self.Noise is None:
             raise ValueError("Impossible to generate noise realisation because no noise class has been set")
