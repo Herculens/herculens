@@ -121,14 +121,14 @@ class Plotter(object):
                 true_source = self._true_source
                 if source_model.size != true_source.size:
                     npix_true = len(true_source)
-                    x_coords_true = np.linspace(src_extent[0], src_extent[1], npix_true)
-                    y_coords_true = np.linspace(src_extent[2], src_extent[3], npix_true)
+                    x_coords_true = np.linspace(extent[0], extent[1], npix_true)
+                    y_coords_true = np.linspace(extent[2], extent[3], npix_true)
                     if lens_image.SourceModel.has_pixels:
                         x_coords_src, y_coords_src = lens_image.Grid.model_pixel_axes('source')
                     else:
                         npix_src = len(source_model)
-                        x_coords_src = np.linspace(src_extent[0], src_extent[1], npix_src)
-                        y_coords_src = np.linspace(src_extent[2], src_extent[3], npix_src)
+                        x_coords_src = np.linspace(extent[0], extent[1], npix_src)
+                        y_coords_src = np.linspace(extent[2], extent[3], npix_src)
                     true_source = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords_src, y_coords_src)
                     warnings.warn("True source array has been interpolated to match model array.")
             else:
