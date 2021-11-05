@@ -53,7 +53,7 @@ class Noise(object):
             UserWarning("Previous noise map will be replaced with new estimate from a model")
             self._noise_map = None
             #raise ValueError("A noise map has already been set!")
-        noise_map = np.sqrt(self.C_D_model(model))
+        noise_map = jnp.sqrt(self.C_D_model(model))
         self._reset_cache()
         self._noise_map = noise_map
 
