@@ -73,18 +73,6 @@ def compute_SNR_grid(Spectra_grid,Noise_spectral_density):
     mean_SNR=np.nanmean(SNR,axis=-1)
     return mean_SNR
 
-def compute_Loss_grid(Spectra_grid,Spectra_Loss_pure):
-    Loss_grid=np.zeros((Spectra_grid.shape[0],Spectra_grid.shape[1]))
-
-    for i,Spectra_Beta_row in enumerate(Spectra_grid):
-        for j,Spectra_Phase_row in enumerate(Spectra_Beta_row):
-            #Spectrum=Spectra_Phase_row.mean(axis=0)
-            Loss_grid[i,j]=Spectra_Loss_pure(Spectra_Phase_row)
-
-    pred_logA_index=np.where(Loss_grid==Loss_grid.min())[0].item()
-    pred_Beta_index=np.where(Loss_grid==Loss_grid.min())[1].item()
-
-    return Loss_grid,pred_logA_index,pred_Beta_index
 
 def compute_Confidence_grid(likelihood):
     isolevels=np.linspace(1,0,101)
@@ -116,35 +104,54 @@ def compute_Confidence_grid(likelihood):
 
     return confidence_grid
 
-def Inference_pipeline(data_resid_spectrum,Spectra_grid,fitted_logA_index,fitted_Beta_index):
+def compute_Loss_grid(Spectra_grid,Spectra_Loss_pure):
 
-    print('Estimating uncertainties')
+    #map function over row of Betas_array and GRF_seeds
+    def loop_over_Betas(Spectra_Beta_row):
+        return jax_map(Spectra_Loss_pure,Spectra_Beta_row)
+
+    Loss_grid=jax_map(loop_over_Betas,Spectra_grid)
+
+    return Loss_grid
+
+
+def Inference_pipeline(data_resid_spectrum,Spectra_grid,fitted_logA_index,fitted_Beta_index,report_timings=True):
+
+    #Estimating uncertainties
     start_time=time.time()
     gamma_data,mu_data,sigma_data=infer_LogNorm_params(Spectra_grid[fitted_logA_index,fitted_Beta_index])
-    end_time=time.time()
-    print('Uncertainties estimation took {:.1f} seconds'.format(end_time-start_time))
+    time_uncertainties=time.time()-start_time
+
 
     logSpec_data=np.log(data_resid_spectrum)
     Spectra_Loss_pure=lambda model_spectra: Spectra_Loss(model_spectra,logSpec_data,sigma_data)
 
-    print('Computing Loss grid')
+    #Computing Loss grid
     start_time=time.time()
+    '''
     Loss_grid=np.zeros((Spectra_grid.shape[0],Spectra_grid.shape[1]))
     for i,Spectra_Beta_row in enumerate(Spectra_grid):
         for j,Spectra_Phase_row in enumerate(Spectra_Beta_row):
             Loss_grid[i,j]=Spectra_Loss_pure(Spectra_Phase_row)
-    end_time=time.time()
-    print('Loss grid computation took {:.1f} seconds'.format(end_time-start_time))
+    '''
+    Loss_grid=compute_Loss_grid(Spectra_grid,Spectra_Loss_pure)
+    time_Loss_grid=time.time()-start_time
+
 
     pred_logA_index=np.where(Loss_grid==Loss_grid.min())[0].item()
     pred_Beta_index=np.where(Loss_grid==Loss_grid.min())[1].item()
     likelihood=np.exp(-Loss_grid/2)
 
-    print('Computing Confidence grid')
+    #Computing Confidence grid
     start_time=time.time()
     Confidence_grid=compute_Confidence_grid(likelihood)
-    end_time=time.time()
-    print('Confidence grid computation took {:.1f} seconds'.format(end_time-start_time))
+    time_Confidence_grid=time.time()-start_time
+
+
+    if report_timings:
+        print('Uncertainties estimation took {:.1f} seconds'.format(time_uncertainties))
+        print('Loss grid computation took {:.1f} seconds'.format(time_Loss_grid))
+        print('Confidence grid computation took {:.1f} seconds'.format(time_Confidence_grid))
 
     return likelihood,Confidence_grid,pred_logA_index,pred_Beta_index
 
