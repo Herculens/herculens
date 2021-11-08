@@ -130,6 +130,10 @@ class Plotter(object):
                         x_coords_src = np.linspace(extent[0], extent[1], npix_src)
                         y_coords_src = np.linspace(extent[2], extent[3], npix_src)
                     true_source = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords_src, y_coords_src)
+                    if lens_image.Grid.x_is_inverted:
+                        true_source = np.flip(true_source, axis=1)
+                    if lens_image.Grid.y_is_inverted:
+                        true_source = np.flip(true_source, axis=0)
                     warnings.warn("True source array has been interpolated to match model array.")
             else:
                 true_source = None
@@ -344,5 +348,4 @@ class Plotter(object):
             ax.set_title(r"$\delta\kappa_{\rm model}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
-
-        plt.show()
+        return fig
