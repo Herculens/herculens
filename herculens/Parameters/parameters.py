@@ -117,7 +117,7 @@ class Parameters(object):
         self._map_values = np.median(samples, axis=0)
         self._kwargs_map = self.args2kwargs(self._map_values)
 
-    def update_fixed(self, kwargs_fixed):
+    def update_fixed(self, kwargs_fixed, kwargs_prior=None):
         # TODO: fill current and init values with values that were previously fixed, if needed
         self._set_params_update_fixed(kwargs_fixed, 'lens_model_list', 'kwargs_lens')
         self._set_params_update_fixed(kwargs_fixed, 'source_model_list', 'kwargs_source')
@@ -125,6 +125,8 @@ class Parameters(object):
 
         # update fixed settings and everything that depends on it
         self._kwargs_fixed.update(kwargs_fixed)
+        if kwargs_prior is not None:
+            self._kwargs_prior = kwargs_prior
         self._update_arrays()
 
     def args2kwargs(self, args):
@@ -189,12 +191,16 @@ class Parameters(object):
         return logP
 
     def log_prior_uniform(self, args):
-        logP = 0
+        logP = 0.
         for i in range(self.num_parameters):
             uniform_prior  = self._prior_types[i] == 'uniform'
-            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
-            logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            # logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            # logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
+            logP += lax.cond(uniform_prior, lambda _: - (args[i] - jnp.clip(args[i], a_min=self._lowers[i], a_max=self._uppers[i]))**2, lambda _: 0., operand=None)
         return logP
+
+    def apply_bounds(self, args):
+        return jnp.clip(args, a_min=self._lowers, a_max=self._uppers)
 
     def log_prior_nojit(self, args):
         logP = 0
