@@ -2,7 +2,7 @@ import copy
 import numpy as np
 import jax.numpy as jnp
 from scipy.ndimage import morphology
-from scipy import sparse
+from scipy import sparse, ndimage
 import findiff
 
 from herculens.LightModel.light_model import LightModel
@@ -11,7 +11,7 @@ from herculens.Util import param_util
 from herculens.Util.jax_util import BicubicInterpolator as Interpolator
 
 
-def mask_from_pixelated_source(lens_image, parameters):
+def mask_from_source_area(lens_image, parameters):
     src_idx = lens_image.SourceModel.pixelated_index
     kwargs_param_mask = copy.deepcopy(parameters.current_values(as_kwargs=True))
     pixels = kwargs_param_mask['kwargs_source'][src_idx]['pixels']
@@ -29,20 +29,28 @@ def mask_from_pixelated_source(lens_image, parameters):
     return model_mask
 
 
-def mask_from_smooth_source(lens_image, parameters, threshold=0.1):
-    kwargs_param = parameters.current_values(as_kwargs=True)
-    source_model = lens_image.source_surface_brightness(kwargs_param['kwargs_source'], de_lensed=True, unconvolved=True)
+def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
+                            threshold=0.1, smoothing=0):
+    if parameters is None and source_model is None:
+        raise ValueError("You must provide an the source model "
+                         "if no parameters are provided.")
+    if parameters is not None:
+        kwargs_param = parameters.current_values(as_kwargs=True)
+        source_model = lens_image.source_surface_brightness(kwargs_param['kwargs_source'], de_lensed=True, unconvolved=True)
     source_model = np.array(source_model)
+    if smoothing > 0:
+        source_model = ndimage.gaussian_filter(source_model, sigma=smoothing)
     binary_source = source_model / source_model.max()
     binary_source[binary_source < threshold] = 0.
     binary_source[binary_source >= threshold] = 1.
-    lens_image_pixel = LensImage(lens_image.Grid, lens_image.PSF, 
+    grid = copy.deepcopy(lens_image.Grid)
+    grid.remove_model_grid('source')
+    lens_image_pixel = LensImage(grid, lens_image.PSF, 
                                  noise_class=lens_image.Noise,
                                  lens_model_class=lens_image.LensModel,
                                  source_model_class=LightModel(['PIXELATED']),
                                  lens_light_model_class=lens_image.LensLightModel,
                                  kwargs_numerics=lens_image._kwargs_numerics)
-
     kwargs_param_mask = copy.deepcopy(kwargs_param)
     kwargs_param_mask['kwargs_source'] = [{'pixels': jnp.array(binary_source)}]
     model_mask = lens_image_pixel.source_surface_brightness(kwargs_param_mask['kwargs_source'], 
@@ -117,6 +125,7 @@ def R_omega(z, t, q, nmax):
         # Update the partial sum
         partial_sum += omega_i
     return partial_sum
+
 
 def build_bilinear_interpol_matrix(x_grid_1d_in, y_grid_1d_in, x_grid_1d_out, 
                                    y_grid_1d_out, warning=True):
@@ -216,6 +225,7 @@ def build_bilinear_interpol_matrix(x_grid_1d_in, y_grid_1d_in, x_grid_1d_out,
     interpol_matrix = sparse.csr_matrix((weights, indices), shape=dense_shape)
     interpol_norm = np.squeeze(np.maximum(1, interpol_matrix.sum(axis=0)).A)
     return interpol_matrix, interpol_norm
+
 
 def build_DsD_matrix(smooth_lens_image, smooth_kwargs_params, hybrid_lens_image=None):
     """this functions build the full operator from Koopmans 2005"""
