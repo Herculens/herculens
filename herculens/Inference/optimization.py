@@ -3,6 +3,7 @@ from scipy import optimize
 import numpy as np
 from scipy.optimize import Bounds
 import optax
+from tqdm import tqdm
 
 from herculens.Inference.inference_base import InferenceBase
 
@@ -70,7 +71,7 @@ class Optimizer(InferenceBase):
         return res.x, extra_fields
 
     def optax(self, algorithm='adabelief', max_iterations=100, init_learning_rate=1e-2, 
-              restart_from_init=False, schedule_learning_rate=True):
+              restart_from_init=False, schedule_learning_rate=True, progress_bar=True):
         if schedule_learning_rate is True:
             # Exponential decay of the learning rate
             scheduler = optax.exponential_decay(
@@ -106,9 +107,14 @@ class Optimizer(InferenceBase):
 
         # Gradient descent loop
         start_time = time.time()
-        for _ in range(max_iterations):
-            updates, opt_state = optim.update(self.gradient(params), opt_state, params)
-            params = optax.apply_updates(params, updates)
+        if progress_bar is True:
+            for _ in tqdm(range(max_iterations), total=max_iterations, desc=f"optax.{algorithm}"):
+                updates, opt_state = optim.update(self.gradient(params), opt_state, params)
+                params = optax.apply_updates(params, updates)
+        else:
+            for _ in range(max_iterations):
+                updates, opt_state = optim.update(self.gradient(params), opt_state, params)
+                params = optax.apply_updates(params, updates)
         runtime = time.time() - start_time
         best_fit = params
         logL_best_fit = self.loss(best_fit)
