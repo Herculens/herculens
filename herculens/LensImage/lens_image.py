@@ -8,7 +8,7 @@ from herculens.LensImage.Numerics.numerics_subframe import NumericsSubFrame
 from herculens.LensImage.image2source_mapping import Image2SourceMapping
 
 
-__all__ = ['ImageModel']
+__all__ = ['LensImage']
 
 
 class LensImage(object):

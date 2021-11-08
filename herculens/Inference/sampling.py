@@ -127,11 +127,11 @@ class Sampler(InferenceBase):
         rng_key = jax.random.PRNGKey(seed)
 
         if sampler_type.lower() == 'hmc':
-            kernel = numpyro._HMC(potential_fn=self.potential_fn, kinetic_fn=self.kinetic_fn, 
-                                  **sampler_kwargs)
+            kernel = numpyro_HMC(potential_fn=self.potential_fn, kinetic_fn=self.kinetic_fn, 
+                                 **sampler_kwargs)
         elif sampler_type.lower() == 'nuts': # NUTS stands for 'no U-turn sampler'
-            kernel = numpyro._NUTS(potential_fn=self.potential_fn, kinetic_fn=self.kinetic_fn, 
-                                   **sampler_kwargs)
+            kernel = numpyro_NUTS(potential_fn=self.potential_fn, kinetic_fn=self.kinetic_fn, 
+                                  **sampler_kwargs)
         else:
             raise ValueError(f"Sampler/kernel type '{sampler_type}' is not supported ('NUTS' or 'HMC' only).")
         
