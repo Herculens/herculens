@@ -88,6 +88,14 @@ class Coordinates(object):
         """
         return np.sqrt(self.pixel_area)
 
+    @property
+    def x_is_inverted(self):
+        return self.transform_pix2angle[0, 0] < 0
+
+    @property
+    def y_is_inverted(self):
+        return self.transform_pix2angle[1, 1] < 0
+
     def coordinate_grid(self, nx, ny):
         """
 

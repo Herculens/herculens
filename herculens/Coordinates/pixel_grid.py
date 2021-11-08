@@ -118,6 +118,19 @@ class PixelGrid(Coordinates):
         x_coords, y_coords = self.model_pixel_axes(name)
         return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
 
+    def model_pixel_shape(self, name):
+        """
+
+        :return: RA coords, DEC coords
+        """
+        if self._model_grids[name] is None:
+            return None
+        x_coords, y_coords = self.model_pixel_axes(name)
+        return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
+
+    def remove_model_grid(self, name):
+        del self._model_grids[name]
+
     def create_model_grid(self, grid_center=None, grid_shape=None, 
                           pixel_scale_factor=None, conserve_extent=False,
                           name='none', overwrite=False):
