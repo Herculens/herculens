@@ -406,3 +406,4 @@ class BicubicInterpolator(object):
                           lambda _: result * (x >= self.x[0]) * (x <= self.x[-1]) * (y >= self.y[0]) * (y <= self.y[-1]), 
                           operand=None)
         return result
+        
