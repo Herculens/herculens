@@ -4,7 +4,8 @@ import jax.numpy as jnp
 from jax import lax
 
 from herculens.LensModel.Profiles import pixelated as pixelated_lens
-from herculens.LensModel.Profiles import epl, sie, nie, shear, point_mass, gaussian_potential
+from herculens.LensModel.Profiles import (epl, sie, nie, shear, point_mass, 
+                                          gaussian_potential, multipole)
 from herculens.LightModel.Profiles import pixelated as pixelated_light
 from herculens.LightModel.Profiles import gaussian, sersic, uniform
 from herculens.LensModel.profile_list_base import SUPPORTED_MODELS as LENS_MODELS
@@ -20,6 +21,27 @@ class Parameters(object):
     - uniform and gaussian priors for subsets of parameters
     - log-prior values, that are meant to be added to the full loss function
     - nice LaTeX format for parameter names
+
+    Example syntax for kwargs_joint:
+    'lens_with_lens_light' : [
+        [
+            (lens_light_index1, lens_index1), [(lens_light_param1, lens_param1), (lens_light_param2, lens_param2), ...]
+        ],
+        [
+            (lens_light_index2, lens_index2), [(lens_light_param3, lens_param3), (lens_light_param4, lens_param4), ...]
+        ],
+        ...
+    ]
+
+    Alternatively, if the parameters share the same name'lens_with_lens_light' : [
+        [
+            (lens_light_index1, lens_index1), [param1, param2, ...]
+        ],
+        [
+            (lens_light_index2, lens_index2), [param3, param4, ...]
+        ],
+        ...
+    ]'lens_with_lens_light' : [(lens_light_index, lens_index), [param1, param2, ...]]
     """
 
     _unif_prior_penalty = 1e10
@@ -213,6 +235,7 @@ class Parameters(object):
 
     @staticmethod
     def get_class_for_model(kwargs_key, model):
+        # TODO: move outside of this class
         profile_class = None
         if kwargs_key in ['kwargs_source', 'kwargs_lens_light']:
             if model not in LIGHT_MODELS:
@@ -246,6 +269,8 @@ class Parameters(object):
                 profile_class = shear.Shear
             elif model == 'SHEAR_GAMMA_PSI':
                 profile_class = shear.ShearGammaPsi
+            elif model == 'MULTIPOLE':
+                profile_class = multipole.Multipole
             elif model == 'PIXELATED':
                 profile_class = pixelated_lens.PixelatedPotential
             elif model == 'PIXELATED_DIRAC':
@@ -440,6 +465,8 @@ class Parameters(object):
 
     @staticmethod
     def name2latex(name):
+        # TODO: move outside of this class
+
         # pixelated models
         if name[:2] == 'd_':  
             latex = r"$d_{" + r"{}".format(int(name[2:])) + r"}$"
@@ -447,7 +474,10 @@ class Parameters(object):
             latex = r"$s_{" + r"{}".format(int(name[2:])) + r"}$"
         elif name[:5] == 'dpsi_':  
             latex = r"$\delta\psi_{" + r"{}".format(int(name[5:])) + r"}$"
-        # other parametric models
+        elif name == 'pixels':
+            latex = r"{\rm pixels}"
+
+        # analytical models
         elif name == 'theta_E':
             latex = r"$\theta_{\rm E}$"
         elif name == 'gamma':
@@ -475,11 +505,15 @@ class Parameters(object):
         elif name == 'center_y':
             latex = r"$y_0$"
         elif name == 'ra_0':
-            latex = r"$x_0$"
+            latex = r"${\rm RA}_0$"
         elif name == 'dec_0':
-            latex = r"$y_0$"
-        elif name == 'pixels':
-            latex = r"{\rm pixels}"
+            latex = r"${\rm Dec}_0$"
+        elif name == 'm':
+            latex = r"$m$"
+        elif name == 'a_m':
+            latex = r"$a_m$"
+        elif name == 'phi_m':
+            latex = r"$\phi_m$"
         elif name == 'psi':
             latex = r"\psi"
         else:

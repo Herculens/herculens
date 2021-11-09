@@ -58,3 +58,37 @@ def shear_cartesian2polar(gamma1, gamma2):
     gamma = jnp.sqrt(gamma1 ** 2 + gamma2 ** 2)
     return phi, gamma
     
+def cart2polar(x, y, center_x=0, center_y=0):
+    """
+    transforms cartesian coords [x,y] into polar coords [r,phi] in the frame of the lens center
+
+    :param x: set of x-coordinates
+    :type x: array of size (n)
+    :param y: set of x-coordinates
+    :type y: array of size (n)
+    :param center_x: rotation point
+    :type center_x: float
+    :param center_y: rotation point
+    :type center_y: float
+    :returns:  array of same size with coords [r,phi]
+    """
+    coord_shift_x = x - center_x
+    coord_shift_y = y - center_y
+    r = jnp.sqrt(coord_shift_x**2+coord_shift_y**2)
+    phi = jnp.arctan2(coord_shift_y, coord_shift_x)
+    return r, phi
+
+def polar2cart(r, phi, center):
+    """
+    transforms polar coords [r,phi] into cartesian coords [x,y] in the frame of the lense center
+
+    :param coord: set of coordinates
+    :type coord: array of size (n,2)
+    :param center: rotation point
+    :type center: array of size (2)
+    :returns:  array of same size with coords [x,y]
+    :raises: AttributeError, KeyError
+    """
+    x = r*jnp.cos(phi)
+    y = r*jnp.sin(phi)
+    return x - center[0], y - center[1]
