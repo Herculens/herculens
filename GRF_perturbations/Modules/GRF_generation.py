@@ -151,12 +151,12 @@ def get_jaxified_GRF(params,seed,npix,pix_scl):
   GRF_field=jnp.real(Config_image)
 
   #According to Parseval's theorem Total spectral energy should be equal to variance
-  Total_energy=jnp.power(sqrt_power_array,2).sum()
+  #Total_energy=jnp.power(sqrt_power_array,2).sum()
 
   #Random generation of phase introduces deviation from this relation, but we can fix it using rescaling
-  Rescaling_factor=jnp.sqrt(Total_energy/jnp.var(GRF_field))
+  #Rescaling_factor=jnp.sqrt(Total_energy/jnp.var(GRF_field))
 
   #Rescaling the field to match variance to total spectral energy
-  GRF_field=Rescaling_factor*GRF_field
+  #GRF_field=Rescaling_factor*GRF_field
 
   return GRF_field
