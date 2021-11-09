@@ -78,7 +78,7 @@ class Plotter(object):
                       reproject_pixelated_models=False, shift_potential_model='min',
                       likelihood_mask=None, potential_mask=None,
                       vmin_pot=None, vmax_pot=None,  # TEMP
-                      ):
+                      show_plot=True):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_light, show_lens_mass, show_lens_mass])
         
@@ -181,6 +181,9 @@ class Plotter(object):
             else:
                 potential_model = kwargs_lens[pot_idx]['pixels']
             
+            if potential_mask is None:
+                potential_mask = np.ones_like(potential_model)
+
             # here we know that there are no perturbations in the true potential
             if hasattr(self, '_true_pot_perturb'):
                 true_potential = self._true_pot_perturb
@@ -348,4 +351,6 @@ class Plotter(object):
             ax.set_title(r"$\delta\kappa_{\rm model}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+        if show_plot:
+            plt.show()
         return fig
