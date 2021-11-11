@@ -41,7 +41,7 @@ class Optimizer(InferenceBase):
         runtime = time.time() - start
         if self._metrics.loss_history == []:
             raise ValueError("The loss history does not contain any value")
-        logL_best_fit = float(self._metrics.loss_history[-1])
+        logL_best_fit = - float(self._metrics.loss_history[-1])
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 
@@ -104,6 +104,7 @@ class Optimizer(InferenceBase):
         # Initialise optimizer state
         params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         opt_state = optim.init(params)
+        loss_history = []
 
         # Gradient descent loop
         start_time = time.time()
@@ -111,14 +112,16 @@ class Optimizer(InferenceBase):
             for _ in tqdm(range(max_iterations), total=max_iterations, desc=f"optax.{algorithm}"):
                 updates, opt_state = optim.update(self.gradient(params), opt_state, params)
                 params = optax.apply_updates(params, updates)
+                loss_history.append(self.loss(params))  # TODO: use jax.value_and_grad instead? but does it jit the gradient??
         else:
             for _ in range(max_iterations):
                 updates, opt_state = optim.update(self.gradient(params), opt_state, params)
                 params = optax.apply_updates(params, updates)
+                loss_history.append(self.loss(params))
         runtime = time.time() - start_time
         best_fit = params
-        logL_best_fit = self.loss(best_fit)
-        extra_fields = {}  # TODO: use optax.second_order module to compute diagonal of Hessian?
+        logL_best_fit = self.log_probability(best_fit)
+        extra_fields = {'loss_history': np.array(loss_history)}  # TODO: use optax.second_order module to compute diagonal of Hessian?
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 
@@ -133,7 +136,7 @@ class Optimizer(InferenceBase):
             params -= step_size * self.gradient(params)
         runtime = time.time() - start_time
         best_fit = params
-        logL_best_fit = self.loss(best_fit)
+        logL_best_fit = self.log_probability(best_fit)
         extra_fields = {}  # TODO: use optax.second_order module to compute diagonal of Hessian?
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
