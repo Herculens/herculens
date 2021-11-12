@@ -56,14 +56,14 @@ class Plotter(object):
     def set_data(self, data):
         self._data = data
 
-    def set_true_source(self, true_source):
-        self._true_source = true_source
+    def set_ref_source(self, ref_source):
+        self._ref_source = ref_source
 
-    def set_true_lens_light(self, true_lens_light):
-        self._true_lens_light = true_lens_light
+    def set_ref_lens_light(self, ref_lens_light):
+        self._ref_lens_light = ref_lens_light
 
-    def set_true_potential_perturbations(self, true_potential):
-        self._true_pot_perturb = true_potential
+    def set_ref_potential_perturbations(self, ref_potential):
+        self._ref_pot_perturb = ref_potential
 
     def plot_flux(self, image, title=None):
         fig, ax = plt.subplots(1, 1)
@@ -120,26 +120,26 @@ class Plotter(object):
             else:
                 source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
 
-            if hasattr(self, '_true_source'):
-                true_source = self._true_source
-                if source_model.size != true_source.size:
-                    npix_true = len(true_source)
-                    x_coords_true = np.linspace(extent[0], extent[1], npix_true)
-                    y_coords_true = np.linspace(extent[2], extent[3], npix_true)
+            if hasattr(self, '_ref_source'):
+                ref_source = self._ref_source
+                if source_model.size != ref_source.size:
+                    npix_ref = len(ref_source)
+                    x_coords_ref = np.linspace(extent[0], extent[1], npix_ref)
+                    y_coords_ref = np.linspace(extent[2], extent[3], npix_ref)
                     if lens_image.SourceModel.has_pixels:
                         x_coords_src, y_coords_src = lens_image.Grid.model_pixel_axes('source')
                     else:
                         npix_src = len(source_model)
                         x_coords_src = np.linspace(extent[0], extent[1], npix_src)
                         y_coords_src = np.linspace(extent[2], extent[3], npix_src)
-                    true_source = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords_src, y_coords_src)
+                    ref_source = image_util.re_size_array(x_coords_ref, y_coords_ref, ref_source, x_coords_src, y_coords_src)
                     if lens_image.Grid.x_is_inverted:
-                        true_source = np.flip(true_source, axis=1)
+                        ref_source = np.flip(ref_source, axis=1)
                     if lens_image.Grid.y_is_inverted:
-                        true_source = np.flip(true_source, axis=0)
-                    warnings.warn("True source array has been interpolated to match model array.")
+                        ref_source = np.flip(ref_source, axis=0)
+                    warnings.warn("Reference source array has been interpolated to match model array.")
             else:
-                true_source = None
+                ref_source = None
 
         if show_lens_light:
             kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
@@ -152,22 +152,22 @@ class Plotter(object):
             else:
                 lens_light_model = lens_image.lens_surface_brightness(kwargs_lens_light, unconvolved=True)
             
-            if hasattr(self, '_true_lens_light'):
-                true_lens_light = self._true_lens_light
-                if lens_light_model.size != true_lens_light.size:
-                    npix_true = len(true_lens_light)
-                    x_coords_true = np.linspace(extent[0], extent[1], npix_true)
-                    y_coords_true = np.linspace(extent[2], extent[3], npix_true)
+            if hasattr(self, '_ref_lens_light'):
+                ref_lens_light = self._ref_lens_light
+                if lens_light_model.size != ref_lens_light.size:
+                    npix_ref = len(ref_lens_light)
+                    x_coords_ref = np.linspace(extent[0], extent[1], npix_ref)
+                    y_coords_ref = np.linspace(extent[2], extent[3], npix_ref)
                     if lens_image.SourceModel.has_pixels:
                         x_coords, y_coords = lens_image.Grid.model_pixel_axes('lens_light')
                     else:
                         npix = len(lens_light_model)
                         x_coords = np.linspace(extent[0], extent[1], npix)
                         y_coords = np.linspace(extent[2], extent[3], npix)
-                    true_lens_light = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords, y_coords)
-                    warnings.warn("True lens light array has been interpolated to match model array.")
+                    ref_lens_light = image_util.re_size_array(x_coords_ref, y_coords_ref, ref_source, x_coords, y_coords)
+                    warnings.warn("Reference lens light array has been interpolated to match model array.")
             else:
-                true_lens_light = None
+                ref_lens_light = None
 
         if show_lens_potential:
             kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
@@ -187,9 +187,9 @@ class Plotter(object):
             if potential_mask is None:
                 potential_mask = np.ones_like(potential_model)
 
-            # here we know that there are no perturbations in the true potential
-            if hasattr(self, '_true_pot_perturb'):
-                true_potential = self._true_pot_perturb
+            # here we know that there are no perturbations in the reference potential
+            if hasattr(self, '_ref_pot_perturb'):
+                ref_potential = self._ref_pot_perturb
             
                 if shift_potential_model == 'min':
                     min_in_mask = (potential_model * potential_mask).min()
@@ -197,11 +197,11 @@ class Plotter(object):
                     print("delta_psi shift by min:", min_in_mask)
                 elif shift_potential_model == 'mean':
                     mean_in_mask = (potential_model * potential_mask).mean()
-                    true_mean_in_mask = (true_potential * potential_mask).mean()
-                    potential_model = potential_model - mean_in_mask + true_mean_in_mask
-                    print("delta_psi shift by mean values:", mean_in_mask, true_mean_in_mask)
+                    ref_mean_in_mask = (ref_potential * potential_mask).mean()
+                    potential_model = potential_model - mean_in_mask + ref_mean_in_mask
+                    print("delta_psi shift by mean values:", mean_in_mask, ref_mean_in_mask)
             else:
-                true_potential = None
+                ref_potential = None
 
             if potential_mask is None:
                 # TODO: compute potential mask based on undersampled likelihood_mask
@@ -250,10 +250,10 @@ class Plotter(object):
 
             ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
             ax = axes[i_row, 0]
-            if true_source is not None:
-                im = ax.imshow(true_source, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+            if ref_source is not None:
+                im = ax.imshow(ref_source, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
                 im.set_rasterized(True)
-                ax.set_title("true source", fontsize=self.base_fontsize)
+                ax.set_title("ref. source", fontsize=self.base_fontsize)
                 nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                               colorbar_kwargs={'orientation': 'horizontal'})
             else:
@@ -266,13 +266,13 @@ class Plotter(object):
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            if true_source is not None:
-                diff = source_model - true_source
-                vmax_diff = true_source.max() / 10.
+            if ref_source is not None:
+                diff = source_model - ref_source
+                vmax_diff = ref_source.max() / 10.
                 im = ax.imshow(diff, extent=src_extent, 
                                cmap=self.cmap_res, norm=Normalize(-vmax_diff, vmax_diff))
                 im.set_rasterized(True)
-                ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm truth}$", fontsize=self.base_fontsize)
+                ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm ref}$", fontsize=self.base_fontsize)
                 nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
                                         vmin=-vmax_diff, vmax=vmax_diff,
                                         colorbar_kwargs={'orientation': 'horizontal'})
@@ -284,10 +284,10 @@ class Plotter(object):
 
             ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
             ax = axes[i_row, 0]
-            if true_lens_light is not None:
-                im = ax.imshow(true_lens_light, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+            if ref_lens_light is not None:
+                im = ax.imshow(ref_lens_light, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
                 im.set_rasterized(True)
-                ax.set_title("true lens light", fontsize=self.base_fontsize)
+                ax.set_title("ref. lens light", fontsize=self.base_fontsize)
                 nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                               colorbar_kwargs={'orientation': 'horizontal'})
             else:
@@ -300,13 +300,13 @@ class Plotter(object):
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            if true_lens_light is not None:
-                diff = lens_light_model - true_lens_light
-                vmax_diff = true_lens_light.max() / 10.
+            if ref_lens_light is not None:
+                diff = lens_light_model - ref_lens_light
+                vmax_diff = ref_lens_light.max() / 10.
                 im = ax.imshow(diff, extent=extent, 
                                cmap=self.cmap_res, norm=Normalize(-vmax_diff, vmax_diff))
                 im.set_rasterized(True)
-                ax.set_title(r"l${}_{\rm model}$ - l${}_{\rm truth}$", fontsize=self.base_fontsize)
+                ax.set_title(r"l${}_{\rm model}$ - l${}_{\rm ref}$", fontsize=self.base_fontsize)
                 nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
                                         vmin=-vmax_diff, vmax=vmax_diff,
                                         colorbar_kwargs={'orientation': 'horizontal'})
@@ -318,12 +318,12 @@ class Plotter(object):
 
             ##### PIXELATED POTENTIAL PERTURBATIONS #####
             ax = axes[i_row, 0]
-            if true_potential is not None:
-                im = ax.imshow(true_potential * potential_mask, extent=extent,
+            if ref_potential is not None:
+                im = ax.imshow(ref_potential * potential_mask, extent=extent,
                                vmin=vmin_pot, vmax=vmax_pot,
                                cmap=self.cmap_default)
                 im.set_rasterized(True)
-                ax.set_title(r"$\delta\psi_{\rm truth}$", fontsize=self.base_fontsize)
+                ax.set_title(r"$\delta\psi_{\rm ref}$", fontsize=self.base_fontsize)
                 nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                               colorbar_kwargs={'orientation': 'horizontal'})
             else:
@@ -337,13 +337,13 @@ class Plotter(object):
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            if true_potential is not None:
-                pot_abs_res = (true_potential - potential_model) * potential_mask
-                vmax = np.max(np.abs(true_potential)) / 2.
+            if ref_potential is not None:
+                pot_abs_res = (ref_potential - potential_model) * potential_mask
+                vmax = np.max(np.abs(ref_potential)) / 2.
                 im = ax.imshow(pot_abs_res, extent=extent,
                                vmin=-vmax, vmax=vmax,
                                cmap=self.cmap_res)
-                ax.set_title(r"$\delta\psi_{\rm model}$ - $\delta\psi_{\rm truth}$", fontsize=self.base_fontsize)
+                ax.set_title(r"$\delta\psi_{\rm model}$ - $\delta\psi_{\rm ref}$", fontsize=self.base_fontsize)
                 nice_colorbar_residuals(im, pot_abs_res, position='top', pad=0.4, size=0.2, 
                                         vmin=-vmax, vmax=vmax,
                                         colorbar_kwargs={'orientation': 'horizontal'})
