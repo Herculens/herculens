@@ -1,3 +1,5 @@
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
 import numpy as np
 from herculens.LensImage.Numerics.grid import RegularGrid #, AdaptiveGrid
 from herculens.LensImage.Numerics.convolution import PixelKernelConvolution, SubgridKernelConvolution, MultiGaussianConvolution #AdaptiveConvolution

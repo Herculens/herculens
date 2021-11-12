@@ -197,7 +197,7 @@ def build_bilinear_interpol_matrix(x_grid_1d_in, y_grid_1d_in, x_grid_1d_out,
     # unique, counts = np.unique(zero_dx + zero_dy, return_counts=True)
     # repeat_row = [ii + 1 for c in counts for ii in range(0, 3, 3 - c)]
     # repeat_col = [u for (u, c) in zip(unique, counts) for _ in range(c + 1)]
-    #mask[(repeat_row, repeat_col)] = False  # TODO: this leads to strange lines
+    # mask[(repeat_row, repeat_col)] = False  # TODO: this leads to strange lines
 
     # Generate 2D indices of non-zero elements for the sparse matrix
     row = np.tile(np.nonzero(selection)[0], (4, 1))
