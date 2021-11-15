@@ -3,28 +3,158 @@ import numpy as np
 import jax.numpy as jnp
 import time
 
-from GRF_perturbations.Modules.Jax_Utils import jax_map
+from GRF_perturbations.Modules.Jax_Utils import jax_map,gradient_descent
+from GRF_perturbations.Modules.GRF_generation import get_k_grid,get_Fourier_phase,get_jaxified_GRF
+from GRF_perturbations.Modules.Image_processing import model_loss_function,Radial_profile,compute_radial_spectrum
+from GRF_perturbations.Modules.Data_generation import Observation_conditions_class
 
 from skimage import measure
 import scipy.ndimage as ndimage
+from scipy.optimize import minimize as scipy_minimize
 
 import matplotlib.pyplot as plt
 
-def compute_spectrum(logA,Beta,GRF_seed,get_GRF,simulate_perturbed_image_pure,differentiable_fit_image_pure,compute_radial_spectrum_pure):
+class Inference_class:
 
-    GRF_potential=get_GRF([logA,Beta],GRF_seed)
+    def __init__(self,Observation_conditions: Observation_conditions_class,\
+                 model_kwargs=None,GRF_seeds_number=None,
+                 SL_fitting_max_iter=None,SL_fitting_learning_rate=None):
 
-    #We want noise to be random or at least different for every generated GRF
-    #It should complicate computation of gradients, but we want to keep the function pure
-    #+1 are needed cause those parameters are great or equal to zero
-    noise_seed=jnp.round(jnp.abs(logA*(Beta+1)*(GRF_seed+1)*1e+5)).astype(int)
+        self.model_kwargs=model_kwargs
+        self.GRF_seeds_number=GRF_seeds_number
+        self.SL_max_iter=SL_fitting_max_iter
+        self.SL_learning_rate=SL_fitting_learning_rate
+        self.Observation_conditions=Observation_conditions
 
-    simulated_image=simulate_perturbed_image_pure(GRF_potential,noise_seed)
-    fit_image=differentiable_fit_image_pure(simulated_image)
+        if self.model_kwargs is None:
+            self.model_kwargs=self.Observation_conditions.kwargs_data
 
-    residuals=simulated_image-fit_image
-    spectrum=compute_radial_spectrum_pure(residuals)
-    return spectrum
+        if self.GRF_seeds_number is None:
+            self.GRF_seeds_number=100
+
+        if self.SL_max_iter is None:
+            self.SL_max_iter=400
+
+        if self.SL_learning_rate is None:
+            self.SL_learning_rate=1e-4
+
+        print('Precomputing Fourier phases')
+        #Precompute Fourier phases, because jax doesn't tolerate random inside pure functions
+        self.Fourier_phase_tensor=np.zeros((self.GRF_seeds_number,self.Observation_conditions.pixel_number,self.Observation_conditions.pixel_number),dtype=complex)
+        for i in range(self.GRF_seeds_number):
+            self.Fourier_phase_tensor[i]=get_Fourier_phase(self.Observation_conditions.pixel_number,seed=i)
+
+        #Return seed to the fixed one
+        np.random.seed(42)
+
+        print('Precompiling source-lens loss,gradient,hessian')
+        simulate_unperturbed_image=self.Observation_conditions.unperturbed_image_getter
+        simulate_unperturbed_image_pure= lambda model_kwargs: simulate_unperturbed_image(model_kwargs,Noise_flag=False)
+
+        self.image_loss= jax.jit(lambda args,image: model_loss_function(args,image,simulate_unperturbed_image_pure,\
+                                                                        self.Observation_conditions.noise_var,self.Observation_conditions.parameters))
+        self.image_loss_gradient=jax.grad(self.image_loss)
+        self.image_loss_hessian=jax.jacfwd(jax.jit(jax.jacrev(self.image_loss)))
+
+        #During the first use jax does XLA compilation and builds the graph. It takes a lot of time, but should be doe once
+        #Given the graph it computes everything in milliseconds
+        args=self.Observation_conditions.parameters.kwargs2args(self.Observation_conditions.kwargs_data)
+        image=jnp.zeros((self.Observation_conditions.pixel_number,self.Observation_conditions.pixel_number))
+        print('Precomputing loss')
+        _=self.image_loss(args,image)
+        print('Precomputing loss gradient')
+        _=self.image_loss_gradient(args,image)
+        print('Precomputing loss hessian')
+        _=self.image_loss_hessian(args,image)
+        print('Inference class is ready')
+
+    @property
+    def frequency_grids(self):
+        #Grid of Fourier frequencies. nonsingular_grid doesn't have zero for Power_spectrum to not diverge
+        k_grid,nonsingular_k_grid=get_k_grid(self.Observation_conditions.pixel_number, self.Observation_conditions.pixel_scale)
+        return k_grid,nonsingular_k_grid
+
+    @property
+    def GRF_getters(self):
+
+        k_grid,nonsingular_k_grid=self.frequency_grids
+
+        def get_GRF(GRF_params,GRF_seed_index):
+
+            #Check that it can be used as array index -size<=index<size
+            #assert isinstance(GRF_seed_index,int)
+            #assert ((GRF_seed_index>=-self.GRF_seeds_number)) and (GRF_seed_index<self.GRF_seeds_number)
+
+            return get_jaxified_GRF(GRF_params,nonsingular_k_grid,self.Fourier_phase_tensor[GRF_seed_index])
+
+        return get_GRF
+
+    def scipy_fit_image(self,image,method='trust-krylov',initial_values=None):
+
+
+        if initial_values is None:
+            initial_values=self.Observation_conditions.parameters.initial_values()
+
+        image_loss=lambda args: self.image_loss(args,image)
+        image_loss_grad= lambda args: self.image_loss_gradient(args,image)
+        image_loss_hess= lambda args: self.image_loss_hessian(args,image)
+
+        res = scipy_minimize(image_loss, initial_values,jac=image_loss_grad,hess=image_loss_hess, method=method)
+
+        return res.x
+
+    def differentiable_fit_image(self,image,args_guess=None):
+
+        model_loss_grad= lambda args: self.image_loss_gradient(args,image)
+
+        if args_guess is None:
+            args_guess=self.Observation_conditions.parameters.kwargs2args(self.model_kwargs)
+
+        #Gradiend descent is but a recursion. Here its depth-limited and differentiable version
+        args_fit=gradient_descent(model_loss_grad,args_guess,self.SL_max_iter,self.SL_learning_rate)
+
+        return args_fit
+
+    def Radial_profile(self,image):
+        return Radial_profile(image,(self.Observation_conditions.pixel_number,self.Observation_conditions.pixel_number))
+
+    def compute_radial_spectrum(self,image):
+        return compute_radial_spectrum(image,self.Observation_conditions.annulus_mask,self.Observation_conditions.init_freq_index)
+
+    def Residual_spectrum_for_GRF(self,GRF_params,GRF_seed_index,Noise=True):
+        get_GRF=self.GRF_getters
+
+        GRF_potential=get_GRF(GRF_params,GRF_seed_index)
+
+        #We want noise to be random or at least different for every generated GRF
+        #It should complicate computation of gradients, but we want to keep the function pure
+        #+1 are needed cause those parameters are great or equal to zero
+        noise_seed=jnp.round(jnp.abs(GRF_params[0]*(GRF_params[1]+1)*(GRF_seed_index+1)*1e+5)).astype(int)
+
+        simulate_perturbed_image=self.Observation_conditions.perturbed_image_getter
+        simulated_image=simulate_perturbed_image(GRF_potential,self.Observation_conditions.kwargs_data,Noise,noise_seed)
+
+        initial_values=self.Observation_conditions.parameters.kwargs2args(self.Observation_conditions.kwargs_data)
+        args_fit=self.scipy_fit_image(simulated_image,method='trust-krylov',initial_values=initial_values)
+
+        simulate_unperturbed_image=self.Observation_conditions.unperturbed_image_getter
+        fit_image=simulate_unperturbed_image(self.Observation_conditions.parameters.args2kwargs(args_fit),Noise_flag=False)
+
+        residuals=simulated_image-fit_image
+        spectrum=self.compute_radial_spectrum(residuals)
+        return spectrum
+
+    def GRF_Loss(self,GRF_params,GRF_seeds_number,Spectra_Loss_pure,Noise_flag):
+
+        GRF_seed_indices=np.arange(GRF_seeds_number)
+        get_model_spectra=jax.jit(lambda GRF_seed_index: self.Residual_spectrum_for_GRF(GRF_params,GRF_seed_index,Noise_flag))
+        model_spectra=jax_map(get_model_spectra,GRF_seed_indices)
+
+        Loss=Spectra_Loss_pure(model_spectra)
+        return Loss
+
+
+
 
 #Infer parameters of the distribution assuming the data is distributed LogNormally
 def infer_LogNorm_params(Power_spectrum_maxtrix):
@@ -60,13 +190,7 @@ def distribution_Noise_LogSpectrum(noise_var,compute_radial_spectrum_pure):
     return mu,sigma
 
 
-def GRF_Loss(GRF_params,GRF_seeds,compute_spectrum_pure,Spectra_Loss_pure):
 
-    get_model_spectra=jax.jit(lambda GRF_seed: compute_spectrum_pure(GRF_params[0],GRF_params[1],GRF_seed))
-    model_spectra=jax_map(get_model_spectra,GRF_seeds)
-
-    Loss=Spectra_Loss_pure(model_spectra)
-    return Loss
 
 def compute_SNR_grid(Spectra_grid,Noise_spectral_density):
     SNR=10*np.log10(np.mean(Spectra_grid-Noise_spectral_density,axis=-1)/Noise_spectral_density)

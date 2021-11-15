@@ -177,13 +177,16 @@ def scipy_fit_image(data,simulate_unperturbed_image_pure,noise_var,parameters,me
         lens-source kwargs that are the results of the fit
     '''
 
+    model_loss_function_pure=jax.jit(lambda args: model_loss_function(args,data,simulate_unperturbed_image_pure,\
+                                                                  noise_var,parameters))
+    '''
     def loss(args):
         kwargs=parameters.args2kwargs(args)
         model=simulate_unperturbed_image_pure(kwargs)
 
         return jnp.mean((data-model)**2/noise_var)
-
-    loss=jax.jit(loss)
+    '''
+    loss=jax.jit(model_loss_function_pure)
     grad_loss=jax.jit(jax.grad(loss))
     hess_loss=jax.jit(jax.jacfwd(jax.jit(jax.jacrev(loss))))
 
@@ -193,39 +196,3 @@ def scipy_fit_image(data,simulate_unperturbed_image_pure,noise_var,parameters,me
     res = scipy_minimize(loss, initial_values,jac=grad_loss,hess=hess_loss, method=method)
 
     return parameters.args2kwargs(res.x)
-
-def differentiable_fit_image(simulated_image,simulate_smooth_image_pure,args_guess,noise_var,parameters,max_iter,learning_rate):
-    '''
-    Differentiable gradient descent-based function
-    Parameters
-    ----------
-    simulated_image: jnp.ndarray
-            array of shape (size,size) to be fitted with unperturbed source and lens embedded into simulate_smooth_image_pure
-    parameters: Parameters object
-            object needed to transform args<->kwargs
-    simulate_smooth_image_pure: function(smooth_kwargs)
-            Pure version of simulate_smooth_image function
-
-    Explanation
-    -------
-    The GRF fitting pipeline requires to differentiate the fitting. It means given the function args=fit_func(image)
-    we eventually want to know grad(args)=grad(fit_func)(image), i.e. how would our fit change if we give change the image.
-    This is a fully differentible function that carries out the fit of lens image. So we can get grad(fit_func) using jax
-
-    Returns
-    -------
-    image: jnp.ndarray
-        array of shape (size,size) which represents the fit of a given simulated_image
-    '''
-
-    #Purify the model_loss_function for a given fitting setup
-    model_loss_function_pure=purify_function(model_loss_function,simulated_image,simulate_smooth_image_pure,noise_var,parameters)
-    model_loss_grad=jax.grad(model_loss_function_pure)
-
-    #Gradiend descent is but a recursion. Here its depth-limited and differentiable version
-    args_fit=gradient_descent(model_loss_grad,args_guess,max_iter,learning_rate)
-    kwargs_fit=parameters.args2kwargs(args_fit)
-
-    #Model the fit back
-    fit_image=simulate_smooth_image_pure(kwargs_fit)
-    return fit_image

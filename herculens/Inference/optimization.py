@@ -2,7 +2,7 @@ import time
 from scipy import optimize
 import numpy as np
 from scipy.optimize import Bounds
-import optax
+#import optax
 
 from herculens.Inference.inference_base import InferenceBase
 
@@ -68,7 +68,7 @@ class Optimizer(InferenceBase):
             if hasattr(res, key):
                 extra_fields[key] = getattr(res, key)
         return res.x, extra_fields
-
+    '''
     def optax(self, algorithm='adabelief', max_iterations=100, init_learning_rate=1e-2, 
               restart_from_init=False, schedule_learning_rate=True):
         if schedule_learning_rate is True:
@@ -115,6 +115,7 @@ class Optimizer(InferenceBase):
         extra_fields = {}  # TODO: use optax.second_order module to compute diagonal of Hessian?
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
+    '''
 
     def gradient_descent(self, num_iterations=100, step_size=1e-2, restart_from_init=False):
         import jax.numpy as jnp
@@ -132,6 +133,7 @@ class Optimizer(InferenceBase):
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 
+    '''
     def pso(self, n_particles=100, n_iterations=100, restart_from_init=False, n_threads=1):
         """legacy optimization method from lenstronomy, mainly for comparison"""
         from lenstronomy.Sampling.Samplers.pso import ParticleSwarmOptimizer
@@ -151,7 +153,7 @@ class Optimizer(InferenceBase):
         extra_fields = {'chi2_list': chi2_list, 'pos_list': pos_list, 'vel_list': vel_list}
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
-
+    '''
 
 class MinimizeMetrics(object):
     """simple callable class used as callback in scipy.optimize.minimize method"""

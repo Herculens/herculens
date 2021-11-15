@@ -1,22 +1,20 @@
-# This is implementation of function generating Gaussian Random Field
-#In a jaxified way (with tracing amplitude and power slope of GRF)
-#The base of the code was taken from the package https://github.com/steven-murray/powerbox
+#Code by github/egorssed
+# get_Fourier_phase partially done by Giorgos Vernardos
 
 #Basic imports
 import numpy as np
+from copy import deepcopy
 
 #JAX
-import jax
 import jax.numpy as jnp
 from jax.config import config
 config.update("jax_enable_x64", True)
 config.update("jax_debug_nans", True)
 
-#Given length of image size and pixel_scale
-#Returns grid of wavenumbers and configuration space grid step
-def get_k_grid_dx(npix, pix_scl):
+#Given length of image size and pixel_scale (arcsec/pixel)
+#Returns grid of radial frequencies
+def get_k_grid(npix, pix_scl):
   """
-
   Parameters
   ----------
   npix: int
@@ -27,136 +25,92 @@ def get_k_grid_dx(npix, pix_scl):
   Returns
   -------
   k_grid: (ndarray)
-        array (npix,npix) of wavenumbers realisations
-  dx: float
-        step of grid in configuration space
-
+        grid (npix,npix) of radial wavenumbers
   """
-  #THIS IS WRONG BOXLENGTH
-  #DON'T FORGET TO CHANGE IT AND RECOMPUTE ALL THE GRIDS
-  boxlength=2 * np.pi * npix * pix_scl
-  #probably the correct one
-  #boxlength=npix * pix_scl
 
-  #Grid step for real-space
-  dx = float(boxlength) / npix
-  #wavenumbers along side
-  k_vector=np.fft.fftshift(np.fft.fftfreq(npix, d=dx)) * 2 * np.pi
-  #wavenumbers 2d grid
-  k_grid=np.sqrt(np.sum(np.meshgrid(*([k_vector ** 2] * 2)), axis=0))
-  return k_grid,dx
+  k_vector=np.fft.fftfreq(npix,pix_scl)
+  kx,ky=np.meshgrid(k_vector,k_vector)
+  k_grid=np.sqrt(kx**2+ky**2)
+  nonsingular_k_grid=deepcopy(k_grid)
+  nonsingular_k_grid[0,0]=1
 
+  return k_grid,nonsingular_k_grid
 
-def get_phase_realisation(npix,seed=None):
-  "A random array which has Gaussian magnitudes and Hermitian symmetry"
-  key=jax.random.PRNGKey(seed)
-  #uneven number
-  n=npix + 1 if (npix%2==0) else npix
-  #2d grid
-  size=[n]*2
-
-  magnitude=jax.random.normal(key, shape=size)
-  phase=2 * jnp.pi * jax.random.uniform(key,shape=size)
-
-  #Make hermitian (why?)
-  magnitude=(magnitude+magnitude[::-1,::-1])/jnp.sqrt(2)
-  phase=(phase-phase[::-1,::-1])/2 + jnp.pi
-
-  phase_realisation=magnitude * (jnp.cos(phase) + 1j * jnp.sin(phase))
-
-  if (npix%2==0):
-    #why?
-    phase_realisation=phase_realisation[:-1,:-1]
-
-  return phase_realisation
-
-
-def _adjust_phase(ft, npix, pix_scl):
-    '''IDK what is that, some border conditions I guess,
-        But it is needed to correct Configuration space image
-        Otherwise, its just a lattice structure instead of continuous GRF'''
-    #Fourier parameters
-    dx = 2 * np.pi * pix_scl
-    k_vector=np.fft.fftshift(np.fft.fftfreq(npix, d=dx)) * 2 * np.pi
-
-
-    left_edge=k_vector[0]
-    freq=np.fft.fftshift(np.fft.fftfreq(npix,d=2*np.pi/dx/npix))*2*np.pi
-    #for scalar left-edge and 1row freq
-    xp = np.array([np.exp( 1j * freq * left_edge)])
-    #phase correction
-    ft = ft * xp.T
-    ft = ft * xp
-    return ft
-
-
-def get_jaxified_GRF(params,seed,npix,pix_scl):
-  """
-  The very jaxified GRF.
-  Parameters
-  ----------
-  params: (float,float)
-        These are [log(Amp),Power_slope] of desired GRF's spectrum Amp*k^(-Power_slope)
-  seed: int (same as in numpy)
-        The seed is used to generate GRF's phase realisation in Fourier space
-  npix: int
+#Uniformly sampled complex phases
+def get_Fourier_phase(npix,seed):
+    """
+    Parameters
+    ----------
+    npix: int
         Number of pixels along side of the image
-  pix_scl: float
-        arcsec/pixel or any 'physical_unit/pixel'
+    seed: int
+        seed for random cos,sin generation
 
-  Returns
-  -------
-  GRF: DeviceArray with shape (npix,npix)
+    Returns
+    -------
+    Fourier phase grid: (npix,npix) complex
+        grid of Fourier phases obtained using Box-Muller transform Polar form (lookup wiki)
+    """
+    np.random.seed(seed)
+    #rng=np.random.default_rng(seed)
 
-  Examples
-  -------
-  >>> GRF=get_jaxified_GRF([0.,5.],1,100,0.08)
-  >>> GRF.shape
-  (100,100)
-  >>> GRF_std=(lambda parameters: jnp.std(get_jaxified_GRF(parameters,1,100,0.08)))
-  >>> jax.grad(GRF_std)([1.,5.])
-  [DeviceArray(220.31397733, dtype=float64),DeviceArray(183.54880537, dtype=float64)]
-  """
+    Fourier_phases = np.zeros ([npix, npix], dtype='cfloat') # Empty matrix to be filled in for the Fourier plane
+    j= 0 + 1j # Defining the complex number
 
-  logA,beta=params
-  A=jnp.power(10.,logA)
+    for y in range(npix):
+        for x in range(npix):
 
-  k_grid,dx=get_k_grid_dx(npix,pix_scl)
-  #we will do ps=k^(-beta) with gradient ps_grad=-ln(k)*k^(-beta),
-  #we want both to be 0 in center where k=0
-  #So we set k=1 to avoid divergence with setting k=0 or k=inf
-  k_grid[npix//2,npix//2]=1
-  #In the same time we mask out the place where k=0, to exclude it from equation
-  mask_center=np.ones_like(k_grid)
-  mask_center[npix//2,npix//2]=0
+            # Filling in the grid
+            if x==0 and y==0: # Subtract mean instead of modyfing Fourier image
+                Fourier_phases[y,x] = 1.0
+                continue
+
+            phi=np.random.uniform(0,2*np.pi)
+            z1=np.cos(phi)
+            z2=np.sin(phi)
 
 
-  #workaround: sqrt(Power spectrum) in one operation
-  #Jax gets nans when we do operations separately like sqrt(power*mask)
-  sqrt_power_array=jnp.sqrt(A)*jnp.power(k_grid,-beta/2.)*mask_center
-  #Random phase realisation in Fourier space
-  phase_realisation=get_phase_realisation(npix,seed)
+            # three points that need to be real valued to get a real image after FFT:
+            if x== 0 and y==npix/2:
+                Fourier_phases[y,x] = z1
+            elif x==npix/2 and y==0:
+                Fourier_phases[y,x] = z1
+            elif x==npix/2 and y==npix/2:
+                Fourier_phases[y,x] = z1
+            else :
+                Fourier_phases[y,x] = z1+j*z2
 
-  #Create fourier image with random phases
-  Fourier_image=sqrt_power_array*phase_realisation
-  #Fourier_image=power_array*phase_realisation
+            Fourier_phases[-y,-x] = Fourier_phases[y,x].conjugate()
 
-  #Go to configuration space
-  Config_image=(npix**2)*jnp.fft.ifftshift(jnp.fft.ifftn(Fourier_image))
+        if y>npix/2.:
+            break
 
-  #Adjust phases of the image
-  Config_image=_adjust_phase(Config_image,npix, pix_scl)
+    return Fourier_phases
 
-  #Get rid of imaginary part
-  GRF_field=jnp.real(Config_image)
+#Power spectrum that doesn't diverge in k=0.
+#Hence, GRF's mean should be subtracted
+def nonsingular_Power_spectrum(GRF_params,nonsingular_k_grid):
 
-  #According to Parseval's theorem Total spectral energy should be equal to variance
-  #Total_energy=jnp.power(sqrt_power_array,2).sum()
+    Amplitude=jnp.power(10.,GRF_params[0])
+    Power_spectrum=Amplitude*jnp.power(nonsingular_k_grid,-GRF_params[1])
 
-  #Random generation of phase introduces deviation from this relation, but we can fix it using rescaling
-  #Rescaling_factor=jnp.sqrt(Total_energy/jnp.var(GRF_field))
+    return Power_spectrum
 
-  #Rescaling the field to match variance to total spectral energy
-  #GRF_field=Rescaling_factor*GRF_field
+#Get GRF in jax-differentiable manner with respect to GRF_params
+def get_jaxified_GRF(GRF_params,nonsingular_k_grid,Fourier_phase_grid):
 
-  return GRF_field
+  #On zero frequency the power spectrum has nondiverging value
+  #Hence mean of GRF should be subtracted afterwards (it is needed for differentiability)
+  PS=nonsingular_Power_spectrum(GRF_params,nonsingular_k_grid)
+
+  Fourier_image=jnp.sqrt(PS)*Fourier_phase_grid
+  Configuration_image=jnp.fft.ifftshift(jnp.fft.ifftn(Fourier_image))
+
+  #Normalisation for Parseval's theorem
+  Normalisation_factor=nonsingular_k_grid.size
+
+  Normalised_GRF=Normalisation_factor*Configuration_image.real
+
+  Zero_mean_GRF=Normalised_GRF-Normalised_GRF.mean()
+
+  return Zero_mean_GRF

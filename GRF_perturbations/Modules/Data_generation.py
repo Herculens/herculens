@@ -10,9 +10,6 @@ from herculens.LensModel.lens_model import LensModel
 from herculens.LensImage.lens_image import LensImage
 from herculens.Parameters.parameters import Parameters
 
-from GRF_perturbations.Modules.GRF_generation import get_jaxified_GRF
-from GRF_perturbations.Modules.Jax_Utils import purify_function
-from GRF_perturbations.Modules.Image_processing import differentiable_fit_image,compute_radial_spectrum
 
 #Default lensing setup
 default_source_light_model_list = ['SERSIC_ELLIPSE']
@@ -160,33 +157,6 @@ class Observation_conditions_class:
 
         return Parameters(self.LensImage_unperturbed_noiseless, kwargs_init, kwargs_fixed, kwargs_prior=kwargs_prior)
 
-    @property
-    def GRF_getter(self):
-        def get_GRF(GRF_params,GRF_seed):
-            """
-            get GRF potential for given [log(Amp),Power_slope],seed
-            Parameters
-            ----------
-            params: (float,float)
-                These are [log(Amp),Power_slope] of desired GRF's spectrum Amp*k^(-Power_slope)
-            seed: int (same as in numpy)
-                The seed is used to generate GRF's phase realisation in Fourier space
-
-            Returns
-            -------
-            GRF: DeviceArray with shape (npix,npix)
-
-            Examples
-            -------
-            >>> GRF=get_GRF([0.,5.],1)
-            >>> GRF.shape
-            (100,100)
-            >>> GRF_std=(lambda parameters: jnp.std(get_GRF(parameters,1)))
-            >>> jax.grad(GRF_std)([1.,5.])
-            [DeviceArray(220.31397733, dtype=float64),DeviceArray(183.54880537, dtype=float64)]
-            """
-            return get_jaxified_GRF(GRF_params,GRF_seed,self.pixel_number,self.pixel_scale)
-        return get_GRF
 
     @property
     def unperturbed_image_getter(self):
@@ -269,33 +239,3 @@ def get_LensImages(pixel_grid,PSF_FWHM,noise_sigma,exposure_time,lens_mass_model
                                 kwargs_numerics=kwargs_numerics)
 
     return perturbed_lens_image,unperturbed_lens_image
-
-def generate_data(GRF_params,GRF_seed,Observation_conditions,fit=True,Noise_flag=True):
-
-    #Specifics of Observation_conditions
-    get_GRF=Observation_conditions.GRF_getter
-    simulate_perturbed_image=Observation_conditions.perturbed_image_getter
-    parameters=Observation_conditions.parameters
-    simulate_unperturbed_image=Observation_conditions.unperturbed_image_getter
-    simulate_unperturbed_image_pure=lambda kwargs: simulate_unperturbed_image(kwargs,Noise_flag=False)
-    differentiable_fit_image_pure=purify_function(differentiable_fit_image,simulate_unperturbed_image_pure,\
-                                                  parameters.kwargs2args(Observation_conditions.kwargs_data),Observation_conditions.noise_var,parameters,1000,1e-4)
-    compute_radial_spectrum_pure=purify_function(compute_radial_spectrum,Observation_conditions.annulus_mask,Observation_conditions.init_freq_index)
-
-    #this is the true perturbation of the lens potential
-    GRF_potential=get_GRF(GRF_params,GRF_seed)
-
-    #data_image will play the role of the observed lens, that we are going to study
-    data_image=simulate_perturbed_image(GRF_potential,Observation_conditions.kwargs_data,Noise_flag=Noise_flag,noise_seed=42)
-    #Fit the data_image with unperturbed lens-source model to get a guess of kwargs_data, since we don't know them initially
-    #One might use sophisticated trust-krylov optimization but it was found that grad_descent converge to the same values anyway
-
-    if fit:
-        fit_image=differentiable_fit_image_pure(data_image)
-    else:
-        fit_image=simulate_unperturbed_image_pure(Observation_conditions.kwargs_data)
-
-    data_resid_spectrum=compute_radial_spectrum_pure(data_image-fit_image)
-
-
-    return GRF_potential,data_image,fit_image,data_resid_spectrum
