@@ -14,7 +14,7 @@ def powspec(L, variance, Npix, Psum, power):
     if L <= 0:
         P = 0.0 # variance*(Npix**2.)/(2.*Psum)*L**(0.0)
     else:
-        A = variance*(Npix**2.)/(2.*Psum)
+        A = variance*(Npix**2.)/(Psum)
         P = A*L**(power)
     return P
 
@@ -87,14 +87,9 @@ def gauss_rand_2d (par):
 
             # Polar Box-Muller transform
             sigma = math.sqrt(powspec(l, var, nx*ny, Psum, power))
-            s = 1.1
-            while s > 1. :
-                u = np.random.uniform (-1.,1.) 
-                v = np.random.uniform (-1.,1.)
-                s = u**2. + v**2.
-            fac = math.sqrt(-2.*math.log(s)/s)
-            z1 = u*fac*sigma
-            z2 = v*fac*sigma
+            phi=np.random.uniform(0,2*np.pi)
+            z1=np.cos(phi)*sigma
+            z2=np.sin(phi)*sigma
 
             # Filling in the grid
             if x==0 and y==0: # average of the field
