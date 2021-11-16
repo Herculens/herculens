@@ -33,10 +33,10 @@ class Inference_class:
             self.GRF_seeds_number=100
 
         if self.SL_max_iter is None:
-            self.SL_max_iter=400
+            self.SL_max_iter=1000
 
         if self.SL_learning_rate is None:
-            self.SL_learning_rate=1e-4
+            self.SL_learning_rate=5e-4
 
         print('Precomputing Fourier phases')
         #Precompute Fourier phases, because jax doesn't tolerate random inside pure functions
@@ -74,12 +74,11 @@ class Inference_class:
         k_grid,nonsingular_k_grid=get_k_grid(self.Observation_conditions.pixel_number, self.Observation_conditions.pixel_scale)
         return k_grid,nonsingular_k_grid
 
-    @property
-    def GRF_getters(self):
+    def GRF_getters(self,from_index=True):
 
         k_grid,nonsingular_k_grid=self.frequency_grids
 
-        def get_GRF(GRF_params,GRF_seed_index):
+        def get_GRF_from_Phase_index(GRF_params,GRF_seed_index):
 
             #Check that it can be used as array index -size<=index<size
             #assert isinstance(GRF_seed_index,int)
@@ -87,7 +86,18 @@ class Inference_class:
 
             return get_jaxified_GRF(GRF_params,nonsingular_k_grid,self.Fourier_phase_tensor[GRF_seed_index])
 
-        return get_GRF
+        def get_GRF_from_Phase_Matrix(GRF_params,Fourier_phase):
+
+            #Check that it can be used as array index -size<=index<size
+            #assert isinstance(GRF_seed_index,int)
+            #assert ((GRF_seed_index>=-self.GRF_seeds_number)) and (GRF_seed_index<self.GRF_seeds_number)
+
+            return get_jaxified_GRF(GRF_params,nonsingular_k_grid,Fourier_phase)
+
+        if from_index:
+            return get_GRF_from_Phase_index
+        else:
+            return get_GRF_from_Phase_Matrix
 
     def scipy_fit_image(self,image,method='trust-krylov',initial_values=None):
 
@@ -103,12 +113,11 @@ class Inference_class:
 
         return res.x
 
-    def differentiable_fit_image(self,image,args_guess=None):
+    def differentiable_fit_image(self,image):
 
         model_loss_grad= lambda args: self.image_loss_gradient(args,image)
 
-        if args_guess is None:
-            args_guess=self.Observation_conditions.parameters.kwargs2args(self.model_kwargs)
+        args_guess=self.Observation_conditions.parameters.kwargs2args(self.model_kwargs)
 
         #Gradiend descent is but a recursion. Here its depth-limited and differentiable version
         args_fit=gradient_descent(model_loss_grad,args_guess,self.SL_max_iter,self.SL_learning_rate)
@@ -121,21 +130,20 @@ class Inference_class:
     def compute_radial_spectrum(self,image):
         return compute_radial_spectrum(image,self.Observation_conditions.annulus_mask,self.Observation_conditions.init_freq_index)
 
-    def Residual_spectrum_for_GRF(self,GRF_params,GRF_seed_index,Noise=True):
-        get_GRF=self.GRF_getters
+    def Residual_spectrum_for_GRF(self,GRF_params,Fourier_phase,Noise=True):
+        get_GRF=self.GRF_getters(False)
 
-        GRF_potential=get_GRF(GRF_params,GRF_seed_index)
+        GRF_potential=get_GRF(GRF_params,Fourier_phase)
 
         #We want noise to be random or at least different for every generated GRF
         #It should complicate computation of gradients, but we want to keep the function pure
         #+1 are needed cause those parameters are great or equal to zero
-        noise_seed=jnp.round(jnp.abs(GRF_params[0]*(GRF_params[1]+1)*(GRF_seed_index+1)*1e+5)).astype(int)
+        noise_seed=jnp.round(jnp.abs(GRF_params[0]*(GRF_params[1]+1)*(Fourier_phase[0,1].real*(1e+3)+1)*1e+5)).astype(int)
 
         simulate_perturbed_image=self.Observation_conditions.perturbed_image_getter
         simulated_image=simulate_perturbed_image(GRF_potential,self.Observation_conditions.kwargs_data,Noise,noise_seed)
 
-        initial_values=self.Observation_conditions.parameters.kwargs2args(self.Observation_conditions.kwargs_data)
-        args_fit=self.scipy_fit_image(simulated_image,method='trust-krylov',initial_values=initial_values)
+        args_fit=self.differentiable_fit_image(simulated_image)
 
         simulate_unperturbed_image=self.Observation_conditions.unperturbed_image_getter
         fit_image=simulate_unperturbed_image(self.Observation_conditions.parameters.args2kwargs(args_fit),Noise_flag=False)
