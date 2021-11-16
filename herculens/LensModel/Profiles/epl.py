@@ -1,6 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
-from herculens.Util import util, param_util, model_util
+from herculens.Util import util, param_util, func_util
 from herculens.LensModel.Profiles.base_profile import LensProfileBase
 
 __all__ = ['EPL', 'EPLMajorAxis']
@@ -207,7 +207,7 @@ class EPLMajorAxis(LensProfileBase):
         R = jnp.abs(z)
 
         # deflection, eq. (22)
-        alpha = 2. / (1. + q) * (b / R)**t * model_util.R_omega(z, t, q, nmax=20)
+        alpha = 2. / (1. + q) * (b / R)**t * func_util.R_omega(z, t, q, nmax=20)
 
         # return real and imaginary part
         alpha_real = jnp.nan_to_num(alpha.real, posinf=10**10, neginf=-10**10)
