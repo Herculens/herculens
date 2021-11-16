@@ -62,8 +62,8 @@ class Plotter(object):
     def set_ref_lens_light(self, ref_lens_light):
         self._ref_lens_light = ref_lens_light
 
-    def set_ref_potential_perturbations(self, ref_potential):
-        self._ref_pot_perturb = ref_potential
+    def set_ref_pixelated_potential(self, ref_potential):
+        self._ref_pixel_pot = ref_potential
 
     def plot_flux(self, image, title=None):
         fig, ax = plt.subplots(1, 1)
@@ -77,7 +77,7 @@ class Plotter(object):
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, 
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
-                      reproject_pixelated_models=False, shift_potential_model='min',
+                      reproject_pixelated_models=False, shift_pixelated_potential='min',
                       likelihood_mask=None, potential_mask=None,
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       show_plot=True):
@@ -188,17 +188,20 @@ class Plotter(object):
                 potential_mask = np.ones_like(potential_model)
 
             # here we know that there are no perturbations in the reference potential
-            if hasattr(self, '_ref_pot_perturb'):
-                ref_potential = self._ref_pot_perturb
+            if hasattr(self, '_ref_pixel_pot'):
+                ref_potential = self._ref_pixel_pot
             
-                if shift_potential_model == 'min':
+                if shift_pixelated_potential == 'min':
                     min_in_mask = (potential_model * potential_mask).min()
                     potential_model = potential_model - min_in_mask
+                    ref_min_in_mask = (ref_potential * potential_mask).min()
+                    ref_potential = ref_potential - ref_min_in_mask
                     print("delta_psi shift by min:", min_in_mask)
-                elif shift_potential_model == 'mean':
+                elif shift_pixelated_potential == 'mean':
                     mean_in_mask = (potential_model * potential_mask).mean()
+                    potential_model = potential_model - mean_in_mask
                     ref_mean_in_mask = (ref_potential * potential_mask).mean()
-                    potential_model = potential_model - mean_in_mask + ref_mean_in_mask
+                    ref_potential = ref_potential - ref_mean_in_mask
                     print("delta_psi shift by mean values:", mean_in_mask, ref_mean_in_mask)
             else:
                 ref_potential = None
@@ -320,7 +323,7 @@ class Plotter(object):
             ax = axes[i_row, 0]
             if ref_potential is not None:
                 im = ax.imshow(ref_potential * potential_mask, extent=extent,
-                               vmin=vmin_pot, vmax=vmax_pot,
+                               #vmin=vmin_pot, vmax=vmax_pot,
                                cmap=self.cmap_default)
                 im.set_rasterized(True)
                 ax.set_title(r"$\delta\psi_{\rm ref}$", fontsize=self.base_fontsize)
