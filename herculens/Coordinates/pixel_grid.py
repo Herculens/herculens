@@ -138,7 +138,7 @@ class PixelGrid(Coordinates):
         :param grid_center: 2-tuple (center_x, center_y) with grid center in physical units
         If None, defaults to the original grid center. 
         :param grid_shape: 2-tuple (width, height) window size in physical units
-        If None, defaults to the original windo size.
+        If None, defaults to the original window size.
         :param pixel_scale_factor: multiplicative factor to go from original pixel width to new pixel width.
         If None, defaults to the 1.
         :param conserve_extent: if True, make sure the 'extent' of created grid is the same as
@@ -148,7 +148,8 @@ class PixelGrid(Coordinates):
         :param name: unique string for identifying the created grid.
         """
         if not overwrite and name in self._model_grids:
-            raise ValueError(f"Grid name '{name}' is already used for another grid")
+            #raise ValueError(f"Grid name '{name}' is already used for a model grid.")
+            return
         
         unchanged_count = 0
         if grid_center is None or grid_center == self.center:

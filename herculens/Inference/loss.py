@@ -7,6 +7,9 @@ from herculens.Util.jax_util import WaveletTransform
 from herculens.Util import model_util
 
 
+__all__ = ['Loss']
+
+
 class Loss(object):
 
     # TODO: creates subclasses Likelihood, Regularization and Prior to abstract out some of the methods here
