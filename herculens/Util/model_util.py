@@ -102,18 +102,30 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
     from herculens.Inference.loss import Loss
     from herculens.Util import util
 
-    if halo_profile == 'SIS':
-        halo_profile_ = 'SIE'
+    if halo_profile == 'POINT_MASS':
+        init_mass_proxy_param = 1e-10  # typically this is theta_E
+        norm_mass_proxy_param = init_mass_proxy_param
+        kwargs_halo_fixed = {}
+        kwargs_halo_init = {'theta_E': init_mass_proxy_param, 'center_x': 0., 'center_y': 0.}
+    elif halo_profile == 'PIXELATED_DIRAC':
+        init_mass_proxy_param = 0.  # typically this is theta_E
+        norm_mass_proxy_param = 1.
+        kwargs_halo_fixed = {}
+        kwargs_halo_init = {'psi': init_mass_proxy_param, 'center_x': 0., 'center_y': 0.}
+    elif halo_profile == 'SIS':
+        init_mass_proxy_param = 0.  # typically this is theta_E
+        norm_mass_proxy_param = 1.
+        halo_profile = 'SIE'  # because no standalone SIS profile in Herculens so far
         kwargs_halo_fixed = {'e1': 0., 'e2': 0.}
-        kwargs_halo_init = {'theta_E': 0., 'center_x': 0., 'center_y': 0.}
+        kwargs_halo_init = {'theta_E': init_mass_proxy_param, 'center_x': 0., 'center_y': 0.}
     else:
         raise NotImplementedError(f"Halo profile '{halo_profile}' is not yet supported.")
     
-    halo_lens_model_list = macro_lens_image.LensModel.lens_model_list + [halo_profile_]
+    halo_lens_model_list = [halo_profile] + macro_lens_image.LensModel.lens_model_list
     halo_lens_model = LensModel(halo_lens_model_list)
 
     grid = copy.deepcopy(macro_lens_image.Grid)
-    grid.remove_model_grid('lens')
+    #grid.remove_model_grid('lens')
     psf = copy.deepcopy(macro_lens_image.PSF)
     noise = copy.deepcopy(macro_lens_image.Noise)
     halo_lens_image = LensImage(grid, psf, noise_class=noise,
@@ -124,26 +136,33 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
 
     kwargs_macro = macro_parameters.current_values(as_kwargs=True)
     kwargs_fixed = {
-        'kwargs_lens': kwargs_macro['kwargs_lens'] + [kwargs_halo_fixed],
+        #'kwargs_lens': [kwargs_halo_fixed] + [{} for _ in range(len(kwargs_macro['kwargs_lens']))], # + kwargs_macro['kwargs_lens'],
+        'kwargs_lens': [kwargs_halo_fixed] + kwargs_macro['kwargs_lens'],
         'kwargs_source': kwargs_macro['kwargs_source'],
         'kwargs_lens_light': kwargs_macro['kwargs_lens_light'],
     }
     kwargs_init = {
-        'kwargs_lens': [{} for i in range(len(kwargs_macro['kwargs_lens']))] + [kwargs_halo_init],
-        'kwargs_source': [{} for i in range(len(kwargs_macro['kwargs_source']))],
-        'kwargs_lens_light': [{} for i in range(len(kwargs_macro['kwargs_lens_light']))],
+        'kwargs_lens': [kwargs_halo_init] + kwargs_macro['kwargs_lens'],
+        'kwargs_source': [{} for _ in range(len(kwargs_macro['kwargs_source']))],
+        'kwargs_lens_light': [{} for _ in range(len(kwargs_macro['kwargs_lens_light']))],
     }
     halo_parameters = Parameters(halo_lens_image, kwargs_init, kwargs_fixed)
+    print("num. params:", halo_parameters.num_parameters)
+    print("init. params:", halo_parameters.initial_values())
 
     # create the loss to minimize
     halo_loss = Loss(data, halo_lens_image, halo_parameters, likelihood_type='chi2')
 
+    #p_macro = copy.deepcopy(macro_parameters.current_values(as_kwargs=False)).tolist()
+
     # define the function that computes sensitivity at a given pixel (x, y)
     @jax.jit
     def sensitivity_at_pixel(x, y):
-        mass_proxy_param = 0.0  # typically this is theta_E 
-        grad_loss_mass = jax.grad(halo_loss)([mass_proxy_param, x, y])[0]
-        return grad_loss_mass
+        #p = [init_mass_proxy_param, x, y] + p_macro
+        p = [init_mass_proxy_param, x, y]
+        grad_loss_mass = jax.grad(halo_loss)(p)
+        partial_deriv_mass_proxy = grad_loss_mass[0]
+        return partial_deriv_mass_proxy / norm_mass_proxy_param
 
     # efficiently compute sensitivity on the data grid
     if halo_lens_image.ImageNumerics.grid_supersampling_factor > 1:
@@ -162,10 +181,11 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
 
     # get the coordinates where the sensitivity is the highest
     from skimage import feature
-    peak_indices_2d = feature.peak_local_max(-sensitivity_map)
+    peak_indices_2d = feature.peak_local_max(-np.clip(sensitivity_map, a_min=None, a_max=0))
     
     x_coords, y_coords = halo_lens_image.Grid.pixel_axes
-    x_coords_min = x_coords[peak_indices_2d[:, 1]]
-    y_coords_min = y_coords[peak_indices_2d[:, 0]]
+    x_minima = x_coords[peak_indices_2d[:, 1]]
+    y_minima = y_coords[peak_indices_2d[:, 0]]
+    z_minima = sensitivity_map[peak_indices_2d[:, 1], peak_indices_2d[:, 0]]
 
-    return sensitivity_map, (x_coords_min, y_coords_min)
+    return sensitivity_map, (x_minima, y_minima, z_minima)
