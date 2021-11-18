@@ -124,6 +124,7 @@ class Plotter(object):
                 ref_source = self._ref_source
                 if source_model.size != ref_source.size:
                     npix_ref = len(ref_source)
+                    # here we assume that the self._ref_source has the extent of the data (image plane)
                     x_coords_ref = np.linspace(extent[0], extent[1], npix_ref)
                     y_coords_ref = np.linspace(extent[2], extent[3], npix_ref)
                     if lens_image.SourceModel.has_pixels:

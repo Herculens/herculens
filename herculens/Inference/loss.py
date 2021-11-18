@@ -115,10 +115,10 @@ class Loss(object):
 
     def _init_likelihood(self, likelihood_type, likelihood_mask, mask_from_source_plane):
         if likelihood_type == 'chi2':
-            self.log_likelihood = self._log_likelihood_chi2
+            self.log_likelihood = self.log_likelihood_chi2
             self._global_norm = 1.
         elif likelihood_type == 'l2_norm':
-            self.log_likelihood = self._log_likelihood_l2
+            self.log_likelihood = self.log_likelihood_l2
             # here the global norm is such that l2_norm has same order of magnitude as a chi2
             self._global_norm = 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
         if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
@@ -256,13 +256,13 @@ class Loss(object):
         elif 'gaussian' in prior_terms and 'uniform' in prior_terms:
             self.log_prior = self._param.log_prior
 
-    def _log_likelihood_chi2(self, model):
+    def log_likelihood_chi2(self, model):
         #noise_var = self._image.Noise.C_D_model(model)  # TODO: use this?
         noise_var = self._image.Noise.C_D
         residuals = (self._data - model) * self.likelihood_mask
         return - jnp.sum(residuals**2 / noise_var) / self.likelihood_num_data_points
 
-    def _log_likelihood_l2(self, model):
+    def log_likelihood_l2(self, model):
         # TODO: check that mask here does not mess up with the balance between l2-norm and wavelet regularization
         residuals = (self._data - model) * self.likelihood_mask
         return - 0.5 * jnp.sum(residuals**2)
