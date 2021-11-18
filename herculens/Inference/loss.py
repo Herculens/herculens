@@ -57,7 +57,7 @@ class Loss(object):
         """defined as the negative log(likelihood*prior*regularization)"""
         kwargs = self._param.args2kwargs(args)
         model = self._image.model(**kwargs)
-        neg_log = - self._log_likelihood(model) - self._log_regul(kwargs) - self._log_prior(args)
+        neg_log = - self.log_likelihood(model) - self.log_regularization(kwargs) - self.log_prior(args)
         neg_log /= self._global_norm  # to keep loss magnitude in acceptable range
         return neg_log
 
@@ -115,10 +115,10 @@ class Loss(object):
 
     def _init_likelihood(self, likelihood_type, likelihood_mask, mask_from_source_plane):
         if likelihood_type == 'chi2':
-            self._log_likelihood = self._log_likelihood_chi2
+            self.log_likelihood = self._log_likelihood_chi2
             self._global_norm = 1.
         elif likelihood_type == 'l2_norm':
-            self._log_likelihood = self._log_likelihood_l2
+            self.log_likelihood = self._log_likelihood_l2
             # here the global norm is such that l2_norm has same order of magnitude as a chi2
             self._global_norm = 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
         if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
@@ -132,7 +132,7 @@ class Loss(object):
     def _init_regularizations(self, regularization_terms, regularization_strengths, 
                               potential_noise_map):
         if regularization_terms is None:
-            self._log_regul = lambda kwargs: 0.  # no regularization
+            self.log_regularization = lambda kwargs: 0.  # no regularization
             return
 
         self._idx_pix_src = self._image.SourceModel.pixelated_index
@@ -243,18 +243,18 @@ class Loss(object):
                 self._x_lens, self._y_lens = self._image.Grid.model_pixel_coordinates('lens')
 
         # build the composite function (sum of regularization terms)
-        self._log_regul = lambda kw: sum([func(kw) for func in regul_func_list])
+        self.log_regularization = lambda kw: sum([func(kw) for func in regul_func_list])
 
     def _init_priors(self, prior_terms):
         if prior_terms is None:
-            self._log_prior = lambda args: 0.
+            self.log_prior = lambda args: 0.
             return
         if prior_terms == ['uniform']:
-            self._log_prior = self._param.log_prior_uniform
+            self.log_prior = self._param.log_prior_uniform
         elif prior_terms == ['gaussian']:
-            self._log_prior = self._param.log_prior_gaussian
+            self.log_prior = self._param.log_prior_gaussian
         elif 'gaussian' in prior_terms and 'uniform' in prior_terms:
-            self._log_prior = self._param.log_prior
+            self.log_prior = self._param.log_prior
 
     def _log_likelihood_chi2(self, model):
         #noise_var = self._image.Noise.C_D_model(model)  # TODO: use this?
