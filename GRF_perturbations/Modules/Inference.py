@@ -270,9 +270,11 @@ def Inference_pipeline(data_resid_spectrum,Spectra_grid,fitted_logA_index,fitted
     time_Loss_grid=time.time()-start_time
 
 
-    pred_logA_index=np.where(Loss_grid==Loss_grid.min())[0].item()
-    pred_Beta_index=np.where(Loss_grid==Loss_grid.min())[1].item()
+    #pred_logA_index=np.where(Loss_grid==Loss_grid.min())[0].item()
+    #pred_Beta_index=np.where(Loss_grid==Loss_grid.min())[1].item()
     likelihood=np.exp(-Loss_grid/2)
+
+    pred_logA_index,pred_Beta_index,logA_conf_regions,Beta_conf_regions=get_conf_intervals(likelihood)
 
     #Computing Confidence grid
     start_time=time.time()
@@ -287,9 +289,53 @@ def Inference_pipeline(data_resid_spectrum,Spectra_grid,fitted_logA_index,fitted
 
     return likelihood,Confidence_grid,pred_logA_index,pred_Beta_index
 
+def get_cdf(likelihood):
+    cdf=jnp.cumsum(likelihood)
+    normalised_cdf=cdf/cdf[-1]
+
+    return normalised_cdf
+
+def get_prediction(cdf,pred_index,precentage_covered):
+    #indent=np.minimum(0.5,percentage_covered/200.)
+    indent=precentage_covered/200.
+
+    upper_index=jnp.argmin(jnp.abs(cdf-cdf[pred_index]-indent))
+    lower_index=jnp.argmin(jnp.abs(cdf-cdf[pred_index]+indent))
+
+    return jnp.array([lower_index,upper_index])
+
+def get_conf_intervals(likelihood):
+
+    Beta_cdf=get_cdf(likelihood.mean(axis=0))
+    Beta_pred_index=jnp.argmin(jnp.abs(Beta_cdf-0.5))
 
 
+    logA_cdf=get_cdf(likelihood.mean(axis=1))
+    logA_pred_index=jnp.argmin(jnp.abs(logA_cdf-0.5))
 
+    percentage_covered=jnp.array([68,95,99.7])
+
+    Beta_conf_regions=jax_map(lambda percentage: get_prediction(Beta_cdf,Beta_pred_index,percentage),percentage_covered)
+    logA_conf_regions=jax_map(lambda percentage: get_prediction(logA_cdf,logA_pred_index,percentage),percentage_covered)
+
+
+    res_matrix=jnp.array([[logA_pred_index,Beta_pred_index]])
+    res_matrix=jnp.append(res_matrix,logA_conf_regions,axis=0)
+    res_matrix=jnp.append(res_matrix,Beta_conf_regions,axis=0)
+
+    return res_matrix
+
+def get_likelihood(data_spectrum,Spectra_grid,true_logA_index,true_Beta_index):
+
+    logdata_spectrum=jnp.log(data_spectrum)
+    gamma_data,mu_data,sigma_data=infer_LogNorm_params(Spectra_grid[true_logA_index,true_Beta_index])
+
+    Spectra_Loss_pure=lambda model_spectra: Spectra_Loss(model_spectra,logdata_spectrum,sigma_data)
+
+    Loss_grid=compute_Loss_grid(Spectra_grid,Spectra_Loss_pure)
+    likelihood=jnp.exp(-Loss_grid/2)
+
+    return likelihood
 
 
 def plot_likelihood(axis,Beta_array,logA_array,confidence_grid,SNR,true_logA_index,true_Beta_index,pred_logA_index,pred_Beta_index,xticks,yticks,legend=False,fontsize=18):
@@ -340,3 +386,4 @@ def plot_likelihood(axis,Beta_array,logA_array,confidence_grid,SNR,true_logA_ind
         l=axis.legend([truePoint,predPoint,plt.Rectangle((1, 1), 2, 2, fc=imgSNR.collections[0].get_facecolor()[0])],['True value','Predicted value','SNR constraint'],loc='upper left',fontsize=15,framealpha=0)
         for text in l.get_texts():
             text.set_color("k")
+
