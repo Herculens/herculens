@@ -70,8 +70,12 @@ class Optimizer(InferenceBase):
                 extra_fields[key] = getattr(res, key)
         return res.x, extra_fields
 
-    def optax(self, algorithm='adabelief', max_iterations=100, init_learning_rate=1e-2, 
-              restart_from_init=False, schedule_learning_rate=True, progress_bar=True):
+    def optax(self, algorithm='adabelief', max_iterations=100, min_iterations=None,
+              init_learning_rate=1e-2, schedule_learning_rate=True, 
+              restart_from_init=False, stop_at_loss_increase=False, 
+              progress_bar=True):
+        if min_iterations is None:
+            min_iterations = max_iterations
         if schedule_learning_rate is True:
             # Exponential decay of the learning rate
             scheduler = optax.exponential_decay(
@@ -105,19 +109,22 @@ class Optimizer(InferenceBase):
         params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         opt_state = optim.init(params)
         loss_history = []
+        prev_params, prev_loss = params, 1e10
 
         # Gradient descent loop
         start_time = time.time()
-        if progress_bar is True:
-            for _ in tqdm(range(max_iterations), total=max_iterations, desc=f"optax.{algorithm}"):
-                updates, opt_state = optim.update(self.gradient(params), opt_state, params)
-                params = optax.apply_updates(params, updates)
-                loss_history.append(self.loss(params))  # TODO: use jax.value_and_grad instead? but does it jit the gradient??
-        else:
-            for _ in range(max_iterations):
-                updates, opt_state = optim.update(self.gradient(params), opt_state, params)
-                params = optax.apply_updates(params, updates)
-                loss_history.append(self.loss(params))
+        for i in self._for_loop(progress_bar, range(max_iterations), 
+                                total=max_iterations, 
+                                desc=f"optax.{algorithm}"):
+            updates, opt_state = optim.update(self.gradient(params), opt_state, params)
+            params = optax.apply_updates(params, updates)
+            loss = self.loss(params)
+            if stop_at_loss_increase and i > min_iterations and loss > prev_loss:
+                params, loss = prev_params, prev_loss
+                break
+            else:
+                loss_history.append(loss)  # TODO: use jax.value_and_grad instead? but does it jit the gradient??
+                prev_params, prev_loss = params, loss
         runtime = time.time() - start_time
         best_fit = params
         logL_best_fit = self.log_probability(best_fit)
@@ -160,6 +167,14 @@ class Optimizer(InferenceBase):
         extra_fields = {'chi2_list': chi2_list, 'pos_list': pos_list, 'vel_list': vel_list}
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
+
+
+    @staticmethod
+    def _for_loop(progress_bar_bool, iterable, **tqdm_kwargs):
+        if progress_bar_bool is True:
+            return tqdm(iterable, **tqdm_kwargs)
+        else:
+            return iterable
 
 
 class MinimizeMetrics(object):
