@@ -125,8 +125,7 @@ class PixelGrid(Coordinates):
         """
         if self._model_grids[name] is None:
             return None
-        x_coords, y_coords = self.model_pixel_axes(name)
-        return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
+        return self._model_grids[name][0].shape
 
     def remove_model_grid(self, name):
         del self._model_grids[name]
