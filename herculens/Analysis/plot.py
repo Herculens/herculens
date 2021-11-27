@@ -193,15 +193,21 @@ class Plotter(object):
                 ref_potential = self._ref_pixel_pot
             
                 if shift_pixelated_potential == 'min':
-                    min_in_mask = (potential_model * potential_mask).min()
+                    min_in_mask = potential_model[potential_mask == 1].min()
                     potential_model = potential_model - min_in_mask
-                    ref_min_in_mask = (ref_potential * potential_mask).min()
+                    ref_min_in_mask = ref_potential[potential_mask == 1].min()
                     ref_potential = ref_potential - ref_min_in_mask
                     print("delta_psi shift by min:", min_in_mask)
+                if shift_pixelated_potential == 'max':
+                    max_in_mask = potential_model[potential_mask == 1].max()
+                    potential_model = potential_model - max_in_mask
+                    ref_max_in_mask = ref_potential[potential_mask == 1].max()
+                    ref_potential = ref_potential - ref_max_in_mask
+                    print("delta_psi shift by max:", max_in_mask)
                 elif shift_pixelated_potential == 'mean':
-                    mean_in_mask = (potential_model * potential_mask).mean()
+                    mean_in_mask = potential_model[potential_mask == 1].mean()
                     potential_model = potential_model - mean_in_mask
-                    ref_mean_in_mask = (ref_potential * potential_mask).mean()
+                    ref_mean_in_mask = ref_potential[potential_mask == 1].mean()
                     ref_potential = ref_potential - ref_mean_in_mask
                     print("delta_psi shift by mean values:", mean_in_mask, ref_mean_in_mask)
             else:
@@ -324,7 +330,7 @@ class Plotter(object):
             ax = axes[i_row, 0]
             if ref_potential is not None:
                 im = ax.imshow(ref_potential * potential_mask, extent=extent,
-                               #vmin=vmin_pot, vmax=vmax_pot,
+                               vmin=vmin_pot, vmax=vmax_pot,
                                cmap=self.cmap_default)
                 im.set_rasterized(True)
                 ax.set_title(r"$\delta\psi_{\rm ref}$", fontsize=self.base_fontsize)
@@ -333,7 +339,7 @@ class Plotter(object):
             else:
                 ax.axis('off')
             ax = axes[i_row, 1]
-            im = ax.imshow(potential_model * potential_mask, extent=extent,
+            im = ax.imshow(potential_model, extent=extent,
                            vmin=vmin_pot, vmax=vmax_pot,
                            cmap=self.cmap_default)
             ax.set_title(r"$\delta\psi_{\rm model}$", fontsize=self.base_fontsize)
