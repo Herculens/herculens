@@ -24,7 +24,7 @@ class Loss(object):
     - likelihood_type [default: 'chi2']: single choice among
         'chi2', 'l2_norm'
     - regularization_terms [default: None]: a list containing choices among
-        - for a 'PIXELATED' source: 'l1_starlet_source', 'l1_battle_source', 'positivity_source'
+        - for a 'PIXELATED' source or lens light: 'l1_starlet_source', 'l1_battle_source', 'positivity_source'
         - for a 'PIXELATED' lens potential: 'l1_starlet_potential', 'l1_battle_potential', 'positivity_potential'
     - prior_terms [default: None]: a list containing choices among
         'uniform', 'gaussian'
