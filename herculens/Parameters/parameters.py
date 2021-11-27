@@ -292,7 +292,7 @@ class Parameters(object):
         self._num_params = len(self._init_values)
         if self.optimized:
             self._map_values = self.kwargs2args(self._kwargs_map)
-        if hasattr(self, '_name'):
+        if hasattr(self, '_names'):
             delattr(self, '_names')
         if hasattr(self, '_symbols'):
             delattr(self, '_symbols')
