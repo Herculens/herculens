@@ -85,6 +85,8 @@ class Optimizer(InferenceBase):
 
             if algorithm.lower() == 'adabelief':
                 scale_algo = optax.scale_by_belief()
+            elif algorithm.lower() == 'radam':
+                scale_algo = optax.scale_by_radam()
             elif algorithm.lower() == 'adam':
                 scale_algo = optax.scale_by_adam()
             else:
@@ -100,6 +102,8 @@ class Optimizer(InferenceBase):
         else:
             if algorithm.lower() == 'adabelief':
                 optim = optax.adabelief(init_learning_rate)
+            elif algorithm.lower() == 'radam':
+                optim = optax.radam(init_learning_rate)
             elif algorithm.lower() == 'adam':
                 optim = optax.adam(init_learning_rate)
             else:
