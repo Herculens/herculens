@@ -127,6 +127,19 @@ class PixelGrid(Coordinates):
             return None
         return self._model_grids[name][0].shape
 
+    def model_pixel_width(self, name):
+        """
+
+        :return: RA coords, DEC coords
+        """
+        if self._model_grids[name] is None:
+            return None
+        extent = self.model_pixel_extent(name)
+        x_coords, y_coords = self.model_pixel_axes(name)
+        pix_width_x = np.abs(x_coords[1] - x_coords[0])
+        pix_width_y = np.abs(y_coords[1] - y_coords[0])
+        return np.sqrt(pix_width_x * pix_width_y)
+
     def remove_model_grid(self, name):
         del self._model_grids[name]
 
