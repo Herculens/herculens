@@ -3,6 +3,7 @@ from scipy import sparse, linalg
 import findiff
 
 from herculens.Util.jax_util import BicubicInterpolator as Interpolator
+from herculens.Util import util
 
 
 def build_convolution_matrix(kernel_2d, image_shape):
@@ -87,7 +88,7 @@ def build_convolution_matrix(kernel_2d, image_shape):
         c = F_zero_padded[i, :] # i th row of the F 
         r = np.r_[c[0], np.zeros(I_col_num-1)] # first row for the toeplitz fuction should be defined otherwise
                                                             # the result is wrong
-        toeplitz_m = linalg.toeplitz(c,r) # this function is in scipy.linalg library
+        toeplitz_m = linalg.toeplitz(c, r) # this function is in scipy.linalg library
         toeplitz_list.append(toeplitz_m)
         # if print_ir: print('F '+ str(i)+'\n', toeplitz_m)
 
@@ -251,22 +252,21 @@ def build_DsD_matrix(smooth_lens_image, smooth_kwargs_params, hybrid_lens_image=
 
     # numerics grid, for intermediate computation on a higher resolution grid
     x_grid_num, y_grid_num = smooth_lens_image.ImageNumerics.coordinates_evaluate
-    shape_num = tuple([int(np.sqrt(x_grid_num.size))]*2)  # ASSUMES SQUARE GRID!
-    x_grid_num = x_grid_num.reshape(shape_num) # convert to 2D array
-    y_grid_num = y_grid_num.reshape(shape_num) # convert to 2D array
+    x_grid_num = util.array2image(x_grid_num)
+    y_grid_num = util.array2image(y_grid_num)
     x_coords_num, y_coords_num = x_grid_num[0, :], y_grid_num[:, 0]
+    # pixel_width_num = np.abs(x_coords_num[1] - x_coords_num[0])
     
     # get the pixelated source in source plane,
     # on the highest resolution grid possible (it will use )
     smooth_source = smooth_lens_image.SourceModel.surface_brightness(
         x_grid_num, y_grid_num, smooth_kwargs_params['kwargs_source'])
-    smooth_source *= pixel_width**2  # proper units
     interp_source = Interpolator(y_coords_num, x_coords_num, smooth_source)
 
     # compute its derivatives *on source plane*
     grad_s_x_srcplane = interp_source(y_grid_num, x_grid_num, dy=1)
     grad_s_y_srcplane = interp_source(y_grid_num, x_grid_num, dx=1)
-    grad_s_srcplane = np.sqrt(grad_s_x_srcplane**2+grad_s_y_srcplane**2)
+    # grad_s_srcplane = np.sqrt(grad_s_x_srcplane**2 + grad_s_y_srcplane**2)
 
     # setup the Interpolator to read on data pixels
     interp_grad_s_x = Interpolator(y_coords_num, x_coords_num, grad_s_x_srcplane)
@@ -279,7 +279,11 @@ def build_DsD_matrix(smooth_lens_image, smooth_kwargs_params, hybrid_lens_image=
     # evaluate the resulting arrays on that grid
     grad_s_x = interp_grad_s_x(y_src, x_src)
     grad_s_y = interp_grad_s_y(y_src, x_src)
-    grad_s = np.sqrt(grad_s_x**2+grad_s_y**2)
+    # grad_s = np.sqrt(grad_s_x**2 + grad_s_y**2)
+
+    # proper flux units
+    grad_s_x *= pixel_width**2
+    grad_s_y *= pixel_width**2
 
     # put them into sparse diagonal matrices
     D_s_x = sparse.diags([grad_s_x.flatten()], [0])
