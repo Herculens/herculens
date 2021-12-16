@@ -43,7 +43,7 @@ class Plotter(object):
     cmap_deriv2 = plt.get_cmap('inferno')
 
     def __init__(self, data_name=None, base_fontsize=0.28, flux_log_scale=True, 
-                 flux_vmin=None, flux_vmax=None, res_vmax=6):
+                 flux_vmin=None, flux_vmax=None, res_vmax=6, cmap_flux=None):
         self.data_name = data_name
         self.base_fontsize = base_fontsize
         if flux_log_scale is True:
@@ -52,6 +52,9 @@ class Plotter(object):
             self.norm_flux = None
         self.norm_res = Normalize(-res_vmax, res_vmax)
         self.norm_corr = TwoSlopeNorm(0)
+        if cmap_flux is not None:
+            self.cmap_flux = cmap_flux
+            self.cmap_flux_alt = cmap_flux
 
     def set_data(self, data):
         self._data = data
