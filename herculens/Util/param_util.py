@@ -92,3 +92,50 @@ def polar2cart(r, phi, center):
     x = r*jnp.cos(phi)
     y = r*jnp.sin(phi)
     return x - center[0], y - center[1]
+
+def transform_e1e2_product_average(x, y, e1, e2, center_x, center_y):
+    """
+    maps the coordinates x, y with eccentricities e1 e2 into a new elliptical coordinate system
+    such that R = sqrt(R_major * R_minor)
+
+    :param x: x-coordinate
+    :param y: y-coordinate
+    :param e1: eccentricity
+    :param e2: eccentricity
+    :param center_x: center of distortion
+    :param center_y: center of distortion
+    :return: distorted coordinates x', y'
+    """
+    phi_G, q = ellipticity2phi_q(e1, e2)
+    x_shift = x - center_x
+    y_shift = y - center_y
+
+    cos_phi = jnp.cos(phi_G)
+    sin_phi = jnp.sin(phi_G)
+
+    xt1 = cos_phi * x_shift + sin_phi * y_shift
+    xt2 = -sin_phi * x_shift + cos_phi * y_shift
+    return xt1 * jnp.sqrt(q), xt2 / jnp.sqrt(q)
+
+def transform_e1e2_square_average(x, y, e1, e2, center_x, center_y):
+    """
+    maps the coordinates x, y with eccentricities e1 e2 into a new elliptical coordinate system
+    such that R = sqrt(R_major**2 + R_minor**2)
+
+    :param x: x-coordinate
+    :param y: y-coordinate
+    :param e1: eccentricity
+    :param e2: eccentricity
+    :param center_x: center of distortion
+    :param center_y: center of distortion
+    :return: distorted coordinates x', y'
+    """
+    phi_G, q = ellipticity2phi_q(e1, e2)
+    x_shift = x - center_x
+    y_shift = y - center_y
+    cos_phi = jnp.cos(phi_G)
+    sin_phi = jnp.sin(phi_G)
+    e = jnp.abs(1 - q)
+    x_ = (cos_phi * x_shift + sin_phi * y_shift) * jnp.sqrt(1 - e)
+    y_ = (-sin_phi * x_shift + cos_phi * y_shift) * jnp.sqrt(1 + e)
+    return x_, y_

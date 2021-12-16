@@ -242,6 +242,8 @@ class Parameters(object):
                 raise ValueError(f"'{model}' is not supported.")
             if model == 'GAUSSIAN':
                 profile_class = gaussian.Gaussian
+            if model == 'GAUSSIAN_ELLIPSE':
+                profile_class = gaussian.GaussianEllipse
             elif model == 'SERSIC':
                 profile_class = sersic.Sersic
             elif model == 'SERSIC_ELLIPSE':

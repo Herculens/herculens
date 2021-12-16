@@ -5,7 +5,7 @@ from herculens.Util.util import convert_bool_list
 __all__ = ['LightModelBase']
 
 
-SUPPORTED_MODELS = ['SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXELATED']
+SUPPORTED_MODELS = ['GAUSSIAN', 'GAUSSIAN_ELLIPSE', 'SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXELATED']
 
 
 class LightModelBase(object):
@@ -34,7 +34,9 @@ class LightModelBase(object):
         func_list = []
         for profile_type in light_model_list:
             if profile_type == 'GAUSSIAN':
-                self.func_list.append(gaussian.Gaussian())
+                func_list.append(gaussian.Gaussian())
+            elif profile_type == 'GAUSSIAN_ELLIPSE':
+                func_list.append(gaussian.GaussianEllipse())
             elif profile_type == 'SERSIC':
                 func_list.append(sersic.Sersic(smoothing))
             elif profile_type == 'SERSIC_ELLIPSE':
