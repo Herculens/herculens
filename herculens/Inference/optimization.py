@@ -19,30 +19,32 @@ class Optimizer(InferenceBase):
 
     _supported_scipy_methods = ['Nelder-Mead', 'BFGS', 'Newton-CG', 'trust-krylov', 'trust-exact', 'trust-constr']
 
-    @property
-    def loss_history(self):
-        if not hasattr(self, '_metrics'):
-            raise ValueError("You must run the optimizer at least once to access the history")
-        return self._metrics.loss_history
+    # @property
+    # def loss_history(self):
+    #     if not hasattr(self, '_metrics'):
+    #         raise ValueError("You must run the optimizer at least once to access the history")
+    #     return self._metrics.loss_history
 
-    @property
-    def param_history(self):
-        if not hasattr(self, '_metrics'):
-            raise ValueError("You must run the optimizer at least once to access the history")
-        return self._metrics.param_history
+    # @property
+    # def param_history(self):
+    #     if not hasattr(self, '_metrics'):
+    #         raise ValueError("You must run the optimizer at least once to access the history")
+    #     return self._metrics.param_history
 
     def minimize(self, method='BFGS', maxiter=None, restart_from_init=False, use_exact_hessian_if_allowed=False):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
         init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
-        self._metrics = MinimizeMetrics(self.loss, method)
+        metrics = MinimizeMetrics(self.loss, method)
         start = time.time()
-        best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, maxiter, self._metrics,
+        best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, maxiter, metrics,
                                                            use_exact_hessian_if_allowed)
         runtime = time.time() - start
-        if self._metrics.loss_history == []:
+        if metrics.loss_history == []:
             raise ValueError("The loss history does not contain any value")
-        logL_best_fit = - float(self._metrics.loss_history[-1])
+        logL_best_fit = - float(metrics.loss_history[-1])
         self._param.set_best_fit(best_fit)
+        extra_fields['loss_history'] = metrics.loss_history
+        extra_fields['param_history'] = metrics.param_history
         return best_fit, logL_best_fit, extra_fields, runtime
 
     def _run_scipy_minimizer(self, x0, method, maxiter, callback, exact_hessian):
