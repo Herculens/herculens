@@ -32,7 +32,7 @@ class LensImage(object):
         self.PSF = psf_class
         self.Noise = noise_class
         # here we deep-copy the class to prevent issues with model grid creations below
-        self.Grid = copy.deepcopy(grid_class)
+        self.Grid = grid_class
         self.PSF.set_pixel_size(self.Grid.pixel_width)
         if kwargs_numerics is None:
             kwargs_numerics = {}
@@ -164,8 +164,8 @@ class LensImage(object):
     def normalized_residuals(self, data, model, mask=None):
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        #noise_var = self.Noise.C_D_model(model)
-        noise_var = self.Noise.C_D
+        noise_var = self.Noise.C_D_model(model)
+        # noise_var = self.Noise.C_D
         norm_res = (model - data) / np.sqrt(noise_var) * mask
         return norm_res
 

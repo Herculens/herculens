@@ -257,8 +257,8 @@ class Loss(object):
             self.log_prior = self._param.log_prior
 
     def log_likelihood_chi2(self, model):
-        #noise_var = self._image.Noise.C_D_model(model)  # TODO: use this?
-        noise_var = self._image.Noise.C_D
+        noise_var = self._image.Noise.C_D_model(model)
+        # noise_var = self._image.Noise.C_D
         residuals = (self._data - model) * self.likelihood_mask
         return - jnp.sum(residuals**2 / noise_var) / self.likelihood_num_data_points
 
