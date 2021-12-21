@@ -164,15 +164,11 @@ def read_molet_simulation(molet_path, simu_dir,
                                  name='MOLET_source_super')
     #pixel_grid.create_model_grid_simple(source_super.shape, src_extent, name='MOLET_source_super')
     assert pixel_grid.model_pixel_shape('MOLET_source_super') == source_super.shape
-    print([
-        src_fov_xmin + src_pixel_size/2., src_fov_xmax - src_pixel_size/2.,
-        src_fov_ymin + src_pixel_size/2., src_fov_ymax - src_pixel_size/2.
-    ], pixel_grid.model_pixel_extent('MOLET_source_super'))
     np.testing.assert_almost_equal(pixel_grid.model_pixel_extent('MOLET_source_super'),
                                    [src_fov_xmin + src_pixel_size/2., src_fov_xmax - src_pixel_size/2.,
                                     src_fov_ymin + src_pixel_size/2., src_fov_ymax - src_pixel_size/2.])
 
     # flux normalisation
-    source_super *= src_pixel_size**2 / pixel_size**2
+    source_super *= pixel_size**2
 
     return pixel_grid, noise, psf, data, dpsi_map, noise_real, source_super
