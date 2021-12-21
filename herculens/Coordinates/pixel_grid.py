@@ -203,8 +203,29 @@ class PixelGrid(Coordinates):
             center_x - x_sign * semi_width,  center_x + x_sign * semi_width,
             center_y - y_sign * semi_height, center_y + y_sign * semi_height,
         ]
-        nx = int(width / pixel_width)
-        ny = int(height / pixel_width)
+        nx = round(width / pixel_width)
+        ny = round(height / pixel_width)
+        x_coords = np.linspace(extent[0], extent[1], nx) # * x_sign
+        y_coords = np.linspace(extent[2], extent[3], ny) # * y_sign
+        x_grid, y_grid = np.meshgrid(x_coords, y_coords)
+        self._model_grids[name] = (x_grid, y_grid)
+
+    def create_model_grid_simple(self, original_shape, original_extent, name='none', overwrite=False):
+        """
+        Simpler version typically for MOLET grids.
+        """
+        if not overwrite and name in self._model_grids:
+            return
+        nx, ny = original_shape
+        width = original_extent[1] - original_extent[0]
+        height = original_extent[3] - original_extent[2]
+        pixel_width = np.sqrt((width / nx) * (height / ny))
+        #semi_width  = (width - pixel_width)/2.
+        #semi_height = (height - pixel_width)/2.
+        extent = [
+            original_extent[0] + pixel_width/2., original_extent[1] - pixel_width/2.,
+            original_extent[2] + pixel_width/2., original_extent[3] - pixel_width/2.
+        ]
         x_coords = np.linspace(extent[0], extent[1], nx) # * x_sign
         y_coords = np.linspace(extent[2], extent[3], ny) # * y_sign
         x_grid, y_grid = np.meshgrid(x_coords, y_coords)
