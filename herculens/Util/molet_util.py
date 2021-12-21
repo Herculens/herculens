@@ -18,13 +18,19 @@ def read_json(input_path):
         json_in   = json.loads(input_str)
     return json_in
 
-def read_molet_simulation(molet_path, simu_dir, instrument_name, 
+def read_molet_simulation(molet_path, simu_dir, 
                           use_true_noise_map=False, cut_psf=None,
-                          input_file='molet_input.json', intrument_index=0,
-                          return_noise_real=False):
+                          input_file='molet_input.json', 
+                          intrument_index=0, instrument_name=None,
+                          subtract_offset=True):
     """utility method for getting the PixelGrid class from MOLET settings"""
     # load the settings
     input_settings = read_json(os.path.join(molet_path, simu_dir, input_file))
+    if instrument_name is None:
+        instrument_name = input_settings['instruments'][intrument_index]['name']
+        warnings.warn(f"Using MOLET instrument '{instrument_name}'.")
+    else:
+        assert input_settings['instruments'][intrument_index]['name'] == instrument_name, "Instrument names are not consistent."
     instru_settings = read_json(os.path.join(molet_path, 'instrument_modules', instrument_name, 'specs.json'))
     noise_props = read_json(os.path.join(molet_path, simu_dir, 'output', f'{instrument_name}_noise_properties.json'))
     
@@ -40,9 +46,10 @@ def read_molet_simulation(molet_path, simu_dir, instrument_name,
         else:
             offset = float(noise_props['offset'])
     
-    data -= offset
-    if offset != 0.:
-        warnings.warn(f"An offset of {offset:.3f} was subtracted from the original MOLET simulation.")
+    if subtract_offset is True:
+        data -= offset
+        if offset != 0.:
+            warnings.warn(f"An offset of {offset:.3f} was subtracted from the original MOLET simulation.")
 
     mass_profiles = input_settings['lenses'][0]['mass_model']
     for mass_profile in mass_profiles:
@@ -67,15 +74,22 @@ def read_molet_simulation(molet_path, simu_dir, instrument_name,
     fov_xmax = float(data_hdr['XMAX'])
     fov_ymin = float(data_hdr['YMIN'])
     fov_ymax = float(data_hdr['YMAX'])
-    pixel_size = float(instru_settings['resolution'])
+    assert fov_xmin == fov_xmin_input, "Input and output FoV are not consistent."
     
     # the following follows VKL conventions for defining the coordinates grid
+    pixel_size = float(instru_settings['resolution'])
     width  = fov_xmax - fov_xmin
     height = fov_ymax - fov_ymin
     step_x = pixel_size
     step_y = pixel_size
-    Nx = int(width / step_x + width % step_x)
-    Ny = int(height / step_y + width % step_y)
+    #Nx = int(width / step_x + width % step_x)
+    #Ny = int(height / step_y + width % step_y)
+    Nx = round(width / step_x)
+    Ny = round(height / step_y)
+    # if Nx % 2 == 1:
+    #     Nx += 1
+    # if Ny % 2 == 1:
+    #     Ny += 1
     ra_at_xy_0 = -width/2. + step_x/2.
     dec_at_xy_0 = -height/2. + step_y/2.
     # here we assume pixels are square
@@ -87,39 +101,78 @@ def read_molet_simulation(molet_path, simu_dir, instrument_name,
                     'transform_pix2angle': transform_pix2angle}
     pixel_grid = PixelGrid(**kwargs_pixel)
 
+    #assert pixel_grid.extent == [fov_xmin + step_x/2., fov_xmax - step_x/2., fov_ymin + step_y/2., fov_ymax - step_y/2.], "Check FoV in MOLET settings."
+    assert pixel_grid.pixel_coordinates[0].shape == data.shape, "Shape of image not consistent with coordinates grid."
+
     # setup the noise class
-    if input_settings['instruments'][intrument_index]['noise']['type'] == 'PoissonNoise':
+    noise_type = input_settings['instruments'][intrument_index]['noise']['type']
+    if noise_type == 'PoissonNoise':
         background_rms = float(noise_props['sigma_bg'])
-        exp_time = float(input_settings['instruments'][intrument_index]['noise']['texp'])
         if use_true_noise_map:
             noise_map = fits.getdata(os.path.join(molet_path, simu_dir, 'output', f'{instrument_name}_sigma_map.fits'), header=False)
             noise_map = noise_map.astype(float)
+            exp_time  = None
         else:
             noise_map = None
-    else:
+            exp_time  = float(input_settings['instruments'][intrument_index]['noise']['texp'])
+    elif noise_type == 'UniformGaussian':
         background_rms = float(noise_props['sigma'])
-        exp_time = None
+        exp_time  = None
         noise_map = None
+    else:
+        raise ValueError(f"Unknown type of noise '{noise_type}'.")
     noise = Noise(Nx, Ny, background_rms=background_rms, exposure_time=exp_time, noise_map=noise_map)
 
     # setup the psf class
     psf_kernel = fits.getdata(os.path.join(molet_path, 'instrument_modules', instrument_name, 'psf.fits'), header=False)
     psf_kernel = psf_kernel.astype(float)
-    if cut_psf is not None:
-        psf_kernel = psf_kernel[-cut_psf:cut_psf, -cut_psf:cut_psf]
-        psf_kernel /= psf_kernel.sum()
-    psf = PSF(psf_type='PIXEL', kernel_point_source=psf_kernel)
-
-    # sanity checks
-    assert input_settings['instruments'][intrument_index]['name'] == instrument_name
-    assert fov_xmin == fov_xmin_input
-    assert pixel_grid.extent == [fov_xmin + step_x/2., fov_xmax - step_x/2., fov_ymin + step_y/2., fov_ymax - step_y/2.]
-    assert pixel_grid.pixel_coordinates[0].shape == data.shape
-
-    if return_noise_real:
-        noise_real = fits.getdata(os.path.join(molet_path, simu_dir, 'output', f'{instrument_name}_noise_realization.fits'), header=False)
-        noise_real = noise_real.astype(float)
-        noise_real -= offset
-        return pixel_grid, noise, psf, data, dpsi_map, noise_real
+    true_psf_width = float(instru_settings['psf']['width'])
+    expe_psf_width = psf_kernel.shape[0] * pixel_size
+    if expe_psf_width == true_psf_width:  # means not a supersampled PSF
+        if cut_psf is not None:
+            psf_kernel = psf_kernel[-cut_psf:cut_psf, -cut_psf:cut_psf]
+            psf_kernel /= psf_kernel.sum()
+        psf = PSF(psf_type='PIXEL', kernel_point_source=psf_kernel)
     else:
-        return pixel_grid, noise, psf, data, dpsi_map
+        psf = None
+        warnings.warn("Could not prepare the 'PIXEL' PSF instance as the PSF in the instrument module is supersampled (supersampling factor?).")
+
+    # get specific noise realisation
+    noise_real = fits.getdata(os.path.join(molet_path, simu_dir, 'output', f'{instrument_name}_noise_realization.fits'), header=False)
+    noise_real = noise_real.astype(float)
+    if subtract_offset is True:
+        noise_real -= offset
+
+    # load supersampled source and corresponding extent
+    source_super, source_hdr = fits.getdata(os.path.join(molet_path, simu_dir, 'output', f'{instrument_name}_source_super.fits'), header=True)
+    source_super = source_super.astype(float)
+    src_fov_xmin = float(source_hdr['XMIN'])
+    src_fov_xmax = float(source_hdr['XMAX'])
+    src_fov_ymin = float(source_hdr['YMIN'])
+    src_fov_ymax = float(source_hdr['YMAX'])
+    # src_extent = (src_fov_xmin, src_fov_xmax, src_fov_ymin, src_fov_ymax)
+    src_width  = src_fov_xmax - src_fov_xmin
+    src_height = src_fov_ymax - src_fov_ymin
+    src_pixel_size = src_width / source_super.shape[0]
+    pixel_scale_factor = src_pixel_size / pixel_size
+    grid_shape = (src_width, src_height)
+    grid_center = ((src_fov_xmin + src_fov_xmax) / 2., (src_fov_ymin + src_fov_ymax) / 2.)
+    pixel_grid.create_model_grid(grid_center=grid_center, 
+                                 grid_shape=grid_shape, 
+                                 pixel_scale_factor=pixel_scale_factor, 
+                                 conserve_extent=False,
+                                 name='MOLET_source_super')
+    #pixel_grid.create_model_grid_simple(source_super.shape, src_extent, name='MOLET_source_super')
+    assert pixel_grid.model_pixel_shape('MOLET_source_super') == source_super.shape
+    print([
+        src_fov_xmin + src_pixel_size/2., src_fov_xmax - src_pixel_size/2.,
+        src_fov_ymin + src_pixel_size/2., src_fov_ymax - src_pixel_size/2.
+    ], pixel_grid.model_pixel_extent('MOLET_source_super'))
+    np.testing.assert_almost_equal(pixel_grid.model_pixel_extent('MOLET_source_super'),
+                                   [src_fov_xmin + src_pixel_size/2., src_fov_xmax - src_pixel_size/2.,
+                                    src_fov_ymin + src_pixel_size/2., src_fov_ymax - src_pixel_size/2.])
+
+    # flux normalisation
+    source_super *= src_pixel_size**2 / pixel_size**2
+
+    return pixel_grid, noise, psf, data, dpsi_map, noise_real, source_super
