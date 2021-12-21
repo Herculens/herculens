@@ -46,7 +46,8 @@ class Plotter(object):
                  flux_vmin=None, flux_vmax=None, res_vmax=6, cmap_flux=None):
         self.data_name = data_name
         self.base_fontsize = base_fontsize
-        if flux_log_scale is True:
+        self.flux_log_scale = flux_log_scale
+        if self.flux_log_scale is True:
             self.norm_flux = LogNorm(flux_vmin, flux_vmax)
         else:
             self.norm_flux = None
@@ -59,8 +60,9 @@ class Plotter(object):
     def set_data(self, data):
         self._data = data
 
-    def set_ref_source(self, ref_source):
+    def set_ref_source(self, ref_source, source_grid_name=None):
         self._ref_source = ref_source
+        self._ref_src_grid_name = source_grid_name
 
     def set_ref_lens_light(self, ref_lens_light):
         self._ref_lens_light = ref_lens_light
@@ -82,6 +84,7 @@ class Plotter(object):
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
                       reproject_pixelated_models=False, shift_pixelated_potential='min',
                       likelihood_mask=None, potential_mask=None,
+                      lock_colorbars=False,
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       show_plot=True):
         n_cols = 3
@@ -89,10 +92,6 @@ class Plotter(object):
                      show_lens_potential, (show_lens_others and show_lens_potential)])
         
         extent = lens_image.Grid.extent
-        if lens_image.SourceModel.has_pixels:
-            src_extent = lens_image.Grid.model_pixel_extent('source')
-        else:
-            src_extent = extent
 
         ##### PREPARE IMAGES #####
             
@@ -120,23 +119,33 @@ class Plotter(object):
                     source_model *= lens_image.Grid.pixel_area
                 else:
                     source_model = kwargs_source[src_idx]['pixels']
+                src_extent = lens_image.Grid.model_pixel_extent('source')
+            elif hasattr(self, '_ref_src_grid_name'):
+                x_grid_src, y_grid_src = lens_image.Grid.model_pixel_coordinates(self._ref_src_grid_name)
+                source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
+                source_model *= lens_image.Grid.pixel_area
+                src_extent = lens_image.Grid.model_pixel_extent(self._ref_src_grid_name)
             else:
                 source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
+                src_extent = extent
 
             if hasattr(self, '_ref_source'):
                 ref_source = self._ref_source
                 if source_model.size != ref_source.size:
-                    npix_ref = len(ref_source)
-                    # here we assume that the self._ref_source has the extent of the data (image plane)
-                    x_coords_ref = np.linspace(extent[0], extent[1], npix_ref)
-                    y_coords_ref = np.linspace(extent[2], extent[3], npix_ref)
+                    if self._ref_src_grid_name is not None:
+                        x_axes_ref, y_axes_ref = lens_image.Grid.model_pixel_axes(self._ref_src_grid_name)
+                    else:
+                        npix_ref = len(ref_source)
+                        # here we assume that the self._ref_source has the extent of the data (image plane)
+                        x_axes_ref = np.linspace(extent[0], extent[1], npix_ref)
+                        y_axes_ref = np.linspace(extent[2], extent[3], npix_ref)
                     if lens_image.SourceModel.has_pixels:
-                        x_coords_src, y_coords_src = lens_image.Grid.model_pixel_axes('source')
+                        x_axes_src, y_axes_src = lens_image.Grid.model_pixel_axes('source')
                     else:
                         npix_src = len(source_model)
-                        x_coords_src = np.linspace(extent[0], extent[1], npix_src)
-                        y_coords_src = np.linspace(extent[2], extent[3], npix_src)
-                    ref_source = image_util.re_size_array(x_coords_ref, y_coords_ref, ref_source, x_coords_src, y_coords_src)
+                        x_axes_src = np.linspace(extent[0], extent[1], npix_src)
+                        y_axes_src = np.linspace(extent[2], extent[3], npix_src)
+                    ref_source = image_util.re_size_array(x_axes_ref, y_axes_ref, ref_source, x_axes_src, y_axes_src)
                     if lens_image.Grid.x_is_inverted:
                         ref_source = np.flip(ref_source, axis=1)
                     if lens_image.Grid.y_is_inverted:
@@ -149,10 +158,7 @@ class Plotter(object):
             kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
             if lens_image.LensLightModel.has_pixels:
                 ll_idx = lens_image.LensLightModel.pixelated_index
-                if reproject_pixelated_models:
-                    raise NotImplementedError("Reprojection of pixelated lens light profile not yet implemented.")
-                else:
-                    lens_light_model = kwargs_lens_light[ll_idx]['pixels']
+                lens_light_model = kwargs_lens_light[ll_idx]['pixels']
             else:
                 lens_light_model = lens_image.lens_surface_brightness(kwargs_lens_light, unconvolved=True)
             
@@ -160,15 +166,15 @@ class Plotter(object):
                 ref_lens_light = self._ref_lens_light
                 if lens_light_model.size != ref_lens_light.size:
                     npix_ref = len(ref_lens_light)
-                    x_coords_ref = np.linspace(extent[0], extent[1], npix_ref)
-                    y_coords_ref = np.linspace(extent[2], extent[3], npix_ref)
+                    x_axes_ref = np.linspace(extent[0], extent[1], npix_ref)
+                    y_axes_ref = np.linspace(extent[2], extent[3], npix_ref)
                     if lens_image.SourceModel.has_pixels:
-                        x_coords, y_coords = lens_image.Grid.model_pixel_axes('lens_light')
+                        x_axes, y_axes = lens_image.Grid.model_pixel_axes('lens_light')
                     else:
                         npix = len(lens_light_model)
-                        x_coords = np.linspace(extent[0], extent[1], npix)
-                        y_coords = np.linspace(extent[2], extent[3], npix)
-                    ref_lens_light = image_util.re_size_array(x_coords_ref, y_coords_ref, ref_source, x_coords, y_coords)
+                        x_axes = np.linspace(extent[0], extent[1], npix)
+                        y_axes = np.linspace(extent[2], extent[3], npix)
+                    ref_lens_light = image_util.re_size_array(x_axes_ref, y_axes_ref, ref_source, x_axes, y_axes)
                     warnings.warn("Reference lens light array has been interpolated to match model array.")
             else:
                 ref_lens_light = None
@@ -229,17 +235,18 @@ class Plotter(object):
         i_row = 0
 
         if show_image:
+            norm_flux = self._get_norm_for_model(model, lock_colorbars)
 
             ##### IMAGING DATA AND MODEL IMAGE #####
             ax = axes[i_row, 0]
-            im = ax.imshow(data * likelihood_mask, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
+            im = ax.imshow(data * likelihood_mask, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
             im.set_rasterized(True)
             data_title = self.data_name if self.data_name is not None else "data"
             ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
-            im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
+            im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
             im.set_rasterized(True)
             ax.set_title("model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -248,6 +255,7 @@ class Plotter(object):
             residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
             red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
             im = ax.imshow(residuals * likelihood_mask, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
+            # im = ax.imshow((model - data) * likelihood_mask, cmap=self.cmap_res, extent=extent, norm=TwoSlopeNorm(0))
             ax.set_title(r"(f${}_{\rm model}$ - f${}_{\rm data})/\sigma$", fontsize=self.base_fontsize)
             nice_colorbar_residuals(im, residuals, position='top', pad=0.4, size=0.2, 
                                     vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
@@ -260,11 +268,12 @@ class Plotter(object):
             i_row += 1
 
         if show_source:
+            norm_flux = self._get_norm_for_model(source_model, lock_colorbars)
 
             ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
             ax = axes[i_row, 0]
             if ref_source is not None:
-                im = ax.imshow(ref_source, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+                im = ax.imshow(ref_source, extent=src_extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
                 im.set_rasterized(True)
                 ax.set_title("ref. source", fontsize=self.base_fontsize)
                 nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -272,7 +281,7 @@ class Plotter(object):
             else:
                 ax.axis('off')
             ax = axes[i_row, 1]
-            im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+            im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
             #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
             im.set_rasterized(True)
             ax.set_title("source model", fontsize=self.base_fontsize)
@@ -294,11 +303,12 @@ class Plotter(object):
             i_row += 1
 
         if show_lens_light:
+            norm_flux = self._get_norm_for_model(lens_light_model, lock_colorbars)
 
             ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
             ax = axes[i_row, 0]
             if ref_lens_light is not None:
-                im = ax.imshow(ref_lens_light, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+                im = ax.imshow(ref_lens_light, extent=extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
                 im.set_rasterized(True)
                 ax.set_title("ref. lens light", fontsize=self.base_fontsize)
                 nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -306,7 +316,7 @@ class Plotter(object):
             else:
                 ax.axis('off')
             ax = axes[i_row, 1]
-            im = ax.imshow(lens_light_model, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+            im = ax.imshow(lens_light_model, extent=extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
             #im = ax.imshow(lens_light_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
             im.set_rasterized(True)
             ax.set_title("lens light model", fontsize=self.base_fontsize)
@@ -391,3 +401,14 @@ class Plotter(object):
         if show_plot:
             plt.show()
         return fig
+
+
+    def _get_norm_for_model(self, model, lock_colorbars):
+        if lock_colorbars is True and self.norm_flux is None:
+            if self.flux_log_scale is True:
+                norm_flux = LogNorm(model.min(), model.max())
+            else:
+                norm_flux = Normalize(model.min(), model.max())
+        else:
+            norm_flux = self.norm_flux
+        return norm_flux
