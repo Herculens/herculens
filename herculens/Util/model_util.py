@@ -26,6 +26,8 @@ def mask_from_source_area(lens_image, parameters):
 
 def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
                             threshold=0.1, smoothing=0):
+    # imports are here to avoid issues with circular imports
+    from herculens.LensImage.lens_image import LensImage
     from herculens.LightModel.light_model import LightModel
 
     if parameters is None and source_model is None:
@@ -63,6 +65,7 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
 
 def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
                                  min_width=1.0, min_height=1.0, scaling=1.0):
+    # imports are here to avoid issues with circular imports
     from herculens.Util import param_util
 
     # TODO: support arbitrary smooth source profile

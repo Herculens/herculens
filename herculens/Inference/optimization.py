@@ -119,7 +119,7 @@ class Optimizer(InferenceBase):
 
         # Gradient descent loop
         start_time = time.time()
-        for i in self._for_loop(progress_bar, range(max_iterations), 
+        for i in self._for_loop(range(max_iterations), progress_bar, 
                                 total=max_iterations, 
                                 desc=f"optax.{algorithm}"):
             updates, opt_state = optim.update(self.gradient(params), opt_state, params)
@@ -176,7 +176,7 @@ class Optimizer(InferenceBase):
 
 
     @staticmethod
-    def _for_loop(progress_bar_bool, iterable, **tqdm_kwargs):
+    def _for_loop(iterable, progress_bar_bool, **tqdm_kwargs):
         if progress_bar_bool is True:
             return tqdm(iterable, **tqdm_kwargs)
         else:
