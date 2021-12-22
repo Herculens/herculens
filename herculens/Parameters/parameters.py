@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax import lax
 
 from herculens.LensModel.Profiles import pixelated as pixelated_lens
-from herculens.LensModel.Profiles import (epl, sie, nie, shear, point_mass, 
+from herculens.LensModel.Profiles import (epl, sie, sis, nie, shear, point_mass, 
                                           gaussian_potential, multipole)
 from herculens.LightModel.Profiles import pixelated as pixelated_light
 from herculens.LightModel.Profiles import gaussian, sersic, uniform
@@ -263,6 +263,8 @@ class Parameters(object):
                 profile_class = epl.EPL
             elif model == 'SIE':
                 profile_class = sie.SIE
+            elif model == 'SIS':
+                profile_class = sis.SIS
             elif model == 'NIE':
                 profile_class = nie.NIE
             elif model == 'POINT_MASS':

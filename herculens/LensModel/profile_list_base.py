@@ -1,11 +1,11 @@
 from herculens.LensModel.Profiles import (gaussian_potential, point_mass, multipole,
-                                           shear, sie, nie, epl, pixelated)
+                                           shear, sie, sis, nie, epl, pixelated)
 from herculens.Util.util import convert_bool_list
 
 __all__ = ['ProfileListBase']
 
 SUPPORTED_MODELS = [
-    'EPL', 'NIE', 'SIE', 'GAUSSIAN', 'POINT_MASS', 
+    'EPL', 'NIE', 'SIE', 'SIS', 'GAUSSIAN', 'POINT_MASS', 
     'SHEAR', 'SHEAR_GAMMA_PSI', 'MULTIPOLE',
     'PIXELATED', 'PIXELATED_DIRAC',
 ]
@@ -63,6 +63,8 @@ class ProfileListBase(object):
             return nie.NIE()
         elif lens_type == 'SIE':
             return sie.SIE()
+        elif lens_type == 'SIS':
+            return sis.SIS()
         elif lens_type == 'EPL':
             return epl.EPL()
         elif lens_type == 'MULTIPOLE':
