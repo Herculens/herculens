@@ -206,7 +206,7 @@ class BilinearInterpolator(object):
 
     """
     def __init__(self, x, y, z, allow_extrapolation=True):
-        self.z = z
+        self.z = jnp.array(z)  # z
         if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
             self.x = jnp.array(x)
         else:
