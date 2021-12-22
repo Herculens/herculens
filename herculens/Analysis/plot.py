@@ -352,7 +352,7 @@ class Plotter(object):
             else:
                 ax.axis('off')
             ax = axes[i_row, 1]
-            im = ax.imshow(potential_model, extent=extent,
+            im = ax.imshow(potential_model * potential_mask, extent=extent,
                            vmin=vmin_pot, vmax=vmax_pot,
                            cmap=self.cmap_default)
             ax.set_title(r"$\delta\psi_{\rm model}$", fontsize=self.base_fontsize)
