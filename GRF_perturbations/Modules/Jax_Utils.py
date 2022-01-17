@@ -34,25 +34,20 @@ def purify_function(function,*static_args):
       return function(traced_arg,*static_args)
     return jax.jit(pure_function)
 
-
 def jax_map(f, xs):
   '''
-
   Parameters
   ----------
   f: function(x)
   xs: collection [x1,x2,x3]
-
   Returns
   -------
   [f(x1),f(x2),f(x3)]
-
   Explanation
   -------
   Differentiable version of mapping a function over an array.
   Can be used to map function over matrix,
   Mapping is carried out over the first dimension in that case
-
   Examples
   -------
   >>> get_GRF=lambda GRF_seed: get_jaxified_GRF_pure(GRF_params,GRF_seed)

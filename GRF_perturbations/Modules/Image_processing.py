@@ -23,6 +23,30 @@ from scipy.optimize import minimize as scipy_minimize
 #Parameters to make args<->kwargs transformations
 #parameters=get_parameters()
 
+def Spectrum_radial_averaging(spectrum,k_grid_half,frequencies):
+    shape_spectrum = k_grid_half.shape
+    length_radial = len(frequencies)
+
+    # Mask rings with increasing integer radius (in pixels)
+    Ring_masks = np.zeros((length_radial, shape_spectrum[0], shape_spectrum[1]))
+    for i in range(length_radial - 1):
+        # Chose ring of given radius
+        Ring_masks[i] = np.logical_and(k_grid_half >= frequencies[i], k_grid_half < frequencies[i + 1])
+
+    # max negative freq 6.25
+    dk = frequencies[1] - frequencies[0]
+    Ring_masks[-1] = np.logical_and(k_grid_half >= frequencies[-1], k_grid_half < frequencies[-1] + dk)
+
+    # Number of pixels in ring
+    pix_in_bins = Ring_masks.sum(axis=(1, 2))
+    # Sum of image values in a ring with radius i
+    scan_func = lambda _, Ring_mask: (1, jnp.sum(spectrum * Ring_mask))
+    # Differentiable loop over rings
+    sum_in_bins = jax.lax.scan(scan_func, 0, Ring_masks)[1]
+
+    radial_spectrum = sum_in_bins / pix_in_bins
+    return radial_spectrum
+
 def Radial_profile(image,image_shape):
     '''
 
@@ -81,7 +105,57 @@ def Radial_profile(image,image_shape):
     radial_profile=sum_in_bins/pix_in_bins
     return radial_profile
 
-def compute_radial_spectrum(image,annulus_mask,init_freq_index):
+
+def compute_radial_spectrum(image,annulus_mask,k_grid,frequencies):
+    '''
+    Parameters
+    ----------
+    image: jnp.ndarray
+        array of shape (size,size)
+    annulus_mask: np.ndarray
+        mask of shape (size,size). Leaves only Einstein ring region
+    init_freq_index: int
+        indent of spectra from zero
+        spectral frequencies k<1/(rmax-rmin) refer to scales bigger than the ring, so don't make sense
+
+    Returns
+    -------
+    power_spectrum: jnp.ndarray
+        array with shape (size//2-mask_spectral_cut_index)
+    Explanation
+    -------
+    For a given image computes Power spectrum. Then computes radial profile of the power spectrum,
+    which is axially averaged spectrum.
+    Returns radial profile of the power spectrum, with indent from low frequencies that corresponds to the mask_spectral_cut_index
+
+    Examples
+    -------
+    >>> compute_radial_spectrum(resid0,Radial_profile,mask,0)
+    DeviceArray([2.75495046e+00, 7.38967978e+00, 9.19915373e+00,1.17016538e+01, 1.23753751e+01, ...], dtype=float64)
+    >>> compute_radial_spectrum_pure=purify_function(compute_radial_spectrum,Radial_profile,mask,4)
+    >>> compute_radial_spectrum_pure(resid0)
+    DeviceArray([1.23753751e+01, 1.02814510e+01, ...], dtype=float64)
+    '''
+    #Mask should have the same shape as image
+    #it should be square
+    assert annulus_mask.shape[0]==annulus_mask.shape[1]
+
+    #Leave only region with Einstein ring
+    masked_image=image*annulus_mask
+
+    independent_spectrum_index=annulus_mask.shape[1]//2
+
+    spectrum = jnp.fft.fft2(masked_image)[:, :independent_spectrum_index]
+    power_spectrum = jnp.abs(spectrum) ** 2
+    #unitary normalisation of the Fourier transform (look np.fft norm 'ortho')
+    normalized_spectrum=power_spectrum/annulus_mask.sum()
+
+    k_grid_half=k_grid[:,:independent_spectrum_index]
+    Radial_spectrum=Spectrum_radial_averaging(normalized_spectrum,k_grid_half,frequencies)
+
+    return Radial_spectrum
+
+def compute_radial_spectrum_old(image,annulus_mask,init_freq_index,frequencies):
     '''
     Parameters
     ----------

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import time
 
 from GRF_perturbations.Modules.Jax_Utils import jax_map,gradient_descent
-from GRF_perturbations.Modules.GRF_generation import get_k_grid,get_Fourier_phase,get_jaxified_GRF
+from GRF_perturbations.Modules.GRF_generation import get_k_grid,get_Fourier_phase,get_jaxified_GRF,nonsingular_Power_spectrum
 from GRF_perturbations.Modules.Image_processing import model_loss_function,Radial_profile,compute_radial_spectrum
 from GRF_perturbations.Modules.Data_generation import Observation_conditions_class
 
@@ -99,6 +99,28 @@ class Inference_class:
         else:
             return get_GRF_from_Phase_Matrix
 
+    def alpha_kappa_variance(self,GRF_params):
+        k_grid,nonsingular_k_grid=self.frequency_grids
+        k_vector=np.fft.fftfreq(self.Observation_conditions.pixel_number,self.Observation_conditions.pixel_scale)
+        kx,ky=np.meshgrid(k_vector,k_vector)
+
+        zero_mean_mask=np.ones_like(nonsingular_k_grid)
+        zero_mean_mask[0,0]=0
+
+        potential_PS=nonsingular_Power_spectrum(GRF_params,nonsingular_k_grid)*zero_mean_mask
+
+        #d(psi)/dx in Fourier space
+        alphax_PS=(2*np.pi*kx)**2*potential_PS
+        #d(psi)/dy in Fourier space
+        alphay_PS=(2*np.pi*ky)**2*potential_PS
+
+        #laplacian/2 in Fourier space
+        kappa_PS=((2*np.pi*ky)**4+(2*np.pi*kx)**4)*potential_PS/4
+
+        return alphax_PS.sum(),alphay_PS.sum(),kappa_PS.sum()
+
+
+
     def scipy_fit_image(self,image,method='trust-krylov',initial_values=None):
 
 
@@ -128,7 +150,8 @@ class Inference_class:
         return Radial_profile(image,(self.Observation_conditions.pixel_number,self.Observation_conditions.pixel_number))
 
     def compute_radial_spectrum(self,image):
-        return compute_radial_spectrum(image,self.Observation_conditions.annulus_mask,self.Observation_conditions.init_freq_index)
+        k_grid,_=self.frequency_grids
+        return compute_radial_spectrum(image,self.Observation_conditions.annulus_mask,k_grid,self.Observation_conditions.frequencies)
 
     def Residual_spectrum_for_GRF(self,GRF_params,Fourier_phase,Noise=True):
         get_GRF=self.GRF_getters(False)
@@ -207,15 +230,15 @@ def compute_SNR_grid(Spectra_grid,Noise_spectral_density):
 
 
 def compute_Confidence_grid(likelihood):
-    isolevels=np.linspace(1,0,101)
+    isolevels=likelihood.max()*np.linspace(1,0,101)
     contours=[]
 
 
     confidence_grid=np.zeros_like(likelihood)*np.nan
 
     #Compute isolevel contours
-    for i,isolevel in enumerate(isolevels):
-        contours+=[np.array(measure.find_contours(likelihood,isolevel))]
+    #for i,isolevel in enumerate(isolevels):
+    #contours+=[np.array(measure.find_contours(likelihood,isolevel))]
 
     confidence_levels=np.zeros_like(isolevels)
 
@@ -247,7 +270,25 @@ def compute_Loss_grid(Spectra_grid,Spectra_Loss_pure):
     return Loss_grid
 
 
-def Inference_pipeline(data_resid_spectrum,Spectra_grid,fitted_logA_index,fitted_Beta_index,report_timings=True):
+def Inference_pipeline(data_resid_spectrum,MU_tensor,Sigma_tensor):
+
+
+    logSpec_data=np.log(data_resid_spectrum)
+    Loss_grid=jnp.mean(jnp.power((logSpec_data-MU_tensor)/Sigma_tensor,2),axis=-1)
+
+
+    likelihood=np.exp(-Loss_grid/2)
+
+    res_matrix=get_conf_intervals(likelihood)
+    pred_logA_index,pred_Beta_index=res_matrix[0]
+    logA_conf_regions=res_matrix[1:4]
+    Beta_conf_regions=res_matrix[4:]
+
+    Confidence_grid=compute_Confidence_grid(likelihood)
+
+    return likelihood,Confidence_grid,pred_logA_index,pred_Beta_index,logA_conf_regions,Beta_conf_regions
+
+def Inference_pipeline_old(data_resid_spectrum,Spectra_grid,fitted_logA_index,fitted_Beta_index,report_timings=True):
 
     #Estimating uncertainties
     start_time=time.time()
@@ -274,7 +315,11 @@ def Inference_pipeline(data_resid_spectrum,Spectra_grid,fitted_logA_index,fitted
     #pred_Beta_index=np.where(Loss_grid==Loss_grid.min())[1].item()
     likelihood=np.exp(-Loss_grid/2)
 
-    pred_logA_index,pred_Beta_index,logA_conf_regions,Beta_conf_regions=get_conf_intervals(likelihood)
+    res_matrix=get_conf_intervals(likelihood)
+    pred_logA_index,pred_Beta_index=res_matrix[0]
+    logA_conf_regions=res_matrix[1:4]
+    Beta_conf_regions=res_matrix[4:]
+    #pred_logA_index,pred_Beta_index,logA_conf_regions,Beta_conf_regions=get_conf_intervals(likelihood)
 
     #Computing Confidence grid
     start_time=time.time()
@@ -283,7 +328,7 @@ def Inference_pipeline(data_resid_spectrum,Spectra_grid,fitted_logA_index,fitted
 
 
     if report_timings:
-        print('Uncertainties estimation took {:.1f} seconds'.format(time_uncertainties))
+        print('Uncertainties estimation took {:.1f} second§s'.format(time_uncertainties))
         print('Loss grid computation took {:.1f} seconds'.format(time_Loss_grid))
         print('Confidence grid computation took {:.1f} seconds'.format(time_Confidence_grid))
 
@@ -325,20 +370,16 @@ def get_conf_intervals(likelihood):
 
     return res_matrix
 
-def get_likelihood(data_spectrum,Spectra_grid,true_logA_index,true_Beta_index):
+def get_likelihood(data_spectrum,MU_tensor,Sigma_tensor):
 
-    logdata_spectrum=jnp.log(data_spectrum)
-    gamma_data,mu_data,sigma_data=infer_LogNorm_params(Spectra_grid[true_logA_index,true_Beta_index])
-
-    Spectra_Loss_pure=lambda model_spectra: Spectra_Loss(model_spectra,logdata_spectrum,sigma_data)
-
-    Loss_grid=compute_Loss_grid(Spectra_grid,Spectra_Loss_pure)
+    logSpec_data = jnp.log(data_spectrum)
+    Loss_grid = jnp.mean(jnp.power((logSpec_data - MU_tensor) / Sigma_tensor, 2), axis=-1)
     likelihood=jnp.exp(-Loss_grid/2)
 
     return likelihood
 
 
-def plot_likelihood(axis,Beta_array,logA_array,confidence_grid,SNR,true_logA_index,true_Beta_index,pred_logA_index,pred_Beta_index,xticks,yticks,legend=False,fontsize=18):
+def plot_likelihood(axis,Beta_array,logA_array,confidence_grid,SNR,true_logA_index,true_Beta_index,pred_logA_index,pred_Beta_index,xticks,yticks,manual_locations,legend=False,fontsize=18):
 
     #Confidence levels
     #smooth the grid to avoid sharp edged contours
@@ -353,17 +394,17 @@ def plot_likelihood(axis,Beta_array,logA_array,confidence_grid,SNR,true_logA_ind
     for l,s in zip( img.levels, strs ):
         fmt[l] = s
 
-    manual_locations=[(5,20)]
-    axis.clabel(img,[0.988891],inline=True,fmt={0.988891: '$3\\sigma$'},fontsize=15,manual=manual_locations)
-    manual_locations=[(5,20)]
-    axis.clabel(img,[0.86466],inline=True,fmt={0.86466: '$2\\sigma$'},fontsize=15,manual=manual_locations)
-    manual_locations=[(5,20)]
-    axis.clabel(img,[0.39347],inline=True,fmt={0.39347: '$1\\sigma$'},fontsize=15,manual=manual_locations)
+    #manual_locations=[(5,20)]
+    axis.clabel(img,[0.988891],inline=True,fmt={0.988891: '$3\\sigma$'},fontsize=15,manual=manual_locations[0])
+    #manual_locations=[(5,20)]
+    axis.clabel(img,[0.86466],inline=True,fmt={0.86466: '$2\\sigma$'},fontsize=15,manual=manual_locations[1])
+    #manual_locations=[(5,20)]
+    axis.clabel(img,[0.39347],inline=True,fmt={0.39347: '$1\\sigma$'},fontsize=15,manual=manual_locations[2])
 
     #Prediction and truth
 
-    predPoint=axis.scatter(Beta_array[pred_Beta_index],logA_array[pred_logA_index],label='Predicted value',marker="o",s=80,color='k')
-    truePoint=axis.scatter(Beta_array[true_Beta_index],logA_array[true_logA_index],label='True value',marker="*",s=80,color='k')
+    predPoint=axis.scatter(Beta_array[pred_Beta_index],logA_array[pred_logA_index],label='Max likelihood',marker="o",s=80,color='k')
+    truePoint=axis.scatter(Beta_array[true_Beta_index],logA_array[true_logA_index],label='Ground truth',marker="*",s=80,color='k')
 
     #SNR constraint
 
@@ -383,7 +424,7 @@ def plot_likelihood(axis,Beta_array,logA_array,confidence_grid,SNR,true_logA_ind
     #plt.yticks([-9,-8.5,-8,-8.5,-7.5,-7])
 
     if legend:
-        l=axis.legend([truePoint,predPoint,plt.Rectangle((1, 1), 2, 2, fc=imgSNR.collections[0].get_facecolor()[0])],['True value','Predicted value','SNR constraint'],loc='upper left',fontsize=15,framealpha=0)
+        l=axis.legend([truePoint,predPoint,plt.Rectangle((1, 1), 2, 2, fc=imgSNR.collections[0].get_facecolor()[0])],['Ground truth','Max likelihood',r'$SNR \leq 0$'],loc='upper right',fontsize=15,framealpha=0)
         for text in l.get_texts():
             text.set_color("k")
 

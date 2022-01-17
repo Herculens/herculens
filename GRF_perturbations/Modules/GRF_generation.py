@@ -36,6 +36,17 @@ def get_k_grid(npix, pix_scl):
 
   return k_grid,nonsingular_k_grid
 
+def Box_Muller_transform():
+    s = 1.1
+    while s > 1. :
+        u = np.random.uniform (-1.,1.)
+        v = np.random.uniform (-1.,1.)
+        s = u**2. + v**2.
+    fac = np.sqrt(-2.*np.log(s)/s)
+    z1 = u*fac
+    z2 = v*fac
+    return z1,z2
+
 #Uniformly sampled complex phases
 def get_Fourier_phase(npix,seed):
     """
@@ -65,10 +76,10 @@ def get_Fourier_phase(npix,seed):
                 Fourier_phases[y,x] = 1.0
                 continue
 
-            phi=np.random.uniform(0,2*np.pi)
-            z1=np.cos(phi)
-            z2=np.sin(phi)
-
+            #phi=np.random.uniform(0,2*np.pi)
+            #z1=np.cos(phi)
+            #z2=np.sin(phi)
+            z1,z2=Box_Muller_transform()
 
             # three points that need to be real valued to get a real image after FFT:
             if x== 0 and y==npix/2:
@@ -78,7 +89,7 @@ def get_Fourier_phase(npix,seed):
             elif x==npix/2 and y==npix/2:
                 Fourier_phases[y,x] = z1
             else :
-                Fourier_phases[y,x] = z1+j*z2
+                Fourier_phases[y,x] = (z1+j*z2)/np.sqrt(2)
 
             Fourier_phases[-y,-x] = Fourier_phases[y,x].conjugate()
 
@@ -107,6 +118,7 @@ def get_jaxified_GRF(GRF_params,nonsingular_k_grid,Fourier_phase_grid):
   Configuration_image=jnp.fft.ifftshift(jnp.fft.ifftn(Fourier_image))
 
   #Normalisation for Parseval's theorem
+  #In numpy default FFT normalisation is 'backward'
   Normalisation_factor=nonsingular_k_grid.size
 
   Normalised_GRF=Normalisation_factor*Configuration_image.real
