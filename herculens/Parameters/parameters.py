@@ -491,9 +491,9 @@ class Parameters(object):
         elif name == 'psi_ext':
             latex = r"$\psi_{\rm ext}$"
         elif name == 'gamma1':
-            latex = r"$\gamma_{\rm 1, ext}$"
+            latex = r"$\gamma_{\rm ext, 1}$"
         elif name == 'gamma2':
-            latex = r"$\gamma_{\rm 2, ext}$"
+            latex = r"$\gamma_{\rm ext, 2}$"
         elif name == 'amp':
             latex = r"$A$"
         elif name == 'R_sersic':
