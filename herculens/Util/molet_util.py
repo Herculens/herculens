@@ -130,7 +130,7 @@ def read_molet_simulation(molet_path, simu_dir,
     expe_psf_width = psf_kernel.shape[0] * pixel_size
     if expe_psf_width == true_psf_width:  # means not a supersampled PSF
         if cut_psf is not None:
-            psf_kernel = psf_kernel[-cut_psf:cut_psf, -cut_psf:cut_psf]
+            psf_kernel = psf_kernel[cut_psf:-cut_psf, cut_psf:-cut_psf]
             psf_kernel /= psf_kernel.sum()
         psf = PSF(psf_type='PIXEL', kernel_point_source=psf_kernel)
     else:
