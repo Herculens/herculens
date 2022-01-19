@@ -192,3 +192,95 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
     z_minima = sensitivity_map[peak_indices_2d[:, 1], peak_indices_2d[:, 0]]
 
     return sensitivity_map, (x_minima, y_minima, z_minima)
+
+
+def pixel_pot_noise_map(lens_image, kwargs_res, k_src=None, cut=1e-5):
+    """EMPIRICAL noise map based on the ivnerse of the sqrt of the source model"""
+    # imports are here to avoid issues with circular imports
+    from herculens.Util import image_util
+
+    ls_0 = lens_image.source_surface_brightness(kwargs_res['kwargs_source'],
+                                                kwargs_lens=kwargs_res['kwargs_lens'],
+                                                de_lensed=False, unconvolved=False,
+                                                k=k_src)
+    ls_0 = np.array(ls_0)
+    #print(ls_0.min(), ls_0.max())
+
+    #scaled_ls_0 = ls_0
+    scaled_ls_0 = ls_0**(1/2.)
+    #scaled_ls_0 = ls_0**(1/3.)
+
+    potential_noise_map = np.zeros_like(ls_0)
+    potential_noise_map[ls_0 > cut] = 1. / scaled_ls_0[ls_0 > cut]
+    potential_noise_map[ls_0 <= cut] = potential_noise_map.max()
+
+    # normalize by data noise
+    noise_map = np.sqrt(lens_image.Noise.C_D)  # TODO: replace by .C_D_model()
+    #print(noise_map.mean())
+    potential_noise_map *= noise_map
+
+    # rescaled to potential grid
+    x_in, y_in = lens_image.Grid.pixel_axes
+    x_out, y_out = lens_image.Grid.model_pixel_axes('lens')
+    potential_noise_map = image_util.re_size_array(x_in, y_in, potential_noise_map, x_out, y_out)
+    
+    return potential_noise_map
+
+
+def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5):
+    """EMPIRICAL noise map (although inspired by Koopmans+05) as the inverse of the blurred source derivative"""
+    # imports are here to avoid issues with circular imports
+    from herculens.Util.jax_util import BicubicInterpolator as Interpolator
+    from herculens.Util import image_util, util
+    # TODO: fix the inconsitent use of either Interpolator or re_size_array method
+
+    # data coordinates
+    x_grid, y_grid = lens_image.Grid.pixel_coordinates
+
+    # numerics grid, for intermediate computation on a higher resolution grid
+    x_grid_num, y_grid_num = lens_image.ImageNumerics.coordinates_evaluate
+    x_grid_num = util.array2image(x_grid_num)
+    y_grid_num = util.array2image(y_grid_num)
+    x_coords_num, y_coords_num = x_grid_num[0, :], y_grid_num[:, 0]
+    s_0 = lens_image.SourceModel.surface_brightness(x_grid_num, y_grid_num, 
+                                                    kwargs_res['kwargs_source'], 
+                                                    k=k_src)
+    interp_source = Interpolator(y_coords_num, x_coords_num, s_0)
+    grad_s_x_srcplane = interp_source(y_grid_num, x_grid_num, dy=1)
+    grad_s_y_srcplane = interp_source(y_grid_num, x_grid_num, dx=1)
+    # compute its derivatives *on source plane*
+    grad_s_x_srcplane = interp_source(y_grid_num, x_grid_num, dy=1)
+    grad_s_y_srcplane = interp_source(y_grid_num, x_grid_num, dx=1)
+    # setup the Interpolator to read on data pixels
+    interp_grad_s_x = Interpolator(y_coords_num, x_coords_num, grad_s_x_srcplane)
+    interp_grad_s_y = Interpolator(y_coords_num, x_coords_num, grad_s_y_srcplane)
+    # use the lens equation to ray shoot the coordinates of the data grid
+    x_src, y_src = lens_image.LensModel.ray_shooting(
+        x_grid, y_grid, kwargs_res['kwargs_lens'])
+    # evaluate the resulting arrays on that grid
+    grad_s_x = interp_grad_s_x(y_src, x_src)
+    grad_s_y = interp_grad_s_y(y_src, x_src)
+    # proper flux units
+    pixel_area = lens_image.Grid.pixel_area
+    grad_s_x = np.array(grad_s_x) * pixel_area
+    grad_s_y = np.array(grad_s_y) * pixel_area
+    grad_s = np.hypot(grad_s_x, grad_s_y)
+
+    # convolve with PSF
+    grad_s = lens_image.ImageNumerics.convolution_class.convolution2d(grad_s)
+
+    potential_noise_map = np.zeros_like(grad_s)
+    potential_noise_map[grad_s > cut] = 1. / grad_s[grad_s > cut]
+    potential_noise_map[grad_s <= cut] = potential_noise_map.max()
+
+    # normalize by data noise
+    noise_map = np.sqrt(lens_image.Noise.C_D)  # TODO: replace by .C_D_model()
+    #print(noise_map.mean())
+    potential_noise_map *= noise_map
+
+    # rescaled to potential grid
+    x_in, y_in = lens_image.Grid.pixel_axes
+    x_out, y_out = lens_image.Grid.model_pixel_axes('lens')
+    potential_noise_map = image_util.re_size_array(x_in, y_in, potential_noise_map, x_out, y_out)
+    return potential_noise_map
+
