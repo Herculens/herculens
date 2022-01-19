@@ -120,7 +120,7 @@ class Plotter(object):
                 else:
                     source_model = kwargs_source[src_idx]['pixels']
                 src_extent = lens_image.Grid.model_pixel_extent('source')
-            elif hasattr(self, '_ref_src_grid_name'):
+            elif hasattr(self, '_ref_source') and self._ref_src_grid_name is not None:
                 x_grid_src, y_grid_src = lens_image.Grid.model_pixel_coordinates(self._ref_src_grid_name)
                 source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
                 source_model *= lens_image.Grid.pixel_area
