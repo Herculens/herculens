@@ -403,8 +403,8 @@ def plot_likelihood(axis,Beta_array,logA_array,confidence_grid,SNR,true_logA_ind
 
     #Prediction and truth
 
-    predPoint=axis.scatter(Beta_array[pred_Beta_index],logA_array[pred_logA_index],label='Max likelihood',marker="o",s=80,color='k')
-    truePoint=axis.scatter(Beta_array[true_Beta_index],logA_array[true_logA_index],label='Ground truth',marker="*",s=80,color='k')
+    predPoint=axis.scatter(Beta_array[pred_Beta_index],logA_array[pred_logA_index],label='Max likelihood',marker="o",s=80,color='k',edgecolor='w',linewidth=0.5)
+    truePoint=axis.scatter(Beta_array[true_Beta_index],logA_array[true_logA_index],label='Ground truth',marker="*",s=80,color='k',edgecolor='w',linewidth=0.5)
 
     #SNR constraint
 
@@ -427,4 +427,5 @@ def plot_likelihood(axis,Beta_array,logA_array,confidence_grid,SNR,true_logA_ind
         l=axis.legend([truePoint,predPoint,plt.Rectangle((1, 1), 2, 2, fc=imgSNR.collections[0].get_facecolor()[0])],['Ground truth','Max likelihood',r'$SNR \leq 0$'],loc='upper right',fontsize=15,framealpha=0)
         for text in l.get_texts():
             text.set_color("k")
+
 
