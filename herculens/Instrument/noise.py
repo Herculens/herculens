@@ -106,7 +106,7 @@ class Noise(object):
             else:
                 if self._data is None:
                     raise ValueError("No imaging data array has been set, impossible to estimate the diagonal covariance matrix")
-                self._C_D = covariance_matrix(self._data, self.background_rms, self.exposure_map)
+                self._C_D = self.covariance_matrix(self._data, self.background_rms, self.exposure_map)
         return self._C_D
 
     def C_D_model(self, model):
@@ -118,33 +118,34 @@ class Noise(object):
         if self._noise_map is not None:
             return self._noise_map ** 2
         else:
-            return covariance_matrix(model, self._background_rms, self._exp_map)
+            return self.covariance_matrix(model, self._background_rms, self._exp_map)
 
     def _reset_cache(self):
         if hasattr(self, '_C_D'):
             delattr(self, '_C_D')
 
 
-def covariance_matrix(data, background_rms, exposure_map):
-    """
-    returns a diagonal matrix for the covariance estimation which describes the error
+    @staticmethod
+    def covariance_matrix(data, background_rms, exposure_map):
+        """
+        returns a diagonal matrix for the covariance estimation which describes the error
 
-    Notes:
+        Notes:
 
-    - the exposure map must be positive definite. Values that deviate too much from the mean exposure time will be
-        given a lower limit to not under-predict the Poisson component of the noise.
+        - the exposure map must be positive definite. Values that deviate too much from the mean exposure time will be
+            given a lower limit to not under-predict the Poisson component of the noise.
 
-    - the data must be positive semi-definite for the Poisson noise estimate.
-        Values < 0 (Possible after mean subtraction) will not have a Poisson component in their noise estimate.
+        - the data must be positive semi-definite for the Poisson noise estimate.
+            Values < 0 (Possible after mean subtraction) will not have a Poisson component in their noise estimate.
 
 
-    :param data: data array, eg in units of photons/second
-    :param background_rms: background noise rms, eg. in units (photons/second)^2
-    :param exposure_map: exposure time per pixel, e.g. in units of seconds
-    :return: len(d) x len(d) matrix that give the error of background and Poisson components; (photons/second)^2
-    """
-    sigma = background_rms**2
-    if exposure_map is not None:
-        d_pos = jnp.maximum(0, data)
-        sigma += d_pos / exposure_map
-    return sigma
+        :param data: data array, eg in units of photons/second
+        :param background_rms: background noise rms, eg. in units (photons/second)^2
+        :param exposure_map: exposure time per pixel, e.g. in units of seconds
+        :return: len(d) x len(d) matrix that give the error of background and Poisson components; (photons/second)^2
+        """
+        sigma = background_rms**2
+        if exposure_map is not None:
+            d_pos = jnp.maximum(0, data)
+            sigma += d_pos / exposure_map
+        return sigma
