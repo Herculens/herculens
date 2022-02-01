@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import jax.numpy as jnp
 import jax
+import warnings
 from scipy.ndimage import morphology
 from scipy import ndimage
 
@@ -227,7 +228,8 @@ def pixel_pot_noise_map(lens_image, kwargs_res, k_src=None, cut=1e-5):
     return potential_noise_map
 
 
-def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5):
+def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5, 
+                              use_model_covariance=True):
     """EMPIRICAL noise map (although inspired by Koopmans+05) as the inverse of the blurred source derivative"""
     # imports are here to avoid issues with circular imports
     from herculens.Util.jax_util import BicubicInterpolator as Interpolator
@@ -274,7 +276,16 @@ def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5):
     potential_noise_map[grad_s <= cut] = potential_noise_map.max()
 
     # normalize by data noise
-    noise_map = np.sqrt(lens_image.Noise.C_D)  # TODO: replace by .C_D_model()
+    if use_model_covariance:
+        if lens_image.Noise.exposure_map is None:
+            warnings.warn("Exposure map is None, model variance might not be computed properly.")
+        model_source_only = lens_image.model(**kwargs_res, lens_light_add=False)
+        C_D_model = lens_image.Noise.covariance_matrix(model_source_only, 
+                                                       lens_image.Noise.background_rms, 
+                                                       lens_image.Noise.exposure_map)
+        noise_map = np.sqrt(C_D_model)
+    else:
+        noise_map = np.sqrt(lens_image.Noise.C_D)
     #print(noise_map.mean())
     potential_noise_map *= noise_map
 
