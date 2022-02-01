@@ -154,10 +154,9 @@ class Inference_class:
         return compute_radial_spectrum(image,self.Observation_conditions.annulus_mask,k_grid,self.Observation_conditions.frequencies)
 
     def Residual_spectrum_for_GRF(self,GRF_params,Fourier_phase,Noise=True):
-        get_GRF=self.GRF_getters(False)
+        get_GRF=self.GRF_getters(from_index=False)
 
         GRF_potential=get_GRF(GRF_params,Fourier_phase)
-
         #We want noise to be random or at least different for every generated GRF
         #It should complicate computation of gradients, but we want to keep the function pure
         #+1 are needed cause those parameters are great or equal to zero
@@ -177,9 +176,9 @@ class Inference_class:
 
     def GRF_Loss(self,GRF_params,GRF_seeds_number,Spectra_Loss_pure,Noise_flag):
 
-        GRF_seed_indices=np.arange(GRF_seeds_number)
-        get_model_spectra=jax.jit(lambda GRF_seed_index: self.Residual_spectrum_for_GRF(GRF_params,GRF_seed_index,Noise_flag))
-        model_spectra=jax_map(get_model_spectra,GRF_seed_indices)
+        Fourier_phases=self.Fourier_phase_tensor[:GRF_seeds_number]
+        get_model_spectra=jax.jit(lambda Fourier_phase: self.Residual_spectrum_for_GRF(GRF_params,Fourier_phase,Noise_flag))
+        model_spectra=jax_map(get_model_spectra,Fourier_phases)
 
         Loss=Spectra_Loss_pure(model_spectra)
         return Loss
