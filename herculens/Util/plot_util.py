@@ -71,6 +71,6 @@ def nice_colorbar_residuals(mappable, res_map, vmin, vmax, position='right', pad
     else:
         cb_extend = 'neither'
     colorbar_kwargs.update({'extend': cb_extend})
-    nice_colorbar(mappable, position=position, pad=pad, size=size, label=label, fontsize=fontsize,
+    return nice_colorbar(mappable, position=position, pad=pad, size=size, label=label, fontsize=fontsize,
                   invisible=invisible, colorbar_kwargs=colorbar_kwargs, label_kwargs=label_kwargs,
                   divider_kwargs=divider_kwargs)
