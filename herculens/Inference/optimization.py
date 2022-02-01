@@ -1,8 +1,9 @@
 import time
-from scipy import optimize
+import warnings
 import numpy as np
-from scipy.optimize import Bounds
 import optax
+from scipy import optimize
+from scipy.optimize import Bounds
 from tqdm import tqdm
 
 from herculens.Inference.inference_base import InferenceBase
@@ -40,8 +41,10 @@ class Optimizer(InferenceBase):
                                                            use_exact_hessian_if_allowed)
         runtime = time.time() - start
         if metrics.loss_history == []:
-            raise ValueError("The loss history does not contain any value")
-        logL_best_fit = - float(metrics.loss_history[-1])
+            warnings.warn("The loss history does not contain any value")
+            logL_best_fit = self.loss(best_fit)
+        else:
+            logL_best_fit = - float(metrics.loss_history[-1])
         self._param.set_best_fit(best_fit)
         extra_fields['loss_history'] = metrics.loss_history
         extra_fields['param_history'] = metrics.param_history
