@@ -1,4 +1,5 @@
 from functools import partial
+from copy import deepcopy
 import numpy as np
 import jax.numpy as jnp
 from jax import jit, vmap, lax
@@ -6,6 +7,23 @@ from jax.scipy.special import gammaln
 from jax.scipy.signal import convolve2d
 from jax.scipy.stats import norm
 from jax.lax import conv_general_dilated, conv_dimension_numbers
+
+
+def unjaxify_kwargs(kwargs_params):
+    """
+    Utility to convert all JAX's device arrays contained in a model kwargs 
+    to standard floating point or numpy arrays.
+    """
+    kwargs_params_new = deepcopy(kwargs_params)
+    for model_key, model_kwargs in kwargs_params.items():
+        for profile_idx, profile_kwargs in enumerate(model_kwargs):
+            for param_key, param_value in profile_kwargs.items():
+                if not isinstance(param_value, (float, int)):
+                    if param_value.size == 1:
+                        kwargs_params_new[model_key][profile_idx][param_key] = float(param_value)
+                    else:
+                        kwargs_params_new[model_key][profile_idx][param_key] = np.array(param_value)
+    return kwargs_params_new
 
 
 class special(object):
