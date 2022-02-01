@@ -1,6 +1,7 @@
 import numpy as np
 from herculens.LensModel.Profiles.base_profile import LensProfileBase
 from herculens.LensModel.Profiles.nie import NIE
+from herculens.LensModel.Profiles.epl import EPL
 
 __all__ = ['SIE']
 
@@ -12,9 +13,13 @@ class SIE(LensProfileBase):
     upper_limit_default = {'theta_E': 100, 'e1': 0.5, 'e2': 0.5, 'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
     
-    def __init__(self):
-        self.profile = NIE()
-        self._s_scale = 0.0000000001
+    def __init__(self, backend_profile='EPL'):
+        if backend_profile == 'NIE':
+            self.profile = NIE()
+            self._fixed = 0.0000000001  # core 'scale' radius
+        elif backend_profile == 'EPL':
+            self.profile = EPL()
+            self._fixed = 2.  # slope
         super(SIE, self).__init__()
 
     def function(self, x, y, theta_E, e1, e2, center_x=0, center_y=0):
@@ -29,7 +34,7 @@ class SIE(LensProfileBase):
         :param center_y:
         :return:
         """
-        return self.profile.function(x, y, theta_E, e1, e2, self._s_scale,
+        return self.profile.function(x, y, theta_E, e1, e2, self._fixed,
                                      center_x, center_y)
 
     def derivatives(self, x, y, theta_E, e1, e2, center_x=0, center_y=0):
@@ -44,7 +49,7 @@ class SIE(LensProfileBase):
         :param center_y:
         :return:
         """
-        return self.profile.derivatives(x, y, theta_E, e1, e2, self._s_scale,
+        return self.profile.derivatives(x, y, theta_E, e1, e2, self._fixed,
                                         center_x, center_y)
 
     def hessian(self, x, y, theta_E, e1, e2, center_x=0, center_y=0):
@@ -59,7 +64,7 @@ class SIE(LensProfileBase):
         :param center_y:
         :return:
         """
-        return self.profile.hessian(x, y, theta_E, e1, e2, self._s_scale,
+        return self.profile.hessian(x, y, theta_E, e1, e2, self._fixed,
                                     center_x, center_y)
 
     @staticmethod

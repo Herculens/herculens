@@ -150,8 +150,8 @@ class NIE(LensProfileBase):
         kappa = 1./2 * (f__xx + f__yy)
         gamma1__ = 1./2 * (f__xx - f__yy)
         gamma2__ = f__xy
-        gamma1 = np.cos(2 * phi_G) * gamma1__ - np.sin(2 * phi_G) * gamma2__
-        gamma2 = +np.sin(2 * phi_G) * gamma1__ + np.cos(2 * phi_G) * gamma2__
+        gamma1 = jnp.cos(2. * phi_G) * gamma1__ - jnp.sin(2. * phi_G) * gamma2__
+        gamma2 = jnp.sin(2. * phi_G) * gamma1__ + jnp.cos(2. * phi_G) * gamma2__
         f_xx = kappa + gamma1
         f_yy = kappa - gamma1
         f_xy = gamma2
@@ -183,14 +183,14 @@ class NIEMajorAxis(LensProfileBase):
 
     param_names = ['b', 's', 'q', 'center_x', 'center_y']
 
-    def __init__(self, diff=0.0000000001):
+    def __init__(self, diff=0.0000000001):  # WARNING: this diff causes large numerical innacuracies in hessian()!
         self._diff = diff
         super(NIEMajorAxis, self).__init__()
 
     def function(self, x, y, b, s, q):
         psi = self._psi(x, y, q, s)
         alpha_x, alpha_y = self.derivatives(x, y, b, s, q)
-        f_ = x * alpha_x + y * alpha_y - b * s * 1. / 2. * np.log((psi + s)**2 + (1. - q**2) * x**2)
+        f_ = x * alpha_x + y * alpha_y - b * s * 1. / 2. * jnp.log((psi + s)**2 + (1. - q**2) * x**2)
         return f_
 
     def derivatives(self, x, y, b, s, q):
