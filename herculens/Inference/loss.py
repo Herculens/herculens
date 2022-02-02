@@ -22,7 +22,7 @@ class Loss(object):
 
     Supported options are:
     - likelihood_type [default: 'chi2']: single choice among
-        'chi2', 'l2_norm'
+        'chi2', 'reduced_chi2', 'l2_norm'
     - regularization_terms [default: None]: a list containing choices among
         - for a 'PIXELATED' source or lens light: 'l1_starlet_source', 'l1_battle_source', 'positivity_source'
         - for a 'PIXELATED' lens potential: 'l1_starlet_potential', 'l1_battle_potential', 'positivity_potential'
@@ -30,7 +30,7 @@ class Loss(object):
         'uniform', 'gaussian'
     """
 
-    _supported_ll = ('chi2', 'l2_norm')
+    _supported_ll = ('chi2', 'reduced_chi2', 'l2_norm')
     _supported_regul_source = ('l1_starlet_source', 'l1_battle_source', 'positivity_source')
     _supported_regul_lens_mass = ('l1_starlet_potential', 'l1_battle_potential', 'positivity_potential', 'positivity_convergence')
     _supported_regul_lens_light = ('l1_starlet_lens_light', 'l1_battle_lens_light', 'positivity_lens_light')
@@ -88,7 +88,7 @@ class Loss(object):
             elif len(regularization_terms) != len(regularization_strengths):
                 raise ValueError(f"There should be at least one choice of "
                                  "regularization strength per regularization term.")
-            if likelihood_type == 'chi2':
+            if likelihood_type in ['chi2', 'reduced_chi2']:
                 UserWarning(f"Likelihood type is '{likelihood_type}', which might "
                             "cause issues with some regularization choices")
             for term in regularization_terms:
@@ -117,10 +117,13 @@ class Loss(object):
         if likelihood_type == 'chi2':
             self.log_likelihood = self.log_likelihood_chi2
             self._global_norm = 1.
+        elif likelihood_type == 'reduced_chi2':
+            self.log_likelihood = self.log_likelihood_chi2
+            self._global_norm = 0.5 * self.likelihood_num_data_points
         elif likelihood_type == 'l2_norm':
             self.log_likelihood = self.log_likelihood_l2
             # here the global norm is such that l2_norm has same order of magnitude as a chi2
-            self._global_norm = 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
+            self._global_norm = 1.0 # 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
         if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
             self._ll_mask = model_util.mask_from_pixelated_source(self._image, self._param)
         elif likelihood_mask is None:
@@ -256,11 +259,19 @@ class Loss(object):
         elif 'gaussian' in prior_terms and 'uniform' in prior_terms:
             self.log_prior = self._param.log_prior
 
+    # def log_likelihood_gaussian(self, model):
+    #     C_D = self._image.Noise.C_D_model(model)
+    #     det_C_D = jnp.prod(noise_var)  # knowing that C_D is diagonal
+    #     #print("det_C_D", det_C_D)
+    #     Z_D = np.sqrt( (2*np.pi)**self.likelihood_num_data_points * det_C_D )  # Eq. 24 from Vegetti & Koopmans 2009
+    #     chi2 = - 0.5 * jnp.sum( (self._data - model)**2 * self.likelihood_mask / C_D )
+    #     return jnp.log(Z_D) + chi2
+
     def log_likelihood_chi2(self, model):
         noise_var = self._image.Noise.C_D_model(model)
         # noise_var = self._image.Noise.C_D
         residuals = (self._data - model) * self.likelihood_mask
-        return - jnp.sum(residuals**2 / noise_var) / self.likelihood_num_data_points
+        return - 0.5 * jnp.sum(residuals**2 / noise_var)
 
     def log_likelihood_l2(self, model):
         # TODO: check that mask here does not mess up with the balance between l2-norm and wavelet regularization
