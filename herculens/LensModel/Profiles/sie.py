@@ -20,6 +20,8 @@ class SIE(LensProfileBase):
         elif backend_profile == 'EPL':
             self.profile = EPL()
             self._fixed = 2.  # slope
+        else:
+            raise ValueError(f"Backend profile {backend_profile} is not supported (choose 'NIE' or 'EPL').")
         super(SIE, self).__init__()
 
     def function(self, x, y, theta_E, e1, e2, center_x=0, center_y=0):
