@@ -233,4 +233,24 @@ def convert_bool_list(n, k=None):
     else:
         raise ValueError('input list k as %s not compatible' % k)
     return bool_list
+
+def check_psd_force_symmetry(X_in):
+    """ensure that the matrix X is symmetric positive-semidefinite"""
+    X = np.copy(X_in)
+    # check if positive-semidefinite
+    if not np.all(np.linalg.eigvals(X) > 0):
+        min_eig = np.min(np.real(np.linalg.eigvals(X)))
+        print(f"correcting for negative eigenvalues with {10*min_eig}")
+        X -= 10*min_eig * np.eye(*X.shape)
+
+    # check symmetry (sometimes condition for being positive-semidefinite)
+    if not np.all(X - X.T == 0):
+        print("forcing symmetry")
+        lower_triangle = np.tril(X)
+        X = lower_triangle + lower_triangle.T - np.diag(lower_triangle.diagonal())
+
+    # final check
+    assert (np.all(np.linalg.eigvals(X) > 0) and np.all(X - X.T == 0))
+    return X
+
     
