@@ -1,3 +1,5 @@
+__author__ = 'aymgal'
+
 from copy import deepcopy
 import numpy as np
 import jax.numpy as jnp
@@ -33,7 +35,8 @@ class Parameters(object):
         ...
     ]
 
-    Alternatively, if the parameters share the same name'lens_with_lens_light' : [
+    Alternatively, if the parameters share the same name:
+    'lens_with_lens_light' : [
         [
             (lens_light_index1, lens_index1), [param1, param2, ...]
         ],
