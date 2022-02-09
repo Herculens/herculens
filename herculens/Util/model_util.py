@@ -97,7 +97,12 @@ def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
 
 def halo_sensitivity_map(macro_lens_image, macro_parameters, data, 
                          halo_profile='SIS', kwargs_numerics=None,
+                         init_mass_proxy_param=0., norm_mass_proxy_param=1.,
                          x_grid=None, y_grid=None):
+    """
+    init_mass_proxy_param is the value of the mass parameter (e.g. theta_E)
+    that is used for evaluated the gradient of the loss function.
+    """
     # imports are here to avoid issues with circular imports
     from herculens.LightModel.light_model import LightModel
     from herculens.LensModel.lens_model import LensModel
@@ -107,18 +112,12 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
     from herculens.Util import util
 
     if halo_profile == 'POINT_MASS':
-        init_mass_proxy_param = 1e-10  # typically this is theta_E
-        norm_mass_proxy_param = init_mass_proxy_param
         kwargs_halo_fixed = {}
         kwargs_halo_init = {'theta_E': init_mass_proxy_param, 'center_x': 0., 'center_y': 0.}
     elif halo_profile == 'PIXELATED_DIRAC':
-        init_mass_proxy_param = 0.  # typically this is theta_E
-        norm_mass_proxy_param = 1.
         kwargs_halo_fixed = {}
         kwargs_halo_init = {'psi': init_mass_proxy_param, 'center_x': 0., 'center_y': 0.}
     elif halo_profile == 'SIS':
-        init_mass_proxy_param = 0.  # typically this is theta_E
-        norm_mass_proxy_param = 1.
         halo_profile = 'SIE'  # because no standalone SIS profile in Herculens so far
         kwargs_halo_fixed = {'e1': 0., 'e2': 0.}
         kwargs_halo_init = {'theta_E': init_mass_proxy_param, 'center_x': 0., 'center_y': 0.}
@@ -286,7 +285,6 @@ def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5,
         noise_map = np.sqrt(C_D_model)
     else:
         noise_map = np.sqrt(lens_image.Noise.C_D)
-    #print(noise_map.mean())
     potential_noise_map *= noise_map
 
     # rescaled to potential grid

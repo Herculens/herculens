@@ -1,6 +1,8 @@
 import math
 import numpy as np
 import jax.numpy as jnp
+import json
+import re
 
 
 def rotate(xcoords, ycoords, angle):
@@ -253,4 +255,11 @@ def check_psd_force_symmetry(X_in):
     assert (np.all(np.linalg.eigvals(X) > 0) and np.all(X - X.T == 0))
     return X
 
+def read_json(input_path):
+    with open(input_path,'r') as f:
+        input_str = f.read()
+        input_str = re.sub(re.compile("/\*.*?\*/", re.DOTALL), "", input_str)
+        input_str = re.sub(re.compile("//.*?\n" ), "", input_str)
+        json_in   = json.loads(input_str)
+    return json_in
     

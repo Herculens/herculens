@@ -1,6 +1,4 @@
 import os
-import re
-import json
 import warnings
 import numpy as np
 from astropy.io import fits
@@ -8,15 +6,8 @@ from astropy.io import fits
 from herculens.Instrument.noise import Noise
 from herculens.Instrument.psf import PSF
 from herculens.Coordinates.pixel_grid import PixelGrid
+from herculens.Util.util import read_json
 
-
-def read_json(input_path):
-    with open(input_path,'r') as f:
-        input_str = f.read()
-        input_str = re.sub(re.compile("/\*.*?\*/", re.DOTALL), "", input_str)
-        input_str = re.sub(re.compile("//.*?\n" ), "", input_str)
-        json_in   = json.loads(input_str)
-    return json_in
 
 def read_molet_simulation(molet_path, simu_dir, 
                           use_true_noise_map=False, cut_psf=None,
