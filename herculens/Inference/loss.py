@@ -114,6 +114,13 @@ class Loss(object):
                                      "compatible with a 'PIXELATED' lens profile")
 
     def _init_likelihood(self, likelihood_type, likelihood_mask, mask_from_source_plane):
+        if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
+            self._ll_mask = model_util.mask_from_pixelated_source(self._image, self._param)
+        elif likelihood_mask is None:
+            self._ll_mask = np.ones_like(self._data)
+        else:
+            self._ll_mask = likelihood_mask.astype(float)
+        self._ll_num_data_points = np.count_nonzero(self._ll_mask)
         if likelihood_type == 'chi2':
             self.log_likelihood = self.log_likelihood_chi2
             self._global_norm = 1.
@@ -124,13 +131,6 @@ class Loss(object):
             self.log_likelihood = self.log_likelihood_l2
             # here the global norm is such that l2_norm has same order of magnitude as a chi2
             self._global_norm = 1.0 # 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
-        if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
-            self._ll_mask = model_util.mask_from_pixelated_source(self._image, self._param)
-        elif likelihood_mask is None:
-            self._ll_mask = np.ones_like(self._data)
-        else:
-            self._ll_mask = likelihood_mask.astype(float)
-        self._ll_num_data_points = np.count_nonzero(self._ll_mask)
 
     def _init_regularizations(self, regularization_terms, regularization_strengths, 
                               potential_noise_map):
