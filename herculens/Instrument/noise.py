@@ -109,14 +109,14 @@ class Noise(object):
                 self._C_D = self.covariance_matrix(self._data, self.background_rms, self.exposure_map)
         return self._C_D
 
-    def C_D_model(self, model):
+    def C_D_model(self, model, force_recompute=False):
         """
 
         :param model: model (same as data but without noise)
         :return: estimate of the noise per pixel based on the model flux
         """
-        if self._noise_map is not None:
-            return self._noise_map ** 2
+        if not force_recompute and self._noise_map is not None:
+            return self._noise_map**2
         else:
             return self.covariance_matrix(model, self._background_rms, self._exp_map)
 
