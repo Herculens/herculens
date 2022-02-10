@@ -22,9 +22,24 @@ def Box_Muller_transform():
     z2 = v*fac
     return z1,z2
 
-class GRF_inhomogeneities:
+class GRF_inhomogeneities_class:
+    """A class that handles generation of GRF gravitational potential inhomogeneities that
+    correspond to potential of galaxy satellites. Also generates supplementary quantities
+    like differential deflection and convergence fields and field variances from Parseval's theorem"""
 
     def __init__(self,pixel_number: int,pixel_scale: float,Phase_seeds_number: int):
+        """
+        Initialize model for given grid pixelisation, resolution and number GRF random seeds
+        Parameters
+        ----------
+        pixel_number: int
+            Lens plane grid is a square with side of 'pixel_number' pixels
+        pixel_scale: float
+            Resolution 'arcsec/pixel'
+        Phase_seeds_number: int
+            Number of random seeds for generation of different GRFs. Needed to precompute
+            Fourier images for unit power spectrum.
+        """
 
         self.pixel_number=pixel_number
         self.pixel_scale=pixel_scale
@@ -50,7 +65,7 @@ class GRF_inhomogeneities:
 
     def sample_unit_Fourier_image(self,random_seed):
         """
-        Samples random Fourier image for unit power spectrum of GRF
+        Samples random Fourier image for unit power spectrum of GRF inhomogeneities
         Parameters
         ----------
         random_seed: int
@@ -114,7 +129,7 @@ class GRF_inhomogeneities:
     def field_variance(self,Spectrum_parameters,field='potential'):
         """
         Computes variance of a given field using Parseval's theorem
-        This will the theoretical variance, i.e. the field variance averaged over random seeds
+        The result is the theoretical variance, i.e. the field variance averaged over infinite random realisations
         Parameters
         ----------
         Spectrum_parameters: [float,float]
@@ -158,7 +173,8 @@ class GRF_inhomogeneities:
 
     def potential(self,Spectrum_parameters,unit_Fourier_image):
         """
-        Function generating GRF gravitational potential
+        Function generating gravitational potential of galaxy satellites
+        in the model of GRF inhomogeneities.
         We have to pass Fourier image explicitly, to eventually compile the function
         to a pure one: potential(Spectrum_parameters)
         Parameters
@@ -172,7 +188,7 @@ class GRF_inhomogeneities:
         Returns
         -------
         potential: np.ndarray real (pixel_number,pixel_number)
-            Gravitational potential of GRF inhomogeneities
+            GRF Gravitational potential
         """
 
         #Power spectrum softened in wavevector=0
@@ -194,7 +210,7 @@ class GRF_inhomogeneities:
 
     def alpha(self,Spectrum_parameters,unit_Fourier_image,direction='y'):
         """
-        Differential deflection of GRF inhomogeneities for given direction
+        Differential deflection of GRF potential inhomogeneities for given direction
         Parameters
         ----------
         Spectrum_parameters: [float,float]
@@ -243,7 +259,7 @@ class GRF_inhomogeneities:
 
     def kappa(self,Spectrum_parameters,unit_Fourier_image):
         """
-        Differential convergence of GRF inhomogeneities
+        Differential convergence of GRF potential inhomogeneities
         Parameters
         ----------
         Spectrum_parameters: [float,float]

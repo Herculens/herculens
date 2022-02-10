@@ -1,14 +1,13 @@
 import unittest
-import pytest
 
-from GRF_perturbations.Modules.GRF_inhomogeneities import *
+from GRF_perturbations.Modules.GRF_inhomogeneities_class import *
 import scipy as sc
 
 
 class test_GRF_inhomogeneities(unittest.TestCase):
 
     def setUp(self):
-        self.GRF_class = GRF_inhomogeneities(100, 0.08, 100)
+        self.GRF_class = GRF_inhomogeneities_class(100, 0.08, 100)
 
     def test_box_muller(self):
         BM_variates = np.zeros((1000, 2))
@@ -58,6 +57,7 @@ class test_GRF_inhomogeneities(unittest.TestCase):
                 Potentials = np.array([self.GRF_class.potential([logA,Beta],self.GRF_class.tensor_unit_Fourier_images[seed])\
                                        for seed in range(100)])
                 generated_Variances[i,j]=Potentials.var(axis=(-1,-2))
+
 
         #Test that logVariances match
         self.assertTrue(np.allclose(np.log(generated_Variances),np.log(theoretical_Variances),rtol=0.25))
