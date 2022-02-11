@@ -85,8 +85,8 @@ class Inference_class:
 
         # Compile pure function grad(Loss) for arguments of Source-Lens model
         model_loss_grad= jax.jit(lambda args: self.image_loss_gradient(args,data))
-        # Initialise the parameters used to start gradient descent
-        args_guess=self.SL_parameters.kwargs2args(self.Surface_brightness.kwargs_unperturbed_model)
+        # Initialise the parameters used to start gradient descent (important that it is np.array, not list)
+        args_guess=np.array(self.SL_parameters.kwargs2args(self.Surface_brightness.kwargs_unperturbed_model))
 
         # Differentiable version of gradient descent algorithm
         args_max_likelihood=gradient_descent(model_loss_grad,args_guess,self.max_iter,self.lr_rate)

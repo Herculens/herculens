@@ -132,6 +132,7 @@ class Surface_brightness_class:
             Inner and Outer borders of the mask covering Einstien ring in units of arcsec
         """
 
+        # Even shaped square grid facilitates geometrical trnasformations, but should be generalised in the future
         assert (type(pixel_number)==int) and (pixel_number%2==0)
 
         #Size of grid and resolution

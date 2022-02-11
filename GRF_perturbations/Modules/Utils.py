@@ -11,9 +11,9 @@ def gradient_descent(gradient_function,initial_guess,max_iter,learning_rate):
     to propagate derivatives from surface brightness anomalies to power spectrum of GRF potential inhomogeneities
     Parameters
     ----------
-    gradient_function: func(args: list[float])->list[float]
+    gradient_function: func(args: jnp.array([float]))->jnp.array([float])
               grad(Loss) that is gradient of negative log-likelihood to be minimised
-    initial_guess: jnp.ndarray real
+    initial_guess: np.ndarray real
           the 'args' from which the gradient descent starts
     max_iter: int
           Number of gradient descent iterations used for fitting

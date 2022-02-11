@@ -40,7 +40,8 @@ class GRF_inhomogeneities_class:
             Number of random seeds for generation of different GRFs. Needed to precompute
             Fourier images for unit power spectrum.
         """
-
+        
+        # Even shaped square grid facilitates geometrical trnasformations, but should be generalised in the future
         assert (type(pixel_number) == int) and (pixel_number % 2 == 0)
 
         self.pixel_number=pixel_number
