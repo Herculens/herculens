@@ -32,7 +32,7 @@ class GRF_inhomogeneities_class:
         Initialize model for given grid pixelisation, resolution and number GRF random seeds
         Parameters
         ----------
-        pixel_number: int
+        pixel_number: int (even)
             Lens plane grid is a square with side of 'pixel_number' pixels
         pixel_scale: float
             Resolution 'arcsec/pixel'
@@ -40,6 +40,8 @@ class GRF_inhomogeneities_class:
             Number of random seeds for generation of different GRFs. Needed to precompute
             Fourier images for unit power spectrum.
         """
+
+        assert (type(pixel_number) == int) and (pixel_number % 2 == 0)
 
         self.pixel_number=pixel_number
         self.pixel_scale=pixel_scale
@@ -81,7 +83,7 @@ class GRF_inhomogeneities_class:
         Fourier_image = np.zeros([self.pixel_number, self.pixel_number], dtype='cfloat')  # Empty matrix to be filled in for the Fourier plane
         j = 0 + 1j  # Defining the complex number
 
-        half_length=math.ceil(self.pixel_number/2.)
+        half_length=self.pixel_number//2
 
         #Define top part of Fourier image and obtain bottom as complex conjugate
         for y in range(half_length+1):

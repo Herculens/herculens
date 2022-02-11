@@ -1,7 +1,6 @@
 #Basic imports
 import numpy as np
 from copy import deepcopy
-import math
 
 #JAX
 import jax.numpy as jnp
@@ -96,16 +95,16 @@ class Surface_brightness_class:
     for predefined source galaxy sb, lens galaxy sb, lens galaxy gravitational potential
     and for varying galaxy satellites gravitational potential"""
 
-    def __init__(self, pixel_number, pixel_scale, PSF_FWHM, SNR, exposure_time, supersampling_factor=None,
+    def __init__(self, pixel_number: int, pixel_scale: float, PSF_FWHM: float, SNR: float, exposure_time: float, supersampling_factor=None,
                  source_light_model_list=None, kwargs_source_light=None,
                  lens_mass_model_list=None, kwargs_lens_mass=None,
                  lens_light_model_list=None, kwargs_lens_light=None,
                  annulus_mask_borders=None):
         """
-
+        Initialize model for given observation conditions and unperturbed source-lens setup
         Parameters
         ----------
-        pixel_number: int
+        pixel_number: int (even)
             Lens plane grid is a square with side of 'pixel_number' pixels
         pixel_scale: float
             Resolution 'arcsec/pixel'
@@ -133,6 +132,7 @@ class Surface_brightness_class:
             Inner and Outer borders of the mask covering Einstien ring in units of arcsec
         """
 
+        assert (type(pixel_number)==int) and (pixel_number%2==0)
 
         #Size of grid and resolution
         self.pixel_number=pixel_number

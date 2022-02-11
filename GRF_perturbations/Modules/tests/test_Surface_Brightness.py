@@ -89,7 +89,7 @@ class test_Surface_Brightness(unittest.TestCase):
         self.assertLess(scipy.stats.page_trend_test(SB_anomalies_spectrum_logAs.T).pvalue,0.05)
         # Spatial scale of anomalies should grow with spatial scale of potential perturbations
         self.assertLess(scipy.stats.page_trend_test(SB_anomalies_spectrum_Betas.T).pvalue, 0.05)
-        # Quite a weird test, I know. But it will tell you if your generation of perturbations doesn't work or if you mistaken with signs
+        # Quite a weird test, I know. But it will tell you if your generation of perturbations doesn't work or if you have mistaken with signs
 
 if __name__ == '__main__':
     unittest.main()
