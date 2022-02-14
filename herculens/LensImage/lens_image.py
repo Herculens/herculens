@@ -1,4 +1,3 @@
-import functools
 import copy
 import jax.numpy as np
 from functools import partial
