@@ -3,6 +3,7 @@ from functools import partial
 import jax.numpy as jnp
 from jax import jit
 
+from herculens.Inference.base_differentiable import Differentiable
 from herculens.Util.jax_util import WaveletTransform
 from herculens.Util import model_util
 
@@ -10,7 +11,7 @@ from herculens.Util import model_util
 __all__ = ['Loss']
 
 
-class Loss(object):
+class Loss(Differentiable):
 
     # TODO: creates subclasses Likelihood, Regularization and Prior to abstract out some of the methods here
 
@@ -49,12 +50,8 @@ class Loss(object):
         self._init_regularizations(regularization_terms, regularization_strengths, potential_noise_map)
         self._init_priors(prior_terms)
 
-    @partial(jit, static_argnums=(0,))
-    def __call__(self, args):
-        return self.loss(args)
-
-    def loss(self, args):
-        """defined as the negative log(likelihood*prior*regularization)"""
+    def _func(self, args):
+        """negative log(likelihood*prior*regularization)"""
         kwargs = self._param.args2kwargs(args)
         model = self._image.model(**kwargs)
         neg_log = - self.log_likelihood(model) - self.log_regularization(kwargs) - self.log_prior(args)

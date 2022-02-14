@@ -13,7 +13,7 @@ from numpyro.infer import MCMC as numpyro_MCMC
 #from numpyro.infer.util import ParamInfo
 from emcee import EnsembleSampler
 
-from herculens.Inference.inference_base import InferenceBase
+from herculens.Inference.base_inference import Inference
 
 # ref: https://bayesianbrad.github.io/posts/2019_hmc.html
 # - q is the position, which are variables we are interested in
@@ -26,7 +26,7 @@ from herculens.Inference.inference_base import InferenceBase
 __all__ = ['Sampler']
 
 
-class Sampler(InferenceBase):
+class Sampler(Inference):
     """Class that handles sampling tasks, i.e. approximating posterior distributions of parameters.
     It currently supports:
     - Hamiltonian Monte Carlo from numpyro
@@ -38,7 +38,7 @@ class Sampler(InferenceBase):
                      step_size=1e-3, inv_mass_matrix=None, num_integ_steps=30, 
                      seed=0):
         rng_key = jax.random.PRNGKey(seed)
-        logprob = self.loss
+        logprob = self._loss.function
         init_positions = self._param.current_values(as_kwargs=False, restart=restart_from_init)
         if inv_mass_matrix is None:
             # default inverse mass matrix is only 1s

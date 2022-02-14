@@ -1,0 +1,36 @@
+from functools import partial
+from jax import jit, grad, jacfwd, jacrev, jvp
+
+
+__all__ = ['Differentiable']
+
+
+class Differentiable(object):
+
+    """Abstract class that defines a function with its derivatives, typically the loss function.
+    """
+
+    @partial(jit, static_argnums=(0,))
+    def __call__(self, args):
+        """alias differentiable function"""
+        return self._func(args)
+
+    @partial(jit, static_argnums=(0,))
+    def function(self, args):
+        return self._func(args)
+
+    @partial(jit, static_argnums=(0,))
+    def gradient(self, args):
+        """gradient (first derivative) of the loss function"""
+        return grad(self._func)(args)
+
+    @partial(jit, static_argnums=(0,))
+    def hessian(self, args):
+        """hessian (second derivative) of the loss function"""
+        return jacfwd(jacrev(self._func))(args)
+
+    @partial(jit, static_argnums=(0,))
+    def hessian_vec_prod(self, args, vec):
+        """hessian-vector product"""
+        # forward-over-reverse (https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html#hessian-vector-products-using-both-forward-and-reverse-mode)
+        return jvp(grad(self._func), (args,), (vec,))[1]

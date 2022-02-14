@@ -6,12 +6,12 @@ from scipy import optimize
 from scipy.optimize import Bounds
 from tqdm import tqdm
 
-from herculens.Inference.inference_base import InferenceBase
+from herculens.Inference.base_inference import Inference
 
 __all__ = ['Optimizer']
 
 
-class Optimizer(InferenceBase):
+class Optimizer(Inference):
     """Class that handles optimization tasks, i.e. finding best-fit point estimates of parameters
     It currently handles:
     - a subset of scipy.optimize.minimize routines, using first and second order derivatives when required
@@ -35,14 +35,14 @@ class Optimizer(InferenceBase):
     def minimize(self, method='BFGS', maxiter=None, restart_from_init=False, use_exact_hessian_if_allowed=False):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
         init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
-        metrics = MinimizeMetrics(self.loss, method)
+        metrics = MinimizeMetrics(self._loss, method)
         start = time.time()
         best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, maxiter, metrics,
                                                            use_exact_hessian_if_allowed)
         runtime = time.time() - start
         if metrics.loss_history == []:
             warnings.warn("The loss history does not contain any value")
-            logL_best_fit = self.loss(best_fit)
+            logL_best_fit = self._loss(best_fit)
         else:
             logL_best_fit = - float(metrics.loss_history[-1])
         self._param.set_best_fit(best_fit)
@@ -56,18 +56,18 @@ class Optimizer(InferenceBase):
         # here we only put select the kwargs related to the chosen method 
         extra_kwargs = {}
         if method in ['BFGS']:
-            extra_kwargs['jac'] = self.gradient
+            extra_kwargs['jac'] = self._loss.gradient
         elif method in ['Newton-CG', 'trust-krylov', 'trust-exact', 'trust-constr']:
-            extra_kwargs['jac'] = self.gradient
+            extra_kwargs['jac'] = self._loss.gradient
             if method == 'trust-exact' or exact_hessian is True:
-                extra_kwargs['hess'] = self.hessian
+                extra_kwargs['hess'] = self._loss.hessian
             else:
-                extra_kwargs['hessp'] = self.hessian_vec_prod
+                extra_kwargs['hessp'] = self._loss.hessian_vec_prod
             if method == 'trust-constr':
                 extra_kwargs['bounds'] = Bounds(*self._param.bounds)
         if maxiter is not None:
             extra_kwargs['options'] = {'maxiter': maxiter}
-        res = optimize.minimize(self.loss, x0, method=method, callback=callback, 
+        res = optimize.minimize(self._loss, x0, method=method, callback=callback, 
                                 **extra_kwargs)
         extra_fields = {'result_class': res, 'jac': None, 'hess': None, 'hess_inv': None}
         for key in extra_fields:
@@ -125,9 +125,9 @@ class Optimizer(InferenceBase):
         for i in self._for_loop(range(max_iterations), progress_bar, 
                                 total=max_iterations, 
                                 desc=f"optax.{algorithm}"):
-            updates, opt_state = optim.update(self.gradient(params), opt_state, params)
+            updates, opt_state = optim.update(self._loss.gradient(params), opt_state, params)
             params = optax.apply_updates(params, updates)
-            loss = self.loss(params)
+            loss = self._loss(params)
             if stop_at_loss_increase and i > min_iterations and loss > prev_loss:
                 params, loss = prev_params, prev_loss
                 break
@@ -149,7 +149,7 @@ class Optimizer(InferenceBase):
         # Gradient descent loop
         start_time = time.time()
         for _ in range(num_iterations):
-            params -= step_size * self.gradient(params)
+            params -= step_size * self._loss.gradient(params)
         runtime = time.time() - start_time
         best_fit = params
         logL_best_fit = self.log_probability(best_fit)
@@ -168,7 +168,7 @@ class Optimizer(InferenceBase):
         optimizer = ParticleSwarmOptimizer(self.log_likelihood, 
                                            lowers, uppers, n_particles, pool=pool)
         init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init)
-        optimizer.set_global_best(init_params, [0]*len(init_params), - self.loss(init_params))
+        optimizer.set_global_best(init_params, [0]*len(init_params), - self._loss(init_params))
         start = time.time()
         best_fit, [chi2_list, pos_list, vel_list] = optimizer.optimize(n_iterations)
         runtime = time.time() - start

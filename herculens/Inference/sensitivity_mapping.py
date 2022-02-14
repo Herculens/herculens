@@ -48,7 +48,6 @@ class MassSensitivityMapping(object):
 
         # create the loss corresponding this new model
         self.halo_loss = Loss(self.data, self.halo_lens_image, self.halo_param, likelihood_type='chi2')
-        self.halo_grad_loss = jit(grad(self.halo_loss.loss))
 
         # define the grid on which to compute sensitivity
         if self.halo_lens_image.ImageNumerics.grid_supersampling_factor > 1:
@@ -60,7 +59,7 @@ class MassSensitivityMapping(object):
         if self.verbose:
             print("halo loss at edge:", self.halo_loss([init_mass, x_grid[0, 0], y_grid[0, 0]]))
             print("halo loss on arc:", self.halo_loss([init_mass, 1.1, 1.1]))
-            print("halo grad loss on arc:", self.halo_grad_loss([init_mass, 1.1, 1.1]))
+            print("halo grad loss on arc:", self.halo_loss.gradient([init_mass, 1.1, 1.1]))
 
             print("macro loss:", self.m_loss(self.p_macro))
             # print("macro grad loss:", grad(self.m_loss)(self.p_macro))
@@ -71,7 +70,7 @@ class MassSensitivityMapping(object):
                 p = [init_mass, x, y]
             else:
                 p = [init_mass, x, y] + self.p_macro
-            grad_loss_mass = self.halo_grad_loss(p)
+            grad_loss_mass = self.halo_loss.gradient(p)
             partial_deriv_mass = grad_loss_mass[0]
             return partial_deriv_mass
         
