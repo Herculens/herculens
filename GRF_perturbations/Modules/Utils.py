@@ -2,6 +2,8 @@ import jax
 import numpy as np
 import jax.numpy as jnp
 from functools import partial
+from GRF_perturbations.Modules.Surface_Brightness_class import Surface_brightness_class,default_kwargs_init
+from scipy.optimize import minimize
 
 
 def gradient_descent(gradient_function,initial_guess,max_iter,learning_rate):
@@ -32,46 +34,44 @@ def gradient_descent(gradient_function,initial_guess,max_iter,learning_rate):
     # This method introduces recursion that you can differentiate
     return jax.lax.fori_loop(0,max_iter,step_function,initial_guess)
 
-# TODO: change arguments and realisation to use Surface_Brightness_class
-"""
-def scipy_fit_image(data,simulate_unperturbed_image_pure,noise_var,parameters,method='BFGS',initial_values=None):
-    '''
-    Differentiable gradient descent-based function
+# Inference class could be used here, but it triggers cyclic imports and necessary Inference_class initialization
+# TODO: function comments
+def scipy_fit_Surface_Brightness(data,Surface_brightness: Surface_brightness_class,method='Newton-CG'):
+    """
+
     Parameters
     ----------
-    data: jnp.ndarray
-        image to be fitted
-    lens_image: LensModel object
-        class used to simulate the model image for the fit
-    noise_var: jnp.ndarray
-        map of noise variances needed for chi^2
+    data
+    Surface_brightness
+    method
 
     Returns
     -------
-    kwargs
-        lens-source kwargs that are the results of the fit
-    '''
-    
-    model_loss_function_pure=jax.jit(lambda args: model_loss_function(args,data,simulate_unperturbed_image_pure,\
-                                                                  noise_var,parameters))
-    '''
-    def loss(args):
-        kwargs=parameters.args2kwargs(args)
-        model=simulate_unperturbed_image_pure(kwargs)
 
-        return jnp.mean((data-model)**2/noise_var)
-    '''
-    loss=jax.jit(model_loss_function_pure)
-    grad_loss=jax.jit(jax.grad(loss))
-    hess_loss=jax.jit(jax.jacfwd(jax.jit(jax.jacrev(loss))))
+    """
+    #Initialize image generation function
+    simulate_unperturbed_image = Surface_brightness.unperturbed_image_getter
+    simulate_unperturbed_image_pure = lambda model_kwargs: simulate_unperturbed_image(model_kwargs, Noise_flag=False)
+    # args<->kwargs transformation
+    SL_parameters=Surface_brightness.parameters()
+    # args to start fitting from
+    initial_guess=SL_parameters.initial_values()
 
-    if initial_values is None:
-        initial_values=parameters.initial_values()
+    @jax.jit
+    def Loss_function(args):
+        kwargs = SL_parameters.args2kwargs(args)
+        model = simulate_unperturbed_image_pure(kwargs)
+        # Chi^2 loss
+        return jnp.mean((data-model)**2/Surface_brightness.noise_var)
 
-    res = scipy_minimize(loss, initial_values,jac=grad_loss,hess=hess_loss, method=method)
+    Loss_gradient=jax.jit(jax.grad(Loss_function))
+    Loss_hessian=jax.jit(jax.jacfwd(jax.jit(jax.jacrev(Loss_function))))
 
-    return parameters.args2kwargs(res.x)
-"""
+    #Scipy-driven Loss optimization
+    res = minimize(Loss_function, initial_guess,jac=Loss_gradient,hess=Loss_hessian, method=method)
+
+    return SL_parameters.args2kwargs(res.x)
+
 
 def Spectrum_radial_averaging(power_spectrum_half,k_grid_half,frequencies):
     """
@@ -136,22 +136,25 @@ def jax_map(f, xs):
     Differentiable version of mapping a function over an array.
     Can be used to map function over matrix,
     Mapping is carried out over the first dimension in that case
-    Examples
-    -------
-    >>> get_GRF=lambda GRF_seed: get_jaxified_GRF_pure(GRF_params,GRF_seed)
-    >>> GRFs=jax_map(get_GRF,GRF_seeds)
-    >>> print('GRF_seeds.shape',GRF_seeds.shape)
-    GRF_seeds.shape (10,)
-    >>> print('Function output shape',get_jaxified_GRF_pure(GRF_params,GRF_seed).shape)
-    Function output shape (100, 100)
-    >>> print('Mapping output shape',GRFs.shape)
-    Mapping output shape (10, 100, 100)
     '''
     #Function (carry,value)->(carry,f(value)), with no interest in carry
     scan_func = lambda _,x: (1,f(x))
     #Jaxified loop over an array
     ys=jax.lax.scan(scan_func,0,xs)[1]
     return ys
+
+@partial(jax.jit, static_argnums=(2,))
+def Spectra_Loss(model_spectra,data_spectrum,Number_of_spectra):
+
+    data_log_spectrum=jnp.log(data_spectrum)
+    models_log_spectra=jnp.log(model_spectra)
+
+    Mean_logN=models_log_spectra.mean(axis=-2)
+    Sigma_logN=jnp.sqrt(jnp.power(models_log_spectra-Mean_logN,2).sum(axis=-2)/
+                      (Number_of_spectra-1))
+
+    #Chi^2 loss for Normal likelihood of log(Power_spectrum)
+    return jnp.mean(jnp.power((data_log_spectrum - Mean_logN) / Sigma_logN, 2), axis=-1)
 
 
 #map function(logA,Beta,GRF_seed) over grid of arrays of logA,Beta,GRF_seeds

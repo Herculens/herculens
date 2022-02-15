@@ -44,8 +44,8 @@ class test_Utils(unittest.TestCase):
         self.assertTrue(np.allclose(gradient_of_b_wrp_y(y1), gradient_of_b_wrp_y(y2)),msg='dL/dk are linear wrp b, so grads should be equal')
 
     def test_spectrum_radial_averaging(self):
-        logA_array = [-9., -8., -7.]
-        Beta_array = [0, 2, 4]
+        logA_array = [-9.,-8.5, -8.,-7.5, -7.]
+        Beta_array = [0,1, 2,3, 4]
 
         independent_spectrum_index = self.Surface_brightness.pixel_number // 2
         k_grid_half = self.GRF_class.k_grid[:, :independent_spectrum_index]
@@ -69,12 +69,72 @@ class test_Utils(unittest.TestCase):
                     spectrum_logAs[i, j, seed] = fit_results[0]
                     spectrum_Betas[i, j, seed] = fit_results[1]
 
-        self.assertTrue(np.allclose(spectrum_logAs[2]-spectrum_logAs[1],1))
-        self.assertTrue(np.allclose(spectrum_logAs[1] - spectrum_logAs[0], 1))
+        # fitted logA change like mock logA (different normalisations though)
+        for i in range(len(logA_array)-1):
+            self.assertTrue(np.allclose(spectrum_logAs[i+1]-spectrum_logAs[i],0.5))
 
-        # TODO: test for Beta
+        # Check that fitted Beta is independent of logA
+        for i in range(len(logA_array)-1):
+            self.assertTrue(np.allclose(spectrum_Betas[i+1].flatten() - spectrum_Betas[i].flatten(), 0,atol=5e-5))
 
+        # rearranged tensor (logA*phi,Beta)
+        Spec_subjects_treatments=np.transpose(spectrum_Betas, axes=[0, 2, 1]).flatten().reshape((len(logA_array)*10, len(Beta_array)))
+        # Check the trend that fitted Beta grows with mock Beta
+        self.assertLess(scipy.stats.page_trend_test(Spec_subjects_treatments).pvalue, 0.05)
 
+    def test_jax_map(self):
+        np.random.seed(42)
+        tensor = np.random.normal(size=(10, 2, 2))
+        #test that maps over first dimension
+        self.assertTrue(np.allclose(jax_map(lambda x: x.sum(),tensor),
+                                    tensor.sum(axis=(1,2))))
+
+        def func(tensor):
+            reduced_tensor = jax_map(lambda x: x.sum(), tensor)
+            power_sum = jnp.power(reduced_tensor, 2).sum()
+            return power_sum
+
+        gradients=jax.grad(func)(tensor)
+        analytic_gradients=tensor.sum(axis=(1,2))*2
+        analytic_gradients_tensor=np.repeat(analytic_gradients,4).reshape((10,2,2))
+
+        #Test that gradients are correct
+        self.assertTrue(np.allclose(gradients,analytic_gradients_tensor))
+
+    def test_scipy_fit_surface_brightness(self):
+
+        # Functions for image generation
+        simulate_unperturbed_image = self.Surface_brightness.unperturbed_image_getter
+        simulate_unperturbed_image_noiseless = lambda model_kwargs: simulate_unperturbed_image(model_kwargs,Noise_flag=False)
+        simulate_perturbed_image = self.Surface_brightness.perturbed_image_getter
+
+        # Images for fitting to be tested on
+        Image_unperturbed_noiseless=simulate_unperturbed_image_noiseless(self.Surface_brightness.kwargs_unperturbed_model)
+        Image_unperturbed_noisy=simulate_unperturbed_image(self.Surface_brightness.kwargs_unperturbed_model,Noise_flag=True,noise_seed=18)
+        GRF_potential = self.GRF_class.potential([-7.8, 2], self.GRF_class.tensor_unit_Fourier_images[0])
+        Image_perturbed_noisy=simulate_perturbed_image(GRF_potential,Noise_flag=True,noise_seed=42)
+
+        # args<->kwargs transformation
+        SL_parameters = self.Surface_brightness.parameters()
+        #Chi^2 loss function
+        def Loss_function(args, data):
+            kwargs = SL_parameters.args2kwargs(args)
+            model = simulate_unperturbed_image_noiseless(kwargs)
+            # Chi^2 loss
+            return jnp.mean((data - model) ** 2 / self.Surface_brightness.noise_var)
+
+        losses = np.zeros(3)
+        for i, data in enumerate([Image_unperturbed_noiseless, Image_unperturbed_noisy, Image_perturbed_noisy]):
+            fit = scipy_fit_Surface_Brightness(data, self.Surface_brightness,method='Newton-CG')
+            losses[i] = Loss_function(SL_parameters.kwargs2args(fit), data)
+
+        self.assertAlmostEqual(losses[0],0,msg='Noiseless unperturbed image should be fitted perfectly')
+        self.assertTrue(np.isclose(losses[1], 1,rtol=0.2), msg='Noisy unperturbed image should result in chi^2 close to 1')
+        self.assertGreater(losses[2],1,msg='Perturbed image should result in chi^2>1, since the model has no power to describe perturbations')
+        self.assertLess(losses[2], 3, msg='In the perturbation limit the model should still result in relevant description of the image')
+
+    def test_Spectra_Loss(self):
+        self.assertTrue(False)
 
 if __name__ == '__main__':
     unittest.main()
