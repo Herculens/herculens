@@ -82,7 +82,6 @@ class test_Inference(unittest.TestCase):
         Grads_of_Loss_final=jax.grad(test_func)(self.Image_perturbed_noisy)
         self.assertTrue((np.abs(Grads_of_Loss_final)>0).all())
 
-    """
     def test_compute_radial_spectrum(self):
 
         # Image of noise only
@@ -176,7 +175,7 @@ class test_Inference(unittest.TestCase):
         # Gradients in the wrong point lead to direction of the correct point
         self.assertGreater(Grad_in_false_point[0],0)
         self.assertLess(Grad_in_false_point[1], 0)
-    """
+
 
 if __name__ == '__main__':
     unittest.main()
