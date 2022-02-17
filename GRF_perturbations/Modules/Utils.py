@@ -143,6 +143,7 @@ def jax_map(f, xs):
     ys=jax.lax.scan(scan_func,0,xs)[1]
     return ys
 
+'''
 @partial(jax.jit, static_argnums=(2,))
 def Spectra_Loss(model_spectra,data_spectrum,Number_of_spectra):
 
@@ -155,7 +156,7 @@ def Spectra_Loss(model_spectra,data_spectrum,Number_of_spectra):
 
     #Chi^2 loss for Normal likelihood of log(Power_spectrum)
     return jnp.mean(jnp.power((data_log_spectrum - Mean_logN) / Sigma_logN, 2), axis=-1)
-
+'''
 
 #map function(logA,Beta,GRF_seed) over grid of arrays of logA,Beta,GRF_seeds
 def jax_map_over_grid(function,logA_array,Beta_array,GRF_seeds):

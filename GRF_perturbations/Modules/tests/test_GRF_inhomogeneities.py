@@ -6,7 +6,8 @@ import scipy as sc
 
 class test_GRF_inhomogeneities(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(self):
         self.GRF_class = GRF_inhomogeneities_class(100, 0.08, 100)
 
     def test_box_muller(self):

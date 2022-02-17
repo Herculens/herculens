@@ -7,7 +7,8 @@ import scipy
 
 class test_Utils(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(self):
         self.GRF_class = GRF_inhomogeneities_class(100, 0.08, 100)
         self.Surface_brightness = Surface_brightness_class(100, 0.08, 0.1, 200, 2028)
 
@@ -132,9 +133,6 @@ class test_Utils(unittest.TestCase):
         self.assertTrue(np.isclose(losses[1], 1,rtol=0.2), msg='Noisy unperturbed image should result in chi^2 close to 1')
         self.assertGreater(losses[2],1,msg='Perturbed image should result in chi^2>1, since the model has no power to describe perturbations')
         self.assertLess(losses[2], 3, msg='In the perturbation limit the model should still result in relevant description of the image')
-
-    def test_Spectra_Loss(self):
-        self.assertTrue(False)
 
 if __name__ == '__main__':
     unittest.main()

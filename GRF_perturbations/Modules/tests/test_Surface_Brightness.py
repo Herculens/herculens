@@ -9,7 +9,8 @@ from tqdm import tqdm
 
 class test_Surface_Brightness(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(self):
         self.GRF_class=GRF_inhomogeneities_class(100,0.08,100)
         self.Surface_brightness=Surface_brightness_class(100,0.08,0.1,200,2028)
         self.compute_radial_spectrum_pure=jax.jit(lambda image: compute_radial_spectrum(image,self.Surface_brightness.annulus_mask,self.GRF_class.k_grid,self.Surface_brightness.frequencies))

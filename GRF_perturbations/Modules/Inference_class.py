@@ -128,7 +128,7 @@ class Inference_class:
 
         return Radial_spectrum
 
-    # TODO: comments and unittests
+    # TODO: comments
     @partial(jax.jit, static_argnums=(0,3,))
     def Anomalies_Radial_Power_Spectrum(self,GRF_params,unit_Fourier_image,Noise_flag=True):
         """
@@ -165,7 +165,7 @@ class Inference_class:
         return Radial_Power_Spectrum
 
 
-    # TODO: comments for the function, unittests for differentiability,
+    # TODO: comments for the function,
     #  figure  out how to not use std inside the function Cause otherwise we either won't have enough statistics
     # Or the func would be not differentiable. Approach step by step improving uncertainty?
     @partial(jax.jit, static_argnums=(0,2,3,4))
