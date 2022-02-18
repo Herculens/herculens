@@ -169,7 +169,7 @@ class Inference_class:
     #  figure  out how to not use std inside the function Cause otherwise we either won't have enough statistics
     # Or the func would be not differentiable. Approach step by step improving uncertainty?
     @partial(jax.jit, static_argnums=(0,2,3,4))
-    def GRF_Power_Spectrum_Loss(self,GRF_params,GRF_seeds_number,Spectra_Loss_function,Noise=True):
+    def GRF_Power_Spectrum_Loss(self,GRF_params,GRF_seeds_number,Spectra_Loss_function,Noise_flag=True):
         """
 
         Parameters
@@ -180,7 +180,7 @@ class Inference_class:
             It should be Chi^2 with fixed uncertainties, which are estimated separately and
             Loss is optimized step by step. Otherwise function is too costful to differentiate
             or the number of spectra used for uncertainty estimation is highly insufficient
-        Noise
+        Noise_flag:
 
         Returns
         -------
@@ -191,7 +191,7 @@ class Inference_class:
         unit_Fourier_images=self.GRF_inhomogeneities.tensor_unit_Fourier_images[:GRF_seeds_number]
 
         # Simulate Radial Power spectra for Surface Brightness Anomalies images generated for every GRF potential realisation
-        getter_SB_Anomalies_spectra=jax.jit(lambda unit_Fourier_image: self.Anomalies_Radial_Power_Spectrum(GRF_params,unit_Fourier_image,Noise))
+        getter_SB_Anomalies_spectra=jax.jit(lambda unit_Fourier_image: self.Anomalies_Radial_Power_Spectrum(GRF_params,unit_Fourier_image,Noise_flag))
         SB_Anomalies_spectra=jax_map(getter_SB_Anomalies_spectra,unit_Fourier_images)
 
         Loss=Spectra_Loss_function(SB_Anomalies_spectra)

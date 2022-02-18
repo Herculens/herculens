@@ -93,15 +93,16 @@ class GRF_inhomogeneities_class:
                 #Zero mean value of the field
                 if (y==0) and (x==0):
                     Fourier_image[y,x]=0.
+                    continue
 
-                #Real and Imaginary parts
+                # Real and Imaginary parts
                 z1, z2 = Box_Muller_transform()
 
-                #Points where Fourier image should be real for configuration image to be real
-                if (np.isin(y,[0,half_length]) and np.isin(x,[0,half_length])):
-                    Fourier_image[y,x]=z1
+                # Points where Fourier image should be real for configuration image to be real
+                if (np.isin(y, [0, half_length]) and np.isin(x, [0, half_length])):
+                    Fourier_image[y, x] = z1
                 else:
-                    Fourier_image[y,x]=(z1+j*z2)/np.sqrt(2)
+                    Fourier_image[y, x] = (z1 + j * z2) / np.sqrt(2)
 
                 #Complex conjugation
                 Fourier_image[-y, -x] = Fourier_image[y, x].conjugate()
@@ -207,9 +208,10 @@ class GRF_inhomogeneities_class:
         potential = Normalisation_factor * Configuration_image.real
 
         #Account for softening of Power spectrum by subtracting mean
-        zero_mean_potential=potential-potential.mean()
+        #zero_mean_potential=potential-potential.mean()
 
-        return zero_mean_potential
+        return potential
+
 
     def alpha(self,Spectrum_parameters,unit_Fourier_image,direction='y'):
         """
