@@ -70,8 +70,14 @@ def scipy_fit_Surface_Brightness(data,Surface_brightness: Surface_brightness_cla
     #Scipy-driven Loss optimization
     res = minimize(Loss_function, initial_guess,jac=Loss_gradient,hess=Loss_hessian, method=method)
 
-    return SL_parameters.args2kwargs(res.x)
+    return SL_parameters.args2kwargs(np.array(res.x))
 
+def kwargs_values_to_float(kwargs):
+    # If values in kwargs are DeviceArray this is the function to convert them to float
+    for _, object in kwargs.items():
+        for instance in object:
+            for parameter, value in instance.items():
+                instance[parameter] = float(value)
 
 def Spectrum_radial_averaging(power_spectrum_half,k_grid_half,frequencies):
     """

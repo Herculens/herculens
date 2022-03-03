@@ -9,8 +9,9 @@ from jax.config import config
 config.update("jax_enable_x64", True)
 config.update("jax_debug_nans", True)
 
+# Its very strange because Box-Muller function passes normality test, but some of  Fourier images pixels don't
 def Box_Muller_transform():
-    # Polar Box-Muller transform samples independent stadard normal deviates
+    # Polar Box-Muller transform samples independent standard normal deviates
     #Samples real and imaginary parts of Fourier image for unit power
     s = 1.1
     while s > 1. :
@@ -66,6 +67,8 @@ class GRF_inhomogeneities_class:
         # Return seed to the fixed one
         np.random.seed(42)
 
+    # TODO: Change sampling with np.random.seed to rng = np.random.RandomState(2021)
+    #  (https://towardsdatascience.com/stop-using-numpy-random-seed-581a9972805f)
     def sample_unit_Fourier_image(self,random_seed):
         """
         Samples random Fourier image for unit power spectrum of GRF inhomogeneities
@@ -198,7 +201,7 @@ class GRF_inhomogeneities_class:
         #Power spectrum softened in wavevector=0
         Power_spectrum=self.nonsingular_Power_spectrum(Spectrum_parameters)
 
-        #Fourier image of GRF to generate
+        #Fourier image of GRF to generate. unit_Fourier_image[0,0]=0, so spectrum softening doesn't play a role
         Fourier_image=jnp.sqrt(Power_spectrum)*unit_Fourier_image
         #Conf image that needs proper norm
         Configuration_image = jnp.fft.ifftshift(jnp.fft.ifftn(Fourier_image))
@@ -206,9 +209,6 @@ class GRF_inhomogeneities_class:
         # Normalisation for Parseval's theorem (Power_spectrum.sum()=potential.var())
         Normalisation_factor = self.pixel_number*self.pixel_number
         potential = Normalisation_factor * Configuration_image.real
-
-        #Account for softening of Power spectrum by subtracting mean
-        #zero_mean_potential=potential-potential.mean()
 
         return potential
 

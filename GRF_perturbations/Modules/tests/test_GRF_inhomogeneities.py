@@ -15,7 +15,7 @@ class test_GRF_inhomogeneities(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        self.GRF_class = GRF_inhomogeneities_class(100, 0.08, 1000)
+        self.GRF_class = GRF_inhomogeneities_class(100, 0.08, 100)
 
     def test_box_muller(self):
         """An algorithm to sample to independent standard normal random variates
@@ -64,13 +64,11 @@ class test_GRF_inhomogeneities(unittest.TestCase):
         os.system('echo pval max r= {:.5f}, pval min r= {:.5f}'.format(p_values_normality_real.max(), p_values_normality_real.min()))
         os.system('echo pval max i= {:.5f}, pval min i= {:.5f}'.format(p_values_normality_imag.max(), p_values_normality_imag.min()))
 
-
         self.assertTrue(np.allclose(Fourier_values.real.std(axis=1), 1., rtol=0.05), msg='Std is not 1')
         self.assertTrue(np.allclose(Fourier_values.imag.std(axis=1), 1., rtol=0.05), msg='Std is not 1')
 
     # TODO: test that mean is zero and that the image is actually real
     def test_potential(self):
-
         logA_array=[-9.,-8.,-7.]
         Beta_array=[0,2,4]
 
@@ -79,9 +77,9 @@ class test_GRF_inhomogeneities(unittest.TestCase):
 
         for i,logA in enumerate(logA_array):
             for j,Beta in enumerate(Beta_array):
-                #100 variances for each logA,Beta from Parseval's theorem
+                # 100 variances for each logA,Beta from Parseval's theorem
                 theoretical_Variances[i,j]=np.repeat(self.GRF_class.field_variance([logA,Beta],field='potential'),100)
-                #100 variances for each logA,Beta from actually sampled field
+                # 100 variances for each logA,Beta from actually sampled field
                 Potentials = np.array([self.GRF_class.potential([logA,Beta],self.GRF_class.tensor_unit_Fourier_images[seed])\
                                        for seed in range(100)])
                 generated_Variances[i,j]=Potentials.var(axis=(-1,-2))

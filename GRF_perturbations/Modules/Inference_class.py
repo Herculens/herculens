@@ -129,8 +129,8 @@ class Inference_class:
         return Radial_spectrum
 
     # TODO: comments
-    @partial(jax.jit, static_argnums=(0,3,))
-    def Anomalies_Radial_Power_Spectrum(self,GRF_params,unit_Fourier_image,Noise_flag=True):
+    @partial(jax.jit, static_argnums=(0,3,4))
+    def Anomalies_Radial_Power_Spectrum(self,GRF_params,unit_Fourier_image,Noise_flag=True,fit_image=True):
         """
 
         Parameters
@@ -152,8 +152,11 @@ class Inference_class:
         # Mock Surface brightness with noise and GRF potential perturbations
         Perturbed_SB_image=self.simulate_perturbed_image(GRF_potential,Noise_flag=Noise_flag,noise_seed=noise_seed)
 
-        # Fit perturbed image with unperturbed model to infer the Surface brightness anomalies
-        args_Unperturbed_SB=self.differentiable_fit_Surface_Brightness(Perturbed_SB_image)
+        if fit_image:
+            # Fit perturbed image with unperturbed model to infer the Surface brightness anomalies
+            args_Unperturbed_SB=self.differentiable_fit_Surface_Brightness(Perturbed_SB_image)
+        else:
+            args_Unperturbed_SB=self.SL_parameters.kwargs2args(self.Surface_brightness.kwargs_unperturbed_model)
 
         # Surface brightness of the gravitational lens that doesn't contain GRF perturbations or noise
         Unperturbed_SB_image=self.simulate_unperturbed_image_pure(self.SL_parameters.args2kwargs(args_Unperturbed_SB))
@@ -168,8 +171,8 @@ class Inference_class:
     # TODO: comments for the function,
     #  figure  out how to not use std inside the function Cause otherwise we either won't have enough statistics
     # Or the func would be not differentiable. Approach step by step improving uncertainty?
-    @partial(jax.jit, static_argnums=(0,2,3,4))
-    def GRF_Power_Spectrum_Loss(self,GRF_params,GRF_seeds_number,Spectra_Loss_function,Noise_flag=True):
+    @partial(jax.jit, static_argnums=(0,2,3,4,5))
+    def GRF_Power_Spectrum_Loss(self,GRF_params,GRF_seeds_number,Spectra_Loss_function,Noise_flag=True,fit_image=True):
         """
 
         Parameters
@@ -191,7 +194,7 @@ class Inference_class:
         unit_Fourier_images=self.GRF_inhomogeneities.tensor_unit_Fourier_images[:GRF_seeds_number]
 
         # Simulate Radial Power spectra for Surface Brightness Anomalies images generated for every GRF potential realisation
-        getter_SB_Anomalies_spectra=jax.jit(lambda unit_Fourier_image: self.Anomalies_Radial_Power_Spectrum(GRF_params,unit_Fourier_image,Noise_flag))
+        getter_SB_Anomalies_spectra=jax.jit(lambda unit_Fourier_image: self.Anomalies_Radial_Power_Spectrum(GRF_params,unit_Fourier_image,Noise_flag,fit_image))
         SB_Anomalies_spectra=jax_map(getter_SB_Anomalies_spectra,unit_Fourier_images)
 
         Loss=Spectra_Loss_function(SB_Anomalies_spectra)

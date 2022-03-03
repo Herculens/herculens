@@ -63,7 +63,7 @@ def check_model(model, kwargs):
 
     """
     # Empty model
-    if model == [] and kwargs == [{}]:
+    if (model == [] or model == [{}]) and (kwargs == [{}] or kwargs == []):
         return True
 
     #Check model
