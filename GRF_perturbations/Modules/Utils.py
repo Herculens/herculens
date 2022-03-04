@@ -165,7 +165,7 @@ def Spectra_Loss(model_spectra,data_spectrum,Number_of_spectra):
 '''
 
 #map function(logA,Beta,GRF_seed) over grid of arrays of logA,Beta,GRF_seeds
-def jax_map_over_grid(function,logA_array,Beta_array,GRF_seeds):
+def jax_pmap_over_grid(function,logA_array,Beta_array,GRF_seeds):
     '''
 
     Parameters
@@ -209,4 +209,7 @@ def jax_map_over_grid(function,logA_array,Beta_array,GRF_seeds):
         func_of_Beta=partial(loop_over_seeds,logA)
         return jax_map(func_of_Beta,Beta_array)
 
-    return jax_map(loop_over_Betas,logA_array)
+    # Function computing loop over GRF amplitudes logA in parallel
+    compute_spectrum_grid_pmapped = jax.pmap(loop_over_Betas)
+
+    return compute_spectrum_grid_pmapped(logA_array)
