@@ -217,7 +217,7 @@ def marginalize_value(value,precision,marginalization='round'):
     else:
         raise ValueError('wrong marginalization type, pick one of "round","floor","ceil"')
 
-
+# TODO some problems with
 def plot_Inference_results(fig,ax_row,Surface_brightness,logA_array,Beta_array,Observed_image,Observed_anomalies,GRF_potential,Likelihood_grid,Confidence_grid,SNR_grid,
               logA_true_index,Beta_true_index,confidence_labels_locations=None,
               logA_ind_lim=None,Beta_ind_lim=None,legend_flag=True,titles_flag=True,fontsize=18):
@@ -268,7 +268,7 @@ def plot_Inference_results(fig,ax_row,Surface_brightness,logA_array,Beta_array,O
 
     # Figure of GRF gravitational potential inhomogeneities
     im=ax_row[1].imshow(GRF_potential,cmap='Spectral',norm=mpl.colors.TwoSlopeNorm(0))
-    colorborders=[marginalize_value(GRF_potential.min(),3,'ceil'),0,marginalize_value(GRF_potential.min(),3,'floor')]
+    colorborders=[marginalize_value(GRF_potential.min(),3,'ceil'),0,marginalize_value(GRF_potential.max(),3,'floor')]
     cbar=fig.colorbar(im,ax=ax_row[1],ticks=colorborders,fraction=0.045)
     cbar.ax.set_ylabel('Potential',rotation=90,fontsize=fontsize,labelpad=-20)
     cbar.ax.set_yticklabels(['{:.3f}'.format(colorborders[0]),'0','{:.3f}'.format(colorborders[2])],fontsize=fontsize)
@@ -276,7 +276,7 @@ def plot_Inference_results(fig,ax_row,Surface_brightness,logA_array,Beta_array,O
     # Figure for Observed anomalies
     normalised_masked_anomalies = (Observed_anomalies*Surface_brightness.annulus_mask)/np.sqrt(Surface_brightness.noise_var)
     im = ax_row[2].imshow(normalised_masked_anomalies, cmap='seismic', norm=mpl.colors.TwoSlopeNorm(0))
-    colorborders=[marginalize_value(normalised_masked_anomalies.min(),1,'ceil'),0,marginalize_value(normalised_masked_anomalies.min(),1,'floor')]
+    colorborders=[marginalize_value(normalised_masked_anomalies.min(),1,'ceil'),0,marginalize_value(normalised_masked_anomalies.max(),1,'floor')]
     cbar=fig.colorbar(im,ax=ax_row[2],ticks=colorborders,fraction=0.045)
     cbar.ax.set_ylabel('Normalised Flux',rotation=90,fontsize=fontsize,labelpad=-20)
     cbar.ax.set_yticklabels(['{:.1f}'.format(colorborders[0])+r'$\sigma$', '0', '{:.1f}'.format(colorborders[2])+r'$\sigma$'],fontsize=fontsize)
