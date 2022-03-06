@@ -188,7 +188,7 @@ def plot_Confidence_grid(axis,Beta_array,logA_array,Confidence_grid,SNR_grid,
     # Mark max likelihood logA,Beta
     predicted_Point=axis.scatter(Beta_array[Beta_max_likelihood_index],logA_array[logA_max_likelihood_index],label='Max likelihood',marker="o",s=80,color='k',edgecolor='w',linewidth=0.5)
     # Mark ground truth logA,Beta
-    true_Point=axis.scatter(Beta_array[logA_true_index],logA_array[Beta_true_index],label='Ground truth',marker="*",s=80,color='k',edgecolor='w',linewidth=0.5)
+    true_Point=axis.scatter(Beta_array[Beta_true_index],logA_array[logA_true_index],label='Ground truth',marker="*",s=80,color='k',edgecolor='w',linewidth=0.5)
 
     #Outline region of negative SNR
     imgSNR=axis.contourf(Beta_array,logA_array,SNR_grid,[SNR_grid.min(),0],colors='grey',alpha=0.5)
