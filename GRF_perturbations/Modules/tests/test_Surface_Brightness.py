@@ -2,7 +2,7 @@ import unittest
 
 from GRF_perturbations.Modules.GRF_inhomogeneities_class import GRF_inhomogeneities_class
 from GRF_perturbations.Modules.Surface_Brightness_class import *
-from GRF_perturbations.Modules.Image_processing import compute_radial_spectrum
+from GRF_perturbations.Modules.Inference_class import Inference_class
 import jax
 import scipy
 from tqdm import tqdm
@@ -13,7 +13,7 @@ class test_Surface_Brightness(unittest.TestCase):
     def setUpClass(self):
         self.GRF_class=GRF_inhomogeneities_class(100,0.08,100)
         self.Surface_brightness=Surface_brightness_class(100,0.08,0.1,200,2028)
-        self.compute_radial_spectrum_pure=jax.jit(lambda image: compute_radial_spectrum(image,self.Surface_brightness.annulus_mask,self.GRF_class.k_grid,self.Surface_brightness.frequencies))
+        self.Inference = Inference_class(self.GRF_class, self.Surface_brightness, Grad_descent_max_iter=0)
 
     def test_check_model(self):
         #Empty model
@@ -74,17 +74,16 @@ class test_Surface_Brightness(unittest.TestCase):
         for i in tqdm(range(5)):
             # 100 realisations for tests
             for seed in range(100):
-                GRF_potential = self.GRF_class.potential([logA_array[i], Beta_array[i]],
-                                                         self.GRF_class.tensor_unit_Fourier_images[seed])
+                GRF_potential = self.GRF_class.potential([logA_array[i], Beta_array[i]],self.GRF_class.tensor_unit_Fourier_images[seed])
                 Images[i, seed] = np.array([simulate_perturbed_image(GRF_potential, Noise_flag=False)])
-                Surface_brightness_Anomalies_spectrum=self.compute_radial_spectrum_pure(Images[i,seed]-unperturbed_Image)
+                Surface_brightness_Anomalies_spectrum=self.Inference.compute_radial_spectrum(Images[i,seed]-unperturbed_Image)
                 fit_results,_=scipy.optimize.curve_fit(power_law_function,self.Surface_brightness.frequencies,Surface_brightness_Anomalies_spectrum)
                 SB_anomalies_spectrum_logAs[i,seed]=fit_results[0]
                 SB_anomalies_spectrum_Betas[i,seed]=fit_results[1]
 
         #Conservation of total flux
         Total_flux=unperturbed_Image.sum()
-        self.assertTrue(np.allclose(Images.sum(axis=(-1,-2,)).flatten(),np.repeat(Total_flux, 5 * 100), rtol=0.05))
+        self.assertTrue(np.allclose(Images.sum(axis=(-1,-2,)).flatten(),np.repeat(Total_flux, 5 * 100), rtol=0.1))
 
         # Amplitude of anomalies should grow with amplitude of potential perturbations
         self.assertLess(scipy.stats.page_trend_test(SB_anomalies_spectrum_logAs.T).pvalue,0.05)

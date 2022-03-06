@@ -72,11 +72,11 @@ class test_Utils(unittest.TestCase):
 
         # fitted logA change like mock logA (different normalisations though)
         for i in range(len(logA_array)-1):
-            self.assertTrue(np.allclose(spectrum_logAs[i+1]-spectrum_logAs[i],0.5))
+            self.assertTrue(np.allclose(spectrum_logAs[i+1]-spectrum_logAs[i],0.5,atol=1e-4))
 
         # Check that fitted Beta is independent of logA
         for i in range(len(logA_array)-1):
-            self.assertTrue(np.allclose(spectrum_Betas[i+1].flatten() - spectrum_Betas[i].flatten(), 0,atol=5e-5))
+            self.assertTrue(np.allclose(spectrum_Betas[i+1].flatten() - spectrum_Betas[i].flatten(), 0,atol=5e-4))
 
         # rearranged tensor (logA*phi,Beta)
         Spec_subjects_treatments=np.transpose(spectrum_Betas, axes=[0, 2, 1]).flatten().reshape((len(logA_array)*10, len(Beta_array)))

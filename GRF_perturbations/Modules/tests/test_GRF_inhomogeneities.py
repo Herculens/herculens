@@ -58,11 +58,11 @@ class test_GRF_inhomogeneities(unittest.TestCase):
         # Total power is 1
         Total_powers=np.sum(np.abs(Fourier_values)**2,axis=1)/(2*100**2)
         self.assertTrue(np.allclose(Total_powers,1,atol=0.2))
-        os.system('echo total power max= {:.5f}, total power min= {:.5f}'.format(Total_powers.max(),Total_powers.min()))
-        p_values_normality_real = scipy.stats.normaltest(Fourier_values.real, axis=0).pvalue
-        p_values_normality_imag = scipy.stats.normaltest(Fourier_values.imag, axis=0).pvalue
-        os.system('echo pval max r= {:.5f}, pval min r= {:.5f}'.format(p_values_normality_real.max(), p_values_normality_real.min()))
-        os.system('echo pval max i= {:.5f}, pval min i= {:.5f}'.format(p_values_normality_imag.max(), p_values_normality_imag.min()))
+        #os.system('echo total power max= {:.5f}, total power min= {:.5f}'.format(Total_powers.max(),Total_powers.min()))
+        #p_values_normality_real = scipy.stats.normaltest(Fourier_values.real, axis=0).pvalue
+        #p_values_normality_imag = scipy.stats.normaltest(Fourier_values.imag, axis=0).pvalue
+        #os.system('echo pval max r= {:.5f}, pval min r= {:.5f}'.format(p_values_normality_real.max(), p_values_normality_real.min()))
+        #os.system('echo pval max i= {:.5f}, pval min i= {:.5f}'.format(p_values_normality_imag.max(), p_values_normality_imag.min()))
 
         self.assertTrue(np.allclose(Fourier_values.real.std(axis=1), 1., rtol=0.05), msg='Std is not 1')
         self.assertTrue(np.allclose(Fourier_values.imag.std(axis=1), 1., rtol=0.05), msg='Std is not 1')
@@ -86,7 +86,7 @@ class test_GRF_inhomogeneities(unittest.TestCase):
 
 
         #Test that logVariances match
-        self.assertTrue(np.allclose(np.log(generated_Variances),np.log(theoretical_Variances),rtol=0.25))
+        self.assertTrue(np.allclose(np.log(generated_Variances),np.log(theoretical_Variances),rtol=0.3))
 
     def test_alpha(self):
 
@@ -112,7 +112,7 @@ class test_GRF_inhomogeneities(unittest.TestCase):
                 generated_Variances[i, j, :, 1] = alphas_x.var(axis=(-1, -2))
 
         # Test that logVariances match
-        self.assertTrue(np.allclose(np.log(generated_Variances), np.log(theoretical_Variances), rtol=0.25))
+        self.assertTrue(np.allclose(np.log(generated_Variances), np.log(theoretical_Variances), rtol=0.3))
 
     def test_kappa(self):
 
@@ -132,7 +132,7 @@ class test_GRF_inhomogeneities(unittest.TestCase):
                 generated_Variances[i,j]=kappas.var(axis=(-1,-2))
 
         # Test that logVariances match
-        self.assertTrue(np.allclose(np.log(generated_Variances), np.log(theoretical_Variances), rtol=0.25))
+        self.assertTrue(np.allclose(np.log(generated_Variances), np.log(theoretical_Variances), rtol=0.3))
 
 if __name__ == '__main__':
     unittest.main()
