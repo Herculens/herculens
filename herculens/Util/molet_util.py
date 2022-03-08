@@ -128,6 +128,10 @@ def read_molet_simulation(molet_path, simu_dir,
         psf = None
         warnings.warn("Could not prepare the 'PIXEL' PSF instance as the PSF in the instrument module is supersampled (supersampling factor?).")
 
+    # get the super-sampled PSF that was used for the mock
+    psf_kernel_super = fits.getdata(os.path.join(molet_path, simu_dir, 'output', 'supersampled_psf.fits'), header=False)
+    psf_kernel_super = psf_kernel_super.astype(float)
+    
     # get specific noise realisation
     noise_real = fits.getdata(os.path.join(molet_path, simu_dir, 'output', f'{instrument_name}_noise_realization.fits'), header=False)
     noise_real = noise_real.astype(float)
@@ -162,4 +166,4 @@ def read_molet_simulation(molet_path, simu_dir,
     # flux normalisation
     source_super *= pixel_size**2
 
-    return pixel_grid, noise, psf, data, dpsi_map, noise_real, source_super
+    return pixel_grid, noise, psf, data, dpsi_map, noise_real, source_super, psf_kernel_super
