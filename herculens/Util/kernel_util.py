@@ -46,7 +46,7 @@ def subgrid_kernel(kernel, subgrid_res, odd=False, num_iter=100):
     kernel_input = copy.deepcopy(kernel)
     kernel_subgrid = image_util.re_size_array(x_in, y_in, kernel_input, x_out, y_out)
     kernel_subgrid = kernel_norm(kernel_subgrid)
-    for i in range(max(num_iter, 1)):
+    for i in range(num_iter):
         # given a proposition, re-size it to original pixel size
         if subgrid_res % 2 == 0:
             kernel_pixel = averaging_even_kernel(kernel_subgrid, subgrid_res)
