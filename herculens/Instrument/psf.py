@@ -59,10 +59,10 @@ class PSF(object):
                 raise ValueError('kernel_point_source needs to be specified for PIXEL PSF type!')
             if len(kernel_point_source) % 2 == 0:
                 raise ValueError('kernel needs to have odd axis number, not ', np.shape(kernel_point_source))
-        #     if point_source_supersampling_factor > 1:
-        #         self._kernel_point_source_supersampled = kernel_point_source
-        #         self._point_source_supersampling_factor = point_source_supersampling_factor
-        #         kernel_point_source = kernel_util.degrade_kernel(self._kernel_point_source_supersampled, self._point_source_supersampling_factor)
+            if point_source_supersampling_factor > 1:
+                self._kernel_point_source_supersampled = kernel_point_source
+                self._point_source_supersampling_factor = point_source_supersampling_factor
+                kernel_point_source = kernel_util.degrade_kernel(self._kernel_point_source_supersampled, self._point_source_supersampling_factor)
             self._kernel_point_source = kernel_point_source / np.sum(kernel_point_source)
         elif self.psf_type == 'NONE':
             self._kernel_point_source = np.zeros((3, 3))
@@ -99,7 +99,7 @@ class PSF(object):
             self._kernel_pixel = kernel_util.pixel_kernel(self.kernel_point_source, subgrid_res=1)
         return self._kernel_pixel
 
-    def kernel_point_source_supersampled(self, supersampling_factor, updata_cache=True):
+    def kernel_point_source_supersampled(self, supersampling_factor, updata_cache=True, num_iter_correction=5):
         """
         generates (if not already available) a supersampled PSF with ood numbers of pixels centered
 
@@ -121,7 +121,8 @@ class PSF(object):
                     kernel_numPix += 1
                 kernel_point_source_supersampled = kernel_util.kernel_gaussian(kernel_numPix, self._pixel_size / supersampling_factor, self._fwhm)
             elif self.psf_type == 'PIXEL':
-                kernel = kernel_util.subgrid_kernel(self.kernel_point_source, supersampling_factor, odd=True, num_iter=5)
+                kernel = kernel_util.subgrid_kernel(self.kernel_point_source, supersampling_factor, 
+                                                    odd=True, num_iter=num_iter_correction)
                 n = len(self.kernel_point_source)
                 n_new = n * supersampling_factor
                 if n_new % 2 == 0:
