@@ -5,9 +5,9 @@ import numpy as np
 
 class FisherCovariance(object):
 
-    def __init__(self, parameter_class, inference_class):
-        self.param = parameter_class  # TODO: this should hold the indices for splitting matrices
-        self.inference = inference_class
+    def __init__(self, parameter_class, differentiable_class):
+        self._param = parameter_class  # TODO: this should hold the indices for splitting matrices
+        self._diff = differentiable_class
 
     @property
     def fisher_matrix(self):
@@ -24,20 +24,20 @@ class FisherCovariance(object):
     def draw_samples(self, num_samples=10000, seed=None):
         if seed is not None:
             np.random.seed(seed)
-        mean = self.param.current_values()
+        mean = self._param.current_values()
         cov  = self.covariance_matrix
         samples = np.random.multivariate_normal(mean, cov, size=num_samples)
         return samples
 
     def get_kwargs_sigma(self):
         sigma_values = np.sqrt(np.abs(np.diag(self.covariance_matrix)))
-        return self.param.args2kwargs(sigma_values)
+        return self._param.args2kwargs(sigma_values)
 
     def compute_fisher_information(self, recompute=False):
         if hasattr(self, '_fim') and not recompute:
             return  # nothing to do
-        best_fit_values = self.param.current_values()
-        self._fim = self.inference.hessian(best_fit_values).block_until_ready()
+        best_fit_values = self._param.current_values()
+        self._fim = self._diff.hessian(best_fit_values).block_until_ready()
         self._fim = np.array(self._fim)
         if hasattr(self, '_cov'):
             delattr(self, '_cov')

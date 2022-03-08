@@ -32,9 +32,11 @@ class Optimizer(Inference):
     #         raise ValueError("You must run the optimizer at least once to access the history")
     #     return self._metrics.param_history
 
-    def minimize(self, method='BFGS', maxiter=None, restart_from_init=False, use_exact_hessian_if_allowed=False):
+    def minimize(self, method='BFGS', maxiter=None, init_params=None,
+                 restart_from_init=False, use_exact_hessian_if_allowed=False):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
-        init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
+        if init_params is None:
+            init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         metrics = MinimizeMetrics(self._loss, method)
         start = time.time()
         best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, maxiter, metrics,
@@ -42,7 +44,7 @@ class Optimizer(Inference):
         runtime = time.time() - start
         if metrics.loss_history == []:
             warnings.warn("The loss history does not contain any value")
-            logL_best_fit = self._loss(best_fit)
+            logL_best_fit = self.log_probability(best_fit)
         else:
             logL_best_fit = - float(metrics.loss_history[-1])
         self._param.set_best_fit(best_fit)

@@ -20,10 +20,10 @@ class Inference(object):
     @partial(jit, static_argnums=(0,))
     def log_probability(self, args):
         """unnormalized log-posterior as the negative loss, typically for Bayesian inference using MCMC"""
-        return - self.loss(args)
+        return - self._loss(args)
 
     @partial(jit, static_argnums=(0,))
     def potential_fn(self, args):
         """alias for negative log-likelihood, typically for Bayesian inference using HMC"""
-        return self.loss(args)
+        return self._loss(args)
         
