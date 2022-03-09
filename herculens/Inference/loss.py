@@ -39,7 +39,7 @@ class Loss(Differentiable):
 
     def __init__(self, data, image_class, param_class, 
                  likelihood_type='chi2', likelihood_mask=None, mask_from_source_plane=False,
-                 regularization_terms=None, regularization_strengths=None,
+                 regularization_terms=None, regularization_strengths=None, starlet_second_gen=False,
                  potential_noise_map=None, prior_terms=None):
         self._data  = data
         self._image = image_class
@@ -47,7 +47,7 @@ class Loss(Differentiable):
         
         self._check_choices(likelihood_type, prior_terms, regularization_terms, regularization_strengths)
         self._init_likelihood(likelihood_type, likelihood_mask, mask_from_source_plane)
-        self._init_regularizations(regularization_terms, regularization_strengths, potential_noise_map)
+        self._init_regularizations(regularization_terms, regularization_strengths, potential_noise_map, starlet_second_gen)
         self._init_priors(prior_terms)
 
     def _func(self, args):
@@ -130,7 +130,7 @@ class Loss(Differentiable):
             self._global_norm = 1.0 # 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
 
     def _init_regularizations(self, regularization_terms, regularization_strengths, 
-                              potential_noise_map):
+                              potential_noise_map, starlet_second_gen):
         if regularization_terms is None:
             self.log_regularization = lambda kwargs: 0.  # no regularization
             return
@@ -148,7 +148,8 @@ class Loss(Differentiable):
             if term == 'l1_starlet_source':
                 n_pix_src = min(*self._image.SourceModel.pixelated_shape)
                 n_scales = int(np.log2(n_pix_src))  # maximum allowed number of scales
-                self._starlet_src = WaveletTransform(n_scales, wavelet_type='starlet')
+                self._starlet_src = WaveletTransform(n_scales, wavelet_type='starlet',
+                                                     second_gen=starlet_second_gen)
                 wavelet_norms = self._starlet_src.scale_norms[:-1]  # ignore coarsest scale
                 self._st_src_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if isinstance(strength, (int, float)):
@@ -163,7 +164,8 @@ class Loss(Differentiable):
             if term == 'l1_starlet_lens_light':
                 n_pix_ll = min(*self._image.LensLightModel.pixelated_shape)
                 n_scales = int(np.log2(n_pix_ll))  # maximum allowed number of scales
-                self._starlet_ll = WaveletTransform(n_scales, wavelet_type='starlet')
+                self._starlet_ll = WaveletTransform(n_scales, wavelet_type='starlet',
+                                                    second_gen=starlet_second_gen)
                 wavelet_norms = self._starlet_ll.scale_norms[:-1]  # ignore coarsest scale
                 self._st_ll_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if isinstance(strength, (int, float)):
@@ -208,7 +210,8 @@ class Loss(Differentiable):
             elif term == 'l1_starlet_potential':
                 n_pix_pot = min(*self._image.LensModel.pixelated_shape)
                 n_scales = int(np.log2(n_pix_pot))  # maximum allowed number of scales
-                self._starlet_pot = WaveletTransform(n_scales, wavelet_type='starlet')
+                self._starlet_pot = WaveletTransform(n_scales, wavelet_type='starlet',
+                                                     second_gen=starlet_second_gen)
                 wavelet_norms = self._starlet_pot.scale_norms[:-1]  # ignore coarsest scale
                 self._st_pot_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if isinstance(strength, (int, float)):
