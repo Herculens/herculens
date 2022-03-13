@@ -36,7 +36,7 @@ def gradient_descent(gradient_function,initial_guess,max_iter,learning_rate):
 
 # Inference class could be used here, but it triggers cyclic imports and necessary Inference_class initialization
 # TODO: function comments
-def scipy_fit_Surface_Brightness(data,Surface_brightness: Surface_brightness_class,method='Newton-CG'):
+def scipy_fit_Surface_Brightness(data,Surface_brightness: Surface_brightness_class,initial_guess=None,method='Newton-CG'):
     """
 
     Parameters
@@ -55,14 +55,16 @@ def scipy_fit_Surface_Brightness(data,Surface_brightness: Surface_brightness_cla
     # args<->kwargs transformation
     SL_parameters=Surface_brightness.parameters()
     # args to start fitting from
-    initial_guess=SL_parameters.initial_values()
+    if initial_guess is None:
+        initial_guess=SL_parameters.initial_values()
 
     @jax.jit
     def Loss_function(args):
         kwargs = SL_parameters.args2kwargs(args)
         model = simulate_unperturbed_image_pure(kwargs)
+        noise_var=jnp.abs(model)/Surface_brightness.exposure_time+Surface_brightness.bkg_noise_sigma**2
         # Chi^2 loss
-        return jnp.mean((data-model)**2/Surface_brightness.noise_var)
+        return jnp.mean((data-model)**2/noise_var)
 
     Loss_gradient=jax.jit(jax.grad(Loss_function))
     Loss_hessian=jax.jit(jax.jacfwd(jax.jit(jax.jacrev(Loss_function))))

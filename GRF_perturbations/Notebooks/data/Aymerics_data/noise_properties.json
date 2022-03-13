@@ -1,0 +1,4 @@
+{
+	"sigma_bg" : 0.071215575655017807,
+	"type" : "PoissonNoise"
+}

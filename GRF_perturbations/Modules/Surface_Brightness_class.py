@@ -95,7 +95,7 @@ class Surface_brightness_class:
     for predefined source galaxy sb, lens galaxy sb, lens galaxy gravitational potential
     and for varying galaxy satellites gravitational potential"""
 
-    def __init__(self, pixel_number: int, pixel_scale: float, PSF_FWHM: float, SNR: float, exposure_time: float, supersampling_factor=None,
+    def __init__(self, pixel_number: int, pixel_scale: float, PSF_class: float, bkg_noise_sigma: float, exposure_time: float, supersampling_factor=None,
                  source_light_model_list=None, kwargs_source_light=None,
                  lens_mass_model_list=None, kwargs_lens_mass=None,
                  lens_light_model_list=None, kwargs_lens_light=None,
@@ -108,10 +108,10 @@ class Surface_brightness_class:
             Lens plane grid is a square with side of 'pixel_number' pixels
         pixel_scale: float
             Resolution 'arcsec/pixel'
-        PSF_FWHM: float
-            FWHM assuming Gaussian PSF in arcsec
-        SNR: float
-            Peak-SNR for Std of background noise
+        PSF_class: object herculens.Instrument.psf.PSF
+            class defining PSF
+        bkg_noise_sigma: float
+            Std of background noise
         exposure_time: float
             Exposure time for Poisson noise in seconds
         supersampling_factor: int
@@ -194,20 +194,21 @@ class Surface_brightness_class:
         self.frequencies = full_freq_vector[self.init_freq_index:]
 
         #Setup all the observation conditions
-        self.PSF_FWHM=PSF_FWHM
+        self.PSF_class=PSF_class
         self.exposure_time=exposure_time
+        self.bkg_noise_sigma = bkg_noise_sigma
         #Lens images for noiseless observations
-        LensImage_perturbed_noiseless, LensImage_unperturbed_noiseless = self.get_LensImages(PSF_FWHM,1e-10,None)
+        LensImage_perturbed_noiseless, LensImage_unperturbed_noiseless = self.get_LensImages(1e-10,None)
         self.LensImage_unperturbed_noiseless=LensImage_unperturbed_noiseless
         self.LensImage_perturbed_noiseless=LensImage_perturbed_noiseless
         # Evaluate noise level from Peak-SNR of noiseless image
         Image_unperturbed_noiseless=LensImage_unperturbed_noiseless.simulation(**self.kwargs_unperturbed_model)
-        self.bkg_noise_sigma=Image_unperturbed_noiseless.max()/SNR
+        #self.bkg_noise_sigma=Image_unperturbed_noiseless.max()/SNR
         #Poisson+Background noise
         self.noise_var=np.abs(Image_unperturbed_noiseless)/exposure_time+self.bkg_noise_sigma**2
 
         # Lens images for noisy setup
-        LensImage_perturbed_noisy, LensImage_unperturbed_noisy = self.get_LensImages(PSF_FWHM,self.bkg_noise_sigma,exposure_time)
+        LensImage_perturbed_noisy, LensImage_unperturbed_noisy = self.get_LensImages(self.bkg_noise_sigma,exposure_time)
         self.LensImage_perturbed_noisy=LensImage_perturbed_noisy
         self.LensImage_unperturbed_noisy=LensImage_unperturbed_noisy
 
@@ -281,13 +282,11 @@ class Surface_brightness_class:
 
         return simulate_perturbed_image
 
-    def get_LensImages(self,PSF_FWHM,noise_sigma,exposure_time):
+    def get_LensImages(self,noise_sigma,exposure_time):
         """
 
         Parameters
         ----------
-        PSF_FWHM: float
-            FWHM assuming Gaussian PSF in arcsec
         noise_sigma: float
             Std of background noise in units of flux
         exposure_time: float
@@ -298,13 +297,13 @@ class Surface_brightness_class:
         herculens.LensImage.lens_image.LensImage,herculens.LensImage.lens_image.LensImage
             Class for perturbed lens simulationa and class for unperturbed lens simulation correspondingly
         """
-        PSF_class = PSF(**{'psf_type': 'GAUSSIAN', 'fwhm': PSF_FWHM})
+        #PSF_class = PSF(**{'psf_type': 'GAUSSIAN', 'fwhm': PSF_FWHM})
         pixel_number, _ = self.pixel_grid.num_pixel_axes
         Noise_class = Noise(pixel_number, pixel_number,
                             **{'background_rms': noise_sigma, 'exposure_time': exposure_time})
 
         # Unperturbed lens
-        unperturbed_kwargs_for_LensImage={'grid_class':self.pixel_grid,'psf_class':PSF_class,'noise_class':Noise_class,
+        unperturbed_kwargs_for_LensImage={'grid_class':self.pixel_grid,'psf_class':self.PSF_class,'noise_class':Noise_class,
                                  'lens_model_class':LensModel(self.lens_mass_model_list),'source_model_class':LightModel(self.source_light_model_list),
                                  'lens_light_model_class':LightModel(self.lens_light_model_list),'kwargs_numerics':self.kwargs_numerics}
 

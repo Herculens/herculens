@@ -1,0 +1,2 @@
+exposure time: 2000s
+pixel size: 0.08 arcsec
