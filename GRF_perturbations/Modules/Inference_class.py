@@ -199,3 +199,40 @@ class Inference_class:
 
         Loss=Spectra_Loss_function(SB_Anomalies_spectra)
         return Loss
+
+    @partial(jax.jit, static_argnums=(0, 2, 3, 4, 5, 6))
+    def GRF_Power_Spectrum_Loss_pmap(self, GRF_params, GRF_seeds_number, Spectra_Loss_function, num_cores, Noise_flag=True,
+                                fit_image=True):
+        """
+        Jax can not take gradients of this function because of pmap inside
+        Parameters
+        ----------
+        GRF_params
+        GRF_seeds_number
+        Spectra_Loss_function:
+            It should be Chi^2 with fixed uncertainties, which are estimated separately and
+            Loss is optimized step by step. Otherwise function is too costful to differentiate
+            or the number of spectra used for uncertainty estimation is highly insufficient
+        num_cores: int
+            number of cores that are able to do processing in parallel
+        Noise_flag:
+
+        Returns
+        -------
+
+        """
+
+        batch_length=GRF_seeds_number//num_cores
+
+        # Set of random Fourier images representing different GRF field realisations
+        unit_Fourier_images = self.GRF_inhomogeneities.tensor_unit_Fourier_images[:num_cores*batch_length]
+        batched_Fourier_images= unit_Fourier_images.reshape((num_cores,batch_length,*unit_Fourier_images.shape[1:]))
+        # Simulate Radial Power spectra for Surface Brightness Anomalies images generated for every GRF potential realisation
+        getter_SB_Anomalies_spectra = jax.jit(
+            lambda unit_Fourier_image: self.Anomalies_Radial_Power_Spectrum(GRF_params, unit_Fourier_image, Noise_flag,
+                                                                            fit_image))
+        get_Spectra_batch = lambda Fourier_batch: jax_map(getter_SB_Anomalies_spectra, Fourier_batch)
+        SB_Anomalies_spectra = jax.pmap(get_Spectra_batch)(batched_Fourier_images)
+        SB_Anomalies_spectra=SB_Anomalies_spectra.reshape((num_cores*batch_length,len(self.Surface_brightness.frequencies)))
+        Loss = Spectra_Loss_function(SB_Anomalies_spectra)
+        return Loss

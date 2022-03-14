@@ -95,7 +95,7 @@ class Surface_brightness_class:
     for predefined source galaxy sb, lens galaxy sb, lens galaxy gravitational potential
     and for varying galaxy satellites gravitational potential"""
 
-    def __init__(self, pixel_number: int, pixel_scale: float, PSF_class: float, bkg_noise_sigma: float, exposure_time: float, supersampling_factor=None,
+    def __init__(self, pixel_number: int, pixel_scale: float, PSF_class: float, bkg_noise_sigma: float, exposure_time: float, kwargs_numerics=None,
                  source_light_model_list=None, kwargs_source_light=None,
                  lens_mass_model_list=None, kwargs_lens_mass=None,
                  lens_light_model_list=None, kwargs_lens_light=None,
@@ -114,8 +114,8 @@ class Surface_brightness_class:
             Std of background noise
         exposure_time: float
             Exposure time for Poisson noise in seconds
-        supersampling_factor: int
-            factor of higher resolution sub-pixel sampling of surface brightness
+        kwargs_numerics: dict
+            kwargs defining numerical parameters like supersampling and convolution type
         source_light_model_list: [str,str,...] or []
             Names of models used to define light in the source plane
         kwargs_source_light: [{str:float,...},...] or [{}]
@@ -149,9 +149,9 @@ class Surface_brightness_class:
         self.pixel_grid=PixelGrid(**kwargs_pixel)
 
         #Pixelisation of source and lens plane
-        if supersampling_factor is None:
-            supersampling_factor = 1
-        self.kwargs_numerics = {'supersampling_factor': supersampling_factor}
+        if kwargs_numerics is None:
+            kwargs_numerics = {'supersampling_factor': 1}
+        self.kwargs_numerics=kwargs_numerics
 
         #PreInitialize unperturbed source-lens models and their parameters
         self.kwargs_unperturbed_model=default_unperturbed_model_kwargs
