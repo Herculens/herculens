@@ -10,7 +10,7 @@ class Image2SourceMapping(object):
     The class is enable to deal with an arbitrary number of different source planes. There are two different settings:
 
     Single lens plane modelling:
-    In case of a single deflector, jaxtronomy models the reduced deflection angles
+    In case of a single deflector, herculens models the reduced deflection angles
     (matched to the source plane in single source plane mode). Each source light model can be added a number
     (scale_factor) that rescales the reduced deflection angle to the specific source plane.
 
@@ -23,7 +23,7 @@ class Image2SourceMapping(object):
     def __init__(self, lens_model, source_model):
         """
 
-        :param lens_model: jaxtronomy LensModel() class instance
+        :param lens_model: herculens LensModel() class instance
         :param source_model: LightModel () class instance
         The lightModel includes:
         - source_scale_factor_list: list of floats corresponding to the rescaled deflection angles to the specific source

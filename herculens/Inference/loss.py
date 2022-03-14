@@ -29,7 +29,8 @@ class Loss(object):
 
     _supported_ll = ('chi2', 'l2_norm')
     _supported_regul_source = ('l1_starlet_source', 'l1_battle_source', 'positivity_source')
-    _supported_regul_lens = ('l1_starlet_potential', 'l1_battle_potential', 'positivity_potential', 'positivity_convergence')
+    _supported_regul_lens_mass = ('l1_starlet_potential', 'l1_battle_potential', 'positivity_potential', 'positivity_convergence')
+    _supported_regul_lens_light = ('l1_starlet_lens_light', 'l1_battle_lens_light', 'positivity_lens_light')
     _supported_prior = ('uniform', 'gaussian')
 
     def __init__(self, data, image_class, param_class, 
@@ -81,18 +82,27 @@ class Loss(object):
                 UserWarning(f"Likelihood type is '{likelihood_type}', which might "
                             "cause issues with some regularization choices")
             for term in regularization_terms:
-                if term not in self._supported_regul_source + self._supported_regul_lens:
+                if term not in (self._supported_regul_source + 
+                                self._supported_regul_lens_mass +
+                                self._supported_regul_lens_light):
                     raise ValueError(f"Regularization term '{term}' is not supported")
-                # TODO: if any regularization terms are not dependent on PIXELATED profiles, update this check
-                source_profile_list = self._image.SourceModel.profile_type_list
-                lens_profile_list = self._image.LensModel.lens_model_list
-                if term in self._supported_regul_source and 'PIXELATED' not in source_profile_list:
+                # TODO: if any regularization terms are not dependent on PIXELATED profiles
+                # need to update these checks below
+                if (term in self._supported_regul_source and 
+                    'PIXELATED' not in self._image.SourceModel.profile_type_list):
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' source light profile")
                 
-                elif term in self._supported_regul_lens and 'PIXELATED' not in lens_profile_list:
+                if (term in self._supported_regul_lens_mass and 
+                    'PIXELATED' not in self._image.LensModel.lens_model_list):
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' lens profile")
+
+                if (term in self._supported_regul_lens_light and 
+                    'PIXELATED' not in self._image.LensLightModel.profile_type_list):
+                    raise ValueError(f"Regularization term '{term}' is only "
+                                     "compatible with a 'PIXELATED' lens profile")
+
             if len(regularization_terms) != len(regularization_strengths):
                 raise ValueError(f"There should be one choice of regularization strength per regularization term")
 
@@ -120,6 +130,7 @@ class Loss(object):
 
         self._idx_pix_src = self._image.SourceModel.pixelated_index
         self._idx_pix_pot = self._image.LensModel.pixelated_index
+        self._idx_pix_ll  = self._image.LensLightModel.pixelated_index
         self._noise_map_pot = potential_noise_map
 
         regul_func_list = []
@@ -142,6 +153,21 @@ class Loss(object):
                     self._st_src_lambda_hf = float(strength[0])
                     self._st_src_lambda = float(strength[1])
 
+            if term == 'l1_starlet_lens_light':
+                n_pix_ll = min(*self._image.LensLightModel.pixelated_shape)
+                n_scales = int(np.log2(n_pix_ll))  # maximum allowed number of scales
+                self._starlet_ll = WaveletTransform(n_scales, wavelet_type='starlet')
+                wavelet_norms = self._starlet_ll.scale_norms[:-1]  # ignore coarsest scale
+                self._st_ll_norms = jnp.expand_dims(wavelet_norms, (1, 2))
+                if isinstance(strength, (int, float)):
+                    self._st_ll_lambda = self._st_ll_lambda_hf = float(strength)
+                elif isinstance(strength, (tuple, list)):
+                    if len(strength) > 2:
+                        raise ValueError("You can only specify two starlet regularization "
+                                         "strength values at maximum")
+                    self._st_ll_lambda_hf = float(strength[0])
+                    self._st_ll_lambda = float(strength[1])
+
             elif term == 'l1_battle_source':
                 n_scales = 1  # maximum allowed number of scales
                 self._battle_src = WaveletTransform(n_scales, wavelet_type='battle-lemarie-3')
@@ -151,11 +177,26 @@ class Loss(object):
                                      "strength for Battle-Lemarie regularization")
                 self._bt_src_lambda = float(strength)
 
+            elif term == 'l1_battle_lens_light':
+                n_scales = 1  # maximum allowed number of scales
+                self._battle_ll = WaveletTransform(n_scales, wavelet_type='battle-lemarie-3')
+                self._bt_ll_norm = self._battle_ll.scale_norms[0]  # consider only first scale
+                if isinstance(strength, (tuple, list)):
+                    raise ValueError("You can only specify one regularization "
+                                     "strength for Battle-Lemarie regularization")
+                self._bt_ll_lambda = float(strength)
+
             elif term == 'positivity_source':
                 if isinstance(strength, (tuple, list)):
                     raise ValueError("You can only specify one regularization "
                                      "strength for positivity constraint")
                 self._pos_src_lambda = float(strength)
+
+            elif term == 'positivity_lens_light':
+                if isinstance(strength, (tuple, list)):
+                    raise ValueError("You can only specify one regularization "
+                                     "strength for positivity constraint")
+                self._pos_ll_lambda = float(strength)
 
             elif term == 'l1_starlet_potential':
                 n_pix_pot = min(*self._image.LensModel.pixelated_shape)
@@ -229,6 +270,24 @@ class Loss(object):
         st_weighted_l1 = jnp.sum(self._st_src_norms[1:] * noise_level * jnp.abs(st[1:]))  # other scales
         return - (self._st_src_lambda_hf * st_weighted_l1_hf + self._st_src_lambda * st_weighted_l1)
 
+    def _log_regul_l1_starlet_lens_light(self, kwargs):
+        # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
+        noise_map = np.sqrt(self._image.Noise.C_D)
+
+        # TEST reweight the noise map based on lensed source model
+        #lensed_source_model = self._image.source_surface_brightness(kwargs['kwargs_source'], 
+        #                                                            kwargs_lens=kwargs['kwargs_lens'],
+        #                                                            de_lensed=False, unconvolved=True)
+        #noise_level = noise_map # + lensed_source_model**3
+        noise_level = np.mean(noise_map[self.likelihood_mask == 1])
+        # end TEST
+
+        model = kwargs['kwargs_lens_light'][self._idx_pix_ll]['pixels']
+        st = self._starlet_ll.decompose(model)[:-1]  # ignore coarsest scale
+        st_weighted_l1_hf = jnp.sum(self._st_ll_norms[0] * noise_level * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
+        st_weighted_l1 = jnp.sum(self._st_ll_norms[1:] * noise_level * jnp.abs(st[1:]))  # other scales
+        return - (self._st_ll_lambda_hf * st_weighted_l1_hf + self._st_ll_lambda * st_weighted_l1)
+
     def _log_regul_l1_starlet_potential(self, kwargs):
         noise_map = self._noise_map_pot
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
@@ -246,6 +305,16 @@ class Loss(object):
         bt_weighted_l1 = jnp.sum(self._bt_src_norm * noise_level * jnp.abs(bt))
         return - self._bt_src_lambda * bt_weighted_l1
 
+    def _log_regul_l1_battle_lens_light(self, kwargs):
+        # TODO: generalise this for Poisson noise! but then the noise needs to be properly propagated to source plane
+        noise_map = np.sqrt(self._image.Noise.C_D)
+        noise_level = np.mean(noise_map[self.likelihood_mask == 1])
+        #noise_level = noise_map
+        model = kwargs['kwargs_lens_light'][self._idx_pix_ll]['pixels']
+        bt = self._battle_ll.decompose(model)[0]  # consider only first scale
+        bt_weighted_l1 = jnp.sum(self._bt_ll_norm * noise_level * jnp.abs(bt))
+        return - self._bt_ll_lambda * bt_weighted_l1
+
     def _log_regul_l1_battle_potential(self, kwargs):
         noise_map = self._noise_map_pot
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
@@ -256,6 +325,10 @@ class Loss(object):
     def _log_regul_positivity_source(self, kwargs):
         source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
         return - self._pos_src_lambda * jnp.abs(jnp.sum(jnp.minimum(0., source_model)))
+
+    def _log_regul_positivity_lens_light(self, kwargs):
+        model = kwargs['kwargs_lens_light'][self._idx_pix_ll]['pixels']
+        return - self._pos_ll_lambda * jnp.abs(jnp.sum(jnp.minimum(0., model)))
 
     def _log_regul_positivity_potential(self, kwargs):
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']

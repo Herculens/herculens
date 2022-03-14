@@ -46,8 +46,8 @@ class InferenceBase(object):
         return jvp(grad(self.loss), (args,), (vec,))[1]
 
     @partial(jit, static_argnums=(0,))
-    def log_likelihood(self, args):
-        """log-likelihood as the negative loss, typically for Bayesian inference using MCMC"""
+    def log_probability(self, args):
+        """unnormalized log-posterior as the negative loss, typically for Bayesian inference using MCMC"""
         return - self.loss(args)
 
     @partial(jit, static_argnums=(0,))

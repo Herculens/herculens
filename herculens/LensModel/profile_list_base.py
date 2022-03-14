@@ -1,10 +1,14 @@
-from herculens.LensModel.Profiles import (gaussian_potential,
+from herculens.LensModel.Profiles import (gaussian_potential, point_mass,
                                            shear, sie, nie, epl, pixelated)
 from herculens.Util.util import convert_bool_list
 
 __all__ = ['ProfileListBase']
 
-SUPPORTED_MODELS = ['EPL', 'NIE', 'SIE', 'GAUSSIAN', 'SHEAR', 'SHEAR_GAMMA_PSI', 'PIXELATED']
+SUPPORTED_MODELS = [
+    'EPL', 'NIE', 'SIE', 'GAUSSIAN', 'POINT_MASS', 
+    'SHEAR', 'SHEAR_GAMMA_PSI', 
+    'PIXELATED', 'PIXELATED_DIRAC',
+]
 
 
 class ProfileListBase(object):
@@ -33,7 +37,7 @@ class ProfileListBase(object):
         for lens_type in lens_model_list:
             # These models require a new instance per profile as certain pre-computations
             # are relevant per individual profile
-            if lens_type in ['PIXELATED']:
+            if lens_type in ['PIXELATED', 'PIXELATED_DIRAC']:
                 lensmodel_class = self._import_class(lens_type)
             else:
                 if lens_type not in imported_classes.keys():
@@ -44,7 +48,8 @@ class ProfileListBase(object):
             func_list.append(lensmodel_class)
         return func_list
 
-    def _import_class(self, lens_type):
+    @staticmethod
+    def _import_class(lens_type):
         """Get the lens profile class of the corresponding type."""
         if lens_type == 'GAUSSIAN':
             return gaussian_potential.Gaussian()
@@ -52,6 +57,8 @@ class ProfileListBase(object):
             return shear.Shear()
         elif lens_type == 'SHEAR_GAMMA_PSI':
             return shear.ShearGammaPsi()
+        elif lens_type == 'POINT_MASS':
+            return point_mass.PointMass()
         elif lens_type == 'NIE':
             return nie.NIE()
         elif lens_type == 'SIE':
@@ -60,6 +67,8 @@ class ProfileListBase(object):
             return epl.EPL()
         elif lens_type == 'PIXELATED':
             return pixelated.PixelatedPotential()
+        elif lens_type == 'PIXELATED_DIRAC':
+            return pixelated.PixelatedPotentialDirac()
         else:
             err_msg = (f"{lens_type} is not a valid lens model. " +
                        f"Supported types are {SUPPORTED_MODELS}")
@@ -87,7 +96,7 @@ class ProfileListBase(object):
 
     @property
     def has_pixels(self):
-        return ('PIXELATED' in self._model_list)
+        return ('PIXELATED' in self._model_list) or ('PIXELATED_DIRAC' in self._model_list)
 
     @property
     def pixel_grid_settings(self):
@@ -95,7 +104,7 @@ class ProfileListBase(object):
 
     def set_pixel_grid(self, pixel_axes):
         for i, func in enumerate(self.func_list):
-            if self._model_list[i] == 'PIXELATED':
+            if self._model_list[i] in ['PIXELATED', 'PIXELATED_DIRAC']:
                 func.set_data_pixel_grid(pixel_axes)
 
     @property
@@ -104,7 +113,10 @@ class ProfileListBase(object):
             try:
                 self._pix_idx = self._model_list.index('PIXELATED')
             except ValueError:
-                self._pix_idx = None
+                try:
+                    self._pix_idx = self._model_list.index('PIXELATED_DIRAC')
+                except ValueError:
+                    self._pix_idx = None
         return self._pix_idx
 
     @property

@@ -57,6 +57,9 @@ class Plotter(object):
     def set_true_source(self, true_source):
         self._true_source = true_source
 
+    def set_true_lens_light(self, true_lens_light):
+        self._true_lens_light = true_lens_light
+
     def set_true_potential_perturbations(self, true_potential):
         self._true_pot_perturb = true_potential
 
@@ -70,19 +73,22 @@ class Plotter(object):
         return fig
 
     def model_summary(self, lens_image, kwargs_result,
-                      show_image=True, show_source=True, show_lens_mass=False,
+                      show_image=True, show_source=True, 
+                      show_lens_light=False, show_lens_mass=False,
                       reproject_pixelated_models=False, shift_potential_model='min',
                       likelihood_mask=None, potential_mask=None,
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       ):
         n_cols = 3
-        n_rows = sum([show_image, show_source, show_lens_mass, show_lens_mass])
+        n_rows = sum([show_image, show_source, show_lens_light, show_lens_mass, show_lens_mass])
         
         extent = lens_image.Grid.extent
         if lens_image.SourceModel.has_pixels:
             src_extent = lens_image.Grid.model_pixel_extent('source')
         else:
             src_extent = extent
+
+        ##### PREPARE IMAGES #####
             
         if show_image:
             # create the resulting model image
@@ -124,9 +130,37 @@ class Plotter(object):
                         x_coords_src = np.linspace(extent[0], extent[1], npix_src)
                         y_coords_src = np.linspace(extent[2], extent[3], npix_src)
                     true_source = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords_src, y_coords_src)
-                    warnings.warn("True source array has been interpolated to match model array")
+                    warnings.warn("True source array has been interpolated to match model array.")
             else:
                 true_source = None
+
+        if show_lens_light:
+            kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
+            if lens_image.LensLightModel.has_pixels:
+                ll_idx = lens_image.LensLightModel.pixelated_index
+                if reproject_pixelated_models:
+                    raise NotImplementedError("Reprojection of pixelated lens light profile not yet implemented.")
+                else:
+                    lens_light_model = kwargs_lens_light[ll_idx]['pixels']
+            else:
+                lens_light_model = lens_image.lens_surface_brightness(kwargs_lens_light, unconvolved=True)
+            
+            if hasattr(self, '_true_lens_light'):
+                true_lens_light = self._true_lens_light
+                if lens_light_model.size != true_lens_light.size:
+                    npix_true = len(true_lens_light)
+                    x_coords_true = np.linspace(extent[0], extent[1], npix_true)
+                    y_coords_true = np.linspace(extent[2], extent[3], npix_true)
+                    if lens_image.SourceModel.has_pixels:
+                        x_coords, y_coords = lens_image.Grid.model_pixel_axes('lens_light')
+                    else:
+                        npix = len(lens_light_model)
+                        x_coords = np.linspace(extent[0], extent[1], npix)
+                        y_coords = np.linspace(extent[2], extent[3], npix)
+                    true_lens_light = image_util.re_size_array(x_coords_true, y_coords_true, true_source, x_coords, y_coords)
+                    warnings.warn("True lens light array has been interpolated to match model array.")
+            else:
+                true_lens_light = None
 
         if show_lens_mass:
             kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
@@ -162,6 +196,9 @@ class Plotter(object):
             if potential_mask is None:
                 # TODO: compute potential mask based on undersampled likelihood_mask
                 potential_mask = np.ones_like(potential_model)
+
+
+        ##### BUILD UP THE PLOTS #####
 
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows*5))
         if len(axes.shape) == 1:
@@ -210,7 +247,7 @@ class Plotter(object):
             ax = axes[i_row, 1]
             im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
             #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
-            ax.set_title("model source", fontsize=self.base_fontsize)
+            ax.set_title("source model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
@@ -220,6 +257,37 @@ class Plotter(object):
                 im = ax.imshow(diff, extent=src_extent, 
                                cmap=self.cmap_resid, norm=Normalize(-vmax_diff, vmax_diff))
                 ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm truth}$", fontsize=self.base_fontsize)
+                nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
+                                        vmin=-vmax_diff, vmax=vmax_diff,
+                                        colorbar_kwargs={'orientation': 'horizontal'})
+            else:
+                ax.axis('off')
+            i_row += 1
+
+        if show_lens_light:
+
+            ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
+            ax = axes[i_row, 0]
+            if true_lens_light is not None:
+                im = ax.imshow(true_lens_light, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+                ax.set_title("true lens light", fontsize=self.base_fontsize)
+                nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                              colorbar_kwargs={'orientation': 'horizontal'})
+            else:
+                ax.axis('off')
+            ax = axes[i_row, 1]
+            im = ax.imshow(lens_light_model, extent=extent, cmap=self.cmap_flux_alt, norm=self.norm_flux) #, vmax=vmax)
+            #im = ax.imshow(lens_light_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
+            ax.set_title("lens light model", fontsize=self.base_fontsize)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
+            ax = axes[i_row, 2]
+            if true_lens_light is not None:
+                diff = lens_light_model - true_lens_light
+                vmax_diff = true_lens_light.max() / 10.
+                im = ax.imshow(diff, extent=extent, 
+                               cmap=self.cmap_resid, norm=Normalize(-vmax_diff, vmax_diff))
+                ax.set_title(r"l${}_{\rm model}$ - l${}_{\rm truth}$", fontsize=self.base_fontsize)
                 nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
                                         vmin=-vmax_diff, vmax=vmax_diff,
                                         colorbar_kwargs={'orientation': 'horizontal'})
