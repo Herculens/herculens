@@ -141,7 +141,8 @@ class PixelGrid(Coordinates):
         return np.sqrt(pix_width_x * pix_width_y)
 
     def remove_model_grid(self, name):
-        del self._model_grids[name]
+        if name in self._model_grids:
+            del self._model_grids[name]
 
     def create_model_grid(self, grid_center=None, grid_shape=None, 
                           pixel_scale_factor=None, conserve_extent=False,
