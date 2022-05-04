@@ -1,5 +1,6 @@
 import scipy.special as special
-import jax.numpy as np
+import numpy as np
+import jax.numpy as jnp
 import scipy
 from herculens.Util import param_util
 
@@ -51,12 +52,12 @@ class SersicUtil(object):
         """
         x_shift = x - center_x
         y_shift = y - center_y
-        cos_phi = np.cos(phi_G)
-        sin_phi = np.sin(phi_G)
+        cos_phi = jnp.cos(phi_G)
+        sin_phi = jnp.sin(phi_G)
         xt1 = cos_phi*x_shift+sin_phi*y_shift
         xt2 = -sin_phi*x_shift+cos_phi*y_shift
         xt2difq2 = xt2/(q*q)
-        R = np.sqrt(xt1*xt1+xt2*xt2difq2)
+        R = jnp.sqrt(xt1*xt1+xt2*xt2difq2)
         return R
 
     def _x_reduced(self, x, y, n_sersic, r_eff, center_x, center_y):
@@ -87,7 +88,7 @@ class SersicUtil(object):
         :return:
         """
         b = self.b_n(n_sersic)
-        alpha_eff = n_sersic * r_eff * k_eff * b**(-2*n_sersic) * np.exp(b) * special.gamma(2*n_sersic)
+        alpha_eff = n_sersic * r_eff * k_eff * b**(-2*n_sersic) * jnp.exp(b) * special.gamma(2*n_sersic)
         return -alpha_eff
 
     def alpha_abs(self, x, y, n_sersic, r_eff, k_eff, center_x=0, center_y=0):
@@ -106,7 +107,8 @@ class SersicUtil(object):
         x_red = self._x_reduced(x, y, n_sersic, r_eff, center_x, center_y)
         b = self.b_n(n_sersic)
         a_eff = self._alpha_eff(r_eff, n_sersic, k_eff)
-        alpha = 2. * a_eff * x_red ** (-n) * (special.gammainc(2 * n, b * x_red))
+        #alpha = 2. * a_eff * x_red ** (-n) * (special.gammainc(2 * n, b * x_red))
+        alpha = 2. * a_eff * x_red ** (-n) * (1 - special.gammainc(2 * n, b * x_red)/special.gamma(2 * n))
         return alpha
 
     def d_alpha_dr(self, x, y, n_sersic, r_eff, k_eff, center_x=0, center_y=0):
@@ -124,7 +126,7 @@ class SersicUtil(object):
         _dr = 0.00001
         x_ = x - center_x
         y_ = y - center_y
-        r = np.sqrt(x_**2 + y_**2)
+        r = jnp.sqrt(x_**2 + y_**2)
         alpha = self.alpha_abs(r, 0, n_sersic, r_eff, k_eff)
         alpha_dr = self.alpha_abs(r+_dr, 0, n_sersic, r_eff, k_eff)
         d_alpha_dr = (alpha_dr - alpha)/_dr
@@ -148,7 +150,7 @@ class SersicUtil(object):
         :return: integrated flux to infinity
         """
         bn = self.b_n(n_sersic)
-        return I_eff * r_eff**2 * 2 * np.pi * n_sersic * np.exp(bn) / bn**(2*n_sersic) * scipy.special.gamma(2*n_sersic)
+        return I_eff * r_eff**2 * 2 * jnp.pi * n_sersic * jnp.exp(bn) / bn**(2*n_sersic) * scipy.special.gamma(2*n_sersic)
 
     def total_flux(self, amp, R_sersic, n_sersic, e1=0, e2=0, Re=None, gamma=None, center_x=None, center_y=None,
                    alpha=None):
@@ -169,7 +171,7 @@ class SersicUtil(object):
         """
         phi_G, q = param_util.ellipticity2phi_q(e1, e2)
         # compute product average half-light radius
-        r_eff = R_sersic * np.sqrt(q)
+        r_eff = R_sersic * jnp.sqrt(q)
         return self._total_flux(r_eff=r_eff, I_eff=amp, n_sersic=n_sersic)
 
     def _R_stable(self, R):
@@ -178,7 +180,7 @@ class SersicUtil(object):
         :param R: radius
         :return: smoothed and stabilized radius
         """
-        return np.maximum(self._smoothing, R)
+        return jnp.maximum(self._smoothing, R)
 
     def _r_sersic(self, R, R_sersic, n_sersic, max_R_frac=100.0, alpha=1.0, R_break=0.0):
         """
@@ -194,6 +196,6 @@ class SersicUtil(object):
         R_sersic_ = self._R_stable(R_sersic)
         bn = self.b_n(n_sersic)
         R_frac = R_ / R_sersic_
-        good_inds = (np.asarray(R_frac) <= max_R_frac).astype(int)
-        result = good_inds * np.exp(-bn * (R_frac**(1. / n_sersic) - 1.))
-        return np.nan_to_num(result)
+        good_inds = (jnp.asarray(R_frac) <= max_R_frac).astype(int)
+        result = good_inds * jnp.exp(-bn * (R_frac**(1. / n_sersic) - 1.))
+        return jnp.nan_to_num(result)
