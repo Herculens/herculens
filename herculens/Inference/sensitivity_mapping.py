@@ -19,6 +19,7 @@ from herculens.Inference.optimization import Optimizer
 # from herculens.Parameters.covariance import FisherCovariance
 from herculens.Util import util
 
+
 __all__ = ['MassSensitivityMapping']
 
 
@@ -50,7 +51,8 @@ class MassSensitivityMapping(object):
         self.prepare_halo_model(init_mass)
 
         # create the loss corresponding this new model
-        self.halo_loss = Loss(self.data, self.halo_lens_image, self.halo_param, likelihood_type='chi2')
+        self.halo_loss = Loss(self.data, self.halo_lens_image, self.halo_param, 
+                              likelihood_type='chi2')
 
         # define the grid on which to compute sensitivity
         if self.halo_lens_image.ImageNumerics.grid_supersampling_factor > 1:
@@ -112,7 +114,7 @@ class MassSensitivityMapping(object):
 
         return sensitivity_map, (x_minima, y_minima, z_minima), runtime
 
-    def sensitivity_map_optim(self, init_mass=0., x_grid=None, y_grid=None, **kwargs_optimizer):
+    def sensitivity_map_optim(self, init_mass=0., x_grid=None, y_grid=None, minimize_method='trust-krylov', **kwargs_optimizer):
         # prepare the new model
         self.prepare_halo_model(init_mass)
 
@@ -142,7 +144,7 @@ class MassSensitivityMapping(object):
                 p = [init_mass, x, y]
             else:
                 p = [init_mass, x, y] + self.p_macro
-            best_fit, logL, _, runtime = optimizer.minimize('trust-krylov', init_params=p, **kwargs_optimizer)
+            best_fit, logL, _, runtime = optimizer.minimize(method=minimize_method, init_params=p, **kwargs_optimizer)
             return float(best_fit[0]), logL, runtime
         
         # evaluate the sensitivity over the coordinates grid
@@ -210,7 +212,7 @@ class MassSensitivityMapping(object):
 
         kwargs_macro = self.m_param.current_values(as_kwargs=True)
         self.p_macro = copy.deepcopy(self.m_param.current_values(as_kwargs=False)).tolist()
-        
+
         if self.fix_macro:
             kwargs_fixed = {
                 'kwargs_lens': [kwargs_halo_fixed] + kwargs_macro['kwargs_lens'],
