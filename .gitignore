@@ -138,3 +138,8 @@ dmypy.json
 
 # Illustrator files
 **.ai
+
+# debugging/test notebooks
+**/check*.ipynb
+**/test*.ipynb
+**/verify*.ipynb
