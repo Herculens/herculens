@@ -1,5 +1,8 @@
 import numpy as np
 import jax.numpy as jnp
+from jax import jit, grad
+from functools import partial
+
 from herculens.LensModel.Profiles.sersic_utils import SersicUtil
 import herculens.Util.param_util as param_util
 
@@ -40,6 +43,63 @@ class Sersic(SersicUtil):
         result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
         return amp * result
 
+    def derivatives(self, x, y, amp, R_sersic, n_sersic, center_x=0, center_y=0, max_R_frac=100.0):
+        """
+
+        :param x:
+        :param y:
+        :param amp: surface brightness/amplitude value at the half light radius
+        :param R_sersic: semi-major axis half light radius
+        :param n_sersic: Sersic index
+        :param e1: eccentricity parameter
+        :param e2: eccentricity parameter
+        :param center_x: center in x-coordinate
+        :param center_y: center in y-coordinate
+        :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
+        :return: partial derivatives of Sersic profile value at (x, y) with respect to x and y
+        """
+        def _function(p):
+            return self.function(p[0], p[1], 
+                                 amp, R_sersic, n_sersic,
+                                 center_x=center_x, center_y=center_y,
+                                 max_R_frac=max_R_frac)
+        
+        grad_function = grad(_function)
+
+        @jit
+        def _grad_function(x, y):
+            return grad_function([x, y])[0], grad_function([x, y])[1]
+        
+        f_x, f_y = jnp.vectorize(_grad_function)(x, y)
+        return f_x, f_y
+
+    def derivatives_explicit(self, x, y, amp, R_sersic, n_sersic, center_x=0, center_y=0, max_R_frac=100.0):
+        """
+
+        :param x:
+        :param y:
+        :param amp: surface brightness/amplitude value at the half light radius
+        :param R_sersic: semi-major axis half light radius
+        :param n_sersic: Sersic index
+        :param e1: eccentricity parameter
+        :param e2: eccentricity parameter
+        :param center_x: center in x-coordinate
+        :param center_y: center in y-coordinate
+        :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
+        :return: partial derivatives of Sersic profile value at (x, y) with respect to x and y
+        """
+        x_ = np.array(x) - center_x
+        y_ = np.array(y) - center_y
+        r = np.sqrt(x_**2 + y_**2)
+        #if isinstance(r, int) or isinstance(r, float):
+        #    r = max(self._s, r)
+        #else:
+        #    r[r < self._s] = self._s
+        alpha = -self.alpha_abs(x, y, n_sersic, R_sersic, amp, center_x, center_y)
+        f_x = alpha * x_ / r
+        f_y = alpha * y_ / r
+        return f_x, f_y
+
 
 class SersicElliptic(SersicUtil):
     """
@@ -71,6 +131,36 @@ class SersicElliptic(SersicUtil):
         R = self.get_distance_from_center(x, y, phi_G, q, center_x, center_y)
         result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
         return amp * result
+
+    def derivatives(self, x, y, amp, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, max_R_frac=100.0):
+        """
+
+        :param x:
+        :param y:
+        :param amp: surface brightness/amplitude value at the half light radius
+        :param R_sersic: semi-major axis half light radius
+        :param n_sersic: Sersic index
+        :param e1: eccentricity parameter
+        :param e2: eccentricity parameter
+        :param center_x: center in x-coordinate
+        :param center_y: center in y-coordinate
+        :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
+        :return: partial derivatives of Sersic profile value at (x, y) with respect to x and y
+        """
+        def _function(p):
+            return self.function(p[0], p[1], 
+                                 amp, R_sersic, n_sersic, e1, e2,
+                                 center_x=center_x, center_y=center_y,
+                                 max_R_frac=max_R_frac)
+        
+        grad_function = grad(_function)
+
+        @jit
+        def _grad_function(x, y):
+            return grad_function([x, y])[0], grad_function([x, y])[1]
+        
+        f_x, f_y = jnp.vectorize(_grad_function)(x, y)
+        return f_x, f_y
 
 
 class CoreSersic(SersicUtil):
