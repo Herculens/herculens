@@ -108,7 +108,7 @@ class SersicUtil(object):
         b = self.b_n(n_sersic)
         a_eff = self._alpha_eff(r_eff, n_sersic, k_eff)
         #alpha = 2. * a_eff * x_red ** (-n) * (special.gammainc(2 * n, b * x_red))
-        alpha = 2. * a_eff * x_red ** (-n) * (1 - special.gammainc(2 * n, b * x_red)/special.gamma(2 * n))
+        alpha = 2. * a_eff * x_red ** (-n) * (1. - special.gammainc(2 * n, b * x_red)/special.gamma(2 * n))
         return alpha
 
     def d_alpha_dr(self, x, y, n_sersic, r_eff, k_eff, center_x=0, center_y=0):
