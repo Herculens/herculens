@@ -150,8 +150,8 @@ class EPL(LensProfileBase):
         kappa = 1./2 * (f__xx + f__yy)
         gamma1__ = 1./2 * (f__xx - f__yy)
         gamma2__ = f__xy
-        gamma1 = np.cos(2 * phi_G) * gamma1__ - np.sin(2 * phi_G) * gamma2__
-        gamma2 = +np.sin(2 * phi_G) * gamma1__ + np.cos(2 * phi_G) * gamma2__
+        gamma1 = jnp.cos(2 * phi_G) * gamma1__ - jnp.sin(2 * phi_G) * gamma2__
+        gamma2 = +jnp.sin(2 * phi_G) * gamma1__ + jnp.cos(2 * phi_G) * gamma2__
         f_xx = kappa + gamma1
         f_yy = kappa - gamma1
         f_xy = gamma2
@@ -219,15 +219,15 @@ class EPLMajorAxis(LensProfileBase):
         """
         returns the Hessian matrix of the lensing potential
         """
-        R = np.hypot(q * x, y)
-        r = np.hypot(x, y)
+        R = jnp.hypot(q * x, y)
+        r = jnp.hypot(x, y)
 
         cos, sin = x / r, y / r
         cos2, sin2 = cos * cos * 2 - 1., sin * cos * 2
 
         # convergence, eq. (2)
         kappa = (2. - t) / 2. * (b / R)**t
-        kappa = np.nan_to_num(kappa, posinf=10**10, neginf=-10**10)
+        kappa = jnp.nan_to_num(kappa, posinf=10**10, neginf=-10**10)
 
         # deflection via method
         alpha_x, alpha_y = self.derivatives(x, y, b, t, q)
@@ -235,8 +235,8 @@ class EPLMajorAxis(LensProfileBase):
         # shear, eq. (17), corrected version from arXiv/corrigendum
         gamma_1 = (1. - t) * (alpha_x * cos - alpha_y * sin) / r - kappa * cos2
         gamma_2 = (1. - t) * (alpha_y * cos + alpha_x * sin) / r - kappa * sin2
-        gamma_1 = np.nan_to_num(gamma_1, posinf=10**10, neginf=-10**10)
-        gamma_2 = np.nan_to_num(gamma_2, posinf=10**10, neginf=-10**10)
+        gamma_1 = jnp.nan_to_num(gamma_1, posinf=10**10, neginf=-10**10)
+        gamma_2 = jnp.nan_to_num(gamma_2, posinf=10**10, neginf=-10**10)
 
         # second derivatives from convergence and shear
         f_xx = kappa + gamma_1
