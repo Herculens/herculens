@@ -13,7 +13,7 @@ import math
 import numpy as np
 
 
-def vkl_operator(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_Ny,dpsi_y,source0_dx,source0_dy):
+def vkl_operator(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_Nx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_Ny,dpsi_y,source0_dx,source0_dy):
     # Arguments:
     #  data_x: An array containing the X coordinates of the data pixels - must be the length of the data
     #  data_y: An array containing the Y coordinates of the data pixels - must be the length of the data
@@ -26,7 +26,7 @@ def vkl_operator(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_N
     #  dpsi_Ny: The number of dpsi pixels in the Y direction
     #  source0_x: An array of the source derivatives in the X direction at the location of the deflected data pixels (size=number of data pixels)
     #  source0_y: An array of the source derivatives in the Y direction at the location of the deflected data pixels (size=number of data pixels)
-    crosses = createCrosses(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_Ny,dpsi_y)
+    crosses = createCrosses(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_Nx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_Ny,dpsi_y)
     operator = constructDsDpsi(crosses,source0_dx,source0_dy,dpsi_Nx)
     return operator
 
@@ -58,7 +58,7 @@ def derivativeDirection(q,qmax,den):
     return rel_ind,coeff
 
 
-def createCrosses(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_Ny,dpsi_y):
+def createCrosses(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_Nx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_Ny,dpsi_y):
     # Description:
     #  This function creates a 'cross' structure for each data pixel.
     # Arguments:
@@ -142,18 +142,18 @@ def constructDsDpsi(crosses,source0_x,source0_y,dpsi_Nx):
         src_Dx = source0_x[h]
         src_Dy = source0_y[h]
 
-        vals[0]  = crosses[h]['y'][0]*src_Dy
-        vals[1]  = crosses[h]['y'][1]*src_Dy
-        vals[2]  = crosses[h]['x'][0]*src_Dx
-        vals[3]  = crosses[h]['x'][1]*src_Dx + crosses[h]['y'][2]*src_Dy
-        vals[4]  = crosses[h]['x'][2]*src_Dx + crosses[h]['y'][3]*src_Dy
-        vals[5]  = crosses[h]['x'][3]*src_Dx
-        vals[6]  = crosses[h]['x'][4]*src_Dx
-        vals[7]  = crosses[h]['x'][5]*src_Dx + crosses[h]['y'][4]*src_Dy
-        vals[8]  = crosses[h]['x'][6]*src_Dx + crosses[h]['y'][5]*src_Dy
-        vals[9]  = crosses[h]['x'][7]*src_Dx
-        vals[10] = crosses[h]['y'][6]*src_Dy
-        vals[11] = crosses[h]['y'][7]*src_Dy
+        vals[0]  = crosses[h]['coeff_y'][0]*src_Dy
+        vals[1]  = crosses[h]['coeff_y'][1]*src_Dy
+        vals[2]  = crosses[h]['coeff_x'][0]*src_Dx
+        vals[3]  = crosses[h]['coeff_x'][1]*src_Dx + crosses[h]['coeff_y'][2]*src_Dy
+        vals[4]  = crosses[h]['coeff_x'][2]*src_Dx + crosses[h]['coeff_y'][3]*src_Dy
+        vals[5]  = crosses[h]['coeff_x'][3]*src_Dx
+        vals[6]  = crosses[h]['coeff_x'][4]*src_Dx
+        vals[7]  = crosses[h]['coeff_x'][5]*src_Dx + crosses[h]['coeff_y'][4]*src_Dy
+        vals[8]  = crosses[h]['coeff_x'][6]*src_Dx + crosses[h]['coeff_y'][5]*src_Dy
+        vals[9]  = crosses[h]['coeff_x'][7]*src_Dx
+        vals[10] = crosses[h]['coeff_y'][6]*src_Dy
+        vals[11] = crosses[h]['coeff_y'][7]*src_Dy
         
         for q in range(0,12):
             if vals[q] != 0:
