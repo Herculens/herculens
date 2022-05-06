@@ -6,136 +6,91 @@ from herculens.Util.jax_util import BicubicInterpolator as Interpolator
 from herculens.Util import util
 
 
-def build_convolution_matrix(kernel_2d, image_shape):
+def build_convolution_matrix(psf_kernel_2d, image_shape):
     """
-    Credits: https://github.com/alisaaalehi/convolution_as_multiplication
+    Build a sparse matrix to convolve an image via matrix-vector product.
+    Ported from C++ code in VKL from Vernardos & Koopmans 2022.
 
-    Performs 2D convolution between input I and filter F by converting the F to a toeplitz matrix and multiply it
-      with vectorizes version of I
-      By : AliSaaalehi@gmail.com
-      
-    Arg:
-    I -- 2D numpy matrix
-    F -- numpy 2D matrix
-    print_ir -- if True, all intermediate resutls will be printed after each step of the algorithms
-    
-    Returns: 
-    output -- 2D numpy matrix, result of convolving I with F
+    Authors: @gvernard, @aymgal
     """
-    def matrix_to_vector(input):
-        """
-        Converts the input matrix to a vector by stacking the rows in a specific way explained here
+    Ni, Nj = image_shape
+    Ncropx, Ncropy = psf_kernel_2d.shape
 
-        Arg:
-        input -- a numpy matrix
+    def setCroppedLimitsEven(k, Ncrop, Nimg, Nquad):
+        if k < (Nquad - 1):
+            Npre   = k
+            Npost  = Nquad
+            offset = Nquad - k
+        elif k > (Nimg - Nquad - 1):
+            Npre   = Nquad
+            Npost  = Nimg - k
+            offset = 0
+        else:
+            Npre   = Nquad
+            Npost  = Nquad
+            offset = 0
+        return Npre, Npost, offset
 
-        Returns:
-        ouput_vector -- a column vector with size input.shape[0]*input.shape[1]
-        """
-        input_h, input_w = input.shape
-        output_vector = np.zeros(input_h*input_w, dtype=input.dtype)
-        # flip the input matrix up-down because last row should go first
-        input = np.flipud(input) 
-        for i,row in enumerate(input):
-            st = i*input_w
-            nd = st + input_w
-            output_vector[st:nd] = row   
-        return output_vector
+    def setCroppedLimitsOdd(k, Ncrop, Nimg, Nquad):
+        if k < (Nquad - 1):
+            Npre   = k
+            Npost  = Nquad
+            offset = Nquad - 1 - k
+        elif k > (Nimg - Nquad - 1):
+            Npre   = Nquad - 1
+            Npost  = Nimg - k
+            offset = 0
+        else:
+            Npre   = Nquad-1
+            Npost  = Nquad
+            offset = 0
+        return Npre, Npost, offset
 
-    def vector_to_matrix(input, output_shape):
-        """
-        Reshapes the output of the maxtrix multiplication to the shape "output_shape"
+    # get the correct method to offset the PSF kernel from the above
+    if Ncropx % 2 == 0:
+        # Warning: this might be broken in certain cases
+        func_limits_x = setCroppedLimitsEven
+        Nquadx = Ncropx//2
+    else:
+        func_limits_x = setCroppedLimitsOdd
+        Nquadx = np.ceil(Ncropx/2.).astype(int)
+    if Ncropx % 2 == 0:
+        # Warning: this might be broken in certain cases
+        func_limits_y = setCroppedLimitsEven
+        Nquady = Ncropy//2
+    else:
+        func_limits_y = setCroppedLimitsOdd
+        Nquady = np.ceil(Ncropy/2.).astype(int)
 
-        Arg:
-        input -- a numpy vector
+    # create the blurring matrix in a sparse form
+    blur = psf_kernel_2d.flatten()
+    sparse_B_rows, sparse_B_cols = [], []
+    sparse_B_values  = []
+    for i in range(Ni):  # loop over image rows
+        for j in range(Nj):  # loop over image columns
 
-        Returns:
-        output -- numpy matrix with shape "output_shape"
-        """
-        output_h, output_w = output_shape
-        output = np.zeros(output_shape, dtype=input.dtype)
-        for i in range(output_h):
-            st = i*output_w
-            nd = st + output_w
-            output[i, :] = input[st:nd]
-        # flip the output matrix up-down to get correct result
-        output=np.flipud(output)
-        return output
-    
-    # number of columns and rows of the input 
-    I_row_num, I_col_num = image_shape
+            Nleft, Nright, crop_offsetx = func_limits_x(j, Ncropx, Nj, Nquadx)
+            Ntop, Nbottom, crop_offsety = func_limits_y(i, Ncropy, Ni, Nquady)
+            
+            crop_offset = crop_offsety*Ncropx + crop_offsetx
 
-    # number of columns and rows of the filter
-    F = np.copy(kernel_2d)
-    F /= F.sum()  # makes sure the kernel is normalized
-    F_row_num, F_col_num = F.shape
+            for ii in range(i-Ntop, i+Nbottom):  # loop over PSF rows
+                ic = ii - i + Ntop
 
-    #  calculate the output dimensions
-    output_row_num = I_row_num + F_row_num - 1
-    output_col_num = I_col_num + F_col_num - 1
-    # if print_ir: print('output dimension:', output_row_num, output_col_num)
+                for jj in range(j-Nleft, j+Nright):  # loop over PSF columns
+                    jc = jj - j + Nleft;
 
-    # zero pad the filter
-    F_zero_padded = np.pad(F, ((output_row_num - F_row_num, 0),
-                               (0, output_col_num - F_col_num)),
-                            'constant', constant_values=0)
-    # if print_ir: print('F_zero_padded: ', F_zero_padded)
+                    val = blur[crop_offset + ic*Ncropx + jc]
 
-    # use each row of the zero-padded F to creat a toeplitz matrix. 
-    #  Number of columns in this matrices are same as numbe of columns of input signal
-    toeplitz_list = []
-    for i in range(F_zero_padded.shape[0]-1, -1, -1): # iterate from last row to the first row
-        c = F_zero_padded[i, :] # i th row of the F 
-        r = np.r_[c[0], np.zeros(I_col_num-1)] # first row for the toeplitz fuction should be defined otherwise
-                                                            # the result is wrong
-        toeplitz_m = linalg.toeplitz(c, r) # this function is in scipy.linalg library
-        toeplitz_list.append(toeplitz_m)
-        # if print_ir: print('F '+ str(i)+'\n', toeplitz_m)
+                    # save entries
+                    sparse_B_rows.append(ii*Nj + jj)
+                    sparse_B_cols.append(i*Nj + j)
+                    sparse_B_values.append(val)
 
-        # doubly blocked toeplitz indices: 
-    #  this matrix defines which toeplitz matrix from toeplitz_list goes to which part of the doubly blocked
-    c = range(1, F_zero_padded.shape[0]+1)
-    r = np.r_[c[0], np.zeros(I_row_num-1, dtype=int)]
-    doubly_indices = linalg.toeplitz(c, r)
-    # if print_ir: print('doubly indices \n', doubly_indices)
-
-    ## creat doubly blocked matrix with zero values
-    toeplitz_shape = toeplitz_list[0].shape # shape of one toeplitz matrix
-    h = toeplitz_shape[0]*doubly_indices.shape[0]
-    w = toeplitz_shape[1]*doubly_indices.shape[1]
-    doubly_blocked_shape = [h, w]
-    doubly_blocked = np.zeros(doubly_blocked_shape)
-
-    # tile toeplitz matrices for each row in the doubly blocked matrix
-    b_h, b_w = toeplitz_shape # hight and withs of each block
-    for i in range(doubly_indices.shape[0]):
-        for j in range(doubly_indices.shape[1]):
-            start_i = i * b_h
-            start_j = j * b_w
-            end_i = start_i + b_h
-            end_j = start_j + b_w
-            doubly_blocked[start_i: end_i, start_j:end_j] = toeplitz_list[doubly_indices[i,j]-1]
-
-    # if print_ir: print('doubly_blocked: ', doubly_blocked)
-
-    # convert I to a vector
-    #vectorized_I = matrix_to_vector(np.copy(I))
-    # if print_ir: print('vectorized_I: ', vectorized_I)
-    
-    # get result of the convolution by matrix mupltiplication
-    #result_vector = np.matmul(doubly_blocked, vectorized_I)
-    #if print_ir: print('result_vector: ', result_vector)
-
-    # reshape the raw rsult to desired matrix form
-    out_shape = (output_row_num, output_col_num)
-    #output_full = vector_to_matrix(result_vector, out_shape)
-    #if print_ir: print('Result of implemented method: \n', output)
-        
-    n_row_crop = (output_row_num - I_row_num) // 2
-    n_col_crop = (output_col_num - I_col_num) // 2
-    #output = output_full[n_row_crop:-n_row_crop, n_col_crop:-n_col_crop]
-    
-    return doubly_blocked, out_shape, n_row_crop, n_col_crop
+    # populate the sparse matrix
+    blurring_matrix = sparse.csr_matrix((sparse_B_values, (sparse_B_rows, sparse_B_cols)), 
+                                        shape=(Ni**2, Nj**2))
+    return blurring_matrix
 
 
 def build_bilinear_interpol_matrix(x_grid_1d_in, y_grid_1d_in, x_grid_1d_out, 
