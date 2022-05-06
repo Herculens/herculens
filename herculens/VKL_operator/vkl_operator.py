@@ -11,6 +11,7 @@
 
 import math
 import numpy as np
+from scipy import sparse
 
 
 def vkl_operator(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_Nx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_Ny,dpsi_y,source0_dx,source0_dy):
@@ -27,7 +28,7 @@ def vkl_operator(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_Nx,dpsi_x,dpsi_ymax,dpsi_d
     #  source0_x: An array of the source derivatives in the X direction at the location of the deflected data pixels (size=number of data pixels)
     #  source0_y: An array of the source derivatives in the Y direction at the location of the deflected data pixels (size=number of data pixels)
     crosses = createCrosses(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_Nx,dpsi_x,dpsi_ymax,dpsi_dy,dpsi_Ny,dpsi_y)
-    operator = constructDsDpsi(crosses,source0_dx,source0_dy,dpsi_Nx)
+    operator = constructDsDpsi(crosses,source0_dx,source0_dy,dpsi_Nx,dpsi_Ny)
     return operator
 
 
@@ -124,7 +125,7 @@ def createCrosses(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_Nx,dpsi_x,dpsi_ymax,dpsi_
     return crosses
 
 
-def constructDsDpsi(crosses,source0_x,source0_y,dpsi_Nx):
+def constructDsDpsi(crosses,source0_x,source0_y,dpsi_Nx,dpsi_Ny):
     # Description:
     #  Finds the non-zero coefficients for the term given by equation 7 in Vernardos & Koopmans 2022 for each data pixel.
     # Arguments:
@@ -137,7 +138,9 @@ def constructDsDpsi(crosses,source0_x,source0_y,dpsi_Nx):
     rel_j = [0,1,-1,0,1,2,-1,0,1,2,0,1]
     vals = np.zeros(12)
     
-    sparse_mat = []
+    # sparse_mat = []
+    sparse_values = []
+    sparse_rows, sparse_cols = [], []
     for h in range(0,len(crosses)):
         src_Dx = source0_x[h]
         src_Dy = source0_y[h]
@@ -158,7 +161,16 @@ def constructDsDpsi(crosses,source0_x,source0_y,dpsi_Nx):
         for q in range(0,12):
             if vals[q] != 0:
                 col_index = (crosses[h]['i0']+rel_i[q])*dpsi_Nx + (crosses[h]['j0']+rel_j[q])
-                sparse_mat.append( (h,col_index,vals[q]) )
+                # sparse_mat.append( (h,col_index,vals[q]) )
+                sparse_values.append(vals[q])
+                sparse_rows.append(h)
+                sparse_cols.append(col_index)
             vals[q] = 0 # Need to set the values of the 12 coefficients back to zero
 
-    return sparse_mat
+    # populate the sparse matrix
+    Ndata = len(crosses)
+    Ndpsi = dpsi_Nx*dpsi_Ny
+    dense_shape = (Ndata, Ndpsi)
+    DsDpsi_matrix = sparse.csr_matrix((sparse_values, (sparse_rows, sparse_cols)), 
+                                      shape=dense_shape)
+    return DsDpsi_matrix
