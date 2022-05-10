@@ -99,7 +99,6 @@ def createCrosses(data_x,data_y,dpsi_xmin,dpsi_dx,dpsi_Nx,dpsi_x,dpsi_ymax,dpsi_
         den = dpsi_dx*dpsi_dy
         four_w = [xb*ya,xa*ya,xb*yb,xa*yb]/den
 
-
         # Step 3: loop over the dpsi pixel vertices and store the X and Y coefficients in the cross.
         #         The way the coefficients are ordered is defined ad-hoc, left-to-right and top-to-bottom (see notes).
         cross = {
@@ -134,8 +133,8 @@ def constructDsDpsi(crosses,source0_x,source0_y,dpsi_Nx,dpsi_Ny):
     #  source0_y: An array of the source derivatives in the Y direction at the location of the deflected data pixels (size=number of data pixels)
     # Returns:
     #  sparse_mat: An array of tuples. Each tuple contains the row index, column index, and value of the non-zero elements of the sparse matrix
-    rel_i = [-1,-1,0,0,0,0,1,1,1,1,2,2]
-    rel_j = [0,1,-1,0,1,2,-1,0,1,2,0,1]
+    rel_i = [-1, -1,  0, 0, 0, 0,  1, 1, 1, 1, 2, 2]
+    rel_j = [ 0,  1, -1, 0, 1, 2, -1, 0, 1, 2, 0, 1]
     vals = np.zeros(12)
     
     # sparse_mat = []
@@ -161,10 +160,12 @@ def constructDsDpsi(crosses,source0_x,source0_y,dpsi_Nx,dpsi_Ny):
         for q in range(0,12):
             if vals[q] != 0:
                 col_index = (crosses[h]['i0']+rel_i[q])*dpsi_Nx + (crosses[h]['j0']+rel_j[q])
+                
                 # sparse_mat.append( (h,col_index,vals[q]) )
                 sparse_values.append(vals[q])
                 sparse_rows.append(h)
                 sparse_cols.append(col_index)
+            
             vals[q] = 0 # Need to set the values of the 12 coefficients back to zero
 
     # populate the sparse matrix

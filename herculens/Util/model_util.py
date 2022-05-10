@@ -2,9 +2,16 @@ import copy
 import numpy as np
 import jax.numpy as jnp
 import jax
+import time
+from scipy import signal
+from tqdm import tqdm
 import warnings
 from scipy.ndimage import morphology
 from scipy import ndimage
+
+from herculens.Util import linear_util, jax_util
+from herculens.VKL_operator import vkl_operator as vkl_util
+
 
 
 def mask_from_source_area(lens_image, parameters):
@@ -228,7 +235,8 @@ def pixel_pot_noise_map(lens_image, kwargs_res, k_src=None, cut=1e-5):
 
 
 def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5, 
-                              use_model_covariance=True):
+                              use_model_covariance=True,
+                              wavelet_type_list=['starlet', 'battle-lemarie-3']):
     """EMPIRICAL noise map (although inspired by Koopmans+05) as the inverse of the blurred source derivative"""
     # imports are here to avoid issues with circular imports
     from herculens.Util.jax_util import BicubicInterpolator as Interpolator
@@ -287,9 +295,180 @@ def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5,
         noise_map = np.sqrt(lens_image.Noise.C_D)
     potential_noise_map *= noise_map
 
-    # rescaled to potential grid
+    # rebin to potential grid
     x_in, y_in = lens_image.Grid.pixel_axes
     x_out, y_out = lens_image.Grid.model_pixel_axes('lens')
     potential_noise_map = image_util.re_size_array(x_in, y_in, potential_noise_map, x_out, y_out)
-    return potential_noise_map
 
+    # rescale to each wavelet scale
+    psi_wt_std_list = []
+    nx_psi, ny_psi = potential_noise_map.shape
+    for wavelet_type in wavelet_type_list:
+        if wavelet_type in ['battle-lemarie-1', 'battle-lemarie-3']:
+            num_scales = 1  # we only care about the first scale for this one
+        else:
+            num_scales = int(np.log2(min(nx_psi, ny_psi)))
+        wavelet = jax_util.WaveletTransform(num_scales, wavelet_type=wavelet_type, second_gen=False)
+        wavelet_norms = wavelet.scale_norms  # ignore coarsest scale
+        psi_wt_std = []
+        for wavelet_norm in wavelet_norms:
+            psi_wt_std.append(wavelet_norm * potential_noise_map)
+        psi_wt_std_list.append(np.array(psi_wt_std))
+
+    return psi_wt_std_list
+
+
+def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
+                                    wavelet_type_list=['starlet', 'battle-lemarie-3'], 
+                                    method='MC', num_samples=10000, seed=None, 
+                                    model_var_map=None,
+                                    verbose=False, exclude_lens_light_from_noise=True):
+    lens_model = lens_image.LensModel
+    kwargs_lens = kwargs_res['kwargs_lens']
+    source_model = lens_image.SourceModel
+    kwargs_source = kwargs_res['kwargs_source']
+
+    # get model data variance
+    add_lens_light = (not exclude_lens_light_from_noise)
+    model = lens_image.model(**kwargs_res, lens_light_add=add_lens_light)
+    data_var_map = lens_image.Noise.C_D_model(model, force_recompute=True)
+    if model_var_map is not None:
+        var_map = data_var_map + model_var_map
+    else:
+        var_map = data_var_map
+    var_map = np.array(var_map)  # cast to std numpy array otherwise computations are slowed down
+    std_map = np.sqrt(var_map)
+    var_d = var_map.flatten()
+    std_d = std_map.flatten()
+
+    # extract coordinates grid, in image plane, ray-shot to source plane, and for the pixelated potential
+    x_grid_d, y_grid_d = lens_image.Grid.pixel_coordinates
+    x_grid_rs, y_grid_rs = lens_model.ray_shooting(x_grid_d, y_grid_d, kwargs_lens)
+    x_grid_psi, y_grid_psi = lens_image.Grid.model_pixel_coordinates('lens')
+
+    # number of pixels and wavelet scales
+    nx_d, ny_d = x_grid_d.shape
+    nx_psi, ny_psi = x_grid_psi.shape
+    
+    # compute derivatives of the source light at ray-shot coordinates
+    source_deriv_x, source_deriv_y = source_model.spatial_derivatives(x_grid_rs, 
+                                                                      y_grid_rs, 
+                                                                      kwargs_source, k=k_src)
+    source_deriv_x *= lens_image.Grid.pixel_area  # correct flux units
+    source_deriv_y *= lens_image.Grid.pixel_area  # correct flux units
+
+    # reshape all quantities for building the operator
+    data_x = x_grid_d.flatten()
+    data_y = np.flip(y_grid_d, axis=0).flatten()  # WARNING: y-coords must be flipped vertically!
+    dpsi_x = x_grid_psi.flatten()
+    dpsi_y = np.flip(y_grid_psi, axis=0).flatten()  # WARNING: y-coords must be flipped vertically!
+    dpsi_dx = abs(x_grid_psi[0, 0] - x_grid_psi[0, 1])
+    dpsi_dy = abs(y_grid_psi[0, 0] - y_grid_psi[1, 0])
+    dpsi_xmin = x_grid_psi[0, :].min() - dpsi_dx/2.
+    dpsi_ymax = y_grid_psi[:, 0].max() + dpsi_dy/2.
+    dpsi_Nx, dpsi_Ny = nx_psi, ny_psi
+    source0_dx = source_deriv_x.flatten()
+    source0_dy = source_deriv_y.flatten()
+
+    # get the DsD operator (see Koopmans+05)
+    start = time.time()
+    DsDpsi_matrix = vkl_util.vkl_operator(np.array(data_x), np.array(data_y),
+                                          dpsi_xmin, dpsi_dx, dpsi_Nx, np.array(dpsi_x), 
+                                          dpsi_ymax, dpsi_dy, dpsi_Ny, np.array(dpsi_y),
+                                          np.array(source0_dx), np.array(source0_dy))
+    if verbose: print("compute DsDpsi:", time.time()-start)
+
+    # get the blurring operator for PSF convolutions
+    start = time.time()
+    psf_kernel_2d = np.array(lens_image.PSF.kernel_point_source)
+    B_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, (nx_d, ny_d))
+    if verbose: print("compute B:", time.time()-start)
+
+    # D operator
+    start = time.time()
+    D_matrix  = - B_matrix.dot(DsDpsi_matrix)
+    DT_matrix = D_matrix.T
+    if verbose: print("construct D:", time.time()-start)
+
+    # wavelet transform Phi^T operators
+    PhiT_operator_list = []
+    num_scales_list = []
+    for wavelet_type in wavelet_type_list:
+        if wavelet_type in ['battle-lemarie-1', 'battle-lemarie-3']:
+            num_scales = 1  # we only care about the first scale for this one
+        else:
+            num_scales = int(np.log2(min(nx_psi, ny_psi)))
+        wavelet = jax_util.WaveletTransform(num_scales, wavelet_type=wavelet_type, second_gen=False)
+        PhiT_operator_list.append(wavelet.decompose)
+        num_scales_list.append(num_scales)
+
+
+    if method == 'MC':
+
+        # initialize random generator seed
+        np.random.seed(seed)
+
+        # draw samples from the data covariance matrix
+        # cov_d = np.diag(var_d)
+        # mu = np.zeros(nx_d*ny_d)  # zero mean
+        # noise_reals = np.random.multivariate_normal(mu, cov_d, size=num_samples)
+        
+        # apply the operators for each realization of the noise
+        psi_wt_std_list = []
+        for wavelet_type, PhiT_operator in zip(wavelet_type_list, PhiT_operator_list):
+
+            start = time.time()
+            psi_wt_reals = []
+            for i in range(num_samples):
+                # noise_i = noise_reals[i, :]
+                noise_i = std_d * np.random.randn(*std_d.shape)  # draw a noise realization
+                psi_i = DT_matrix.dot(noise_i)
+                psi_wt_i = PhiT_operator( psi_i.reshape(nx_psi, ny_psi) )
+                psi_wt_reals.append(psi_wt_i)
+            psi_wt_reals = np.array(psi_wt_reals) # --> shape = (num_samples, num_scales, nx_psi, ny_psi)
+            if verbose: print(f"loop over MC samples for wavelet '{wavelet_type}':", time.time()-start)
+
+            # compute the variance per wavelet scale per potential pixel over all the samples
+            psi_wt_var = np.var(psi_wt_reals, axis=0)
+            # check
+            if np.any(psi_wt_var < 0.):
+                raise ValueError("Negative variance terms!")
+
+            # convert to standard deviation
+            psi_wt_std = np.sqrt(psi_wt_var)
+
+            psi_wt_std_list.append(psi_wt_std)
+
+
+    elif method == 'SLIT':
+
+        psi_wt_std_list = []
+        for PhiT_operator, num_scales in zip(PhiT_operator_list, num_scales_list):
+
+            # following the same recipe as SLIT(ronomy):
+
+            # first term of
+            B_noise = std_map * np.sqrt(np.sum(psf_kernel_2d.T**2))
+            B_noise = B_noise.flatten()
+            DsDpsiB_noise = (DsDpsi_matrix.T).dot(B_noise)
+            DsDpsiB_noise = DsDpsiB_noise.reshape(nx_psi, ny_psi)
+
+            dirac = np.zeros((nx_psi, ny_psi))
+            if nx_psi % 2 == 0:
+                warnings.warn("Expect the potential noise maps to be shifted by one pixel (psi grid has even size!).")
+            dirac[nx_psi//2, ny_psi//2] = 1
+            dirac_wt = PhiT_operator(dirac)
+
+            psi_wt_std = []
+            for k in range(num_scales+1):
+                psi_wt_std2_k = signal.fftconvolve(DsDpsiB_noise**2, dirac_wt[k]**2, mode='same')
+                psi_wt_std_k = np.sqrt(psi_wt_std2_k)
+                psi_wt_std.append(psi_wt_std_k)
+            psi_wt_std = np.array(psi_wt_std) # --> shape = (num_scales, nx_psi, ny_psi)
+
+            psi_wt_std_list.append(psi_wt_std)
+
+    else:
+        raise ValueError(f"Method '{method}' for noise propagation is not supported.")
+    
+    return psi_wt_std_list

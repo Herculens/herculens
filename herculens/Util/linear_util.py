@@ -82,7 +82,8 @@ def build_convolution_matrix(psf_kernel_2d, image_shape):
 
                     val = blur[crop_offset + ic*Ncropx + jc]
 
-                    # save entries
+                    # save entries 
+                    # (note: rows and cols were inverted from the VKL code)
                     sparse_B_rows.append(ii*Nj + jj)
                     sparse_B_cols.append(i*Nj + j)
                     sparse_B_values.append(val)
