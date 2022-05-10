@@ -21,6 +21,15 @@ class FisherCovariance(object):
             self._cov = self.fisher2covar(self.fisher_matrix, inversion='full')
         return self._cov
 
+    def estimate_model_variance_map(self, lens_image, num_mc_samples=10000, seed=None):
+        samples = self.draw_samples(num_samples=num_mc_samples, seed=seed)
+        model_list = []
+        for sample in samples:
+            kwargs_sample = self._param.args2kwargs(sample)
+            model_sample = lens_image.model(**kwargs_sample)
+            model_list.append(model_sample)
+        return np.var(model_list, axis=0)
+
     def draw_samples(self, num_samples=10000, seed=None):
         if seed is not None:
             np.random.seed(seed)
