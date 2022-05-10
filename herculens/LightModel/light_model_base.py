@@ -83,6 +83,31 @@ class LightModelBase(object):
                 flux += func.function(x, y, **kwargs_list[i])
         return flux
 
+    def spatial_derivatives(self, x, y, kwargs_list, k=None):
+        """Spatial derivatives of the source flux at a given position (along x and y directions).
+
+        Parameters
+        ----------
+        x, y : float or array_like
+            Position coordinate(s) in arcsec relative to the image center.
+        kwargs_list : list
+            List of parameter dictionaries corresponding to each source model.
+        k : int, optional
+            Position index of a single source model component.
+
+        """
+        x = jnp.array(x, dtype=float)
+        y = jnp.array(y, dtype=float)
+        # flux = jnp.zeros_like(x)
+        f_x, f_y = 0., 0.
+        bool_list = convert_bool_list(self._num_func, k=k)
+        for i, func in enumerate(self.func_list):
+            if bool_list[i]:
+                f_x_, f_y_ = func.derivatives(x, y, **kwargs_list[i])
+                f_x += f_x_
+                f_y += f_y_
+        return f_x, f_y
+
     @property
     def has_pixels(self):
         return ('PIXELATED' in self.profile_type_list)
