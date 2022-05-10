@@ -148,4 +148,6 @@ class Noise(object):
         if exposure_map is not None:
             d_pos = jnp.maximum(0, data)
             sigma += d_pos / exposure_map
+        else:
+            sigma = sigma * jnp.ones_like(data)
         return sigma
