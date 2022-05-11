@@ -2,6 +2,8 @@ __author__ = 'aymgal'
 
 import numpy as np
 
+from herculens.Util import model_util
+
 
 class FisherCovariance(object):
 
@@ -21,22 +23,18 @@ class FisherCovariance(object):
             self._cov = self.fisher2covar(self.fisher_matrix, inversion='full')
         return self._cov
 
-    def estimate_model_variance_map(self, lens_image, num_mc_samples=10000, seed=None):
+    def model_covariance(self, lens_image, num_mc_samples=10000, seed=None,
+                         return_cross_covariance=False):
         samples = self.draw_samples(num_samples=num_mc_samples, seed=seed)
-        model_list = []
-        for sample in samples:
-            kwargs_sample = self._param.args2kwargs(sample)
-            model_sample = lens_image.model(**kwargs_sample)
-            model_list.append(model_sample)
-        return np.var(model_list, axis=0)
+        return model_util.estimate_model_covariance(lens_image, self._param, samples,
+                                                    return_cross_covariance=return_cross_covariance)
 
     def draw_samples(self, num_samples=10000, seed=None):
         if seed is not None:
             np.random.seed(seed)
-        mean = self._param.current_values()
-        cov  = self.covariance_matrix
-        samples = np.random.multivariate_normal(mean, cov, size=num_samples)
-        return samples
+        return model_util.draw_samples_from_covariance(self._param.best_fit_values(),
+                                                       self.covariance_matrix,
+                                                       num_samples=num_samples, seed=seed)
 
     def get_kwargs_sigma(self):
         sigma_values = np.sqrt(np.abs(np.diag(self.covariance_matrix)))
@@ -45,7 +43,7 @@ class FisherCovariance(object):
     def compute_fisher_information(self, recompute=False):
         if hasattr(self, '_fim') and not recompute:
             return  # nothing to do
-        best_fit_values = self._param.current_values()
+        best_fit_values = self._param.best_fit_values()
         self._fim = self._diff.hessian(best_fit_values).block_until_ready()
         self._fim = np.array(self._fim)
         if hasattr(self, '_cov'):

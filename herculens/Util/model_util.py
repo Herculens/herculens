@@ -472,3 +472,40 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
         raise ValueError(f"Method '{method}' for noise propagation is not supported.")
     
     return psi_wt_std_list
+
+def estimate_model_covariance(lens_image, parameters, samples, return_cross_covariance=False):
+    model_samples = []
+    for sample in samples:
+        kwargs_sample = parameters.args2kwargs(sample)
+        model_sample = lens_image.model(**kwargs_sample)
+        model_map_shape = model_sample.shape
+        model_samples.append(model_sample.flatten())
+    model_samples = np.array(model_samples)
+    
+    # variance map (as a 2D image)
+    model_var_map = np.var(model_samples, axis=0).reshape(*model_map_shape)
+    
+    # full (auto) covariance matrix from the model samples
+    model_cov = np.cov(model_samples, rowvar=False)
+
+    # computation of the cross-covariance matrix from model and data samples
+    if return_cross_covariance:
+        data_mean_proxy = lens_image.model(**parameters.best_fit_values(as_kwargs=True))   # best-fit model as a proxy for the unknown data 'mean'
+        data_var = lens_image.Noise.C_D_model(data_mean_proxy, force_recompute=True)
+        data_mean_proxy = data_mean_proxy.flatten()
+        data_cov = np.diag(data_var.flatten())
+        data_samples = draw_samples_from_covariance(data_mean_proxy, data_cov, num_samples=len(model_samples))
+        data_vector  = np.mean(data_samples - data_samples.mean(axis=0), axis=0)
+        model_vector = np.mean(model_samples - model_samples.mean(axis=0), axis=0)
+        print("D", data_vector.shape)
+        print("M", model_vector.shape)
+        data_model_cross_cov = np.outer(data_vector, model_vector)
+        return model_var_map, model_cov, data_model_cross_cov
+    else:
+        return model_var_map, model_cov
+
+def draw_samples_from_covariance(mean, covariance, num_samples=10000, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+    samples = np.random.multivariate_normal(mean, covariance, size=num_samples)
+    return samples
