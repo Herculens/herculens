@@ -33,10 +33,9 @@ class Sampler(Inference):
     - Ensemble Affine Invariant MCMC from emcee
     """
 
-    def hmc_blackjax(self, num_warmup=100, num_samples=100, num_chains=1, 
+    def hmc_blackjax(self, seed, num_warmup=100, num_samples=100, num_chains=1, 
                      restart_from_init=False, sampler_type='NUTS', use_stan_warmup=True,
-                     step_size=1e-3, inv_mass_matrix=None, num_integ_steps=30, 
-                     seed=0):
+                     step_size=1e-3, inv_mass_matrix=None, num_integ_steps=30):
         rng_key = jax.random.PRNGKey(seed)
         logprob = self._loss.function
         init_positions = self._param.current_values(as_kwargs=False, restart=restart_from_init)
@@ -105,7 +104,7 @@ class Sampler(Inference):
 
     @staticmethod
     def _run_blackjax_inference(rng_key, kernel, initial_state, 
-                                     num_samples, num_chains):
+                                num_samples, num_chains):
         def one_step_single_chain(state, rng_key):
             state, info = kernel(rng_key, state)
             return state, (state, info)
@@ -121,9 +120,9 @@ class Sampler(Inference):
             _, (states, infos) = jax.lax.scan(one_step_multi_chains, initial_state, keys)
         return states, infos
 
-    def hmc_numpyro(self, num_warmup=100, num_samples=100, num_chains=1, 
+    def hmc_numpyro(self, seed, num_warmup=100, num_samples=100, num_chains=1, 
                     restart_from_init=False, sampler_type='NUTS', 
-                    seed=0, progress_bar=True, sampler_kwargs={}):
+                    progress_bar=True, sampler_kwargs={}):
         rng_key = jax.random.PRNGKey(seed)
 
         if sampler_type.lower() == 'hmc':
@@ -171,9 +170,12 @@ class Sampler(Inference):
                    restart_from_init=False, num_threads=1, progress_bar=True):
         """legacy sampling method from lenstronomy, mainly for comparison.
         Warning: `log_likelihood_fn` needs to be non.jitted (emcee pickles this function, which is incomptabile with JAX objetcs)
-        """ 
-        from lenstronomy.Sampling.Pool.pool import choose_pool  # TODO: remove this dependence
-        pool = choose_pool(mpi=False, processes=num_threads, use_dill=True)
+        """
+        if num_threads > 1:
+            from lenstronomy.Sampling.Pool.pool import choose_pool  # TODO: remove this dependence
+            pool = choose_pool(mpi=False, processes=num_threads, use_dill=True)
+        else:
+            pool = None  # default one
         init_means = self._param.current_values(as_kwargs=False, restart=restart_from_init)
         num_dims = len(init_means)
         num_walkers = int(walker_ratio * num_dims)
