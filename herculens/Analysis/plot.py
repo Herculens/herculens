@@ -82,7 +82,7 @@ class Plotter(object):
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, 
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
-                      reproject_pixelated_models=False, shift_pixelated_potential='min',
+                      reproject_pixelated_models=False, shift_pixelated_potential='none',
                       likelihood_mask=None, potential_mask=None,
                       lock_colorbars=False,
                       vmin_pot=None, vmax_pot=None,  # TEMP
@@ -98,7 +98,7 @@ class Plotter(object):
         if show_image:
             # create the resulting model image
             model = lens_image.model(**kwargs_result)
-            noise_var = lens_image.Noise.C_D
+            noise_var = lens_image.Noise.C_D_model(model)
             if likelihood_mask is None:
                 likelihood_mask = np.ones_like(model)
 
