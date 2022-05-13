@@ -31,8 +31,18 @@ class Loss(Differentiable):
     """
 
     _supported_ll = ('chi2', 'reduced_chi2', 'l2_norm')
-    _supported_regul_source = ('l1_starlet_source', 'l1_battle_source', 'positivity_source')
-    _supported_regul_lens_mass = ('l1_starlet_potential', 'l1_battle_potential', 'positivity_potential', 'positivity_convergence')
+    _supported_regul_source = (
+                               'l1_starlet_source', 
+                               'l1_battle_source', 
+                               'positivity_source'
+                               )
+    _supported_regul_lens_mass = (
+                                  'l1_starlet_potential', 
+                                  'l1_battle_potential', 
+                                  'positivity_potential', 
+                                  'negativity_potential', 
+                                  'positivity_convergence'
+                                  )
     _supported_regul_lens_light = ('l1_starlet_lens_light', 'l1_battle_lens_light', 'positivity_lens_light')
     _supported_prior = ('uniform', 'gaussian')
 
@@ -258,6 +268,12 @@ class Loss(Differentiable):
                                      "strength for positivity constraint")
                 self._pos_pot_lambda = float(strength)
 
+            elif term == 'negativity_potential':
+                if isinstance(strength, (tuple, list)):
+                    raise ValueError("You can only specify one regularization "
+                                     "strength for positivity constraint")
+                self._neg_pot_lambda = float(strength)
+
             elif term == 'positivity_convergence':
                 if isinstance(strength, (tuple, list)):
                     raise ValueError("You can only specify one regularization "
@@ -371,6 +387,10 @@ class Loss(Differentiable):
     def _log_regul_positivity_potential(self, kwargs):
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
         return - self._pos_pot_lambda * jnp.abs(jnp.sum(jnp.minimum(0., psi_model)))
+
+    def _log_regul_negativity_potential(self, kwargs):
+        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
+        return - self._neg_pot_lambda * jnp.abs(jnp.sum(jnp.maximum(0., psi_model)))
 
     def _log_regul_positivity_convergence(self, kwargs):
         kappa_model = self._image.LensModel.kappa(self._x_lens, 
