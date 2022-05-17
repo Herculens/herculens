@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
@@ -43,7 +44,8 @@ def std_colorbar_residuals(mappable, res_map, vmin, vmax, label=None, fontsize=1
                         label_kwargs=label_kwargs, **colorbar_kwargs)
 
 def nice_colorbar(mappable, position='right', pad=0.1, size='5%', label=None, fontsize=12, 
-                  invisible=False, divider_kwargs={}, colorbar_kwargs={}, label_kwargs={}):
+                  invisible=False, max_nbins=None,
+                  divider_kwargs={}, colorbar_kwargs={}, label_kwargs={}):
     divider_kwargs.update({'position': position, 'pad': pad, 'size': size})
     ax = mappable.axes
     divider = make_axes_locatable(ax)
@@ -57,6 +59,9 @@ def nice_colorbar(mappable, position='right', pad=0.1, size='5%', label=None, fo
         cb.set_label(label, fontsize=fontsize, **label_kwargs)
     if position == 'top':
         cax.xaxis.set_ticks_position('top')
+    if max_nbins is not None:
+        cb.locator = ticker.MaxNLocator(nbins=max_nbins)
+        cb.update_ticks()
     return cb
 
 def nice_colorbar_residuals(mappable, res_map, vmin, vmax, position='right', pad=0.1, size='5%', 
