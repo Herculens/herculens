@@ -5,6 +5,7 @@ import optax
 from scipy import optimize
 from scipy.optimize import Bounds
 from tqdm import tqdm
+from copy import deepcopy
 
 from herculens.Inference.base_inference import Inference
 
@@ -33,26 +34,63 @@ class Optimizer(Inference):
     #     return self._metrics.param_history
 
     def minimize(self, method='BFGS', maxiter=None, init_params=None,
-                 restart_from_init=False, use_exact_hessian_if_allowed=False):
+                 restart_from_init=False, use_exact_hessian_if_allowed=False,
+                 multi_start_from_prior=False, num_multi_start=1, seed_multi_start=None,
+                 progress_bar=True):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
-        if init_params is None:
-            init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         metrics = MinimizeMetrics(self._loss, method)
-        start = time.time()
-        best_fit, extra_fields = self._run_scipy_minimizer(init_params, method, maxiter, metrics,
-                                                           use_exact_hessian_if_allowed)
-        runtime = time.time() - start
-        if metrics.loss_history == []:
-            warnings.warn("The loss history does not contain any value")
-            logL_best_fit = self.log_probability(best_fit)
+        if multi_start_from_prior is False:
+            num_multi_start = 1
+        if num_multi_start == 1:
+            if init_params is None:
+                init_params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
+            init_samples = np.asarray(init_params)[None, :]
         else:
-            logL_best_fit = - float(metrics.loss_history[-1])
+            init_samples = self._param.draw_prior_samples(num_samples=num_multi_start, 
+                                                          seed=seed_multi_start)
+        exact_hessian = use_exact_hessian_if_allowed
+
+        start = time.time()
+        best_fit_list = []
+        logL_best_fit_list = []
+        loss_history_list = []
+        param_history_list = []
+        extra_fields_list = []
+        for n in self._for_loop(range(num_multi_start), progress_bar, 
+                                total=num_multi_start, 
+                                desc=f"minimize.{method}"):
+            init_params_n = init_samples[n, :]
+            best_fit_n, extra_fields_n = self._run_scipy_minimizer(init_params_n, 
+                                                                   method, maxiter, metrics,
+                                                                   exact_hessian)
+            if metrics.loss_history == []:
+                warnings.warn("The loss history does not contain any value")
+            best_fit_list.append(best_fit_n)
+            logL_best_fit_list.append(self.log_probability(best_fit_n))
+            loss_history_list.append(metrics.get_loss_history())
+            param_history_list.append(metrics.get_param_history())
+            extra_fields_list.append(extra_fields_n)
+
+        # select the best fit among the multi start runs
+        if num_multi_start > 1:
+            index = np.argmax(logL_best_fit_list)
+        else:
+            index = 0
+        best_fit = best_fit_list[index]
+        logL_best_fit = logL_best_fit_list[index]
+        extra_fields  = extra_fields_list[index]
+
+        runtime = time.time() - start
+
+        extra_fields['best_fit_index'] = index
+        extra_fields['loss_history'] = loss_history_list[index]
+        extra_fields['loss_history_list'] = loss_history_list
+        extra_fields['param_history_list'] = param_history_list  # maybe too memory consuming?
         self._param.set_best_fit(best_fit)
-        extra_fields['loss_history'] = metrics.loss_history
-        extra_fields['param_history'] = metrics.param_history
         return best_fit, logL_best_fit, extra_fields, runtime
 
     def _run_scipy_minimizer(self, x0, method, maxiter, callback, exact_hessian):
+        callback.reset()
         if method not in self._supported_scipy_methods:
             raise ValueError(f"Minimize method '{method}' is not supported.")
         # here we only put select the kwargs related to the chosen method 
@@ -192,23 +230,32 @@ class MinimizeMetrics(object):
     """simple callable class used as callback in scipy.optimize.minimize method"""
     
     def __init__(self, func, method):
-        self.loss_history = []
-        self.param_history = []
         self._func = func
         if method == 'trust-constr':
             self._call = self._call_2args
         else:
             self._call = self._call_1arg
+        self.reset()
+
+    def reset(self):
+        self.loss_history = []
+        self.param_history = []
+
+    def get_loss_history(self, copy=True):
+        return deepcopy(self.loss_history) if copy else self.loss_history
+
+    def get_param_history(self, copy=True):
+        return deepcopy(self.param_history) if copy else self.param_history
 
     def __call__(self, *args, **kwargs):
         return self._call(*args, **kwargs)
         
     def _call_1arg(self, x):
-        self.loss_history.append(self._func(x))
+        self.loss_history.append(float(self._func(x)))
         self.param_history.append(x)
 
     def _call_2args(self, x, state):
         # Input state parameter is necessary for 'trust-constr' method
         # You can use it to stop execution early by returning True
-        self.loss_history.append(self._func(x))
+        self.loss_history.append(float(self._func(x)))
         self.param_history.append(x)

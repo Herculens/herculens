@@ -95,6 +95,24 @@ class Parameters(object):
     def bounds(self):
         return self._lowers, self._uppers
 
+    def draw_prior_samples(self, num_samples, seed=None):
+        """for a parameter that has no prior, returns its current value"""
+        if seed is not None:
+            np.random.seed(seed)
+        samples = []
+        for n in range(num_samples):
+            param_values = []
+            for i in range(self.num_parameters):
+                if self._prior_types[i] == 'gaussian':
+                    param_value = self._means[i] + self._widths[i] * np.random.randn()
+                elif self._prior_types[i] == 'uniform':
+                    param_value = np.random.uniform(low=self._lowers[i], high=self._uppers[i])
+                else:
+                    param_value = self.current_values()[i]
+                param_values.append(param_value)
+            samples.append(param_values)
+        return np.array(samples)
+
     @property
     def names(self):
         if not hasattr(self, '_names'):
