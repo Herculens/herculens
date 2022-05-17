@@ -320,22 +320,30 @@ def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5,
 
 def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
                                     wavelet_type_list=['starlet', 'battle-lemarie-3'], 
+                                    starlet_second_gen=False,
                                     method='MC', num_samples=10000, seed=None, 
-                                    model_var_map=None,
-                                    verbose=False, exclude_lens_light_from_noise=True):
+                                    ignore_poisson_noise=False, ignore_lens_light_flux=False,
+                                    model_var_map=None, verbose=False):
     lens_model = lens_image.LensModel
     kwargs_lens = kwargs_res['kwargs_lens']
     source_model = lens_image.SourceModel
     kwargs_source = kwargs_res['kwargs_source']
 
     # get model data variance
-    add_lens_light = (not exclude_lens_light_from_noise)
-    model = lens_image.model(**kwargs_res, lens_light_add=add_lens_light)
-    data_var_map = lens_image.Noise.C_D_model(model, force_recompute=True)
+    model = lens_image.model(**kwargs_res, lens_light_add=(not ignore_lens_light_flux))
+    if ignore_poisson_noise:
+        data_var_map = lens_image.Noise.background_rms**2 * np.ones_like(model)
+    else:
+        data_var_map = lens_image.Noise.C_D_model(model, force_recompute=True)
     if model_var_map is not None:
-        var_map = data_var_map + model_var_map
+        var_map = data_var_map + model_var_map  # add variances
     else:
         var_map = data_var_map
+    # import matplotlib.pyplot as plt
+    # plt.imshow(var_map)
+    # plt.colorbar()
+    # plt.show()
+    # raise
     var_map = np.array(var_map)  # cast to std numpy array otherwise computations are slowed down
     std_map = np.sqrt(var_map)
     var_d = var_map.flatten()
@@ -398,7 +406,9 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
             num_scales = 1  # we only care about the first scale for this one
         else:
             num_scales = int(np.log2(min(nx_psi, ny_psi)))
-        wavelet = jax_util.WaveletTransform(num_scales, wavelet_type=wavelet_type, second_gen=False)
+        wavelet = jax_util.WaveletTransform(num_scales, 
+                                            wavelet_type=wavelet_type, 
+                                            second_gen=starlet_second_gen)
         PhiT_operator_list.append(wavelet.decompose)
         num_scales_list.append(num_scales)
 
