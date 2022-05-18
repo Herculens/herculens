@@ -404,54 +404,59 @@ class Parameters(object):
             for name in param_names:
                 if not name in kwargs_fixed_k:
                     if name not in kwargs_profile:
-                        types.append(None)
-                        lowers.append(-np.inf)
-                        uppers.append(+np.inf)
-                        means.append(np.nan)
-                        widths.append(np.nan)
-
+                        prior_type = None
                     else:
                         prior_type = kwargs_profile[name][0]
-                        if prior_type == 'uniform':
-                            if model == 'PIXELATED':
-                                if kwargs_key == 'kwargs_lens':
-                                    n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
-                                elif kwargs_key == 'kwargs_source':
-                                    n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
-                                elif kwargs_key == 'kwargs_lens_light':
-                                    n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
-                                num_param = int(n_pix_x * n_pix_y)
-                                types  += [prior_type]*num_param
-                                lowers_tmp, uppers_tmp = kwargs_profile['pixels'][1], kwargs_profile['pixels'][2]
-                                # those bounds can either be whole array (values per pixel)
-                                if isinstance(lowers_tmp, (np.ndarray, jnp.ndarray)):
-                                    lowers += lowers_tmp.flatten().tolist()
-                                    uppers += uppers_tmp.flatten().tolist()
-                                # or they can be single numbers, in which case they are considered the same for pixel
-                                elif isinstance(lowers_tmp, (int, float)):
-                                    lowers += [float(lowers_tmp)]*num_param
-                                    uppers += [float(uppers_tmp)]*num_param
-                                means  += [np.nan]*num_param
-                                widths += [np.nan]*num_param
-                            else:
-                                types.append(prior_type)
-                                lowers.append(float(kwargs_profile[name][1]))
-                                uppers.append(float(kwargs_profile[name][2]))
-                                means.append(np.nan)
-                                widths.append(np.nan)
 
-                        elif prior_type == 'gaussian':
-                            if model == 'PIXELATED':
-                                raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
-                            else:
-                                types.append(prior_type)
-                                lowers.append(-np.inf)
-                                uppers.append(+np.inf)
-                                means.append(kwargs_profile[name][1])
-                                widths.append(kwargs_profile[name][2])
-
+                    if model == 'PIXELATED':
+                        if kwargs_key == 'kwargs_lens':
+                            n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                        elif kwargs_key == 'kwargs_source':
+                            n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
+                        elif kwargs_key == 'kwargs_lens_light':
+                            n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
+                        num_param = int(n_pix_x * n_pix_y)
+                    else:
+                        num_param = 1
+                    
+                    if prior_type == 'uniform':
+                        if num_param > 1:
+                            types += [prior_type]*num_param
+                            lowers_tmp, uppers_tmp = kwargs_profile['pixels'][1], kwargs_profile['pixels'][2]
+                            # those bounds can either be whole array (values per pixel)
+                            if isinstance(lowers_tmp, (np.ndarray, jnp.ndarray)):
+                                lowers += lowers_tmp.flatten().tolist()
+                                uppers += uppers_tmp.flatten().tolist()
+                            # or they can be single numbers, in which case they are considered the same for pixel
+                            elif isinstance(lowers_tmp, (int, float)):
+                                lowers += [float(lowers_tmp)]*num_param
+                                uppers += [float(uppers_tmp)]*num_param
+                            means  += [np.nan]*num_param
+                            widths += [np.nan]*num_param
                         else:
-                            raise ValueError(f"Prior type '{prior_type}' is not supported")
+                            types.append(prior_type)
+                            lowers.append(float(kwargs_profile[name][1]))
+                            uppers.append(float(kwargs_profile[name][2]))
+                            means.append(np.nan)
+                            widths.append(np.nan)
+
+                    elif prior_type == 'gaussian':
+                        if model == 'PIXELATED':
+                            raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
+                        else:
+                            types.append(prior_type)
+                            lowers.append(-np.inf)
+                            uppers.append(+np.inf)
+                            means.append(kwargs_profile[name][1])
+                            widths.append(kwargs_profile[name][2])
+
+                    else:
+                        types  += [prior_type]*num_param
+                        lowers += [-np.inf]*num_param
+                        uppers += [+np.inf]*num_param
+                        means  += [np.nan]*num_param
+                        widths += [np.nan]*num_param
+
         return types, lowers, uppers, means, widths
 
     def _set_params_update_fixed(self, kwargs_fixed, kwargs_model_key, kwargs_key):
