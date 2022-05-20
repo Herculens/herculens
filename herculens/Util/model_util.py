@@ -323,7 +323,7 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
                                     starlet_second_gen=False,
                                     method='MC', num_samples=10000, seed=None, 
                                     ignore_poisson_noise=False, ignore_lens_light_flux=False,
-                                    model_var_map=None, verbose=False):
+                                    model_var_map=None, verbose=False, blurring_matrix=None):
     lens_model = lens_image.LensModel
     kwargs_lens = kwargs_res['kwargs_lens']
     source_model = lens_image.SourceModel
@@ -387,10 +387,13 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
     if verbose: print("compute DsDpsi:", time.time()-start)
 
     # get the blurring operator for PSF convolutions
-    start = time.time()
-    psf_kernel_2d = np.array(lens_image.PSF.kernel_point_source)
-    B_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, (nx_d, ny_d))
-    if verbose: print("compute B:", time.time()-start)
+    if blurring_matrix is None:
+        start = time.time()
+        psf_kernel_2d = np.array(lens_image.PSF.kernel_point_source)
+        B_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, (nx_d, ny_d))
+        if verbose: print("compute B:", time.time()-start)
+    else:
+        B_matrix = blurring_matrix
 
     # D operator
     start = time.time()
@@ -481,7 +484,7 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
     else:
         raise ValueError(f"Method '{method}' for noise propagation is not supported.")
     
-    return psi_wt_std_list
+    return tuple(psi_wt_std_list), B_matrix
 
 def estimate_model_covariance(lens_image, parameters, samples, return_cross_covariance=False):
     model_samples = []
