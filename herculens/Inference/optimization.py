@@ -36,9 +36,9 @@ class Optimizer(Inference):
     def minimize(self, method='BFGS', maxiter=None, init_params=None,
                  restart_from_init=False, use_exact_hessian_if_allowed=False,
                  multi_start_from_prior=False, num_multi_start=1, seed_multi_start=None,
-                 progress_bar=True):
+                 progress_bar=True, return_param_history=False):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
-        metrics = MinimizeMetrics(self._loss, method)
+        metrics = MinimizeMetrics(self._loss, method, with_param_history=return_param_history)
         if multi_start_from_prior is False:
             num_multi_start = 1
         if num_multi_start == 1:
@@ -85,7 +85,8 @@ class Optimizer(Inference):
         extra_fields['best_fit_index'] = index
         extra_fields['loss_history'] = loss_history_list[index]
         extra_fields['loss_history_list'] = loss_history_list
-        extra_fields['param_history_list'] = param_history_list  # maybe too memory consuming?
+        if return_param_history is True:
+            extra_fields['param_history_list'] = param_history_list  # maybe too memory consuming?
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 
@@ -118,7 +119,7 @@ class Optimizer(Inference):
     def optax(self, algorithm='adabelief', max_iterations=100, min_iterations=None,
               init_learning_rate=1e-2, schedule_learning_rate=True, 
               restart_from_init=False, stop_at_loss_increase=False, 
-              progress_bar=True):
+              progress_bar=True, return_param_history=False):
         if min_iterations is None:
             min_iterations = max_iterations
         if schedule_learning_rate is True:
@@ -157,10 +158,11 @@ class Optimizer(Inference):
         # Initialise optimizer state
         params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         opt_state = optim.init(params)
-        loss_history = []
         prev_params, prev_loss = params, 1e10
 
         # Gradient descent loop
+        param_history = []
+        loss_history = []
         start_time = time.time()
         for i in self._for_loop(range(max_iterations), progress_bar, 
                                 total=max_iterations, 
@@ -174,10 +176,14 @@ class Optimizer(Inference):
             else:
                 loss_history.append(loss)  # TODO: use jax.value_and_grad instead? but does it jit the gradient??
                 prev_params, prev_loss = params, loss
+            if return_param_history is True:
+                param_history.append(params)
         runtime = time.time() - start_time
         best_fit = params
         logL_best_fit = self.log_probability(best_fit)
         extra_fields = {'loss_history': np.array(loss_history)}  # TODO: use optax.second_order module to compute diagonal of Hessian?
+        if return_param_history is True:
+            extra_fields['param_history'] = param_history
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime
 
@@ -229,12 +235,13 @@ class Optimizer(Inference):
 class MinimizeMetrics(object):
     """simple callable class used as callback in scipy.optimize.minimize method"""
     
-    def __init__(self, func, method):
+    def __init__(self, func, method, with_param_history=False):
         self._func = func
         if method == 'trust-constr':
             self._call = self._call_2args
         else:
             self._call = self._call_1arg
+        self._with_param_history = with_param_history
         self.reset()
 
     def reset(self):
@@ -252,10 +259,12 @@ class MinimizeMetrics(object):
         
     def _call_1arg(self, x):
         self.loss_history.append(float(self._func(x)))
-        self.param_history.append(x)
+        if self._with_param_history:
+            self.param_history.append(x)
 
     def _call_2args(self, x, state):
         # Input state parameter is necessary for 'trust-constr' method
         # You can use it to stop execution early by returning True
         self.loss_history.append(float(self._func(x)))
-        self.param_history.append(x)
+        if self._with_param_history:
+            self.param_history.append(x)
