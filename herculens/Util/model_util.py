@@ -318,12 +318,16 @@ def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5,
     return psi_wt_std_list
 
 
-def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
+def data_noise_to_wavelet_potential(data, lens_image, kwargs_res, k_src=None,
+                                    likelihood_type='chi2',
                                     wavelet_type_list=['starlet', 'battle-lemarie-3'], 
                                     starlet_second_gen=False,
                                     method='MC', num_samples=10000, seed=None, 
                                     ignore_poisson_noise=False, ignore_lens_light_flux=False,
-                                    model_var_map=None, verbose=False, blurring_matrix=None):
+                                    model_var_map=None, verbose=False):
+    if likelihood_type not in ['l2_norm', 'chi2']:
+        raise ValueError("Only 'l2_norm' and 'chi2' are supported options for likelihood_type.")
+
     lens_model = lens_image.LensModel
     kwargs_lens = kwargs_res['kwargs_lens']
     source_model = lens_image.SourceModel
@@ -339,12 +343,8 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
         var_map = data_var_map + model_var_map  # add variances
     else:
         var_map = data_var_map
-    # import matplotlib.pyplot as plt
-    # plt.imshow(var_map)
-    # plt.colorbar()
-    # plt.show()
-    # raise
-    var_map = np.array(var_map)  # cast to std numpy array otherwise computations are slowed down
+
+    var_map = np.array(var_map)  # cast to numpy array otherwise computations are slowed down
     std_map = np.sqrt(var_map)
     var_d = var_map.flatten()
     std_d = std_map.flatten()
@@ -386,20 +386,16 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
                                           np.array(source0_dx), np.array(source0_dy))
     if verbose: print("compute DsDpsi:", time.time()-start)
 
-    # get the blurring operator for PSF convolutions
-    if blurring_matrix is None:
-        start = time.time()
-        psf_kernel_2d = np.array(lens_image.PSF.kernel_point_source)
-        B_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, (nx_d, ny_d))
-        if verbose: print("compute B:", time.time()-start)
-    else:
-        B_matrix = blurring_matrix
+    # blurring operator for PSF convolutions
+    start = time.time()
+    B_matrix = lens_image.PSF.blurring_matrix(data.shape)
+    if verbose: print("compute B:", time.time()-start)
 
     # D operator
     start = time.time()
     D_matrix  = - B_matrix.dot(DsDpsi_matrix)
     DT_matrix = D_matrix.T
-    if verbose: print("construct D:", time.time()-start)
+    if verbose: print("compute D:", time.time()-start)
 
     # wavelet transform Phi^T operators
     PhiT_operator_list = []
@@ -435,6 +431,11 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
             for i in range(num_samples):
                 # noise_i = noise_reals[i, :]
                 noise_i = std_d * np.random.randn(*std_d.shape)  # draw a noise realization
+
+                # if chi2 loss, rescale by the data variance
+                if likelihood_type == 'chi2':
+                    noise_i /= var_d
+
                 psi_i = DT_matrix.dot(noise_i)
                 psi_wt_i = PhiT_operator( psi_i.reshape(nx_psi, ny_psi) )
                 psi_wt_reals.append(psi_wt_i)
@@ -484,7 +485,7 @@ def data_noise_to_wavelet_potential(lens_image, kwargs_res, k_src=None,
     else:
         raise ValueError(f"Method '{method}' for noise propagation is not supported.")
     
-    return tuple(psi_wt_std_list), B_matrix
+    return psi_wt_std_list
 
 def estimate_model_covariance(lens_image, parameters, samples, return_cross_covariance=False):
     model_samples = []
