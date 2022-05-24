@@ -1,6 +1,6 @@
 import numpy as np
-import herculens.Util.kernel_util as kernel_util
-import herculens.Util.util as util
+from herculens.Util import util, kernel_util, linear_util
+
 
 __all__ = ['PSF']
 
@@ -98,6 +98,13 @@ class PSF(object):
         if not hasattr(self, '_kernel_pixel'):
             self._kernel_pixel = kernel_util.pixel_kernel(self.kernel_point_source, subgrid_res=1)
         return self._kernel_pixel
+
+    def blurring_matrix(self, data_shape):
+        num_pixels = data_shape[0]*data_shape[1]
+        if not hasattr(self, '_blurring_matrix') or self._blurring_matrix.shape != (num_pixels, num_pixels):
+            psf_kernel_2d = np.array(self.kernel_point_source)
+            self._blurring_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, data_shape)
+        return self._blurring_matrix
 
     def kernel_point_source_supersampled(self, supersampling_factor, updata_cache=True, num_iter_correction=5):
         """
