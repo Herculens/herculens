@@ -57,13 +57,14 @@ class FisherCovariance(object):
         else:
             raise ValueError("Only 'full' and 'diag' options are supported for inverting the FIM.")
 
-    def split_fisher_matrix(self, num_before, num_after):
-        fim_interior = self.fisher_matrix[num_before:-num_after, num_before:-num_after]
+    @staticmethod
+    def split_matrix(matrix, num_before, num_after):
+        fim_interior = matrix[num_before:-num_after, num_before:-num_after]
 
-        fim_block_UL = self.fisher_matrix[:num_before, :num_before]
-        fim_block_UR = self.fisher_matrix[:num_before, -num_after:]
-        fim_block_LR = self.fisher_matrix[-num_after:, -num_after:]
-        fim_block_LL = self.fisher_matrix[-num_after:, :num_before]
+        fim_block_UL = matrix[:num_before, :num_before]
+        fim_block_UR = matrix[:num_before, -num_after:]
+        fim_block_LR = matrix[-num_after:, -num_after:]
+        fim_block_LL = matrix[-num_after:, :num_before]
         fim_exterior = np.block([[fim_block_UL, fim_block_UR], 
                                  [fim_block_LL, fim_block_LR]])
 

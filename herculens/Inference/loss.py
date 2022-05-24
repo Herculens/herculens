@@ -191,7 +191,8 @@ class Loss(Differentiable):
                 wavelet_norms = self._starlet_ll.scale_norms[:-1]  # ignore coarsest scale
                 self._st_ll_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if isinstance(strength, (int, float)):
-                    self._st_ll_lambda = self._st_ll_lambda_hf = float(strength)
+                    self._st_ll_lambda = float(strength)
+                    self._st_ll_lambda_hf = float(strength)
                 elif isinstance(strength, (tuple, list)):
                     if len(strength) > 2:
                         raise ValueError("You can only specify two starlet regularization "
@@ -241,7 +242,8 @@ class Loss(Differentiable):
                                      f" (should be {n_scales} inc. coarsest).")
                 self._st_pot_weigths = weights
                 if isinstance(strength, (int, float)):
-                    self._st_pot_lambda = self._st_pot_lambda_hf = float(strength)
+                    self._st_pot_lambda = float(strength)
+                    self._st_pot_lambda_hf = float(strength)
                 elif isinstance(strength, (tuple, list)):
                     if len(strength) > 2:
                         raise ValueError("You can only specify two starlet regularization "
