@@ -54,7 +54,7 @@ class Sampler(Inference):
             kernel_generator = lambda step_size, inverse_mass_matrix: blackjax_hmc.kernel(
                 logprob, step_size, inverse_mass_matrix, num_integ_steps_warmup
             )
-            # update step size and invser mass matrix during warmup with Stan
+            # update step size and inverse mass matrix during warmup with Stan
             warmup_state, (step_size, inv_mass_matrix), warmup_info = stan_warmup.run(
                 rng_subkey,
                 kernel_generator,

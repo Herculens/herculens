@@ -346,7 +346,7 @@ class Plotter(object):
                                vmin=vmin_pot, vmax=vmax_pot,
                                cmap=self.cmap_default)
                 im.set_rasterized(True)
-                ax.set_title(r"$\delta\psi_{\rm ref}$", fontsize=self.base_fontsize)
+                ax.set_title(r"$\psi_{\rm pix, ref}$", fontsize=self.base_fontsize)
                 nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                               colorbar_kwargs={'orientation': 'horizontal'})
             else:
@@ -355,7 +355,7 @@ class Plotter(object):
             im = ax.imshow(potential_model * potential_mask, extent=extent,
                            vmin=vmin_pot, vmax=vmax_pot,
                            cmap=self.cmap_default)
-            ax.set_title(r"$\delta\psi_{\rm model}$", fontsize=self.base_fontsize)
+            ax.set_title(r"$\psi_{\rm pix}$", fontsize=self.base_fontsize)
             im.set_rasterized(True)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
@@ -366,7 +366,7 @@ class Plotter(object):
                 im = ax.imshow(pot_abs_res, extent=extent,
                                vmin=-vmax, vmax=vmax,
                                cmap=self.cmap_res)
-                ax.set_title(r"$\delta\psi_{\rm model}$ - $\delta\psi_{\rm ref}$", fontsize=self.base_fontsize)
+                ax.set_title(r"$\psi_{\rm pix}$ - $\psi_{\rm pix, ref}$", fontsize=self.base_fontsize)
                 nice_colorbar_residuals(im, pot_abs_res, position='top', pad=0.4, size=0.2, 
                                         vmin=-vmax, vmax=vmax,
                                         colorbar_kwargs={'orientation': 'horizontal'})
@@ -381,19 +381,19 @@ class Plotter(object):
             ax = axes[i_row, 0]
             im = ax.imshow(alpha_x * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\delta\alpha_{x,\rm model}$", fontsize=self.base_fontsize)
+            ax.set_title(r"$\alpha_{x,\rm pix}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
             im = ax.imshow(alpha_y * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\delta\alpha_{y,\rm model}$", fontsize=self.base_fontsize)
+            ax.set_title(r"$\alpha_{y,\rm pix}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
             im = ax.imshow(kappa * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\delta\kappa_{\rm model}$", fontsize=self.base_fontsize)
+            ax.set_title(r"$\kappa_{\rm pix}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             i_row += 1
