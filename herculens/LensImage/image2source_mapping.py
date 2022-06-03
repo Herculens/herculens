@@ -77,7 +77,7 @@ class Image2SourceMapping(object):
                 y_source = y_comov / T_z
         return x_source, y_source
 
-    def image_flux_joint(self, x, y, kwargs_lens, kwargs_source, k=None):
+    def image_flux_joint(self, x, y, kwargs_lens, kwargs_source, k=None, k_lens=None):
         """
 
         :param x: coordinate in image plane
@@ -87,19 +87,20 @@ class Image2SourceMapping(object):
         :return: surface brightness of all joint light components at image position (x, y)
         """
         if not self._multi_source_plane:
-            x_source, y_source = self._lensModel.ray_shooting(x, y, kwargs_lens)
+            x_source, y_source = self._lensModel.ray_shooting(x, y, kwargs_lens, k=k_lens)
             return self._lightModel.surface_brightness(x_source, y_source, kwargs_source, k=k)
         else:
             flux = np.zeros_like(x)
             if not self._multi_lens_plane:
-                x_alpha, y_alpha = self._lensModel.alpha(x, y, kwargs_lens)
+                x_alpha, y_alpha = self._lensModel.alpha(x, y, kwargs_lens, k=k_lens)
                 for i in range(len(self._deflection_scaling_list)):
                     scale_factor = self._deflection_scaling_list[i]
                     x_source = x - x_alpha * scale_factor
                     y_source = y - y_alpha * scale_factor
-                    if k is None or k ==i:
+                    if k is None or k == i:
                         flux += self._lightModel.surface_brightness(x_source, y_source, kwargs_source, k=i)
             else:
+                # THE FOLLOWING IS NOT SUPPORTED IN HERCULENS
                 x_comov = np.zeros_like(x)
                 y_comov = np.zeros_like(y)
                 alpha_x, alpha_y = x, y

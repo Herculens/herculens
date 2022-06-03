@@ -77,7 +77,7 @@ class LensImage(object):
         self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Grid, psf=self.PSF, **self._kwargs_numerics)
     
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
-                                  unconvolved=False, de_lensed=False, k=None):
+                                  unconvolved=False, de_lensed=False, k=None, k_lens=None):
         """
 
         computes the source surface brightness distribution
@@ -96,7 +96,7 @@ class LensImage(object):
         if de_lensed is True:
             source_light = self.SourceModel.surface_brightness(ra_grid, dec_grid, kwargs_source, k=k)
         else:
-            source_light = self.source_mapping.image_flux_joint(ra_grid, dec_grid, kwargs_lens, kwargs_source, k=k)
+            source_light = self.source_mapping.image_flux_joint(ra_grid, dec_grid, kwargs_lens, kwargs_source, k=k, k_lens=k_lens)
         source_light_final = self.ImageNumerics.re_size_convolve(source_light, unconvolved=unconvolved)
         return source_light_final
 
@@ -114,10 +114,10 @@ class LensImage(object):
         lens_light_final = self.ImageNumerics.re_size_convolve(lens_light, unconvolved=unconvolved)
         return lens_light_final
 
-    @partial(jit, static_argnums=(0, 4, 5, 6))
+    @partial(jit, static_argnums=(0, 4, 5, 6, 7, 8, 9))
     def model(self, kwargs_lens=None, kwargs_source=None,
               kwargs_lens_light=None, unconvolved=False, source_add=True,
-              lens_light_add=True):
+              lens_light_add=True, k_lens=None, k_source=None, k_lens_light=None):
         """
 
         make an image from parameter values
@@ -134,9 +134,10 @@ class LensImage(object):
         """
         model = np.zeros((self.Grid.num_pixel_axes))
         if source_add is True:
-            model += self.source_surface_brightness(kwargs_source, kwargs_lens, unconvolved=unconvolved)
+            model += self.source_surface_brightness(kwargs_source, kwargs_lens, unconvolved=unconvolved,
+                                                    k=k_source, k_lens=k_lens)
         if lens_light_add is True:
-            model += self.lens_surface_brightness(kwargs_lens_light, unconvolved=unconvolved)
+            model += self.lens_surface_brightness(kwargs_lens_light, unconvolved=unconvolved, k=k_lens_light)
         return model
 
     def simulation(self, add_poisson=True, add_gaussian=True, 
