@@ -68,7 +68,7 @@ class Loss(Differentiable):
         neg_log_p   = - self.log_prior(args)
         neg_log = neg_log_ll + neg_log_reg + neg_log_p
         neg_log /= self._global_norm  # to keep loss magnitude in acceptable range
-        return neg_log
+        return jnp.nan_to_num(neg_log, nan=1e15, posinf=1e15, neginf=1e15)
 
     @property
     def likelihood_num_data_points(self):
