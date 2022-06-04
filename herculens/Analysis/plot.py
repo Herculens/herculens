@@ -86,6 +86,7 @@ class Plotter(object):
                       likelihood_mask=None, potential_mask=None,
                       lock_colorbars=False,
                       vmin_pot=None, vmax_pot=None,  # TEMP
+                      k_lens=None, # TEMP
                       show_plot=True):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_light, 
@@ -97,7 +98,7 @@ class Plotter(object):
             
         if show_image:
             # create the resulting model image
-            model = lens_image.model(**kwargs_result)
+            model = lens_image.model(**kwargs_result, k_lens=k_lens)
             noise_var = lens_image.Noise.C_D_model(model)
             if likelihood_mask is None:
                 likelihood_mask = np.ones_like(model)

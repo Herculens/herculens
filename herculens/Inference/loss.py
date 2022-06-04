@@ -41,28 +41,37 @@ class Loss(Differentiable):
                                   'l1_battle_potential', 
                                   'positivity_potential', 
                                   'negativity_potential', 
-                                  'positivity_convergence'
+                                  'positivity_convergence',
+
+                                  'analytical_potential',  # TEST: by default, regularize the penultimate (index -2) lens profile with the last one (index -1)
                                   )
     _supported_regul_lens_light = ('l1_starlet_lens_light', 'l1_battle_lens_light', 'positivity_lens_light')
     _supported_prior = ('uniform', 'gaussian')
 
     def __init__(self, data, image_class, param_class, 
                  likelihood_type='chi2', likelihood_mask=None, mask_from_source_plane=False,
-                 regularization_terms=None, regularization_strengths=None, regularization_weights=None, 
-                 prior_terms=None, starlet_second_gen=False):
+                 regularization_terms=None, regularization_strengths=None, 
+                 regularization_weights=None, regularization_masks=None,
+                 prior_terms=None, starlet_second_gen=False, index_analytical_potential=None):
         self._data  = data
         self._image = image_class
         self._param = param_class
         
-        self._check_choices(likelihood_type, prior_terms, regularization_terms, regularization_strengths, regularization_weights)
+        self._check_choices(likelihood_type, prior_terms, 
+                            regularization_terms, regularization_strengths, 
+                            regularization_weights, regularization_masks)
         self._init_likelihood(likelihood_type, likelihood_mask, mask_from_source_plane)
-        self._init_regularizations(regularization_terms, regularization_strengths, regularization_weights, starlet_second_gen)
+        self._init_regularizations(regularization_terms, 
+                                   regularization_strengths, 
+                                   regularization_weights, 
+                                   regularization_masks, 
+                                   starlet_second_gen, index_analytical_potential)
         self._init_priors(prior_terms)
 
     def _func(self, args):
         """negative log(likelihood*prior*regularization)"""
         kwargs = self._param.args2kwargs(args)
-        model = self._image.model(**kwargs)
+        model = self._image.model(**kwargs, k_lens=self._regul_k_lens)
         neg_log_ll  = - self.log_likelihood(model)
         neg_log_reg = - self.log_regularization(kwargs)
         neg_log_p   = - self.log_prior(args)
@@ -83,7 +92,8 @@ class Loss(Differentiable):
         return self._data
 
     def _check_choices(self, likelihood_type, prior_terms, 
-                       regularization_terms, regularization_strengths, regularization_weights):
+                       regularization_terms, regularization_strengths, 
+                       regularization_weights, regularization_masks):
         if likelihood_type not in self._supported_ll:
             raise ValueError(f"Likelihood term '{likelihood_type}' is not supported")
         if prior_terms is not None:
@@ -139,10 +149,17 @@ class Loss(Differentiable):
             self._global_norm = 1.0 # 0.5 * self._image.Grid.num_pixel * np.mean(self._image.Noise.C_D)
 
     def _init_regularizations(self, regularization_terms, regularization_strengths, 
-                              regularization_weights, starlet_second_gen):
+                              regularization_weights, regularization_masks,
+                              starlet_second_gen, index_analytical_potential):
+
+        self._regul_k_lens = None  # TEMPORARY
+
         if regularization_terms is None:
             self.log_regularization = lambda kwargs: 0.  # no regularization
             return
+
+        if regularization_masks is None:
+            regularization_masks = [None]*len(regularization_terms)
 
         # TODO: implement regularization_weights for source regularization as well (for now it's only potential)
         i = 0
@@ -161,9 +178,10 @@ class Loss(Differentiable):
         self._idx_pix_ll  = self._image.LensLightModel.pixelated_index
 
         regul_func_list = []
-        for term, strength, weights in zip(regularization_terms, 
+        for term, strength, weights, masks in zip(regularization_terms, 
                                            regularization_strengths, 
-                                           regularization_weights_fix):
+                                           regularization_weights_fix,
+                                           regularization_masks):
             # add the log-regularization function to the list
             regul_func_list.append(getattr(self, '_log_regul_'+term))
 
@@ -283,6 +301,18 @@ class Loss(Differentiable):
                 self._pos_conv_lambda = float(strength)
                 self._x_lens, self._y_lens = self._image.Grid.model_pixel_coordinates('lens')
 
+
+            elif term == 'analytical_potential':
+                if index_analytical_potential is None:
+                    raise ValueError("For analytical potential regularization, a `index_analytical_potential` is required.")
+                self._idx_ana_pot = index_analytical_potential
+                self._regul_k_lens = tuple([True if i != self._idx_ana_pot else False for i in range(len(self._image.LensModel.lens_model_list))])
+                self._weigths = weights
+                self._lambda  = float(strength)
+                self._mask    = masks
+                self._x_lens, self._y_lens = self._image.Grid.model_pixel_coordinates('lens')
+
+
         # build the composite function (sum of regularization terms)
         self.log_regularization = lambda kw: sum([func(kw) for func in regul_func_list])
 
@@ -400,3 +430,12 @@ class Loss(Differentiable):
                                                   kwargs['kwargs_lens'], 
                                                   k=self._idx_pix_pot)
         return - self._pos_conv_lambda * jnp.abs(jnp.sum(jnp.minimum(0., kappa_model)))
+
+    def _log_regul_analytical_potential(self, kwargs):
+        psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
+        target_model = self._image.LensModel.potential(self._x_lens, self._y_lens, 
+                                                       kwargs['kwargs_lens'],
+                                                       k=self._idx_ana_pot)
+        return - self._lambda * jnp.sum(self._mask * self._weigths * (psi_model - target_model)**2)
+        # or similar to Tagore & Keeton 2014 (does not seem to work tho)
+        #return - self._lambda * (jnp.sum(self._mask * self._weigths * psi_model / target_model) - jnp.sum(self._mask) * jnp.mean(psi_model / target_model))
