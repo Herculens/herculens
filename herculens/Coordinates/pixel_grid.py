@@ -210,6 +210,7 @@ class PixelGrid(Coordinates):
         y_coords = np.linspace(extent[2], extent[3], ny) # * y_sign
         x_grid, y_grid = np.meshgrid(x_coords, y_coords)
         self._model_grids[name] = (x_grid, y_grid)
+        return x_grid, y_grid
 
     def create_model_grid_simple(self, original_shape, original_extent, name='none', overwrite=False):
         """

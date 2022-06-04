@@ -170,7 +170,9 @@ class LensImage(object):
         return norm_res
 
     def reduced_chi2(self, data, model, mask=None):
+        if mask is None:
+            mask = np.ones(self.Grid.num_pixel_axes)
         norm_res = self.normalized_residuals(data, model, mask=mask)
-        num_data_points = np.count_nonzero(mask)
+        num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
         
