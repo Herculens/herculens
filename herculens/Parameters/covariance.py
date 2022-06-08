@@ -59,13 +59,13 @@ class FisherCovariance(object):
 
     @staticmethod
     def split_matrix(matrix, num_before, num_after):
-        fim_interior = matrix[num_before:-num_after, num_before:-num_after]
+        interior = matrix[num_before:-num_after, num_before:-num_after]
 
-        fim_block_UL = matrix[:num_before, :num_before]
-        fim_block_UR = matrix[:num_before, -num_after:]
-        fim_block_LR = matrix[-num_after:, -num_after:]
-        fim_block_LL = matrix[-num_after:, :num_before]
-        fim_exterior = np.block([[fim_block_UL, fim_block_UR], 
-                                 [fim_block_LL, fim_block_LR]])
+        block_UL = matrix[:num_before, :num_before]
+        block_UR = matrix[:num_before, -num_after:]
+        block_LR = matrix[-num_after:, -num_after:]
+        block_LL = matrix[-num_after:, :num_before]
+        exterior = np.block([[block_UL, block_UR], 
+                            [block_LL, block_LR]])
 
-        return fim_interior, fim_exterior
+        return interior, exterior

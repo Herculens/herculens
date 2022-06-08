@@ -487,6 +487,7 @@ def data_noise_to_wavelet_potential(data, lens_image, kwargs_res, k_src=None,
     
     return psi_wt_std_list
 
+
 def estimate_model_covariance(lens_image, parameters, samples, return_cross_covariance=False):
     model_samples = []
     for sample in samples:
@@ -517,6 +518,7 @@ def estimate_model_covariance(lens_image, parameters, samples, return_cross_cova
         return model_var_map, model_cov, data_model_cross_cov
     else:
         return model_var_map, model_cov
+
 
 def draw_samples_from_covariance(mean, covariance, num_samples=10000, seed=None):
     if seed is not None:
