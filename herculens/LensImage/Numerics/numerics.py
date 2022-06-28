@@ -15,7 +15,8 @@ class Numerics(PointSourceRendering):
     this classes manages the numerical options and computations of an image.
     The class has two main functions, re_size_convolve() and coordinates_evaluate()
     """
-    def __init__(self, pixel_grid, psf, supersampling_factor=1, compute_mode='regular', supersampling_convolution=False,
+    def __init__(self, pixel_grid, psf, supersampling_factor=1, compute_mode='regular', 
+                 supersampling_convolution=False, iterative_kernel_supersampling=True,
                  supersampling_kernel_size=5, flux_evaluate_indexes=None, supersampled_indexes=None,
                  compute_indexes=None, point_source_supersampling_factor=1, convolution_kernel_size=None,
                  convolution_type='fft_static', truncation=4):
@@ -67,7 +68,7 @@ class Numerics(PointSourceRendering):
             if compute_mode == 'adaptive' and supersampling_convolution is True:
                 raise ValueError("Adaptive convolution is not supported")
                 # from herculens.ImSim.Numerics.adaptive_numerics import AdaptiveConvolution
-                # kernel_super = psf.kernel_point_source_supersampled(supersampling_factor)
+                # kernel_super = psf.kernel_point_source_supersampled(supersampling_factor, iterative_supersampling=iterative_kernel_supersampling)
                 # kernel_super = self._supersampling_cut_kernel(kernel_super, convolution_kernel_size, supersampling_factor)
                 # self._conv = AdaptiveConvolution(kernel_super, supersampling_factor,
                 #                                  conv_supersample_pixels=supersampled_indexes,
@@ -75,9 +76,11 @@ class Numerics(PointSourceRendering):
                 #                                  compute_pixels=compute_indexes, nopython=True, cache=True, parallel=False)
 
             elif compute_mode == 'regular' and supersampling_convolution is True:
-                kernel_super = psf.kernel_point_source_supersampled(supersampling_factor)
+                kernel_super = psf.kernel_point_source_supersampled(supersampling_factor, 
+                                                                    iterative_supersampling=iterative_kernel_supersampling)
                 if convolution_kernel_size is not None:
-                    kernel_super = psf.kernel_point_source_supersampled(supersampling_factor)
+                    kernel_super = psf.kernel_point_source_supersampled(supersampling_factor,
+                                                                        iterative_supersampling=iterative_kernel_supersampling)
                     kernel_super = self._supersampling_cut_kernel(kernel_super, convolution_kernel_size,
                                                                   supersampling_factor)
                 self._conv = SubgridKernelConvolution(kernel_super, supersampling_factor,
@@ -86,7 +89,7 @@ class Numerics(PointSourceRendering):
             else:
                 kernel = psf.kernel_point_source
                 kernel = self._supersampling_cut_kernel(kernel, convolution_kernel_size,
-                                                              supersampling_factor=1)
+                                                        supersampling_factor=1)
                 self._conv = PixelKernelConvolution(kernel, convolution_type=convolution_type)
 
         elif self._psf_type == 'GAUSSIAN':

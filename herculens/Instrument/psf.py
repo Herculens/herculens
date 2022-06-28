@@ -106,7 +106,8 @@ class PSF(object):
             self._blurring_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, data_shape)
         return self._blurring_matrix
 
-    def kernel_point_source_supersampled(self, supersampling_factor, updata_cache=True, num_iter_correction=5):
+    def kernel_point_source_supersampled(self, supersampling_factor, updata_cache=True, 
+                                         iterative_supersampling=True):
         """
         generates (if not already available) a supersampled PSF with ood numbers of pixels centered
 
@@ -128,8 +129,12 @@ class PSF(object):
                     kernel_numPix += 1
                 kernel_point_source_supersampled = kernel_util.kernel_gaussian(kernel_numPix, self._pixel_size / supersampling_factor, self._fwhm)
             elif self.psf_type == 'PIXEL':
+                if iterative_supersampling is True:
+                    num_iter = 5  # default value in lenstronomy
+                else:
+                    num_iter = 0
                 kernel = kernel_util.subgrid_kernel(self.kernel_point_source, supersampling_factor, 
-                                                    odd=True, num_iter=num_iter_correction)
+                                                    odd=True, num_iter=num_iter)
                 n = len(self.kernel_point_source)
                 n_new = n * supersampling_factor
                 if n_new % 2 == 0:

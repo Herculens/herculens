@@ -12,7 +12,8 @@ class NumericsSubFrame(PointSourceRendering):
     flux_evaluate_indexes and performs the numerical calculations only in this frame and then patches zeros around it
     to match the full data size.
     """
-    def __init__(self, pixel_grid, psf, supersampling_factor=1, compute_mode='regular', supersampling_convolution=False,
+    def __init__(self, pixel_grid, psf, supersampling_factor=1, compute_mode='regular', 
+                 supersampling_convolution=False, iterative_kernel_supersampling=True,
                  supersampling_kernel_size=5, flux_evaluate_indexes=None, supersampled_indexes=None,
                  compute_indexes=None, point_source_supersampling_factor=1, convolution_kernel_size=None,
                  convolution_type='fft_static', truncation=4):
@@ -48,6 +49,7 @@ class NumericsSubFrame(PointSourceRendering):
         self._numerics_subframe = Numerics(pixel_grid=pixel_grid_sub, psf=psf,
                                            supersampling_factor=supersampling_factor, compute_mode=compute_mode,
                                            supersampling_convolution=supersampling_convolution,
+                                           iterative_kernel_supersampling=iterative_kernel_supersampling,
                                            supersampling_kernel_size=supersampling_kernel_size,
                                            flux_evaluate_indexes=self._cut_frame(flux_evaluate_indexes),
                                            supersampled_indexes=self._cut_frame(supersampled_indexes),
