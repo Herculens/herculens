@@ -13,15 +13,16 @@ def read_molet_simulation(molet_path, simu_dir,
                           use_true_noise_map=False, cut_psf=None,
                           input_file='molet_input.json', 
                           intrument_index=0, instrument_name=None,
-                          subtract_offset=True):
+                          subtract_offset=True, use_supersampled_psf=False):
     """utility method for getting the PixelGrid class from MOLET settings"""
     # load the settings
     input_settings = read_json(os.path.join(molet_path, simu_dir, input_file))
     if instrument_name is None:
         instrument_name = input_settings['instruments'][intrument_index]['name']
         warnings.warn(f"Using MOLET instrument '{instrument_name}'.")
-    else:
-        assert input_settings['instruments'][intrument_index]['name'] == instrument_name, "Instrument names are not consistent."
+    
+    assert input_settings['instruments'][intrument_index]['name'] == instrument_name, "Instrument names are not consistent."
+    
     instru_settings = read_json(os.path.join(molet_path, 'instrument_modules', instrument_name, 'specs.json'))
     noise_props = read_json(os.path.join(molet_path, simu_dir, 'output', f'{instrument_name}_noise_properties.json'))
     
@@ -114,20 +115,6 @@ def read_molet_simulation(molet_path, simu_dir,
         raise ValueError(f"Unknown type of noise '{noise_type}'.")
     noise = Noise(Nx, Ny, background_rms=background_rms, exposure_time=exp_time, noise_map=noise_map)
 
-    # setup the psf class
-    psf_kernel = fits.getdata(os.path.join(molet_path, 'instrument_modules', instrument_name, 'psf.fits'), header=False)
-    psf_kernel = psf_kernel.astype(float)
-    true_psf_width = float(instru_settings['psf']['width'])
-    expe_psf_width = psf_kernel.shape[0] * pixel_size
-    if expe_psf_width == true_psf_width:  # means not a supersampled PSF
-        if cut_psf is not None:
-            psf_kernel = psf_kernel[cut_psf:-cut_psf, cut_psf:-cut_psf]
-            psf_kernel /= psf_kernel.sum()
-        psf = PSF(psf_type='PIXEL', kernel_point_source=psf_kernel)
-    else:
-        psf = None
-        warnings.warn("Could not prepare the 'PIXEL' PSF instance as the PSF in the instrument module is supersampled (supersampling factor?).")
-
     # if it exists, get the super-sampled PSF that was used for the mock
     super_psf_path = os.path.join(molet_path, simu_dir, 'output', 'supersampled_psf.fits')
     if os.path.exists(super_psf_path):
@@ -135,6 +122,28 @@ def read_molet_simulation(molet_path, simu_dir,
         psf_kernel_super = psf_kernel_super.astype(float)
     else:
         psf_kernel_super = None
+
+    # setup the psf class
+    psf_kernel = fits.getdata(os.path.join(molet_path, 'instrument_modules', instrument_name, 'psf.fits'), header=False)
+    psf_kernel = psf_kernel.astype(float)
+    true_psf_width = float(instru_settings['psf']['width'])
+    expe_psf_width = psf_kernel.shape[0] * pixel_size
+    if use_supersampled_psf:
+        if not len(psf_kernel_super) % 2 == 0:
+            psf = PSF(psf_type='PIXEL', kernel_point_source=psf_kernel_super, 
+                  point_source_supersampling_factor=10)
+        else:
+            psf = None
+            warnings.warn("Could not prepare the supersampled 'PIXEL' PSF instance as the supersampled PSF is even-sized.")
+    else:
+        if expe_psf_width == true_psf_width:  # means it is not a supersampled PSF
+            if cut_psf is not None:
+                psf_kernel = psf_kernel[cut_psf:-cut_psf, cut_psf:-cut_psf]
+                psf_kernel /= psf_kernel.sum()
+            psf = PSF(psf_type='PIXEL', kernel_point_source=psf_kernel)
+        else:
+            psf = None
+            warnings.warn("Could not prepare the 'PIXEL' PSF instance as the PSF in the instrument module is supersampled (what is the supersampling factor?).")
         
     # get specific noise realisation
     noise_real = fits.getdata(os.path.join(molet_path, simu_dir, 'output', f'{instrument_name}_noise_realization.fits'), header=False)
