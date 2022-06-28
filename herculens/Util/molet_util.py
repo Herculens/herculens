@@ -13,8 +13,13 @@ def read_molet_simulation(molet_path, simu_dir,
                           use_true_noise_map=False, cut_psf=None,
                           input_file='molet_input.json', 
                           intrument_index=0, instrument_name=None,
-                          subtract_offset=True, use_supersampled_psf=False):
-    """utility method for getting the PixelGrid class from MOLET settings"""
+                          subtract_offset=True, use_supersampled_psf=False,
+                          align_coordinates=True):
+    """
+    utility method for getting the PixelGrid class from MOLET settings
+
+    If True, align_coordinates will add an offset to the coordinates equal to a supersampled (x10) pixel.
+    """
     # load the settings
     input_settings = read_json(os.path.join(molet_path, simu_dir, input_file))
     if instrument_name is None:
@@ -70,6 +75,8 @@ def read_molet_simulation(molet_path, simu_dir,
     
     # the following follows VKL conventions for defining the coordinates grid
     pixel_size = float(instru_settings['resolution'])
+    transform_pix2angle = pixel_size * np.eye(2)  # here we assume pixels are square
+
     width  = fov_xmax - fov_xmin
     height = fov_ymax - fov_ymin
     step_x = pixel_size
@@ -84,8 +91,10 @@ def read_molet_simulation(molet_path, simu_dir,
     #     Ny += 1
     ra_at_xy_0 = -width/2. + step_x/2.
     dec_at_xy_0 = -height/2. + step_y/2.
-    # here we assume pixels are square
-    transform_pix2angle = pixel_size * np.eye(2)
+    if align_coordinates:
+        half_super_pixel = pixel_size / 10. / 2.  # MOLET uses 10x supersampling
+        ra_at_xy_0 += half_super_pixel
+        dec_at_xy_0 += half_super_pixel
 
     # setup the grid class
     kwargs_pixel = {'nx': Nx, 'ny': Ny,
