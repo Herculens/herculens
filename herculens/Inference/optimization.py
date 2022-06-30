@@ -86,6 +86,7 @@ class Optimizer(Inference):
         extra_fields['loss_history'] = loss_history_list[index]
         extra_fields['loss_history_list'] = loss_history_list
         if return_param_history is True:
+            extra_fields['param_history'] = param_history_list[index]
             extra_fields['param_history_list'] = param_history_list  # maybe too memory consuming?
         self._param.set_best_fit(best_fit)
         return best_fit, logL_best_fit, extra_fields, runtime

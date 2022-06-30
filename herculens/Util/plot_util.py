@@ -5,6 +5,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def plot_minimize_history(parameters, opt_extra_fields):
+    # tood: implement support for multi-start optimization
     fig, axes = plt.subplots(1, 2, figsize=(10, 6))
     ax = axes[0]
     ax.plot(range(len(opt_extra_fields['loss_history'])), opt_extra_fields['loss_history'])
