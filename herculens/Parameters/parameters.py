@@ -472,6 +472,7 @@ class Parameters(object):
 
     def _set_names(self, kwargs_model_key, kwargs_key):
         names = []
+        short_id = kwargs_key.replace('kwargs_', '')
         for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
             kwargs_fixed_k = self._kwargs_fixed[kwargs_key][k]
             param_names = self.get_param_names_for_model(kwargs_key, model)
@@ -481,22 +482,24 @@ class Parameters(object):
                         if kwargs_key == 'kwargs_lens':
                             n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
-                            names += [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
+                            names_k = [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
                         elif kwargs_key == 'kwargs_source':
                             n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
-                            names += [f"s_{i}" for i in range(num_param)]  # 's' for source
+                            names_k = [f"s_{i}" for i in range(num_param)]  # 's' for source
                         elif kwargs_key == 'kwargs_lens':
                             n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
-                            names += [f"dpsi_{i}" for i in range(num_param)]  # 'dpsi' for potential corrections
+                            names_k = [f"dpsi_{i}" for i in range(num_param)]  # 'dpsi' for potential corrections
                     else:
-                        names.append(name)
+                        names_k = [name]
+                    names += [f"{n}-{short_id}-{k}" for n in names_k]  # assign a 
         return names
 
     @staticmethod
-    def name2latex(name):
+    def name2latex(name_raw):
         # TODO: move outside of this class
+        name, model_type, profile_idx = name_raw.split('-')   # encapsulate this line in a well-named method
 
         # pixelated models
         if name[:2] == 'd_':  
