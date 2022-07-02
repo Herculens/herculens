@@ -102,6 +102,9 @@ class Plotter(object):
             noise_var = lens_image.Noise.C_D_model(model)
             if likelihood_mask is None:
                 likelihood_mask = np.ones_like(model)
+            # create a mask with NaNs such that unmasked areasa appear transparent 
+            likelihood_mask_nans = np.nan*np.copy(likelihood_mask)
+            likelihood_mask_nans[likelihood_mask == 0] = 0
 
             if hasattr(self, '_data'):
                 data = self._data
@@ -350,8 +353,10 @@ class Plotter(object):
                 ax.set_title(r"$\psi_{\rm pix, ref}$", fontsize=self.base_fontsize)
                 nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                               colorbar_kwargs={'orientation': 'horizontal'})
+                ax.imshow(likelihood_mask_nans, extent=extent, cmap='gray_r', vmin=0, vmax=1)
             else:
                 ax.axis('off')
+
             ax = axes[i_row, 1]
             im = ax.imshow(potential_model * potential_mask, extent=extent,
                            vmin=vmin_pot, vmax=vmax_pot,
@@ -360,6 +365,8 @@ class Plotter(object):
             im.set_rasterized(True)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+            ax.imshow(likelihood_mask_nans, extent=extent, cmap='gray_r', vmin=0, vmax=1)
+
             ax = axes[i_row, 2]
             if ref_potential is not None:
                 pot_abs_res = (ref_potential - potential_model) * potential_mask
@@ -372,6 +379,7 @@ class Plotter(object):
                                         vmin=-vmax, vmax=vmax,
                                         colorbar_kwargs={'orientation': 'horizontal'})
                 im.set_rasterized(True)
+                ax.imshow(likelihood_mask_nans, extent=extent, cmap='gray_r', vmin=0, vmax=1)
             else:
                 ax.axis('off')
             i_row += 1
@@ -397,6 +405,7 @@ class Plotter(object):
             ax.set_title(r"$\kappa_{\rm pix}$", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+            ax.imshow(likelihood_mask_nans, extent=extent, cmap='gray_r', vmin=0, vmax=1)
             i_row += 1
 
         if show_plot:
