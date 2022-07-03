@@ -319,8 +319,8 @@ def plot_Inference_results(fig,ax_row,Surface_brightness,logA_array,Beta_array,O
 
 
     if titles_flag:
-        titles=['Einstein ring\nsurface brightness','Gravitational potential\ninhomogeneities',\
-                'Anomalies on\nEinstein ring','Confidence regions of\ninhomogeneities parameters']
+        titles=['Einstein ring\nsurface brightness','Gravitational potential\nperturbations',\
+                'Anomalies on\nEinstein ring',"Confidence regions of\nperturbations' parameters"]
         for j in range(4):
             ax_row[j].set_title(titles[j],fontsize=fontsize)
 
