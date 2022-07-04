@@ -1,5 +1,5 @@
-<!-- <img src="https://raw.githubusercontent.com/austinpeel/jax-strong-lensing/main/images/horizontal.png?token=GHSAT0AAAAAABT7RVWHGMOQVPTNPE5RMWOCYWBZP5Q" width="600" /> -->
-![Herculens logo](images/horizontal.png "Herculens logo")
+<img src="https://raw.githubusercontent.com/austinpeel/jax-strong-lensing/main/images/horizontal.png?token=GHSAT0AAAAAABT7RVWHGMOQVPTNPE5RMWOCYWBZP5Q" width="600" />
+<!-- ![Herculens logo](images/horizontal.png "Herculens logo") -->
 
 # Herculens: fully differentiable gravitational lensing
 
