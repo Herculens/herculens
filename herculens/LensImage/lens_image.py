@@ -17,14 +17,14 @@ class LensImage(object):
                  source_model_class=None, lens_light_model_class=None,
                  kwargs_numerics=None, recompute_model_grids=False):
         """
-        :param grid_class: instance of PixelGrid() class
-        :param psf_class: instance of PSF() class
-        :param lens_model_class: instance of LensModel() class
-        :param source_model_class: instance of LightModel() class describing the source parameters
-        :param lens_light_model_class: instance of LightModel() class describing the lens light parameters
-        :param point_source_class: instance of PointSource() class describing the point sources
-        :param kwargs_numerics: keyword arguments with various numeric description (see ImageNumerics class for options)
-        :param kwargs_pixelbased: keyword arguments with various settings related to the pixel-based solver (see SLITronomy documentation)
+        :param grid_class: coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
+        :param psf_class: point spread function, instance of PSF() from herculens.Instrument.psf
+        :param noise_class: noise properties, instance of Noise() from herculens.Instrument.noise
+        :param lens_model_class: lens mass model, instance of LensModel() from herculens.LensModel.lens_model
+        :param source_model_class: source light model, instance of LightModel() from herculens.LensModel.lens_model
+        :param lens_light_model_class: lens light model, instance of LightModel() from herculens.LensModel.lens_model
+        :param kwargs_numerics: keyword arguments for various numerical settings (see .Numerics.numerics_subframe)
+        :param recompute_model_grids: if True, recomputes all coordinate grids for pixelated model components
         """
         self.type = 'single-band'
         self.num_bands = 1
@@ -87,7 +87,8 @@ class LensImage(object):
         :param kwargs_extinction: list of keyword arguments of extinction model
         :param unconvolved: if True: returns the unconvolved light distribution (prefect seeing)
         :param de_lensed: if True: returns the un-lensed source surface brightness profile, otherwise the lensed.
-        :param k: integer, if set, will only return the model of the specific index
+        :param k: list of bool or list of int to select which source profiles to include
+        :param k_lens: list of bool or list of int to select which lens mass profiles to include
         :return: 2d array of surface brightness pixels
         """
         if len(self.SourceModel.profile_type_list) == 0:
@@ -107,6 +108,7 @@ class LensImage(object):
 
         :param kwargs_lens_light: list of keyword arguments corresponding to different lens light surface brightness profiles
         :param unconvolved: if True, returns unconvolved surface brightness (perfect seeing), otherwise convolved with PSF kernel
+        :param k: list of bool or list of int to select which model profiles to include
         :return: 2d array of surface brightness pixels
         """
         ra_grid, dec_grid = self.ImageNumerics.coordinates_evaluate
@@ -119,8 +121,8 @@ class LensImage(object):
               kwargs_lens_light=None, unconvolved=False, source_add=True,
               lens_light_add=True, k_lens=None, k_source=None, k_lens_light=None):
         """
-
-        make an image from parameter values
+        Create the 2D model image from parameter values.
+        Note: due to JIT compilation, the first call to this method will be slower.
 
         :param kwargs_lens: list of keyword arguments corresponding to the superposition of different lens profiles
         :param kwargs_source: list of keyword arguments corresponding to the superposition of different source light profiles
@@ -129,7 +131,9 @@ class LensImage(object):
         :param unconvolved: if True: returns the unconvolved light distribution (prefect seeing)
         :param source_add: if True, compute source, otherwise without
         :param lens_light_add: if True, compute lens light, otherwise without
-        :param point_source_add: if True, add point sources, otherwise without
+        :param k_lens: list of bool or list of int to select which lens mass profiles to include
+        :param k_source: list of bool or list of int to select which source profiles to include
+        :param k_lens_light: list of bool or list of int to select which lens light profiles to include
         :return: 2d array of surface brightness pixels of the simulation
         """
         model = np.zeros((self.Grid.num_pixel_axes))
@@ -162,6 +166,10 @@ class LensImage(object):
         return simu
 
     def normalized_residuals(self, data, model, mask=None):
+        """
+        compute the map of normalized residuals, 
+        given the data and the model image
+        """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
         noise_var = self.Noise.C_D_model(model)
@@ -170,6 +178,9 @@ class LensImage(object):
         return norm_res
 
     def reduced_chi2(self, data, model, mask=None):
+        """
+        compute the reduced chi2 of the data given the model
+        """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
         norm_res = self.normalized_residuals(data, model, mask=mask)

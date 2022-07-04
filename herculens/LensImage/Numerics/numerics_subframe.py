@@ -27,11 +27,11 @@ class NumericsSubFrame(PointSourceRendering):
         grid/pixels
         :param supersampling_kernel_size: int (odd number), size (in regular pixel units) of the super-sampled
         convolution
-        :param flux_evaluate_indexes: boolean 2d array of size of image (or None, then initiated as gird of True's).
+        :param flux_evaluate_indexes: [NOT TESTED] boolean 2d array of size of image (or None, then initiated as gird of True's).
         Pixels indicated with True will be used to perform the surface brightness computation (and possible lensing
         ray-shooting). Pixels marked as False will be assigned a flux value of zero (or ignored in the adaptive
         convolution)
-        :param supersampled_indexes: 2d boolean array (only used in mode='adaptive') of pixels to be supersampled (in
+        :param supersampled_indexes: [NOT TESTED] 2d boolean array (only used in mode='adaptive') of pixels to be supersampled (in
         surface brightness and if supersampling_convolution=True also in convolution)
         :param compute_indexes: 2d boolean array (only used in mode='adaptive'), marks pixel that the resonse after
         convolution is computed (all others =0). This can be set to likelihood_mask in the Likelihood module for
