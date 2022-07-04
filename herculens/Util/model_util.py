@@ -9,8 +9,7 @@ import warnings
 from scipy.ndimage import morphology
 from scipy import ndimage
 
-from herculens.Util import linear_util, jax_util
-from herculens.VKL_operator import vkl_operator as vkl_util
+from herculens.Util import linear_util, jax_util, vkl_util
 
 
 
