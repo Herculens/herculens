@@ -12,7 +12,7 @@
 
 ### Analysis of strong lensing imaging data
 
-Th primary purpose of `Herculens` is to provide flexible modeling methods to model current and future observations of strong gravitational lenses. Currently, it supports various degrees of model complexity, ranging from standard smooth analytical profiles to pixelated models combined with machine learning approaches.
+The primary purpose of `Herculens` is to provide flexible modeling methods to model current and future observations of strong gravitational lenses. Currently, it supports various degrees of model complexity, ranging from standard smooth analytical profiles to pixelated models combined with machine learning approaches.
 
 Currently, `Herculens` supports several of the most widely-used analytical profiles, as well as multi-scale pixelated models regularized with wavelets. Future updates will include the support of point source modeling, new regularization techniques, and more expressive models based on neural networks.
 
@@ -97,7 +97,7 @@ Anyone that would like to contribute to `Herculens` is highly encouraged to do s
 
 ### A note regarding `lenstronomy`
 
-You may quickly realize that the syntax and naming conventions of `Herculens` share many similarities with the general purpose lensing software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy) ([Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283), and references therein). The reason is simple: because it is overall easy to use and open-source, `lenstronomy` was used a baseline for early development phases of `Herculens`. Since then, there have been many modifications throughout the code, primarily to add powerful features from `JAX`, then to implement new modeling techniques. These features features could _not_ be implemented in the `lenstronomy` without significantly affecting the spirit of the package. While many stylistic changes have been made, it should be really easy for any `lenstronomy` user to test specific features exclusive to `Herculens`.
+You may quickly realize that the syntax and naming conventions of `Herculens` share many similarities with the general purpose lensing software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy) ([Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283), and references therein). The reason is simple: because it is overall easy to use and open-source, `lenstronomy` was used a as baseline for the early development phases of `Herculens`. Since then, there have been many modifications throughout the code, primarily to add powerful features from `JAX`, then to implement new modeling techniques that were unachievable beforehand. These features could _not_ be implemented in the `lenstronomy` without significantly affecting the spirit of the package. While many stylistic changes have been made, it should be really easy for any `lenstronomy` user to test specific features exclusive to `Herculens`.
 
 
 
