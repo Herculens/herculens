@@ -33,11 +33,11 @@ This highly modular framework offers a way to merge all modeling paradigms explo
 
 ### Example notebooks
 
-Below you can find a few synthetic problems to tackle with `Herculens`:
+Below you can find a few examples of synthetic problems that can be tackled with `Herculens`:
 
-- [**Starting guide**: Lens modeling with gradient descent, Fisher analysis and Hamiltonian sampling](notebooks/herculens__Starting_guide.ipynb)
-- [Reconstruction of a complex lensed galaxy with wavelets (and analytical profiles)](notebooks/herculens__Complex_source_with_wavelets.ipynb)
-- [Detection of a dark satellite as a localized deviation to the smooth lens potential](notebooks/herculens__Starting_guide.ipynb)
+- [**Starting guide**: Lens modeling with gradient descent, Fisher analysis and Hamiltonian sampling](https://github.com/aymgal/herculens_workspace/edit/main/notebooks/herculens__Starting_guide.ipynb)
+- [Reconstruction of a complex lensed galaxy with wavelets (and analytical profiles)](https://github.com/aymgal/herculens_workspace/edit/main/notebooks/herculens__Complex_source_with_wavelets.ipynb)
+- [Detection of a dark satellite as a localized deviation to the smooth lens potential](https://github.com/aymgal/herculens_workspace/edit/main/notebooks/herculens__Subhalo_detection_with_wavelets.ipynb)
 
 New notebooks will be added soon in order to showcase other features of the package and apply those in different situations.
 
