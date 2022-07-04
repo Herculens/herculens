@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/austinpeel/herculens/main/images/horizontal.png" width="600" />
+<img src="images/horizontal.png" width="600" alt="Herculens logo" />
 <!-- ![Herculens logo](images/horizontal.png "Herculens logo") -->
 
 # Herculens: fully differentiable gravitational lensing
@@ -10,7 +10,7 @@
 
 
 
-### Analysis of imaging data of strong lenses
+### Analysis of strong lensing imaging data
 
 Th primary purpose of `Herculens` is to provide flexible modeling methods to model current and future observations of strong gravitational lenses. Currently, it supports various degrees of model complexity, ranging from standard smooth analytical profiles to pixelated models combined with machine learning approaches.
 
