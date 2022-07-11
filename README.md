@@ -1,12 +1,12 @@
 <img src="images/horizontal.png" width="600" alt="Herculens logo" />
-<!-- ![Herculens logo](images/horizontal.png "Herculens logo") -->
 
-# Herculens: fully differentiable gravitational lensing
+# Herculens: differentiable gravitational lensing
 
-![License](https://img.shields.io/github/license/austinpeel/jax-strong-lensing)
-![PyPi version](https://img.shields.io/pypi/v/herculens)
-![PyPi python support](https://img.shields.io/pypi/pyversions/herculens)
-[![arXiv](https://img.shields.io/badge/arXiv-1234.56789-b31b1b.svg)](https://arxiv.org/abs/1234.56789)
+![License](https://img.shields.io/github/license/austinpeel/herculens)
+![PyPi python support](https://img.shields.io/badge/Python-3.7-blue)
+<!-- [![arXiv](https://img.shields.io/badge/arXiv-1234.56789-b31b1b.svg)](https://arxiv.org/abs/1234.56789) -->
+<!-- ![PyPi version](https://img.shields.io/pypi/v/herculens) -->
+
 
 
 
@@ -19,6 +19,8 @@ Currently, `Herculens` supports several of the most widely-used analytical profi
 Being a forward modeling code, `Herculens` also allows to simulate realistic observations of gravitational lenses.
 
 
+
+
 ## `JAX`-based automatic differentiation and code compilation 
 
 `Herculens` is based on the powerful framework of **differentiable programming**. The code is entirely based on the automatic differentiation and compilation features of [`JAX`](https://github.com/google/jax). This simply means that you have access, _analytically_, to all partial derivatives of your model with respect to any of its parameters. This enables faster convergence to the solution, more efficient exploration of the parameter space including the sampling of posterior distributions, and new ways to mitigate degeneracies that affect gravitational lensing.
@@ -28,6 +30,8 @@ This highly modular framework offers a way to merge all modeling paradigms explo
 - **analytical**: model components are described by analytical functions with few parameters and clear physical meaning, but that can be insufficient to fit all observations;
 - **pixelated**: regular or irregular grid of pixels are used as individual parameters, which offer higher flexibility, but requires well-motivated regularization strategies;
 - **deep learning**: neural networks (among others) are by construction fully differentiable, regardless of being pre-trained or not. It is therefore effortless to plug-in any deep learning-based model component to `Herculens`.
+
+
 
 
 
@@ -45,14 +49,17 @@ New notebooks will be added soon in order to showcase other features of the pack
 
 ## Installation
 
-### Recommended Usage
-First create an independent python environment:
+### Manual installation
+
+The package will be soon available through PyPi directly, but it is as easy to install it manually.
+
+Good practice is to create a new python environment:
 ```sh
 conda create -n herculens-env python=3.7
 conda activate herculens-env
 ```
 
-Then install the local `herculens` package (or use `-e` for a development install):
+Download the package `cd` into the directory. Then install the local `herculens` package (or use `-e` for a development install) as follows:
 ```sh
 pip install (-e) .
 ```
@@ -97,10 +104,13 @@ Anyone that would like to contribute to `Herculens` is highly encouraged to do s
 
 #### A note regarding `lenstronomy`
 
-You may quickly realize that the syntax and naming conventions of `Herculens` share many similarities with the general purpose lensing software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy) ([Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283), and references therein). The reason is simple: because it is overall easy to use and open-source, `lenstronomy` was used a as baseline for the early development phases of `Herculens`. Since then, there have been many modifications throughout the code, primarily to add powerful features from `JAX`, then to implement new modeling techniques that were unachievable beforehand. These features could _not_ be implemented in the original code without significantly affecting the original spirit of `lenstronomy`.
+You may quickly realize that the syntax and naming conventions of `Herculens` share many similarities with the general purpose lensing software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy) ([Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283), and references therein). The reason is simple: because it is overall easy to use and open-source, `lenstronomy` was used a as baseline for the early development phases of `Herculens`. Since then, there have been many modifications throughout the code, primarily to add powerful features from `JAX`, then to implement new modeling techniques that were unachievable beforehand. While these features could not be implemented in `lenstronomy` without significantly affecting the original spirit of the code, the proximity between `Herculens`and `lenstronomy` makes it really easy to switch from one to the other.
+
 
 
 
 ## Parallelization and GPU support
 
 One thing that has not been extensively tested yet---although it is automatically supported with `JAX`---is to run `Herculens` in parallel and over multiple GPUs. If you wish to do that, we would be delighted to get touch with you for possible improvements regarding these aspects.
+
+
