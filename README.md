@@ -113,4 +113,4 @@ If you make use of `Herculens`, please cite [Galan et al. 2022](https://arxiv.or
 All current and past contributors are listed in [this document](AUTHORS.md).
 
 #### Special mention regarding Lenstronomy
-Part of the `Herculens` code originates from the open-source lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy), described in [Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283) (and references therein). In every source file, credits to the specific developers and contributors to `lenstronomy` (up to version 1.9.3) are indicated.
+Part of the `Herculens` code originates from the open-source lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy), described in [Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283) (and references therein). In every source file, proper credits to the specific developers and contributors---to both the original `lenstronomy` (up to version 1.9.3) and `herculens` code---are indicated.
