@@ -3,7 +3,7 @@ import jax.numpy as np
 from functools import partial
 from jax import jit
 
-from herculens.LensImage.Numerics.numerics_subframe import NumericsSubFrame
+from herculens.LensImage.Numerics.numerics import Numerics
 from herculens.LensImage.image2source_mapping import Image2SourceMapping
 
 
@@ -26,16 +26,13 @@ class LensImage(object):
         :param kwargs_numerics: keyword arguments for various numerical settings (see .Numerics.numerics_subframe)
         :param recompute_model_grids: if True, recomputes all coordinate grids for pixelated model components
         """
-        self.type = 'single-band'
-        self.num_bands = 1
         self.PSF = psf_class
         self.Noise = noise_class
-        # here we deep-copy the class to prevent issues with model grid creations below
         self.Grid = grid_class
         self.PSF.set_pixel_size(self.Grid.pixel_width)
         if kwargs_numerics is None:
             kwargs_numerics = {}
-        self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
+        self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
         if lens_model_class is None:
             from herculens.LensModel.lens_model import LensModel
             lens_model_class = LensModel(lens_model_list=[])
@@ -64,18 +61,6 @@ class LensImage(object):
         self._kwargs_numerics = kwargs_numerics
         self.source_mapping = Image2SourceMapping(lens_model_class, source_model_class)
 
-    def update_psf(self, psf_class):
-        """
-
-        update the instance of the class with a new instance of PSF() with a potentially different point spread function
-
-        :param psf_class:
-        :return: no return. Class is updated.
-        """
-        self.PSF = psf_class
-        self.PSF.set_pixel_size(self.Grid.pixel_width)
-        self.ImageNumerics = NumericsSubFrame(pixel_grid=self.Grid, psf=self.PSF, **self._kwargs_numerics)
-    
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, de_lensed=False, k=None, k_lens=None):
         """

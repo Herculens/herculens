@@ -178,7 +178,5 @@ class PSF(object):
 
         :return: full width at half maximum of kernel (in units of pixel)
         """
-        if self.psf_type == 'GAUSSIAN':
-            return self._fwhm
-        else:
-            return kernel_util.fwhm_kernel(self.kernel_point_source) * self._pixel_size
+        return self._fwhm
+        
