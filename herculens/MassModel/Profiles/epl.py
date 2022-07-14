@@ -1,12 +1,12 @@
 import numpy as np
 import jax.numpy as jnp
 from herculens.Util import util, param_util, func_util
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
 
 __all__ = ['EPL', 'EPLMajorAxis']
 
 
-class EPL(LensProfileBase):
+class EPL(MassProfileBase):
     """
     Elliptical Power Law
     kappa = (2-t)/2*(b/r)^t
@@ -171,7 +171,7 @@ class EPL(LensProfileBase):
         return theta_E_new
 
 
-class EPLMajorAxis(LensProfileBase):
+class EPLMajorAxis(MassProfileBase):
     """
     This class contains the function and the derivatives of the
     elliptical power law.

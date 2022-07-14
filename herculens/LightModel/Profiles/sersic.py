@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from jax import jit, grad
 from functools import partial
 
-from herculens.LensModel.Profiles.sersic_utils import SersicUtil
+from herculens.MassModel.Profiles.sersic_utils import SersicUtil
 import herculens.Util.param_util as param_util
 
 

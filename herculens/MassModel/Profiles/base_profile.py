@@ -1,7 +1,7 @@
-__all__ = ['LensProfileBase']
+__all__ = ['MassProfileBase']
 
 
-class LensProfileBase(object):
+class MassProfileBase(object):
     """Base class for all lens model profiles."""
 
     def __init__(self, *args, **kwargs):

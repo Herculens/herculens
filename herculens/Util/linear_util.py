@@ -229,7 +229,7 @@ def build_DsD_matrix(smooth_lens_image, smooth_kwargs_params, hybrid_lens_image=
     interp_grad_s_y = Interpolator(y_coords_num, x_coords_num, grad_s_y_srcplane)
 
     # use the lens equation to ray shoot the coordinates of the data grid
-    x_src, y_src = smooth_lens_image.LensModel.ray_shooting(
+    x_src, y_src = smooth_lens_image.MassModel.ray_shooting(
         x_grid, y_grid, smooth_kwargs_params['kwargs_lens'])
 
     # evaluate the resulting arrays on that grid

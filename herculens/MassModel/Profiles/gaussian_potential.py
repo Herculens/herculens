@@ -1,9 +1,9 @@
 import numpy as np
 import jax.numpy as jnp
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
 
 
-class Gaussian(LensProfileBase):
+class Gaussian(MassProfileBase):
     """
     this class contains functions to evaluate a Gaussian function and calculates its derivative and hessian matrix
     """

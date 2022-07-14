@@ -120,7 +120,7 @@ class Loss(Differentiable):
                                      "compatible with a 'PIXELATED' source light profile")
                 
                 if (term in self._supported_regul_lens_mass and 
-                    'PIXELATED' not in self._image.LensModel.lens_model_list):
+                    'PIXELATED' not in self._image.MassModel.lens_model_list):
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' lens profile")
 
@@ -174,7 +174,7 @@ class Loss(Differentiable):
                 regularization_weights_fix.append(None)
 
         self._idx_pix_src = self._image.SourceModel.pixelated_index
-        self._idx_pix_pot = self._image.LensModel.pixelated_index
+        self._idx_pix_pot = self._image.MassModel.pixelated_index
         self._idx_pix_ll  = self._image.LensLightModel.pixelated_index
 
         regul_func_list = []
@@ -249,7 +249,7 @@ class Loss(Differentiable):
                 self._pos_ll_lambda = float(strength)
 
             elif term == 'l1_starlet_potential':
-                n_pix_pot = min(*self._image.LensModel.pixelated_shape)
+                n_pix_pot = min(*self._image.MassModel.pixelated_shape)
                 n_scales = int(np.log2(n_pix_pot))  # maximum allowed number of scales
                 self._starlet_pot = WaveletTransform(n_scales, wavelet_type='starlet',
                                                      second_gen=starlet_second_gen)
@@ -306,7 +306,7 @@ class Loss(Differentiable):
                 if index_analytical_potential is None:
                     raise ValueError("For analytical potential regularization, a `index_analytical_potential` is required.")
                 self._idx_ana_pot = index_analytical_potential
-                self._regul_k_lens = tuple([True if i != self._idx_ana_pot else False for i in range(len(self._image.LensModel.lens_model_list))])
+                self._regul_k_lens = tuple([True if i != self._idx_ana_pot else False for i in range(len(self._image.MassModel.lens_model_list))])
                 self._weigths = weights
                 self._lambda  = float(strength)
                 self._mask    = masks
@@ -426,7 +426,7 @@ class Loss(Differentiable):
         return - self._neg_pot_lambda * jnp.abs(jnp.sum(jnp.maximum(0., psi_model)))
 
     def _log_regul_positivity_convergence(self, kwargs):
-        kappa_model = self._image.LensModel.kappa(self._x_lens, 
+        kappa_model = self._image.MassModel.kappa(self._x_lens, 
                                                   self._y_lens,
                                                   kwargs['kwargs_lens'], 
                                                   k=self._idx_pix_pot)
@@ -434,7 +434,7 @@ class Loss(Differentiable):
 
     def _log_regul_analytical_potential(self, kwargs):
         psi_model = kwargs['kwargs_lens'][self._idx_pix_pot]['pixels']
-        target_model = self._image.LensModel.potential(self._x_lens, self._y_lens, 
+        target_model = self._image.MassModel.potential(self._x_lens, self._y_lens, 
                                                        kwargs['kwargs_lens'],
                                                        k=self._idx_ana_pot)
         return - self._lambda * jnp.sum(self._mask * self._weigths * (psi_model - target_model)**2)

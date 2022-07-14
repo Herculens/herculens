@@ -1,13 +1,28 @@
-import numpy as np
-from herculens.LensModel.profile_list_base import ProfileListBase
+from herculens.MassModel.mass_model_base import MassProfileBase
 
-__all__ = ['SinglePlane']
+__all__ = ['MassModel']
 
 
-class SinglePlane(ProfileListBase):
-    """
-    class to handle an arbitrary list of lens models in a single lensing plane
-    """
+class MassModel(MassProfileBase):
+    """An arbitrary list of lens models."""
+    def __init__(self, lens_model_list, kwargs_pixelated={}):
+        """Create a MassModel object.
+
+        Parameters
+        ----------
+        lens_model_list : list of str
+            Lens model profile names.
+        kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
+
+        Notes
+        -----
+        The original MassModel class in lenstronomy has many more inputs and
+        supports much more functionality. It has been reduced here to the bare
+        minimum in order to test JAX autodiff through a lensing pipeline.
+
+        """
+        self.lens_model_list = lens_model_list
+        super().__init__(self.lens_model_list, kwargs_pixelated=kwargs_pixelated)
 
     def ray_shooting(self, x, y, kwargs, k=None):
         """
@@ -174,3 +189,89 @@ class SinglePlane(ProfileListBase):
                 density_i = func.density_lens(r, **kwargs_i)
                 density += density_i
         return density
+
+    def alpha(self, x, y, kwargs, k=None):
+        """
+        deflection angles
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+         potential is analytically known
+        :return: deflection angles in units of arcsec
+        """
+        return self.alpha(x, y, kwargs, k=k)
+
+    def kappa(self, x, y, kwargs, k=None):
+        """
+        lensing convergence k = 1/2 laplacian(phi)
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: lensing convergence
+        """
+        f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k)
+        kappa = (f_xx + f_yy) / 2.
+        return kappa
+
+    def curl(self, x, y, kwargs, k=None):
+        """
+        curl computation F_yx - F_xy
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: curl at position (x, y)
+        """
+        f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k)
+        # Note the sign change from lenstronomy
+        return f_yx - f_xy
+
+    def gamma(self, x, y, kwargs, k=None):
+        """
+        shear computation
+        g1 = 1/2(d^2phi/dx^2 - d^2phi/dy^2)
+        g2 = d^2phi/dxdy
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: gamma1, gamma2
+        """
+
+        f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k)
+        gamma1 = (f_xx - f_yy) / 2.
+        gamma2 = f_xy
+        return gamma1, gamma2
+
+    def magnification(self, x, y, kwargs, k=None):
+        """
+        magnification
+        mag = 1/det(A)
+        A = 1 - d^2phi/d_ij
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: magnification
+        """
+
+        f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k)
+        det_A = (1 - f_xx) * (1 - f_yy) - f_xy * f_yx
+        return 1. / det_A  # attention, if dividing by zero

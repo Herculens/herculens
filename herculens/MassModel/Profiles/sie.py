@@ -1,12 +1,12 @@
 import numpy as np
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
-from herculens.LensModel.Profiles.nie import NIE
-from herculens.LensModel.Profiles.epl import EPL
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
+from herculens.MassModel.Profiles.nie import NIE
+from herculens.MassModel.Profiles.epl import EPL
 
 __all__ = ['SIE']
 
 
-class SIE(LensProfileBase):
+class SIE(MassProfileBase):
     """Singular isothermal ellipsoid (SIS with ellipticity) mass profile."""
     param_names = ['theta_E', 'e1', 'e2', 'center_x', 'center_y']
     lower_limit_default = {'theta_E': 0, 'e1': -0.5, 'e2': -0.5, 'center_x': -100, 'center_y': -100}

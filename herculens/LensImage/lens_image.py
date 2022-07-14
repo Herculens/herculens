@@ -13,16 +13,16 @@ __all__ = ['LensImage']
 class LensImage(object):
     """Generate lensed images from source light and lens mass/light models."""
     def __init__(self, grid_class, psf_class, 
-                 noise_class=None, lens_model_class=None,
+                 noise_class=None, mass_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
                  kwargs_numerics=None, recompute_model_grids=False):
         """
         :param grid_class: coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
         :param psf_class: point spread function, instance of PSF() from herculens.Instrument.psf
         :param noise_class: noise properties, instance of Noise() from herculens.Instrument.noise
-        :param lens_model_class: lens mass model, instance of LensModel() from herculens.LensModel.lens_model
-        :param source_model_class: source light model, instance of LightModel() from herculens.LensModel.lens_model
-        :param lens_light_model_class: lens light model, instance of LightModel() from herculens.LensModel.lens_model
+        :param mass_model_class: lens mass model, instance of MassModel() from herculens.MassModel.mass_model
+        :param source_model_class: source light model, instance of LightModel() from herculens.MassModel.mass_model
+        :param lens_light_model_class: lens light model, instance of LightModel() from herculens.MassModel.mass_model
         :param kwargs_numerics: keyword arguments for various numerical settings (see .Numerics.numerics_subframe)
         :param recompute_model_grids: if True, recomputes all coordinate grids for pixelated model components
         """
@@ -33,15 +33,14 @@ class LensImage(object):
         if kwargs_numerics is None:
             kwargs_numerics = {}
         self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
-        if lens_model_class is None:
-            from herculens.LensModel.lens_model import LensModel
-            lens_model_class = LensModel(lens_model_list=[])
-        self.LensModel = lens_model_class
-        if self.LensModel.has_pixels:
-            self.Grid.create_model_grid(**self.LensModel.pixel_grid_settings, name='lens',
+        if mass_model_class is None:
+            from herculens.MassModel.mass_model import MassModel
+            mass_model_class = MassModel(lens_model_list=[])
+        self.MassModel = mass_model_class
+        if self.MassModel.has_pixels:
+            self.Grid.create_model_grid(**self.MassModel.pixel_grid_settings, name='lens',
                                         overwrite=recompute_model_grids)
-            self.LensModel.set_pixel_grid(self.Grid.model_pixel_axes('lens'))
-        self._psf_error_map = self.PSF.psf_error_map_bool
+            self.MassModel.set_pixel_grid(self.Grid.model_pixel_axes('lens'))
         if source_model_class is None:
             from herculens.LightModel.light_model import LightModel
             source_model_class = LightModel(light_model_list=[])
@@ -59,7 +58,7 @@ class LensImage(object):
                                         overwrite=recompute_model_grids)
             self.LensLightModel.set_pixel_grid(self.Grid.model_pixel_axes('lens_light'), self.Grid.pixel_area)
         self._kwargs_numerics = kwargs_numerics
-        self.source_mapping = Image2SourceMapping(lens_model_class, source_model_class)
+        self.source_mapping = Image2SourceMapping(mass_model_class, source_model_class)
 
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, de_lensed=False, k=None, k_lens=None):

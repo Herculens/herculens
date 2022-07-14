@@ -1,11 +1,11 @@
 import numpy as np
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
 from herculens.Util import param_util
 
 __all__ = ['Shear', 'ShearGammaPsi']
 
 
-class Shear(LensProfileBase):
+class Shear(MassProfileBase):
     """External shear in terms of gamma1 and gamma2."""
     param_names = ['gamma1', 'gamma2', 'ra_0', 'dec_0']
     lower_limit_default = {'gamma1': -0.5, 'gamma2': -0.5, 'ra_0': -100, 'dec_0': -100}
@@ -65,7 +65,7 @@ class Shear(LensProfileBase):
         return f_xx, f_yy, f_xy
 
 
-class ShearGammaPsi(LensProfileBase):
+class ShearGammaPsi(MassProfileBase):
     """External shear in terms of magnitude and position angle."""
     param_names = ['gamma_ext', 'psi_ext', 'ra_0', 'dec_0']
     lower_limit_default = {'gamma_ext': 0, 'psi_ext': -np.pi, 'ra_0': -100, 'dec_0': -100}

@@ -2,12 +2,12 @@ import numpy as np
 import jax.numpy as jnp
 import herculens.Util.util as util
 import herculens.Util.param_util as param_util
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
 
 __all__ = ['NIE', 'NIEMajorAxis']
 
 
-class NIE(LensProfileBase):
+class NIE(MassProfileBase):
     """
     Non-singular isothermal ellipsoid
     kappa = theta_E/2 [s2IE + r2(1 − e * cos(2*phi)]−1/2
@@ -171,7 +171,7 @@ class NIE(LensProfileBase):
         return theta_E_new
 
 
-class NIEMajorAxis(LensProfileBase):
+class NIEMajorAxis(MassProfileBase):
     """
     This class contains the function and the derivatives of the non-singular isothermal ellipse.
     See Keeton and Kochanek 1998, https://arxiv.org/pdf/astro-ph/9705194.pdf

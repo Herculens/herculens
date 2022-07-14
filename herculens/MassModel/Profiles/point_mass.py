@@ -2,10 +2,10 @@ __author__ = 'sibirrer', 'aymgal'
 
 import numpy as np
 import jax.numpy as jnp
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
 
 
-class PointMass(LensProfileBase):
+class PointMass(MassProfileBase):
     """
     class to compute the physical deflection angle of a point mass, given as an Einstein radius
     """

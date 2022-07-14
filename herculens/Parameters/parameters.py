@@ -5,12 +5,12 @@ import numpy as np
 import jax.numpy as jnp
 from jax import lax
 
-from herculens.LensModel.Profiles import pixelated as pixelated_lens
-from herculens.LensModel.Profiles import (epl, sie, sis, nie, shear, point_mass, 
+from herculens.MassModel.Profiles import pixelated as pixelated_lens
+from herculens.MassModel.Profiles import (epl, sie, sis, nie, shear, point_mass, 
                                           gaussian_potential, multipole)
 from herculens.LightModel.Profiles import pixelated as pixelated_light
 from herculens.LightModel.Profiles import gaussian, sersic, uniform
-from herculens.LensModel.profile_list_base import SUPPORTED_MODELS as LENS_MODELS
+from herculens.MassModel.mass_model_base import SUPPORTED_MODELS as MASS_MODELS
 from herculens.LightModel.light_model_base import SUPPORTED_MODELS as LIGHT_MODELS
 
 __all__ = ['Parameters']
@@ -54,7 +54,7 @@ class Parameters(object):
         self._image = lens_image
         self._kwargs_init  = kwargs_init
         self._kwargs_fixed = kwargs_fixed
-        num_lens_profiles = max(1, len(self._image.LensModel.lens_model_list))
+        num_lens_profiles = max(1, len(self._image.MassModel.mass_model_list))
         num_source_profiles = max(1, len(self._image.SourceModel.profile_type_list))
         num_lens_light_profiles = max(1, len(self._image.LensLightModel.profile_type_list))
         kwargs_prior_tmp = {
@@ -116,7 +116,7 @@ class Parameters(object):
     @property
     def names(self):
         if not hasattr(self, '_names'):
-            self._names = self._set_names('lens_model_list', 'kwargs_lens')
+            self._names = self._set_names('mass_model_list', 'kwargs_lens')
             self._names += self._set_names('source_model_list', 'kwargs_source')
             self._names += self._set_names('lens_light_model_list', 'kwargs_lens_light')
         return self._names
@@ -130,7 +130,7 @@ class Parameters(object):
     @property
     def kwargs_model(self):
         # TODO: intermediate step, this might be suppressed in the future
-        self._kwargs_model = dict(lens_model_list=self._image.LensModel.lens_model_list,
+        self._kwargs_model = dict(mass_model_list=self._image.MassModel.mass_model_list,
                                   source_model_list=self._image.SourceModel.profile_type_list,
                                   lens_light_model_list=self._image.LensLightModel.profile_type_list)
         return self._kwargs_model
@@ -163,7 +163,7 @@ class Parameters(object):
 
     def update_fixed(self, kwargs_fixed, kwargs_prior=None):
         # TODO: fill current and init values with values that were previously fixed, if needed
-        self._set_params_update_fixed(kwargs_fixed, 'lens_model_list', 'kwargs_lens')
+        self._set_params_update_fixed(kwargs_fixed, 'mass_model_list', 'kwargs_lens')
         self._set_params_update_fixed(kwargs_fixed, 'source_model_list', 'kwargs_source')
         self._set_params_update_fixed(kwargs_fixed, 'lens_light_model_list', 'kwargs_lens_light')
 
@@ -176,7 +176,7 @@ class Parameters(object):
     def args2kwargs(self, args):
         i = 0
         args = jnp.atleast_1d(args)
-        kwargs_lens, i = self._get_params(args, i, 'lens_model_list', 'kwargs_lens')
+        kwargs_lens, i = self._get_params(args, i, 'mass_model_list', 'kwargs_lens')
         kwargs_source, i = self._get_params(args, i, 'source_model_list', 'kwargs_source')
         kwargs_lens_light, i = self._get_params(args, i, 'lens_light_model_list', 'kwargs_lens_light')
         # apply joint param rules
@@ -201,13 +201,13 @@ class Parameters(object):
         return kwargs_list_2
 
     def kwargs2args(self, kwargs):
-        args = self._set_params(kwargs, 'lens_model_list', 'kwargs_lens')
+        args = self._set_params(kwargs, 'mass_model_list', 'kwargs_lens')
         args += self._set_params(kwargs, 'source_model_list', 'kwargs_source')
         args += self._set_params(kwargs, 'lens_light_model_list', 'kwargs_lens_light')
         return jnp.array(args)
 
     def kwargs2args_prior(self, kwargs_prior):
-        types_m, lowers_m, uppers_m, means_m, widths_m = self._set_params_prior(kwargs_prior, 'lens_model_list', 'kwargs_lens')
+        types_m, lowers_m, uppers_m, means_m, widths_m = self._set_params_prior(kwargs_prior, 'mass_model_list', 'kwargs_lens')
         types_s, lowers_s, uppers_s, means_s, widths_s = self._set_params_prior(kwargs_prior, 'source_model_list', 'kwargs_source')
         types_l, lowers_l, uppers_l, means_l, widths_l = self._set_params_prior(kwargs_prior, 'lens_light_model_list', 'kwargs_lens_light')
         types =  types_m  + types_s  + types_l
@@ -277,7 +277,7 @@ class Parameters(object):
             elif model == 'PIXELATED':
                 profile_class = pixelated_light.Pixelated
         elif kwargs_key == 'kwargs_lens':
-            if model not in LENS_MODELS:
+            if model not in MASS_MODELS:
                 raise ValueError("'{model}' is not supported.")
             elif model == 'GAUSSIAN':
                 profile_class = gaussian_potential.Gaussian
@@ -354,7 +354,7 @@ class Parameters(object):
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
                         if kwargs_key == 'kwargs_lens':
-                            n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                            n_pix_x, n_pix_y = self._image.MassModel.pixelated_shape
                         elif kwargs_key == 'kwargs_source':
                             n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                         elif kwargs_key == 'kwargs_lens_light':
@@ -381,7 +381,7 @@ class Parameters(object):
                     if model == 'PIXELATED':
                         pixels = kwargs_profile['pixels']
                         if kwargs_key == 'kwargs_lens':
-                            n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                            n_pix_x, n_pix_y = self._image.MassModel.pixelated_shape
                         elif kwargs_key == 'kwargs_source':
                             n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                         elif kwargs_key == 'kwargs_lens_light':
@@ -410,7 +410,7 @@ class Parameters(object):
 
                     if model == 'PIXELATED':
                         if kwargs_key == 'kwargs_lens':
-                            n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                            n_pix_x, n_pix_y = self._image.MassModel.pixelated_shape
                         elif kwargs_key == 'kwargs_source':
                             n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                         elif kwargs_key == 'kwargs_lens_light':
@@ -480,7 +480,7 @@ class Parameters(object):
                 if not name in kwargs_fixed_k:
                     if model == 'PIXELATED':
                         if kwargs_key == 'kwargs_lens':
-                            n_pix_x, n_pix_y = self._image.LensModel.pixelated_shape
+                            n_pix_x, n_pix_y = self._image.MassModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
                             names_k = [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
                         elif kwargs_key == 'kwargs_source':

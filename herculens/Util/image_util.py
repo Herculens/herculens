@@ -1,3 +1,5 @@
+__author__ = 'sibirrer', 'JelleAalbers', 'dangilman', 'aymgal', 'gvernardos'
+
 import numpy as np
 from scipy import interpolate #, ndimage
 from scipy.ndimage import interpolation as interp
@@ -69,7 +71,6 @@ def add_background(image, sigma_bkd, seed):
     :return: a realisation of Gaussian noise of the same size as image
     """
     background = random.normal(seed, shape=np.shape(image)) * sigma_bkd
-    
     # without JAX:
     # nx, ny = 
     # background = np.random.randn(*image.shape) * sigma_bkd
@@ -87,7 +88,6 @@ def add_poisson(image, exp_time, seed):
     """
     sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
     poisson = random.normal(seed, shape=np.shape(image)) * sigma
-    
     # without JAX:
     # sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
     # poisson = np.random.randn(*image.shape) * sigma
@@ -117,23 +117,6 @@ def cut_edges(image, numPix):
     resized = image[x_min:x_max, y_min:y_max]
     # return copy.deepcopy(resized)
     return resized  # No need to copy, since JAX returns a new DeviceArray
-
-def radial_profile(data, center=[0, 0]):
-    """
-    computes radial profile
-
-    :param data: 2d numpy array
-    :param center: center [x, y] from where to compute the radial profile
-    :return: radial profile (in units pixel)
-    """
-    y, x = np.indices((data.shape))
-    r = np.sqrt((x - center[0])**2 + (y - center[1])**2)
-    r = r.astype(int)
-
-    tbin = np.bincount(r.ravel(), data.ravel())
-    nr = np.bincount(r.ravel())
-    radialprofile = tbin / nr
-    return radialprofile
 
 def re_size(image, factor=1):
     """

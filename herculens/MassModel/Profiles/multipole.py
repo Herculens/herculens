@@ -3,14 +3,14 @@ __author__ = 'lynevdv', 'aymgal'
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
 import herculens.Util.param_util as param_util
 
 
 __all__ = ['Multipole']
 
 
-class Multipole(LensProfileBase):
+class Multipole(MassProfileBase):
     """
     This class contains a multipole contribution (for 1 component with m>=2)
     This uses the same definitions as Xu et al.(2013) in Appendix B3 https://arxiv.org/pdf/1307.4220.pdf

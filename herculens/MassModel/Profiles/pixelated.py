@@ -1,11 +1,12 @@
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
 from herculens.Util.jax_util import BicubicInterpolator
 
 
-class PixelatedPotential(LensProfileBase):
+
+class PixelatedPotential(MassProfileBase):
     param_names = ['pixels']
     lower_limit_default = {'pixels': -1e10}
     upper_limit_default = {'pixels': 1e10}
@@ -68,7 +69,8 @@ class PixelatedPotential(LensProfileBase):
         self.x_coords, self.y_coords = pixel_axes
 
 
-class PixelatedPotentialDirac(LensProfileBase):
+
+class PixelatedPotentialDirac(MassProfileBase):
     param_names = ['psi', 'center_x', 'center_y']
     lower_limit_default = {'psi': -1e10, 'center_x': -100, 'center_y': -100}
     upper_limit_default = {'psi': 1e10, 'center_x': 100, 'center_y': 100}

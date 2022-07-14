@@ -11,7 +11,7 @@ from jax import jit
 import jax.numpy as jnp
 
 from herculens.LightModel.light_model import LightModel
-from herculens.LensModel.lens_model import LensModel
+from herculens.MassModel.mass_model import MassModel
 from herculens.LensImage.lens_image import LensImage
 from herculens.Parameters.parameters import Parameters
 from herculens.Inference.loss import Loss
@@ -197,15 +197,15 @@ class MassSensitivityMapping(object):
         else:
             raise NotImplementedError(f"Halo profile must be in {self._MODELS_SUPPORTED}.")
         
-        halo_lens_model_list = [self.halo_profile] + self.m_lens_image.LensModel.lens_model_list
-        halo_lens_model = LensModel(halo_lens_model_list)
+        halo_mass_model_list = [self.halo_profile] + self.m_lens_image.MassModel.mass_model_list
+        halo_mass_model = MassModel(halo_mass_model_list)
 
         grid = copy.deepcopy(self.m_lens_image.Grid)
         #grid.remove_model_grid('lens')
         psf = copy.deepcopy(self.m_lens_image.PSF)
         noise = copy.deepcopy(self.m_lens_image.Noise)
         self.halo_lens_image = LensImage(grid, psf, noise_class=noise,
-                                    lens_model_class=halo_lens_model,
+                                    mass_model_class=halo_mass_model,
                                     source_model_class=self.m_lens_image.SourceModel,
                                     lens_light_model_class=self.m_lens_image.LensLightModel,
                                     kwargs_numerics=self.kwargs_numerics)

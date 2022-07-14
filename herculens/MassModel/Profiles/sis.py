@@ -1,11 +1,11 @@
 import numpy as np
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
-from herculens.LensModel.Profiles.sie import SIE
+from herculens.MassModel.Profiles.base_profile import MassProfileBase
+from herculens.MassModel.Profiles.sie import SIE
 
 __all__ = ['SIS']
 
 
-class SIS(LensProfileBase):
+class SIS(MassProfileBase):
     """Singular isothermal sphere mass profile."""
     param_names = ['theta_E', 'center_x', 'center_y']
     lower_limit_default = {'theta_E': 0, 'center_x': -100, 'center_y': -100}

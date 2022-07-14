@@ -23,5 +23,3 @@ class LightModel(LightModelBase):
                                          pixel_interpol=pixel_interpol, 
                                          pixel_allow_extrapolation=pixel_allow_extrapolation,
                                          kwargs_pixelated=kwargs_pixelated)
-        self.deflection_scaling_list = deflection_scaling_list
-        self.redshift_list = source_redshift_list
