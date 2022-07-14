@@ -16,7 +16,6 @@ The primary purpose of `Herculens` is to provide flexible modeling methods to mo
 
 Currently, `Herculens` supports several of the most widely-used analytical profiles, as well as multi-scale pixelated models regularized with wavelets. Future updates will include the support of point source modeling, new regularization techniques, and more expressive models based on neural networks.
 
-Being a forward modeling code, `Herculens` also allows to simulate realistic observations of gravitational lenses.
 
 
 
@@ -85,32 +84,23 @@ We tested `Herculens` with the versions mentioned in parenthesis. It does not me
 - `dynesty` (1.1), for nested sampling
 - `jaxns` (1.1), for `jax`-based nested sampling
 - `emcee` (3.0.2), for Ensemble MCMC sampling
-- `lenstronomy` (1.6.0), for particle swarm optimization
+- `lenstronomy` (1.9.3), for particle swarm optimization
 - `palettable` (3.3.0), for nicer colormaps for plots
 
 To run the notebooks, `jupyter` is (of course) also necessary, along with `matplotlib` for plotting.
 
 
 
-## Open-source development
+## Attribution
 
-`Herculens` is currently being actively developed, and several science projects will bring many improvements and new features along the way. Moreover, you can expect very soon better documentation and unit testing to increase the robustness of the code.
+### Citation
 
-Anyone that would like to contribute to `Herculens` is highly encouraged to do so. Please do not hesitate to contact us, open issues on github, fork the repository, and suggest improvements!
-
-
+If you make use of `Herculens`, please cite [Galan et al. 2022](https://arxiv.org/abs/2207.05763). This work presents the global architecture of the tool, and applies it to reconstruct a pixelated lens potential with wavelets.
 
 
+### Contributors
 
-#### A note regarding `lenstronomy`
+All current and past contributors are listed in [this document](AUTHORS.md).
 
-You may quickly realize that the syntax and naming conventions of `Herculens` share many similarities with the general purpose lensing software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy) ([Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283), and references therein). The reason is simple: because it is overall easy to use and open-source, `lenstronomy` was used a as baseline for the early development phases of `Herculens`. Since then, there have been many modifications throughout the code, primarily to add powerful features from `JAX`, then to implement new modeling techniques that were unachievable beforehand. While these features could not be implemented in `lenstronomy` without significantly affecting the original spirit of the code, the proximity between `Herculens`and `lenstronomy` makes it really easy to switch from one to the other.
-
-
-
-
-## Parallelization and GPU support
-
-One thing that has not been extensively tested yet---although it is automatically supported with `JAX`---is to run `Herculens` in parallel and over multiple GPUs. If you wish to do that, we would be delighted to get touch with you for possible improvements regarding these aspects.
-
+Part of the `Herculens` code originates from the open-source lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy), described in [Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283) (and references therein). In every source file, credits to the specific developers and contributors to `lenstronomy` are indicated.
 
