@@ -1,3 +1,10 @@
+# Class to plot a lens model
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal'
+
+
 import copy
 import warnings
 import numpy as np
@@ -11,6 +18,9 @@ from herculens.Util import image_util
 
 # Some general default for plotting
 plt.rc('image', interpolation='none', origin='lower')  # for imshow
+
+
+__all__ = ['Plotter']
 
 
 class Plotter(object):

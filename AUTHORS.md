@@ -1,0 +1,26 @@
+# Authors credits
+
+## Herculens
+
+Core developers:
+
+- Austin Peel: [austinpeel](https://github.com/austinpeel)
+- Aymeric Galan [aymgal](https://github.com/aymgal)
+- Giorgos Vernardos: [gvernard](https://github.com/gvernard)
+
+Contributors:
+
+- [egorssed](https://github.com/egorssed)
+
+
+
+## Lenstronomy
+
+Part of the `LensImage` and `Numerics` modules, as well as analytical light/mass profiles of `Heculens` are based on the general-purpose lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy). In particular, the following people participated to the develepment of the original `lenstronomy` modules:
+
+- Simon Birrer (lead developer): [sibirrer](https://github.com/sibirrer)
+- Daniel Gilman: [dangilman](https://github.com/dangilman)
+- Ji Won Park: [jiwoncpark](https://github.com/jiwoncpark)
+- Lyne Van de Vyvere: [LyneVdV](https://github.com/LyneVdV)
+
+We thank a lot the above contributors for allowing their code to be open-source and accessible to the community for further use.
