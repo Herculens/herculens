@@ -1,3 +1,10 @@
+# Defines a general fully differentiable probability function for inference purposes
+# 
+# Copyright (c) 2022, herculens developers and contributors
+
+__author__ = 'aymgal'
+
+
 from functools import partial
 from jax import jit
 

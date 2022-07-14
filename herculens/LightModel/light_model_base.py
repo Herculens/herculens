@@ -1,3 +1,12 @@
+# Describes a light model, as a list of light profiles
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LightModel module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
 import jax.numpy as jnp
 
@@ -7,7 +16,7 @@ from herculens.Util.util import convert_bool_list
 __all__ = ['LightModelBase']
 
 
-SUPPORTED_MODELS = ['GAUSSIAN', 'GAUSSIAN_ELLIPSE', 'SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXELATED']
+SUPPORTED_MODELS = ['GAUSSIAN', 'GAUSSIAN_ELLIPSE', 'SERSIC', 'SERSIC_ELLIPSE', 'UNIFORM', 'PIXELATED']
 
 
 class LightModelBase(object):

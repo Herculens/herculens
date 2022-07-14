@@ -1,11 +1,20 @@
+# Defines a singular isothermal sphere
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
-from herculens.MassModel.Profiles.base_profile import MassProfileBase
 from herculens.MassModel.Profiles.sie import SIE
+
 
 __all__ = ['SIS']
 
 
-class SIS(MassProfileBase):
+class SIS(object):
     """Singular isothermal sphere mass profile."""
     param_names = ['theta_E', 'center_x', 'center_y']
     lower_limit_default = {'theta_E': 0, 'center_x': -100, 'center_y': -100}

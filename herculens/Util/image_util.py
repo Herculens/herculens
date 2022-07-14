@@ -1,4 +1,10 @@
-__author__ = 'sibirrer', 'JelleAalbers', 'dangilman', 'aymgal', 'gvernardos'
+# Utility functions
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the Util module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'dangilman', 'aymgal'
 
 import numpy as np
 from scipy import interpolate #, ndimage

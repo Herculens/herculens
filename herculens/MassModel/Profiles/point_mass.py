@@ -1,11 +1,18 @@
-__author__ = 'sibirrer', 'aymgal'
+# Defines a point mass
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal'
+
 
 import numpy as np
 import jax.numpy as jnp
-from herculens.MassModel.Profiles.base_profile import MassProfileBase
 
 
-class PointMass(MassProfileBase):
+__all__ = ['PointMass']
+
+
+class PointMass(object):
     """
     class to compute the physical deflection angle of a point mass, given as an Einstein radius
     """

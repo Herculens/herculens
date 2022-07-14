@@ -1,9 +1,14 @@
+# Handles different method to sample the posterior distribution of parameters
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal', 'austinpeel'
+
+
 import time
 import numpy as np
 from functools import partial
 import jax
-
-# inference packages
 import blackjax.hmc as blackjax_hmc
 import blackjax.nuts as blackjax_nuts
 import blackjax.stan_warmup as stan_warmup
@@ -15,13 +20,9 @@ from emcee import EnsembleSampler
 
 from herculens.Inference.base_inference import Inference
 
-# ref: https://bayesianbrad.github.io/posts/2019_hmc.html
-# - q is the position, which are variables we are interested in
-# - p is the momentum
-# The potential energy U(q) will be the minus of the log of the probability density for the distribution 
-# of the position variables we wish to sample, plus any constant that is convenient.
-# The kinetic energy K(p) will represents the dynamics of our variables.
-# A popular form is the Euclidean kinetic energy 1/2 * p^T.(M^-1).p, where M is symmetric, positive definite and typically diagonal.
+
+# TODO: create separate classes for each sampler
+
 
 __all__ = ['Sampler']
 
@@ -168,7 +169,8 @@ class Sampler(Inference):
     def mcmc_emcee(self, log_likelihood_fn, init_stds, walker_ratio=10, 
                    num_warmup=100, num_samples=100, 
                    restart_from_init=False, num_threads=1, progress_bar=True):
-        """legacy sampling method from lenstronomy, mainly for comparison.
+        """
+        emcee MCMC sampling
         Warning: `log_likelihood_fn` needs to be non.jitted (emcee pickles this function, which is incomptabile with JAX objetcs)
         """
         if num_threads > 1:
@@ -216,3 +218,15 @@ class Sampler(Inference):
                               for i in range(size)])
         else:
             raise ValueError('distribution %s not supported. Chose among "uniform" or "normal".' % dist)
+
+
+
+
+# Notes about HMC
+# ref: https://bayesianbrad.github.io/posts/2019_hmc.html
+# - q is the position, which are variables we are interested in
+# - p is the momentum
+# The potential energy U(q) will be the minus of the log of the probability density for the distribution 
+# of the position variables we wish to sample, plus any constant that is convenient.
+# The kinetic energy K(p) will represents the dynamics of our variables.
+# A popular form is the Euclidean kinetic energy 1/2 * p^T.(M^-1).p, where M is symmetric, positive definite and typically diagonal.

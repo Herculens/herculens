@@ -1,11 +1,20 @@
+# Defines external shear profiles
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
-from herculens.MassModel.Profiles.base_profile import MassProfileBase
 from herculens.Util import param_util
+
 
 __all__ = ['Shear', 'ShearGammaPsi']
 
 
-class Shear(MassProfileBase):
+class Shear(object):
     """External shear in terms of gamma1 and gamma2."""
     param_names = ['gamma1', 'gamma2', 'ra_0', 'dec_0']
     lower_limit_default = {'gamma1': -0.5, 'gamma2': -0.5, 'ra_0': -100, 'dec_0': -100}
@@ -65,7 +74,7 @@ class Shear(MassProfileBase):
         return f_xx, f_yy, f_xy
 
 
-class ShearGammaPsi(MassProfileBase):
+class ShearGammaPsi(object):
     """External shear in terms of magnitude and position angle."""
     param_names = ['gamma_ext', 'psi_ext', 'ra_0', 'dec_0']
     lower_limit_default = {'gamma_ext': 0, 'psi_ext': -np.pi, 'ra_0': -100, 'dec_0': -100}

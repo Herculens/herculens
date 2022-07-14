@@ -1,12 +1,20 @@
+# Defines a pixelated profile in the lens potential
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'austinpeel', 'aymgal'
+
+
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.MassModel.Profiles.base_profile import MassProfileBase
 from herculens.Util.jax_util import BicubicInterpolator
 
 
+__all__ = ['PixelatedPotential', 'PixelatedPotentialDirac']
 
-class PixelatedPotential(MassProfileBase):
+
+class PixelatedPotential(object):
     param_names = ['pixels']
     lower_limit_default = {'pixels': -1e10}
     upper_limit_default = {'pixels': 1e10}
@@ -70,7 +78,7 @@ class PixelatedPotential(MassProfileBase):
 
 
 
-class PixelatedPotentialDirac(MassProfileBase):
+class PixelatedPotentialDirac(object):
     param_names = ['psi', 'center_x', 'center_y']
     lower_limit_default = {'psi': -1e10, 'center_x': -100, 'center_y': -100}
     upper_limit_default = {'psi': 1e10, 'center_x': 100, 'center_y': 100}

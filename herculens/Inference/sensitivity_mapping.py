@@ -1,4 +1,9 @@
+# Gradient-based sensitivity mapping
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
 __author__ = 'aymgal'
+
 
 import copy
 import time

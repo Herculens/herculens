@@ -1,3 +1,10 @@
+# Handles different method to optimize a loss function
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal', 'austinpeel'
+
+
 import time
 import warnings
 import numpy as np
@@ -205,9 +212,10 @@ class Optimizer(Inference):
         return best_fit, logL_best_fit, extra_fields, runtime
 
     def pso(self, n_particles=100, n_iterations=100, restart_from_init=False, n_threads=1):
-        """legacy optimization method from lenstronomy, mainly for comparison"""
+        """particle swarm optimization, implemented in lenstronomy"""
         from lenstronomy.Sampling.Samplers.pso import ParticleSwarmOptimizer
         from lenstronomy.Sampling.Pool.pool import choose_pool
+        
         pool = choose_pool(mpi=False, processes=n_threads, use_dill=True)
         lowers, uppers = self._param.bounds
         if np.any(np.isnan(lowers)):

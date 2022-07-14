@@ -1,3 +1,12 @@
+# High-level interface to a light model
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LightModel module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 from herculens.LightModel.light_model_base import LightModelBase
 
 __all__ = ['LightModel']

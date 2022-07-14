@@ -1,12 +1,21 @@
+# Defines a singular isothermal ellipsoid
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
-from herculens.MassModel.Profiles.base_profile import MassProfileBase
 from herculens.MassModel.Profiles.nie import NIE
 from herculens.MassModel.Profiles.epl import EPL
+
 
 __all__ = ['SIE']
 
 
-class SIE(MassProfileBase):
+class SIE(object):
     """Singular isothermal ellipsoid (SIS with ellipticity) mass profile."""
     param_names = ['theta_E', 'e1', 'e2', 'center_x', 'center_y']
     lower_limit_default = {'theta_E': 0, 'e1': -0.5, 'e2': -0.5, 'center_x': -100, 'center_y': -100}

@@ -1,8 +1,20 @@
+# Handles coordinate grid on which ray-tracing and convolution are performed
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the ImSim.Numerics module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import jax.numpy as np
 from jax import ops  # Try to avoid index updates eventually
 from herculens.Util import util
 from herculens.Util import image_util
 from herculens.Coordinates.coord_transforms import Coordinates1D
+
+
+__all__ = ['RegularGrid']
 
 
 class RegularGrid(Coordinates1D):

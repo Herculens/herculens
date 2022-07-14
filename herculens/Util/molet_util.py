@@ -1,3 +1,10 @@
+# Utility functions to read simulation products from MOLET (Vernardos et al. 2022)
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal'
+
+
 import os
 import warnings
 import numpy as np

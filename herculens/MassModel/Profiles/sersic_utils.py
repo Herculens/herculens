@@ -1,8 +1,18 @@
+# Utility methods for Sersic profiles
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'jiwoncpark', 'austinpeel', 'aymgal'
+
+
 import scipy.special as special
 import numpy as np
 import jax.numpy as jnp
 import scipy
 from herculens.Util import param_util
+
 
 __all__ = ['SersicUtil']
 

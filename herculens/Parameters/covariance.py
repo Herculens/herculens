@@ -1,8 +1,15 @@
+# Estimation of the parameter covariance matrix via the Fisher information
+# 
+# Copyright (c) 2022, herculens developers and contributors
+
 __author__ = 'aymgal'
 
-import numpy as np
 
+import numpy as np
 from herculens.Util import model_util
+
+
+__all__ = ['FisherCovariance']
 
 
 class FisherCovariance(object):

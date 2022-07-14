@@ -1,12 +1,20 @@
-from scipy import fftpack
+# Handles different convolution methods
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the ImSim.Numerics module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
 import jax.numpy as jnp
 from jax.scipy import signal
 from herculens.Util.jax_util import GaussianFilter
-import herculens.Util.kernel_util as kernel_util
-import herculens.Util.util as util
-import herculens.Util.image_util as image_util
+from herculens.Util import util, kernel_util, image_util
 
+
+__all__ = ['PixelKernelConvolution', 'SubgridKernelConvolution', 'GaussianConvolution']
 
 
 class PixelKernelConvolution(object):

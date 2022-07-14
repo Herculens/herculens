@@ -1,10 +1,19 @@
+# Handles coordinate grids and convolutions
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the ImSim.Numerics module from lenstronomy (version 1.9.3)
+
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
 
 import numpy as np
 from herculens.LensImage.Numerics.grid import RegularGrid
-from herculens.LensImage.Numerics.convolution import PixelKernelConvolution, SubgridKernelConvolution, GaussianConvolution
-from herculens.Util import util
-from herculens.Util import kernel_util
+from herculens.LensImage.Numerics.convolution import (PixelKernelConvolution, 
+                                                      SubgridKernelConvolution, 
+                                                      GaussianConvolution)
+from herculens.Util import kernel_util, util
+
 
 __all__ = ['Numerics']
 
@@ -132,6 +141,6 @@ class Numerics(object):
     def grid_class(self):
         """
 
-        :return: grid class (can be RegularGrid, AdaptiveGrid)
+        :return: grid class
         """
         return self._grid

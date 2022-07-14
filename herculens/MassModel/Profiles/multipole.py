@@ -1,16 +1,22 @@
-__author__ = 'lynevdv', 'aymgal'
+# Defines a multipole in the potential
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'lynevdv', 'austinpeel', 'aymgal'
+
 
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.MassModel.Profiles.base_profile import MassProfileBase
 import herculens.Util.param_util as param_util
 
 
 __all__ = ['Multipole']
 
 
-class Multipole(MassProfileBase):
+class Multipole(object):
     """
     This class contains a multipole contribution (for 1 component with m>=2)
     This uses the same definitions as Xu et al.(2013) in Appendix B3 https://arxiv.org/pdf/1307.4220.pdf

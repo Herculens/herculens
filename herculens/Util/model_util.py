@@ -1,3 +1,10 @@
+# Utility functions
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal'
+
+
 import copy
 import numpy as np
 import jax.numpy as jnp

@@ -1,3 +1,12 @@
+# Defines the model of a strong lens
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the ImSim module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import copy
 import jax.numpy as np
 from functools import partial
@@ -12,30 +21,30 @@ __all__ = ['LensImage']
 class LensImage(object):
     """Generate lensed images from source light and lens mass/light models."""
     def __init__(self, grid_class, psf_class, 
-                 noise_class=None, mass_model_class=None,
+                 noise_class=None, lens_mass_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
                  kwargs_numerics=None, recompute_model_grids=False):
         """
         :param grid_class: coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
         :param psf_class: point spread function, instance of PSF() from herculens.Instrument.psf
         :param noise_class: noise properties, instance of Noise() from herculens.Instrument.noise
-        :param mass_model_class: lens mass model, instance of MassModel() from herculens.MassModel.mass_model
+        :param lens_mass_model_class: lens mass model, instance of MassModel() from herculens.MassModel.mass_model
         :param source_model_class: source light model, instance of LightModel() from herculens.MassModel.mass_model
         :param lens_light_model_class: lens light model, instance of LightModel() from herculens.MassModel.mass_model
         :param kwargs_numerics: keyword arguments for various numerical settings (see herculens.Numerics.numerics)
         :param recompute_model_grids: if True, recomputes all coordinate grids for pixelated model components
         """
+        self.Grid = grid_class
         self.PSF = psf_class
         self.Noise = noise_class
-        self.Grid = grid_class
         self.PSF.set_pixel_size(self.Grid.pixel_width)
         if kwargs_numerics is None:
             kwargs_numerics = {}
         self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
-        if mass_model_class is None:
+        if lens_mass_model_class is None:
             from herculens.MassModel.mass_model import MassModel
-            mass_model_class = MassModel(lens_model_list=[])
-        self.MassModel = mass_model_class
+            lens_mass_model_class = MassModel(lens_model_list=[])
+        self.MassModel = lens_mass_model_class
         if self.MassModel.has_pixels:
             self.Grid.create_model_grid(**self.MassModel.pixel_grid_settings, name='lens',
                                         overwrite=recompute_model_grids)

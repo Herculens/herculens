@@ -1,3 +1,12 @@
+# Describes a mass model, as a list of mass profiles
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 from herculens.MassModel.Profiles import (gaussian_potential, point_mass, multipole,
                                            shear, sie, sis, nie, epl, pixelated)
 from herculens.Util.util import convert_bool_list
@@ -77,22 +86,6 @@ class MassProfileBase(object):
     def _bool_list(self, k=None):
         """See `Util.util.convert_bool_list`."""
         return convert_bool_list(n=self._num_func, k=k)
-
-    def set_static(self, kwargs_list):
-        """Pre-compute lensing quantities for faster (but fixed) execution."""
-        for kwargs, func in zip(kwargs, self.func_list):
-            func.set_static(**kwargs)
-        return kwargs_list
-
-    def set_dynamic(self):
-        """Free the cache of pre-computed quantities from `set_static`.
-
-        This mode recomputes lensing quantities each time a method is called.
-        This is the default mode if `set_static` has not been called.
-
-        """
-        for func in self.func_list:
-            func.set_dynamic()
 
     @property
     def has_pixels(self):

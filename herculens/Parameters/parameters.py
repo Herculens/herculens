@@ -1,4 +1,9 @@
+# Estimation of model parameters storage and manipulation
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
 __author__ = 'aymgal'
+
 
 from copy import deepcopy
 import numpy as np
@@ -12,6 +17,7 @@ from herculens.LightModel.Profiles import pixelated as pixelated_light
 from herculens.LightModel.Profiles import gaussian, sersic, uniform
 from herculens.MassModel.mass_model_base import SUPPORTED_MODELS as MASS_MODELS
 from herculens.LightModel.light_model_base import SUPPORTED_MODELS as LIGHT_MODELS
+
 
 __all__ = ['Parameters']
 

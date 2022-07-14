@@ -1,12 +1,17 @@
+# Defines regularization choices
+# 
+# Copyright (c) 2022, herculens developers and contributors
+
 __author__ = 'aymgal'
 
-import numpy as np
 
+import numpy as np
 from herculens.RegulModel.Methods import wavelets, positivity
 from herculens.Util import util
 
 
 __all__ = ['RegularizationModel']
+
 
 SUPPORTED_MODELS = [
     'L1_STARLETS_SOURCE',

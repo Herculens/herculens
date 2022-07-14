@@ -1,3 +1,11 @@
+# Utility functions
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2020, SLITronomy developers and contributors
+
+__author__ = 'aymgal'
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker

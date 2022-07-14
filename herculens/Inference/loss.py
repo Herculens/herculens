@@ -1,3 +1,10 @@
+# Defines the full loss function, from likelihood, prior and regularization terms
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal', 'austinpeel'
+
+
 import numpy as np
 import jax.numpy as jnp
 from jax import jit
