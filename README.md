@@ -4,7 +4,7 @@
 
 ![License](https://img.shields.io/github/license/austinpeel/herculens)
 ![PyPi python support](https://img.shields.io/badge/Python-3.7-blue)
-<!-- [![arXiv](https://img.shields.io/badge/arXiv-1234.56789-b31b1b.svg)](https://arxiv.org/abs/1234.56789) -->
+[![arXiv](https://img.shields.io/badge/arXiv-2207.05763-b31b1b.svg)](https://arxiv.org/abs/2207.05763)
 <!-- ![PyPi version](https://img.shields.io/pypi/v/herculens) -->
 
 
@@ -96,11 +96,21 @@ To run the notebooks, `jupyter` is (of course) also necessary, along with `matpl
 ### Citation
 
 If you make use of `Herculens`, please cite [Galan et al. 2022](https://arxiv.org/abs/2207.05763). This work presents the global architecture of the tool, and applies it to reconstruct a pixelated lens potential with wavelets.
+```
+@article{Galan:2022:herculens,
+    author        = "Galan, Aymeric and Vernardos, Georgios and Peel, Austin and Courbin, Fr\'ed\'eric and Starck, Jean-Luc",
+    title         = "{Using wavelets to capture deviations from smoothness in galaxy-scale strong lenses}",
+    eprint        = "2207.05763",
+    archivePrefix = "arXiv",
+    primaryClass  = "astro-ph.CO",
+    year          = "2022"
+}
+```
 
 
 ### Contributors
 
 All current and past contributors are listed in [this document](AUTHORS.md).
 
-Part of the `Herculens` code originates from the open-source lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy), described in [Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283) (and references therein). In every source file, credits to the specific developers and contributors to `lenstronomy` are indicated.
-
+#### Special mention regarding Lenstronomy
+Part of the `Herculens` code originates from the open-source lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy), described in [Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283) (and references therein). In every source file, credits to the specific developers and contributors to `lenstronomy` (up to version 1.9.3) are indicated.
