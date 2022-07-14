@@ -1,3 +1,6 @@
+import numpy as np
+import jax.numpy as jnp
+
 from herculens.MassModel.mass_model_base import MassProfileBase
 
 __all__ = ['MassModel']
@@ -5,12 +8,12 @@ __all__ = ['MassModel']
 
 class MassModel(MassProfileBase):
     """An arbitrary list of lens models."""
-    def __init__(self, lens_model_list, kwargs_pixelated={}):
+    def __init__(self, mass_model_list, kwargs_pixelated={}):
         """Create a MassModel object.
 
         Parameters
         ----------
-        lens_model_list : list of str
+        mass_model_list : list of str
             Lens model profile names.
         kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
 
@@ -21,8 +24,8 @@ class MassModel(MassProfileBase):
         minimum in order to test JAX autodiff through a lensing pipeline.
 
         """
-        self.lens_model_list = lens_model_list
-        super().__init__(self.lens_model_list, kwargs_pixelated=kwargs_pixelated)
+        self.profile_type_list = mass_model_list
+        super().__init__(self.profile_type_list, kwargs_pixelated=kwargs_pixelated)
 
     def ray_shooting(self, x, y, kwargs, k=None):
         """
@@ -67,12 +70,12 @@ class MassModel(MassProfileBase):
         :param k: only evaluate the k-th lens model
         :return: lensing potential in units of arcsec^2
         """
-        x = np.array(x, dtype=float)
-        y = np.array(y, dtype=float)
+        # x = np.array(x, dtype=float)
+        # y = np.array(y, dtype=float)
         if isinstance(k, int):
             return self.func_list[k].function(x, y, **kwargs[k])
         bool_list = self._bool_list(k)
-        potential = np.zeros_like(x)
+        potential = 0.
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 potential += func.function(x, y, **kwargs[i])
@@ -90,12 +93,12 @@ class MassModel(MassProfileBase):
         :param k: only evaluate the k-th lens model
         :return: deflection angles in units of arcsec
         """
-        x = np.array(x, dtype=float)
-        y = np.array(y, dtype=float)
+        # x = np.array(x, dtype=float)
+        # y = np.array(y, dtype=float)
         if isinstance(k, int):
             return self.func_list[k].derivatives(x, y, **kwargs[k])
         bool_list = self._bool_list(k)
-        f_x, f_y = np.zeros_like(x), np.zeros_like(x)
+        f_x, f_y = 0., 0.
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 f_x_i, f_y_i = func.derivatives(x, y, **kwargs[i])
@@ -114,14 +117,14 @@ class MassModel(MassProfileBase):
         :param k: only evaluate the k-th lens model
         :return: f_xx, f_xy, f_yx, f_yy components
         """
-        x = np.array(x, dtype=float)
-        y = np.array(y, dtype=float)
+        # x = np.array(x, dtype=float)
+        # y = np.array(y, dtype=float)
         if isinstance(k, int):
             f_xx, f_yy, f_xy = self.func_list[k].hessian(x, y, **kwargs[k])
             return f_xx, f_xy, f_xy, f_yy
 
         bool_list = self._bool_list(k)
-        f_xx, f_yy, f_xy = np.zeros_like(x), np.zeros_like(x), np.zeros_like(x)
+        f_xx, f_yy, f_xy = 0., 0., 0.
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 f_xx_i, f_yy_i, f_xy_i = func.hessian(x, y, **kwargs[i])
@@ -130,80 +133,6 @@ class MassModel(MassProfileBase):
                 f_xy += f_xy_i
         f_yx = f_xy
         return f_xx, f_xy, f_yx, f_yy
-
-    def mass_3d(self, r, kwargs, bool_list=None):
-        """
-        computes the mass within a 3d sphere of radius r
-
-        if you want to have physical units of kg, you need to multiply by this factor:
-        const.arcsec ** 2 * self._cosmo.dd * self._cosmo.ds / self._cosmo.dds * const.Mpc * const.c ** 2 / (4 * np.pi * const.G)
-        grav_pot = -const.G * mass_dim / (r * const.arcsec * self._cosmo.dd * const.Mpc)
-
-        :param r: radius (in angular units)
-        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
-        :param bool_list: list of bools that are part of the output
-        :return: mass (in angular units, modulo epsilon_crit)
-        """
-        bool_list = self._bool_list(bool_list)
-        mass_3d = 0
-        for i, func in enumerate(self.func_list):
-            if bool_list[i] is True:
-                kwargs_i = {k:v for k, v in kwargs[i].items() if not k in ['center_x', 'center_y']}
-                mass_3d_i = func.mass_3d_lens(r, **kwargs_i)
-                mass_3d += mass_3d_i
-        return mass_3d
-
-    def mass_2d(self, r, kwargs, bool_list=None):
-        """
-        computes the mass enclosed a projected (2d) radius r
-
-        :param r: radius (in angular units)
-        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
-        :param bool_list: list of bools that are part of the output
-        :return: projected mass (in angular units, modulo epsilon_crit)
-        """
-        bool_list = self._bool_list(bool_list)
-        mass_2d = 0
-        for i, func in enumerate(self.func_list):
-            if bool_list[i] is True:
-                kwargs_i = {k: v for k, v in kwargs[i].items() if not k in ['center_x', 'center_y']}
-                mass_2d_i = func.mass_2d_lens(r, **kwargs_i)
-                mass_2d += mass_2d_i
-        return mass_2d
-
-    def density(self, r, kwargs, bool_list=None):
-        """
-        3d mass density at radius r
-        The integral in the LOS projection of this quantity results in the convergence quantity.
-
-        :param r: radius (in angular units)
-        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
-        :param bool_list: list of bools that are part of the output
-        :return: mass density at radius r (in angular units, modulo epsilon_crit)
-        """
-        bool_list = self._bool_list(bool_list)
-        density = 0
-        for i, func in enumerate(self.func_list):
-            if bool_list[i] is True:
-                kwargs_i = {k: v for k, v in kwargs[i].items() if not k in ['center_x', 'center_y']}
-                density_i = func.density_lens(r, **kwargs_i)
-                density += density_i
-        return density
-
-    def alpha(self, x, y, kwargs, k=None):
-        """
-        deflection angles
-
-        :param x: x-position (preferentially arcsec)
-        :type x: numpy array
-        :param y: y-position (preferentially arcsec)
-        :type y: numpy array
-        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
-        :param k: only evaluate the k-th lens model
-         potential is analytically known
-        :return: deflection angles in units of arcsec
-        """
-        return self.alpha(x, y, kwargs, k=k)
 
     def kappa(self, x, y, kwargs, k=None):
         """

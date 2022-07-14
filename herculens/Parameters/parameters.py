@@ -54,7 +54,7 @@ class Parameters(object):
         self._image = lens_image
         self._kwargs_init  = kwargs_init
         self._kwargs_fixed = kwargs_fixed
-        num_lens_profiles = max(1, len(self._image.MassModel.mass_model_list))
+        num_lens_profiles = max(1, len(self._image.MassModel.profile_type_list))
         num_source_profiles = max(1, len(self._image.SourceModel.profile_type_list))
         num_lens_light_profiles = max(1, len(self._image.LensLightModel.profile_type_list))
         kwargs_prior_tmp = {
@@ -130,7 +130,7 @@ class Parameters(object):
     @property
     def kwargs_model(self):
         # TODO: intermediate step, this might be suppressed in the future
-        self._kwargs_model = dict(mass_model_list=self._image.MassModel.mass_model_list,
+        self._kwargs_model = dict(mass_model_list=self._image.MassModel.profile_type_list,
                                   source_model_list=self._image.SourceModel.profile_type_list,
                                   lens_light_model_list=self._image.LensLightModel.profile_type_list)
         return self._kwargs_model

@@ -1,4 +1,6 @@
+import numpy as np
 import jax.numpy as jnp
+
 from herculens.LightModel.Profiles import sersic, pixelated, uniform, gaussian
 from herculens.Util.util import convert_bool_list
 
@@ -73,9 +75,8 @@ class LightModelBase(object):
             Position index of a single source model component.
 
         """
-        x = jnp.array(x, dtype=float)
-        y = jnp.array(y, dtype=float)
-        # flux = jnp.zeros_like(x)
+        # x = jnp.array(x, dtype=float)
+        # y = jnp.array(y, dtype=float)
         flux = 0.
         bool_list = convert_bool_list(self._num_func, k=k)
         for i, func in enumerate(self.func_list):

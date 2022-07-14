@@ -4,7 +4,6 @@ from functools import partial
 from jax import jit
 
 from herculens.LensImage.Numerics.numerics import Numerics
-from herculens.LensImage.image2source_mapping import Image2SourceMapping
 
 
 __all__ = ['LensImage']
@@ -23,7 +22,7 @@ class LensImage(object):
         :param mass_model_class: lens mass model, instance of MassModel() from herculens.MassModel.mass_model
         :param source_model_class: source light model, instance of LightModel() from herculens.MassModel.mass_model
         :param lens_light_model_class: lens light model, instance of LightModel() from herculens.MassModel.mass_model
-        :param kwargs_numerics: keyword arguments for various numerical settings (see .Numerics.numerics_subframe)
+        :param kwargs_numerics: keyword arguments for various numerical settings (see herculens.Numerics.numerics)
         :param recompute_model_grids: if True, recomputes all coordinate grids for pixelated model components
         """
         self.PSF = psf_class
@@ -58,7 +57,6 @@ class LensImage(object):
                                         overwrite=recompute_model_grids)
             self.LensLightModel.set_pixel_grid(self.Grid.model_pixel_axes('lens_light'), self.Grid.pixel_area)
         self._kwargs_numerics = kwargs_numerics
-        self.source_mapping = Image2SourceMapping(mass_model_class, source_model_class)
 
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, de_lensed=False, k=None, k_lens=None):
@@ -77,11 +75,12 @@ class LensImage(object):
         """
         if len(self.SourceModel.profile_type_list) == 0:
             return np.zeros((self.Grid.num_pixel_axes))
-        ra_grid, dec_grid = self.ImageNumerics.coordinates_evaluate
+        ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
         if de_lensed is True:
-            source_light = self.SourceModel.surface_brightness(ra_grid, dec_grid, kwargs_source, k=k)
+            source_light = self.SourceModel.surface_brightness(ra_grid_img, dec_grid_img, kwargs_source, k=k)
         else:
-            source_light = self.source_mapping.image_flux_joint(ra_grid, dec_grid, kwargs_lens, kwargs_source, k=k, k_lens=k_lens)
+            ra_grid_src, dec_grid_src = self.MassModel.ray_shooting(ra_grid_img, dec_grid_img, kwargs_lens, k=k_lens)
+            source_light = self.SourceModel.surface_brightness(ra_grid_src, dec_grid_src, kwargs_source, k=k)
         source_light_final = self.ImageNumerics.re_size_convolve(source_light, unconvolved=unconvolved)
         return source_light_final
 
@@ -95,8 +94,8 @@ class LensImage(object):
         :param k: list of bool or list of int to select which model profiles to include
         :return: 2d array of surface brightness pixels
         """
-        ra_grid, dec_grid = self.ImageNumerics.coordinates_evaluate
-        lens_light = self.LensLightModel.surface_brightness(ra_grid, dec_grid, kwargs_lens_light, k=k)
+        ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
+        lens_light = self.LensLightModel.surface_brightness(ra_grid_img, dec_grid_img, kwargs_lens_light, k=k)
         lens_light_final = self.ImageNumerics.re_size_convolve(lens_light, unconvolved=unconvolved)
         return lens_light_final
 
