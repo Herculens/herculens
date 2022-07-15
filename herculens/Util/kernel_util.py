@@ -93,25 +93,6 @@ def cut_psf(psf_data, psf_size):
     kernel = kernel_norm(kernel)
     return kernel
 
-def pixel_kernel(point_source_kernel, subgrid_res=7):
-    """
-    converts a pixelised kernel of a point source to a kernel representing a uniform extended pixel
-
-    :param point_source_kernel:
-    :param subgrid_res:
-    :return: convolution kernel for an extended pixel
-    """
-    kernel_subgrid = subgrid_kernel(point_source_kernel, subgrid_res, num_iter=10)
-    kernel_size = len(point_source_kernel)
-    kernel_pixel = np.zeros((kernel_size*subgrid_res, kernel_size*subgrid_res))
-    for i in range(subgrid_res):
-        k_x = int((kernel_size-1) / 2 * subgrid_res + i)
-        for j in range(subgrid_res):
-            k_y = int((kernel_size-1) / 2 * subgrid_res + j)
-            kernel_pixel = image_util.add_layer2image(kernel_pixel, k_x, k_y, kernel_subgrid)
-    kernel_pixel = util.averaging(kernel_pixel, numGrid=kernel_size*subgrid_res, numPix=kernel_size)
-    return kernel_norm(kernel_pixel)
-
 def kernel_gaussian(kernel_numPix, deltaPix, fwhm):
     sigma = util.fwhm2sigma(fwhm)
     #if kernel_numPix % 2 == 0:

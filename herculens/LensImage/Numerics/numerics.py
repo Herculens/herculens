@@ -133,7 +133,7 @@ class Numerics(object):
     def convolution_class(self):
         """
 
-        :return: convolution class (can be SubgridKernelConvolution, PixelKernelConvolution, MultiGaussianConvolution, ...)
+        :return: convolution class (can be SubgridKernelConvolution, PixelKernelConvolution or GaussianConvolution)
         """
         return self._conv
 
