@@ -12,6 +12,7 @@ import jax.numpy as jnp
 
 from herculens.MassModel.mass_model_base import MassProfileBase
 
+
 __all__ = ['MassModel']
 
 

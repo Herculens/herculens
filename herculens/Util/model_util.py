@@ -60,7 +60,7 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
     grid.remove_model_grid('source')
     lens_image_pixel = LensImage(grid, lens_image.PSF, 
                                  noise_class=lens_image.Noise,
-                                 mass_model_class=lens_image.MassModel,
+                                 lens_mass_model_class=lens_image.MassModel,
                                  source_model_class=LightModel(['PIXELATED']),
                                  lens_light_model_class=lens_image.LensLightModel,
                                  kwargs_numerics=lens_image._kwargs_numerics)
@@ -145,7 +145,7 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
     psf = copy.deepcopy(macro_lens_image.PSF)
     noise = copy.deepcopy(macro_lens_image.Noise)
     halo_lens_image = LensImage(grid, psf, noise_class=noise,
-                                mass_model_class=halo_mass_model,
+                                lens_mass_model_class=halo_mass_model,
                                 source_model_class=macro_lens_image.SourceModel,
                                 lens_light_model_class=macro_lens_image.LensLightModel,
                                 kwargs_numerics=kwargs_numerics)

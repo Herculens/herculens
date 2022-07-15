@@ -127,7 +127,7 @@ class Loss(Differentiable):
                                      "compatible with a 'PIXELATED' source light profile")
                 
                 if (term in self._supported_regul_lens_mass and 
-                    'PIXELATED' not in self._image.MassModel.lens_model_list):
+                    'PIXELATED' not in self._image.MassModel.profile_type_list):
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' lens profile")
 
@@ -313,7 +313,7 @@ class Loss(Differentiable):
                 if index_analytical_potential is None:
                     raise ValueError("For analytical potential regularization, a `index_analytical_potential` is required.")
                 self._idx_ana_pot = index_analytical_potential
-                self._regul_k_lens = tuple([True if i != self._idx_ana_pot else False for i in range(len(self._image.MassModel.lens_model_list))])
+                self._regul_k_lens = tuple([True if i != self._idx_ana_pot else False for i in range(len(self._image.MassModel.profile_type_list))])
                 self._weigths = weights
                 self._lambda  = float(strength)
                 self._mask    = masks
