@@ -1,3 +1,12 @@
+# High-level interface to a light model
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LightModel module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 from herculens.LightModel.light_model_base import LightModelBase
 
 __all__ = ['LightModel']
@@ -23,5 +32,3 @@ class LightModel(LightModelBase):
                                          pixel_interpol=pixel_interpol, 
                                          pixel_allow_extrapolation=pixel_allow_extrapolation,
                                          kwargs_pixelated=kwargs_pixelated)
-        self.deflection_scaling_list = deflection_scaling_list
-        self.redshift_list = source_redshift_list

@@ -1,9 +1,20 @@
+# Defines a gaussian profile
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
 import jax.numpy as jnp
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
 
 
-class Gaussian(LensProfileBase):
+__all__ = ['Gaussian']
+
+
+class Gaussian(object):
     """
     this class contains functions to evaluate a Gaussian function and calculates its derivative and hessian matrix
     """

@@ -1,3 +1,10 @@
+# Utility functions to read simulation products from MOLET (Vernardos et al. 2022)
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal'
+
+
 import os
 import warnings
 import numpy as np
@@ -140,12 +147,12 @@ def read_molet_simulation(molet_path, simu_dir,
     if use_supersampled_psf:
         if not len(psf_kernel_super) % 2 == 0:
             psf = PSF(psf_type='PIXEL', kernel_point_source=psf_kernel_super, 
-                  point_source_supersampling_factor=10)
+                      point_source_supersampling_factor=10)
         else:
             psf = None
             warnings.warn("Could not prepare the supersampled 'PIXEL' PSF instance as the supersampled PSF is even-sized.")
     else:
-        if expe_psf_width == true_psf_width:  # means it is not a supersampled PSF
+        if round(true_psf_width, 7) == round(expe_psf_width, 7):  # means it is not a supersampled PSF
             if cut_psf is not None:
                 psf_kernel = psf_kernel[cut_psf:-cut_psf, cut_psf:-cut_psf]
                 psf_kernel /= psf_kernel.sum()

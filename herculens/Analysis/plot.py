@@ -1,3 +1,10 @@
+# Class to plot a lens model
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal'
+
+
 import copy
 import warnings
 import numpy as np
@@ -11,6 +18,9 @@ from herculens.Util import image_util
 
 # Some general default for plotting
 plt.rc('image', interpolation='none', origin='lower')  # for imshow
+
+
+__all__ = ['Plotter']
 
 
 class Plotter(object):
@@ -185,15 +195,15 @@ class Plotter(object):
 
         if show_lens_potential:
             kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
-            pot_idx = lens_image.LensModel.pixelated_index
+            pot_idx = lens_image.MassModel.pixelated_index
             x_grid_lens, y_grid_lens = lens_image.Grid.model_pixel_coordinates('lens')
-            alpha_x, alpha_y = lens_image.LensModel.alpha(x_grid_lens, y_grid_lens, 
+            alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_lens, y_grid_lens, 
                                                           kwargs_lens, k=pot_idx)
-            kappa = lens_image.LensModel.kappa(x_grid_lens, y_grid_lens, 
+            kappa = lens_image.MassModel.kappa(x_grid_lens, y_grid_lens, 
                                                kwargs_lens, k=pot_idx)
             #kappa = ndimage.gaussian_filter(kappa, 1)
             if reproject_pixelated_models:
-                potential_model = lens_image.LensModel.potential(x_grid_lens, y_grid_lens,
+                potential_model = lens_image.MassModel.potential(x_grid_lens, y_grid_lens,
                                                                  kwargs_lens, k=pot_idx)
             else:
                 potential_model = kwargs_lens[pot_idx]['pixels']

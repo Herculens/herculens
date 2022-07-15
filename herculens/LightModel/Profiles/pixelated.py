@@ -1,8 +1,16 @@
+# Defines a pixelated profile
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'austinpeel', 'aymgal'
+
+
+import numpy as np
 import jax.numpy as jnp
 from herculens.Util.jax_util import BilinearInterpolator, BicubicInterpolator
 
 
-import numpy as np
+__all__= ['Pixelated']
 
 
 class Pixelated(object):

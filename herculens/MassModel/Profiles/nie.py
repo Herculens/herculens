@@ -1,13 +1,22 @@
+# Defines a non-singular isothermal ellipsoid
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
 import jax.numpy as jnp
 import herculens.Util.util as util
 import herculens.Util.param_util as param_util
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+
 
 __all__ = ['NIE', 'NIEMajorAxis']
 
 
-class NIE(LensProfileBase):
+class NIE(object):
     """
     Non-singular isothermal ellipsoid
     kappa = theta_E/2 [s2IE + r2(1 − e * cos(2*phi)]−1/2
@@ -44,37 +53,6 @@ class NIE(LensProfileBase):
         b = theta_E_conv * jnp.sqrt((1 + q**2)/2)
         s = s_scale * jnp.sqrt((1 + q**2) / (2*q**2))
         return b, s, q, phi_G
-
-    def set_static(self, theta_E, e1, e2, s_scale, center_x=0, center_y=0):
-        """
-
-        :param x: x-coordinate in image plane
-        :param y: y-coordinate in image plane
-        :param theta_E: Einstein radius
-        :param e1: eccentricity component
-        :param e2: eccentricity component
-        :param s_scale: smoothing scale
-        :param center_x: profile center
-        :param center_y: profile center
-        :return: self variables set
-        """
-        self._static = True
-        self._b_static, self._s_static, self._q_static, self._phi_G_static = self._param_conv(theta_E, e1, e2, s_scale)
-
-    def set_dynamic(self):
-        """
-
-        :return:
-        """
-        self._static = False
-        if hasattr(self, '_b_static'):
-            del self._b_static
-        if hasattr(self, '_s_static'):
-            del self._s_static
-        if hasattr(self, '_phi_G_static'):
-            del self._phi_G_static
-        if hasattr(self, '_q_static'):
-            del self._q_static
 
     def function(self, x, y, theta_E, e1, e2, s_scale, center_x=0, center_y=0):
         """
@@ -171,7 +149,7 @@ class NIE(LensProfileBase):
         return theta_E_new
 
 
-class NIEMajorAxis(LensProfileBase):
+class NIEMajorAxis(object):
     """
     This class contains the function and the derivatives of the non-singular isothermal ellipse.
     See Keeton and Kochanek 1998, https://arxiv.org/pdf/astro-ph/9705194.pdf

@@ -1,8 +1,17 @@
-from herculens.LensModel.Profiles import (gaussian_potential, point_mass, multipole,
+# Describes a mass model, as a list of mass profiles
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
+from herculens.MassModel.Profiles import (gaussian_potential, point_mass, multipole,
                                            shear, sie, sis, nie, epl, pixelated)
 from herculens.Util.util import convert_bool_list
 
-__all__ = ['ProfileListBase']
+__all__ = ['MassProfileBase']
 
 SUPPORTED_MODELS = [
     'EPL', 'NIE', 'SIE', 'SIS', 'GAUSSIAN', 'POINT_MASS', 
@@ -11,41 +20,37 @@ SUPPORTED_MODELS = [
 ]
 
 
-class ProfileListBase(object):
+class MassProfileBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, lens_redshift_list=None, kwargs_pixelated={}):
-        """Create a ProfileListBase object.
+    def __init__(self, lens_model_list, kwargs_pixelated={}):
+        """Create a MassProfileBase object.
 
         Parameters
         ----------
         lens_model_list : list of str
             Lens model profile types.
-        lens_redshift_list : list of float, optional
-            Lens redshifts corresponding to the profiles in `lens_model_list`.
 
         """
-        self.func_list = self._load_model_instances(lens_model_list, lens_redshift_list)
+        self.func_list = self._load_model_instances(lens_model_list)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
         self._kwargs_pixelated = kwargs_pixelated
 
-    def _load_model_instances(self, lens_model_list, lens_redshift_list=None):
-        if lens_redshift_list is None:
-            lens_redshift_list = [None] * len(lens_model_list)
+    def _load_model_instances(self, lens_model_list):
         func_list = []
         imported_classes = {}
         for lens_type in lens_model_list:
             # These models require a new instance per profile as certain pre-computations
             # are relevant per individual profile
             if lens_type in ['PIXELATED', 'PIXELATED_DIRAC']:
-                lensmodel_class = self._import_class(lens_type)
+                mass_model_class = self._import_class(lens_type)
             else:
                 if lens_type not in imported_classes.keys():
-                    lensmodel_class = self._import_class(lens_type)
-                    imported_classes.update({lens_type: lensmodel_class})
+                    mass_model_class = self._import_class(lens_type)
+                    imported_classes.update({lens_type: mass_model_class})
                 else:
-                    lensmodel_class = imported_classes[lens_type]
-            func_list.append(lensmodel_class)
+                    mass_model_class = imported_classes[lens_type]
+            func_list.append(mass_model_class)
         return func_list
 
     @staticmethod
@@ -81,22 +86,6 @@ class ProfileListBase(object):
     def _bool_list(self, k=None):
         """See `Util.util.convert_bool_list`."""
         return convert_bool_list(n=self._num_func, k=k)
-
-    def set_static(self, kwargs_list):
-        """Pre-compute lensing quantities for faster (but fixed) execution."""
-        for kwargs, func in zip(kwargs, self.func_list):
-            func.set_static(**kwargs)
-        return kwargs_list
-
-    def set_dynamic(self):
-        """Free the cache of pre-computed quantities from `set_static`.
-
-        This mode recomputes lensing quantities each time a method is called.
-        This is the default mode if `set_static` has not been called.
-
-        """
-        for func in self.func_list:
-            func.set_dynamic()
 
     @property
     def has_pixels(self):

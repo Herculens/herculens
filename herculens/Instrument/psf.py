@@ -1,3 +1,12 @@
+# Defines the point spread function model
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the Data module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
 from herculens.Util import util, kernel_util, linear_util
 
@@ -14,8 +23,8 @@ class PSF(object):
     """
 
     def __init__(self, psf_type='NONE', fwhm=None, truncation=5,
-                 pixel_size=None, kernel_point_source=None, psf_error_map=None,
-                 point_source_supersampling_factor=1):
+                 pixel_size=None, kernel_point_source=None, 
+                 kernel_supersampling_factor=1):
         """Create a PSF object.
 
         Parameters
@@ -35,15 +44,8 @@ class PSF(object):
         kernel_point_source : array_like, optional
             2D array, odd length, of the centered PSF of a point source.
             Default is None.
-        psf_error_map : array_like, optional
-            Uncertainty in the PSF pixel model, matching the shape of
-            `kernel_point_source`. The error is added to the pixel error around
-            point sources as
-            sigma^2_i += `psf_error_map`_j * (point_source_flux_i)**2
-            Default is None.
-        point_source_supersampling_factor : int, optional
+        kernel_supersampling_factor : int, optional
             Supersampling factor of `kernel_point_source`. Default is 1.
-            !! NOT SUPPORTED YET !!
         """
         self.psf_type = psf_type
         self._pixel_size = pixel_size
@@ -53,30 +55,22 @@ class PSF(object):
             self._fwhm = fwhm
             self._sigma_gaussian = util.fwhm2sigma(self._fwhm)
             self._truncation = truncation
-            self._point_source_supersampling_factor = 0
+            self._kernel_supersampling_factor = 0
         elif self.psf_type == 'PIXEL':
             if kernel_point_source is None:
                 raise ValueError('kernel_point_source needs to be specified for PIXEL PSF type!')
             if len(kernel_point_source) % 2 == 0:
                 raise ValueError('kernel needs to have odd axis number, not ', np.shape(kernel_point_source))
-            if point_source_supersampling_factor > 1:
+            if kernel_supersampling_factor > 1:
                 self._kernel_point_source_supersampled = kernel_point_source
-                self._point_source_supersampling_factor = point_source_supersampling_factor
-                kernel_point_source = kernel_util.degrade_kernel(self._kernel_point_source_supersampled, self._point_source_supersampling_factor)
+                self._kernel_supersampling_factor = kernel_supersampling_factor
+                kernel_point_source = kernel_util.degrade_kernel(self._kernel_point_source_supersampled, self._kernel_supersampling_factor)
             self._kernel_point_source = kernel_point_source / np.sum(kernel_point_source)
         elif self.psf_type == 'NONE':
             self._kernel_point_source = np.zeros((3, 3))
             self._kernel_point_source[1, 1] = 1
         else:
             raise ValueError("psf_type %s not supported!" % self.psf_type)
-        if psf_error_map is not None:
-            self._psf_error_map = psf_error_map
-            if self.psf_type == 'PIXEL':
-                if len(self._psf_error_map) != len(self._kernel_point_source):
-                    raise ValueError('psf_error_map must have same size as kernel_point_source!')
-            self.psf_error_map_bool = True
-        else:
-            self.psf_error_map_bool = False
 
     @property
     def kernel_point_source(self):
@@ -116,15 +110,12 @@ class PSF(object):
          Attention, this will overwrite a previously used supersampled PSF if the resolution is changing.
         :return: super-sampled PSF as 2d numpy array
         """
-        if hasattr(self, '_kernel_point_source_supersampled') and self._point_source_supersampling_factor == supersampling_factor:
+        if hasattr(self, '_kernel_point_source_supersampled') and self._kernel_supersampling_factor == supersampling_factor:
             kernel_point_source_supersampled = self._kernel_point_source_supersampled
         else:
             if self.psf_type == 'GAUSSIAN':
                 kernel_numPix = self._truncation / self._pixel_size * supersampling_factor
                 kernel_numPix = int(round(kernel_numPix))
-                if kernel_numPix > 10000:
-                    raise ValueError('The pixelized Gaussian kernel has a grid of %s pixels with a truncation at '
-                                     '%s times the sigma of the Gaussian, exceeding the limit allowed.' % (kernel_numPix, self._truncation))
                 if kernel_numPix % 2 == 0:
                     kernel_numPix += 1
                 kernel_point_source_supersampled = kernel_util.kernel_gaussian(kernel_numPix, self._pixel_size / supersampling_factor, self._fwhm)
@@ -149,7 +140,7 @@ class PSF(object):
                 raise ValueError('psf_type %s not valid!' % self.psf_type)
             if updata_cache is True:
                 self._kernel_point_source_supersampled = kernel_point_source_supersampled
-                self._point_source_supersampling_factor = supersampling_factor
+                self._kernel_supersampling_factor = supersampling_factor
         return kernel_point_source_supersampled
 
     def set_pixel_size(self, deltaPix):
@@ -160,25 +151,14 @@ class PSF(object):
         :return: None
         """
         self._pixel_size = deltaPix
-        if self.psf_type == 'GAUSSIAN':
-            try:
-                del self._kernel_point_source
-            except:
-                pass
-
-    @property
-    def psf_error_map(self):
-        if not hasattr(self, '_psf_error_map'):
-            self._psf_error_map = np.zeros_like(self.kernel_point_source)
-        return self._psf_error_map
-
+        if self.psf_type == 'GAUSSIAN' and hasattr(self, '_kernel_point_source'):
+            del self._kernel_point_source
+            
     @property
     def fwhm(self):
         """
 
         :return: full width at half maximum of kernel (in units of pixel)
         """
-        if self.psf_type == 'GAUSSIAN':
-            return self._fwhm
-        else:
-            return kernel_util.fwhm_kernel(self.kernel_point_source) * self._pixel_size
+        return self._fwhm
+        

@@ -1,11 +1,22 @@
+# Describes a light model, as a list of light profiles
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LightModel module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
+import numpy as np
 import jax.numpy as jnp
+
 from herculens.LightModel.Profiles import sersic, pixelated, uniform, gaussian
 from herculens.Util.util import convert_bool_list
 
 __all__ = ['LightModelBase']
 
 
-SUPPORTED_MODELS = ['GAUSSIAN', 'GAUSSIAN_ELLIPSE', 'SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC', 'UNIFORM', 'PIXELATED']
+SUPPORTED_MODELS = ['GAUSSIAN', 'GAUSSIAN_ELLIPSE', 'SERSIC', 'SERSIC_ELLIPSE', 'UNIFORM', 'PIXELATED']
 
 
 class LightModelBase(object):
@@ -73,9 +84,8 @@ class LightModelBase(object):
             Position index of a single source model component.
 
         """
-        x = jnp.array(x, dtype=float)
-        y = jnp.array(y, dtype=float)
-        # flux = jnp.zeros_like(x)
+        # x = jnp.array(x, dtype=float)
+        # y = jnp.array(y, dtype=float)
         flux = 0.
         bool_list = convert_bool_list(self._num_func, k=k)
         for i, func in enumerate(self.func_list):

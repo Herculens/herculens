@@ -1,3 +1,10 @@
+# Utility functions
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'aymgal'
+
+
 import copy
 import numpy as np
 import jax.numpy as jnp
@@ -53,7 +60,7 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
     grid.remove_model_grid('source')
     lens_image_pixel = LensImage(grid, lens_image.PSF, 
                                  noise_class=lens_image.Noise,
-                                 lens_model_class=lens_image.LensModel,
+                                 mass_model_class=lens_image.MassModel,
                                  source_model_class=LightModel(['PIXELATED']),
                                  lens_light_model_class=lens_image.LensLightModel,
                                  kwargs_numerics=lens_image._kwargs_numerics)
@@ -111,7 +118,7 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
     """
     # imports are here to avoid issues with circular imports
     from herculens.LightModel.light_model import LightModel
-    from herculens.LensModel.lens_model import LensModel
+    from herculens.MassModel.mass_model import MassModel
     from herculens.LensImage.lens_image import LensImage
     from herculens.Parameters.parameters import Parameters
     from herculens.Inference.loss import Loss
@@ -130,15 +137,15 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
     else:
         raise NotImplementedError(f"Halo profile '{halo_profile}' is not yet supported.")
     
-    halo_lens_model_list = [halo_profile] + macro_lens_image.LensModel.lens_model_list
-    halo_lens_model = LensModel(halo_lens_model_list)
+    halo_mass_model_list = [halo_profile] + macro_lens_image.MassModel.mass_model_list
+    halo_mass_model = MassModel(halo_mass_model_list)
 
     grid = copy.deepcopy(macro_lens_image.Grid)
     #grid.remove_model_grid('lens')
     psf = copy.deepcopy(macro_lens_image.PSF)
     noise = copy.deepcopy(macro_lens_image.Noise)
     halo_lens_image = LensImage(grid, psf, noise_class=noise,
-                                lens_model_class=halo_lens_model,
+                                mass_model_class=halo_mass_model,
                                 source_model_class=macro_lens_image.SourceModel,
                                 lens_light_model_class=macro_lens_image.LensLightModel,
                                 kwargs_numerics=kwargs_numerics)
@@ -263,7 +270,7 @@ def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5,
     interp_grad_s_x = Interpolator(y_coords_num, x_coords_num, grad_s_x_srcplane)
     interp_grad_s_y = Interpolator(y_coords_num, x_coords_num, grad_s_y_srcplane)
     # use the lens equation to ray shoot the coordinates of the data grid
-    x_src, y_src = lens_image.LensModel.ray_shooting(
+    x_src, y_src = lens_image.MassModel.ray_shooting(
         x_grid, y_grid, kwargs_res['kwargs_lens'])
     # evaluate the resulting arrays on that grid
     grad_s_x = interp_grad_s_x(y_src, x_src)
@@ -327,7 +334,7 @@ def data_noise_to_wavelet_potential(data, lens_image, kwargs_res, k_src=None,
     if likelihood_type not in ['l2_norm', 'chi2']:
         raise ValueError("Only 'l2_norm' and 'chi2' are supported options for likelihood_type.")
 
-    lens_model = lens_image.LensModel
+    mass_model = lens_image.MassModel
     kwargs_lens = kwargs_res['kwargs_lens']
     source_model = lens_image.SourceModel
     kwargs_source = kwargs_res['kwargs_source']
@@ -350,7 +357,7 @@ def data_noise_to_wavelet_potential(data, lens_image, kwargs_res, k_src=None,
 
     # extract coordinates grid, in image plane, ray-shot to source plane, and for the pixelated potential
     x_grid_d, y_grid_d = lens_image.Grid.pixel_coordinates
-    x_grid_rs, y_grid_rs = lens_model.ray_shooting(x_grid_d, y_grid_d, kwargs_lens)
+    x_grid_rs, y_grid_rs = mass_model.ray_shooting(x_grid_d, y_grid_d, kwargs_lens)
     x_grid_psi, y_grid_psi = lens_image.Grid.model_pixel_coordinates('lens')
 
     # number of pixels and wavelet scales

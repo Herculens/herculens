@@ -1,3 +1,12 @@
+# Utility functions
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the Util module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'aymgal'
+
+
 import copy
 import numpy as np
 # import scipy.ndimage.interpolation as interp
@@ -73,51 +82,6 @@ def subgrid_kernel(kernel, subgrid_res, odd=False, num_iter=100):
     delta_kernel_sub = np.kron(delta_kernel, id)/subgrid_res**2
     return kernel_norm(kernel_subgrid - delta_kernel_sub)
 
-def averaging_even_kernel(kernel_high_res, subgrid_res):
-    """
-    makes a lower resolution kernel based on the kernel_high_res (odd numbers) and the subgrid_res (even number), both
-    meant to be centered.
-
-    :param kernel_high_res: high resolution kernel with even subsampling resolution, centered
-    :param subgrid_res: subsampling resolution (even number)
-    :return: averaged undersampling kernel
-    """
-    n_kernel_high_res = len(kernel_high_res)
-    n_low = int(round(n_kernel_high_res / subgrid_res + 0.5))
-    if n_low % 2 == 0:
-        n_low += 1
-    n_high = int(n_low * subgrid_res - 1)
-    assert n_high % 2 == 1
-    if n_high == n_kernel_high_res:
-        kernel_high_res_edges = kernel_high_res
-    else:
-        i_start = int((n_high - n_kernel_high_res) / 2)
-        kernel_high_res_edges = np.zeros((n_high, n_high))
-        kernel_high_res_edges[i_start:-i_start, i_start:-i_start] = kernel_high_res
-    kernel_low_res = np.zeros((n_low, n_low))
-    # adding pixels that are fully within a single re-binned pixel
-    for i in range(subgrid_res-1):
-        for j in range(subgrid_res-1):
-            kernel_low_res += kernel_high_res_edges[i::subgrid_res, j::subgrid_res]
-    # adding half of a pixel that has over-lap with two pixels
-    i = subgrid_res - 1
-    for j in range(subgrid_res - 1):
-        kernel_low_res[1:, :] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
-        kernel_low_res[:-1, :] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
-    j = subgrid_res - 1
-    for i in range(subgrid_res - 1):
-        kernel_low_res[:, 1:] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
-        kernel_low_res[:, :-1] += kernel_high_res_edges[i::subgrid_res, j::subgrid_res] / 2
-    # adding a quarter of a pixel value that is at the boarder of four pixels
-    i = subgrid_res - 1
-    j = subgrid_res - 1
-    kernel_edge = kernel_high_res_edges[i::subgrid_res, j::subgrid_res]
-    kernel_low_res[1:, 1:] += kernel_edge / 4
-    kernel_low_res[:-1, 1:] += kernel_edge / 4
-    kernel_low_res[1:, :-1] += kernel_edge / 4
-    kernel_low_res[:-1, :-1] += kernel_edge / 4
-    return kernel_low_res
-
 def cut_psf(psf_data, psf_size):
     """
     cut the psf properly
@@ -128,25 +92,6 @@ def cut_psf(psf_data, psf_size):
     kernel = image_util.cut_edges(psf_data, psf_size)
     kernel = kernel_norm(kernel)
     return kernel
-
-def pixel_kernel(point_source_kernel, subgrid_res=7):
-    """
-    converts a pixelised kernel of a point source to a kernel representing a uniform extended pixel
-
-    :param point_source_kernel:
-    :param subgrid_res:
-    :return: convolution kernel for an extended pixel
-    """
-    kernel_subgrid = subgrid_kernel(point_source_kernel, subgrid_res, num_iter=10)
-    kernel_size = len(point_source_kernel)
-    kernel_pixel = np.zeros((kernel_size*subgrid_res, kernel_size*subgrid_res))
-    for i in range(subgrid_res):
-        k_x = int((kernel_size-1) / 2 * subgrid_res + i)
-        for j in range(subgrid_res):
-            k_y = int((kernel_size-1) / 2 * subgrid_res + j)
-            kernel_pixel = image_util.add_layer2image(kernel_pixel, k_x, k_y, kernel_subgrid)
-    kernel_pixel = util.averaging(kernel_pixel, numGrid=kernel_size*subgrid_res, numPix=kernel_size)
-    return kernel_norm(kernel_pixel)
 
 def kernel_gaussian(kernel_numPix, deltaPix, fwhm):
     sigma = util.fwhm2sigma(fwhm)

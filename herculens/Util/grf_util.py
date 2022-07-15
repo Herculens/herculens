@@ -1,4 +1,9 @@
-__author__ = 'gvernardos', 'aymgal'
+# Utility functions to generate gaussian random fields (GRF)
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'gvernard', 'aymgal'
+
 
 import math
 import numpy as np

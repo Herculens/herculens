@@ -4,7 +4,7 @@
 
 ![License](https://img.shields.io/github/license/austinpeel/herculens)
 ![PyPi python support](https://img.shields.io/badge/Python-3.7-blue)
-<!-- [![arXiv](https://img.shields.io/badge/arXiv-1234.56789-b31b1b.svg)](https://arxiv.org/abs/1234.56789) -->
+[![arXiv](https://img.shields.io/badge/arXiv-2207.05763-b31b1b.svg)](https://arxiv.org/abs/2207.05763)
 <!-- ![PyPi version](https://img.shields.io/pypi/v/herculens) -->
 
 
@@ -12,24 +12,23 @@
 
 ## Analysis of strong lensing imaging data
 
-The primary purpose of `Herculens` is to provide flexible modeling methods to model current and future observations of strong gravitational lenses. Currently, it supports various degrees of model complexity, ranging from standard smooth analytical profiles to pixelated models combined with machine learning approaches.
+The primary purpose of `herculens` is to provide flexible modeling methods to model current and future observations of strong gravitational lenses. Currently, it supports various degrees of model complexity, ranging from standard smooth analytical profiles to pixelated models combined with machine learning approaches.
 
-Currently, `Herculens` supports several of the most widely-used analytical profiles, as well as multi-scale pixelated models regularized with wavelets. Future updates will include the support of point source modeling, new regularization techniques, and more expressive models based on neural networks.
+Currently, `herculens` supports several of the most widely-used analytical profiles, as well as multi-scale pixelated models regularized with wavelets. Future updates will include the support of point source modeling, new regularization techniques, and more expressive models based on neural networks.
 
-Being a forward modeling code, `Herculens` also allows to simulate realistic observations of gravitational lenses.
 
 
 
 
 ## `JAX`-based automatic differentiation and code compilation 
 
-`Herculens` is based on the powerful framework of **differentiable programming**. The code is entirely based on the automatic differentiation and compilation features of [`JAX`](https://github.com/google/jax). This simply means that you have access, _analytically_, to all partial derivatives of your model with respect to any of its parameters. This enables faster convergence to the solution, more efficient exploration of the parameter space including the sampling of posterior distributions, and new ways to mitigate degeneracies that affect gravitational lensing.
+`herculens` is based on the powerful framework of **differentiable programming**. The code is entirely based on the automatic differentiation and compilation features of [`JAX`](https://github.com/google/jax). This simply means that you have access, _analytically_, to all partial derivatives of your model with respect to any of its parameters. This enables faster convergence to the solution, more efficient exploration of the parameter space including the sampling of posterior distributions, and new ways to mitigate degeneracies that affect gravitational lensing.
 
 This highly modular framework offers a way to merge all modeling paradigms explored in the literature, into a single tool:
 
-- **analytical**: model components are described by analytical functions with few parameters and clear physical meaning, but that can be insufficient to fit all observations;
+- **analytical**: model components are described by analytical functions with few parameters and clear physical meaning, but that may be insufficient to fit all observations;
 - **pixelated**: regular or irregular grid of pixels are used as individual parameters, which offer higher flexibility, but requires well-motivated regularization strategies;
-- **deep learning**: neural networks (among others) are by construction fully differentiable, regardless of being pre-trained or not. It is therefore effortless to plug-in any deep learning-based model component to `Herculens`.
+- **deep learning**: neural networks (among others) are by construction fully differentiable, regardless of being pre-trained or not. It is therefore effortless to plug-in any deep learning-based model component to `herculens`.
 
 
 
@@ -37,7 +36,7 @@ This highly modular framework offers a way to merge all modeling paradigms explo
 
 ## Example notebooks
 
-Below you can find a few examples of synthetic problems that can be tackled with `Herculens`:
+Below you can find a few examples of synthetic problems that can be tackled with `herculens`:
 
 - [**Starting guide**: Lens modeling with gradient descent, Fisher analysis and Hamiltonian sampling](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Starting_guide.ipynb)
 - [Reconstruction of a complex lensed galaxy with wavelets (and analytical profiles)](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Complex_source_with_wavelets.ipynb)
@@ -70,7 +69,7 @@ The following dependencies will be installed automatically.
 
 ### External package requirements
 
-We tested `Herculens` with the versions mentioned in parenthesis. It does not mean that it breaks for newer versions though.
+We tested `herculens` with the versions mentioned in parenthesis. It does not mean that it breaks for newer versions though.
 
 #### Necessary
 - `jax` (0.2.13)
@@ -85,32 +84,34 @@ We tested `Herculens` with the versions mentioned in parenthesis. It does not me
 - `dynesty` (1.1), for nested sampling
 - `jaxns` (1.1), for `jax`-based nested sampling
 - `emcee` (3.0.2), for Ensemble MCMC sampling
-- `lenstronomy` (1.6.0), for particle swarm optimization
+- `lenstronomy` (1.9.3), for particle swarm optimization
 - `palettable` (3.3.0), for nicer colormaps for plots
 
-To run the notebooks, `jupyter` is (of course) also necessary, along with `matplotlib` for plotting.
+To run the notebooks, `jupyter` and `matplotlib` are also necessary.
 
 
 
-## Open-source development
+## Attribution
 
-`Herculens` is currently being actively developed, and several science projects will bring many improvements and new features along the way. Moreover, you can expect very soon better documentation and unit testing to increase the robustness of the code.
+### Citation
 
-Anyone that would like to contribute to `Herculens` is highly encouraged to do so. Please do not hesitate to contact us, open issues on github, fork the repository, and suggest improvements!
-
-
-
-
-
-#### A note regarding `lenstronomy`
-
-You may quickly realize that the syntax and naming conventions of `Herculens` share many similarities with the general purpose lensing software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy) ([Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283), and references therein). The reason is simple: because it is overall easy to use and open-source, `lenstronomy` was used a as baseline for the early development phases of `Herculens`. Since then, there have been many modifications throughout the code, primarily to add powerful features from `JAX`, then to implement new modeling techniques that were unachievable beforehand. While these features could not be implemented in `lenstronomy` without significantly affecting the original spirit of the code, the proximity between `Herculens`and `lenstronomy` makes it really easy to switch from one to the other.
-
-
-
-
-## Parallelization and GPU support
-
-One thing that has not been extensively tested yet---although it is automatically supported with `JAX`---is to run `Herculens` in parallel and over multiple GPUs. If you wish to do that, we would be delighted to get touch with you for possible improvements regarding these aspects.
+If you make use of `herculens`, please cite [Galan et al. 2022](https://arxiv.org/abs/2207.05763). This work presents the global architecture of the tool, and applies it to reconstruct a pixelated lens potential with wavelets.
+```
+@article{Galan:2022:herculens,
+    author        = "Galan, Aymeric and Vernardos, Georgios and Peel, Austin and Courbin, Fr\'ed\'eric and Starck, Jean-Luc",
+    title         = "{Using wavelets to capture deviations from smoothness in galaxy-scale strong lenses}",
+    eprint        = "2207.05763",
+    archivePrefix = "arXiv",
+    primaryClass  = "astro-ph.CO",
+    year          = "2022"
+}
+```
 
 
+### Special mention regarding Lenstronomy
+Part of the `herculens` code originates from the open-source lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy), described in [Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283) (and references therein). In every source file, proper credits are given to the specific developers and contributors to both the original `lenstronomy` (up to version 1.9.3) and `herculens`.
+
+
+### Contributors
+
+The list of people that contributed to `Herculens` and credits to original `lenstronomy` contributors, is in [this document](AUTHORS.md).

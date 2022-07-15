@@ -1,12 +1,21 @@
+# Defines en elliptical power law profile
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LensModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'dangilman', 'ntessore', 'austinpeel', 'aymgal'
+
+
 import numpy as np
 import jax.numpy as jnp
-from herculens.Util import util, param_util, func_util
-from herculens.LensModel.Profiles.base_profile import LensProfileBase
+from herculens.Util import util, param_util, jax_util
+
 
 __all__ = ['EPL', 'EPLMajorAxis']
 
 
-class EPL(LensProfileBase):
+class EPL(object):
     """
     Elliptical Power Law
     kappa = (2-t)/2*(b/r)^t
@@ -22,11 +31,6 @@ class EPL(LensProfileBase):
         super(EPL, self).__init__()
 
     def param_conv(self, theta_E, e1, e2, gamma):
-        if self._static is True:
-            return self._b_static, self._t_static, self._q_static, self._phi_G_static
-        return self._param_conv(theta_E, e1, e2, gamma)
-
-    def _param_conv(self, theta_E, e1, e2, gamma):
         """
         convert parameters from R = r sqrt(1 − e*cos(2*phi)) to
         R = sqrt(q^2 x^2 + y^2)
@@ -43,37 +47,6 @@ class EPL(LensProfileBase):
         b = theta_E_conv * jnp.sqrt((1. + q**2) / 2.)
         t = gamma - 1.
         return b, t, q, phi_G
-
-    def set_static(self, theta_E, e1, e2, gamma, center_x=0, center_y=0):
-        """
-
-        :param x: x-coordinate in image plane
-        :param y: y-coordinate in image plane
-        :param theta_E: Einstein radius
-        :param e1: eccentricity component
-        :param e2: eccentricity component
-        :param t: power law slope
-        :param center_x: profile center
-        :param center_y: profile center
-        :return: self variables set
-        """
-        self._static = True
-        self._b_static, self._t_static, self._q_static, self._phi_G_static = self._param_conv(theta_E, e1, e2, gamma)
-
-    def set_dynamic(self):
-        """
-
-        :return:
-        """
-        self._static = False
-        if hasattr(self, '_b_static'):
-            del self._b_static
-        if hasattr(self, '_t_static'):
-            del self._t_static
-        if hasattr(self, '_phi_G_static'):
-            del self._phi_G_static
-        if hasattr(self, '_q_static'):
-            del self._q_static
 
     def function(self, x, y, theta_E, e1, e2, gamma, center_x=0, center_y=0):
         """
@@ -171,7 +144,7 @@ class EPL(LensProfileBase):
         return theta_E_new
 
 
-class EPLMajorAxis(LensProfileBase):
+class EPLMajorAxis(object):
     """
     This class contains the function and the derivatives of the
     elliptical power law.
@@ -207,7 +180,7 @@ class EPLMajorAxis(LensProfileBase):
         R = jnp.abs(z)
 
         # deflection, eq. (22)
-        alpha = 2. / (1. + q) * (b / R)**t * func_util.R_omega(z, t, q, nmax=20)
+        alpha = 2. / (1. + q) * (b / R)**t * jax_util.R_omega(z, t, q, nmax=20)
 
         # return real and imaginary part
         alpha_real = jnp.nan_to_num(alpha.real, posinf=10**10, neginf=-10**10)

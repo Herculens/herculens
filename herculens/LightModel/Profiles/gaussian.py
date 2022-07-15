@@ -1,7 +1,19 @@
+# Defines a gaussian profile
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the LightModel.Profiles module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
 import jax.numpy as jnp
 
 from herculens.Util import param_util
+
+
+__all__ = ['Gaussian']
 
 
 class Gaussian(object):

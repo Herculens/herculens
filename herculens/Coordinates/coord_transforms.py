@@ -1,5 +1,17 @@
+# Handles coordinate systems
+# 
+# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2018, Simon Birrer & lenstronomy contributors
+# based on the Data module from lenstronomy (version 1.9.3)
+
+__author__ = 'sibirrer', 'austinpeel', 'aymgal'
+
+
 import numpy as np
 import herculens.Util.util as util
+
+
+__all__ = ['Coordinates', 'Coordinates1D']
 
 
 class Coordinates(object):
@@ -17,7 +29,9 @@ class Coordinates(object):
         self._Ma2pix = np.linalg.inv(self._Mpix2a)
         self._ra_at_xy_0 = ra_at_xy_0
         self._dec_at_xy_0 = dec_at_xy_0
-        self._x_at_radec_0, self._y_at_radec_0 = util.map_coord2pix(-self._ra_at_xy_0, -self._dec_at_xy_0, 0, 0, self._Ma2pix)
+        self._x_at_radec_0, self._y_at_radec_0 \
+            = util.map_coord2pix(-self._ra_at_xy_0, -self._dec_at_xy_0, 
+                                 0, 0, self._Ma2pix)
 
     @property
     def transform_angle2pix(self):
@@ -134,8 +148,9 @@ class Coordinates(object):
             ra_shift, dec_shift = x_shift, y_shift
         self._ra_at_xy_0 += ra_shift
         self._dec_at_xy_0 += dec_shift
-        self._x_at_radec_0, self._y_at_radec_0 = util.map_coord2pix(-self._ra_at_xy_0, -self._dec_at_xy_0, 0, 0,
-                                                                    self._Ma2pix)
+        self._x_at_radec_0, self._y_at_radec_0 \
+            = util.map_coord2pix(-self._ra_at_xy_0, -self._dec_at_xy_0, 
+                                 0, 0, self._Ma2pix)
 
 
 class Coordinates1D(Coordinates):

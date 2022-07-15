@@ -1,11 +1,19 @@
+# Defines a uniform profile
+# 
+# Copyright (c) 2021, herculens developers and contributors
+
+__author__ = 'austinpeel', 'aymgal'
+
+
 import jax.numpy as jnp
+
 
 __all__ = ['Uniform']
 
 
 class Uniform(object):
     """
-    class for Gaussian light profile
+    class for uniform light profile
     """
     param_names = ['amp']
     lower_limit_default = {'amp': -100}
