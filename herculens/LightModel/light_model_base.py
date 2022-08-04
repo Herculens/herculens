@@ -10,20 +10,24 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.LightModel.Profiles import sersic, pixelated, uniform, gaussian
+from herculens.LightModel.Profiles import (sersic, pixelated, uniform, 
+                                           gaussian, shapelets)
 from herculens.Util.util import convert_bool_list
 
 __all__ = ['LightModelBase']
 
 
-SUPPORTED_MODELS = ['GAUSSIAN', 'GAUSSIAN_ELLIPSE', 'SERSIC', 'SERSIC_ELLIPSE', 'UNIFORM', 'PIXELATED']
+SUPPORTED_MODELS = [
+    'GAUSSIAN', 'GAUSSIAN_ELLIPSE', 
+    'SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC',
+    'SHAPELETS', 'UNIFORM', 'PIXELATED']
 
 
 class LightModelBase(object):
     """Base class for source and lens light models."""
     def __init__(self, light_model_list, smoothing=0.001,
                  pixel_interpol='bilinear', pixel_allow_extrapolation=False,
-                 kwargs_pixelated={}):
+                 kwargs_pixelated={}, shapelets_n_max=4):
         """Create a LightModelBase object.
 
         Parameters
@@ -58,6 +62,8 @@ class LightModelBase(object):
                 func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
                 func_list.append(pixelated.Pixelated(method=pixel_interpol, allow_extrapolation=pixel_allow_extrapolation))
+            elif profile_type == 'SHAPELETS':
+                func_list.append(shapelets.Shapelets(shapelets_n_max))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
                            f"Supported types are: {SUPPORTED_MODELS}")
@@ -135,23 +141,27 @@ class LightModelBase(object):
     def pixelated_index(self):
         # TODO: what if there are more than one PIXELATED profiles?
         if not hasattr(self, '_pix_idx'):
-            try:
+            self._pix_idx = None
+            if self.has_pixels:
                 self._pix_idx = self.profile_type_list.index('PIXELATED')
-            except ValueError:
-                self._pix_idx = None
         return self._pix_idx
 
     @property
     def pixelated_coordinates(self):
-        idx = self.pixelated_index
-        if idx is None:
+        if not self.has_pixels:
             return None, None
-        return self.func_list[idx].x_coords, self.func_list[idx].y_coords
+        return (self.func_list[self.pixelated_index].x_coords, 
+                self.func_list[self.pixelated_index].y_coords)
 
     @property
     def pixelated_shape(self):
-        x_coords, y_coords = self.pixelated_coordinates
-        if x_coords is None:
+        if not self.has_pixels:
             return None
-        else:
-            return (len(y_coords), len(x_coords))
+        x_coords, y_coords = self.pixelated_coordinates
+        return (len(y_coords), len(x_coords))
+
+    @property
+    def num_amplitudes_list(self):
+        return [func.num_amplitudes for func in self.func_list]
+
+

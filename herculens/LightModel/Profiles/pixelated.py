@@ -32,6 +32,12 @@ class Pixelated(object):
         self.x_coords, self.y_coords = None, None
         self._extrapol_bool = allow_extrapolation
 
+    @property
+    def num_amplitudes(self):
+        if self.x_coords is None:
+            raise ValueError("No coordinates axes have been set for pixelated profile.")
+        return self.x_coords.size
+
     def function(self, x, y, pixels):
         """Interpolated evaluation of a pixelated light profile.
 

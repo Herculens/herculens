@@ -14,7 +14,7 @@ from herculens.MassModel.Profiles import pixelated as pixelated_lens
 from herculens.MassModel.Profiles import (epl, sie, sis, nie, shear, point_mass, 
                                           gaussian_potential, multipole)
 from herculens.LightModel.Profiles import pixelated as pixelated_light
-from herculens.LightModel.Profiles import gaussian, sersic, uniform
+from herculens.LightModel.Profiles import gaussian, sersic, uniform, shapelets
 from herculens.MassModel.mass_model_base import SUPPORTED_MODELS as MASS_MODELS
 from herculens.LightModel.light_model_base import SUPPORTED_MODELS as LIGHT_MODELS
 
@@ -50,7 +50,7 @@ class Parameters(object):
             (lens_light_index2, lens_index2), [param3, param4, ...]
         ],
         ...
-    ]'lens_with_lens_light' : [(lens_light_index, lens_index), [param1, param2, ...]]
+    ]
     """
 
     _unif_prior_penalty = 1e10
@@ -282,6 +282,8 @@ class Parameters(object):
                 profile_class = uniform.Uniform
             elif model == 'PIXELATED':
                 profile_class = pixelated_light.Pixelated
+            elif model == 'SHAPELETS':
+                profile_class = shapelets.Shapelets
         elif kwargs_key == 'kwargs_lens':
             if model not in MASS_MODELS:
                 raise ValueError("'{model}' is not supported.")
@@ -367,6 +369,14 @@ class Parameters(object):
                             n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                         num_param = int(n_pix_x * n_pix_y)
                         kwargs['pixels'] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
+                    elif model == 'SHAPELETS' and name == 'amps':
+                        if kwargs_key == 'kwargs_source':
+                            num_param = self._image.SourceModel.num_amplitudes_list[k]
+                        elif kwargs_key == 'kwargs_lens_light':
+                            num_param = self._image.LensLightModel.num_amplitudes_list[k]
+                        else:
+                            raise ValueError("Basis functions can only be in the source or lens light.")
+                        kwargs['amps'] = args[i:i + num_param]
                     else:
                         num_param = 1
                         kwargs[name] = args[i]
@@ -397,6 +407,17 @@ class Parameters(object):
                         elif pixels.shape != (n_pix_x, n_pix_y):
                             raise ValueError("Pixelated array is inconsistent with pixelated grid.")
                         args += pixels.flatten().tolist()
+                    elif model == 'SHAPELETS' and name == 'amps':
+                        amps = kwargs_profile['amps']
+                        if kwargs_key == 'kwargs_source':
+                            num_param = self._image.SourceModel.num_amplitudes_list[k]
+                        elif kwargs_key == 'kwargs_lens_light':
+                            num_param = self._image.LensLightModel.num_amplitudes_list[k]
+                        else:
+                            raise ValueError("Basis functions can only be in the source or lens light.")
+                        if len(amps) != num_param:
+                            raise ValueError("Number of functions' amplitudes is not the on expected.")
+                        args += amps
                     else:
                         args.append(kwargs_profile[name])
         return args
@@ -422,6 +443,11 @@ class Parameters(object):
                         elif kwargs_key == 'kwargs_lens_light':
                             n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                         num_param = int(n_pix_x * n_pix_y)
+                    elif model == 'SHAPELETS' and name == 'amps':
+                        if kwargs_key == 'kwargs_source':
+                            num_param = self._image.SourceModel.num_amplitudes_list[k]
+                        elif kwargs_key == 'kwargs_lens_light':
+                            num_param = self._image.LensLightModel.num_amplitudes_list[k]
                     else:
                         num_param = 1
                     
@@ -447,7 +473,7 @@ class Parameters(object):
                             widths.append(np.nan)
 
                     elif prior_type == 'gaussian':
-                        if model == 'PIXELATED':
+                        if model in ['PIXELATED', 'SHAPELETS']:
                             raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
                         else:
                             types.append(prior_type)
@@ -488,15 +514,21 @@ class Parameters(object):
                         if kwargs_key == 'kwargs_lens':
                             n_pix_x, n_pix_y = self._image.MassModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
-                            names_k = [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
+                            names_k = [f"psi_{i}" for i in range(num_param)]  # 'psi' for deflector
                         elif kwargs_key == 'kwargs_source':
                             n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
                             names_k = [f"s_{i}" for i in range(num_param)]  # 's' for source
-                        elif kwargs_key == 'kwargs_lens':
+                        elif kwargs_key == 'kwargs_lens_light':
                             n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
-                            names_k = [f"dpsi_{i}" for i in range(num_param)]  # 'dpsi' for potential corrections
+                            names_k = [f"l_{i}" for i in range(num_param)]  # 'l' for potential
+                    elif model == 'SHAPELETS' and name == 'amps':
+                        if kwargs_key == 'kwargs_source':
+                            num_param = self._image.SourceModel.num_amplitudes_list[k]
+                        elif kwargs_key == 'kwargs_lens':
+                            num_param = self._image.LensLightModel.num_amplitudes_list[k]
+                        names_k = [f"amp_{i}" for i in range(num_param)]
                     else:
                         names_k = [name]
                     names += [f"{n}-{short_id}-{k}" for n in names_k]  # assign a 
@@ -508,14 +540,12 @@ class Parameters(object):
         name, model_type, profile_idx = name_raw.split('-')   # encapsulate this line in a well-named method
 
         # pixelated models
-        if name[:2] == 'd_':  
-            latex = r"$d_{" + r"{}".format(int(name[2:])) + r"}$"
-        elif name[:2] == 's_':  
+        if name[:2] == 's_':  
             latex = r"$s_{" + r"{}".format(int(name[2:])) + r"}$"
-        elif name[:5] == 'dpsi_':  
-            latex = r"$\delta\psi_{" + r"{}".format(int(name[5:])) + r"}$"
-        elif name == 'pixels':
-            latex = r"{\rm pixels}"
+        if name[:2] == 'l_':  
+            latex = r"$l_{" + r"{}".format(int(name[2:])) + r"}$"
+        elif name[:4] == 'psi_':  
+            latex = r"$\psi_{" + r"{}".format(int(name[4:])) + r"}$"
 
         # analytical models
         elif name == 'theta_E':
@@ -554,8 +584,6 @@ class Parameters(object):
             latex = r"$a_m$"
         elif name == 'phi_m':
             latex = r"$\phi_m$"
-        elif name == 'psi':
-            latex = r"\psi"
         else:
             raise ValueError("latex symbol for variable '{}' is unknown".format(name))
         return latex
