@@ -9,7 +9,7 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 import numpy as np
 import jax.numpy as jnp
-from jax.scipy import signal
+import jax.scipy as jsp
 from herculens.Util.jax_util import GaussianFilter
 from herculens.Util import util, kernel_util, image_util
 
@@ -25,10 +25,8 @@ class PixelKernelConvolution(object):
         """
 
         :param kernel: 2d array, convolution kernel
-        :param convolution_type: string, 'fft', 'grid', 'fft_static' mode of 2d convolution
         """
         self._kernel = kernel
-        self._type = convolution_type
 
     def pixel_kernel(self, num_pix=None):
         """
@@ -47,7 +45,7 @@ class PixelKernelConvolution(object):
         :param image: 2d array (image) to be convolved
         :return: fft convolution
         """
-        image_conv = signal.convolve2d(image, self._kernel, mode='same')
+        image_conv = jsp.signal.convolve2d(image, self._kernel, mode='same')
         return image_conv
 
     def re_size_convolve(self, image_low_res, image_high_res=None):
@@ -63,7 +61,7 @@ class SubgridKernelConvolution(object):
     """
     class to compute the convolution on a supersampled grid with partial convolution computed on the regular grid
     """
-    def __init__(self, kernel_supersampled, supersampling_factor, supersampling_kernel_size=None, convolution_type='fft_static'):
+    def __init__(self, kernel_supersampled, supersampling_factor, supersampling_kernel_size=None):
         """
 
         :param kernel_supersampled: kernel in supersampled pixels
@@ -81,8 +79,8 @@ class SubgridKernelConvolution(object):
             kernel_low_res, kernel_high_res = kernel_util.split_kernel(kernel_supersampled, supersampling_kernel_size,
                                                                        self._supersampling_factor)
             self._low_res_convolution = True
-        self._low_res_conv = PixelKernelConvolution(kernel_low_res, convolution_type=convolution_type)
-        self._high_res_conv = PixelKernelConvolution(kernel_high_res, convolution_type=convolution_type)
+        self._low_res_conv = PixelKernelConvolution(kernel_low_res)
+        self._high_res_conv = PixelKernelConvolution(kernel_high_res)
 
     def convolution2d(self, image):
         """

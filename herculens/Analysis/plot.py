@@ -423,6 +423,12 @@ class Plotter(object):
         return fig
 
 
+    def imshow_flux(ax, image, colorbar=True):
+        im = ax.imshow(psf_kernel_orig, cmap=plotter.cmap_flux, norm=plotter.norm_flux)
+        if colorbar is True:
+            plot_util.nice_colorbar(im)
+
+
     def _get_norm_for_model(self, model, lock_colorbars):
         if lock_colorbars is True and self.norm_flux is None:
             if self.flux_log_scale is True:
