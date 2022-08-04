@@ -22,7 +22,7 @@ Currently, `herculens` supports several of the most widely-used analytical profi
 
 ## `JAX`-based automatic differentiation and code compilation 
 
-`herculens` is based on the powerful framework of **differentiable programming**. The code is entirely based on the automatic differentiation and compilation features of [`JAX`](https://github.com/google/jax). This simply means that you have access, _analytically_, to all partial derivatives of your model with respect to any of its parameters. This enables faster convergence to the solution, more efficient exploration of the parameter space including the sampling of posterior distributions, and new ways to mitigate degeneracies that affect gravitational lensing.
+`herculens` is based on the powerful framework of **differentiable programming**. The code is entirely based on the automatic differentiation and compilation features of [JAX](https://jax.readthedocs.io/en/latest/#). This simply means that you have access, _analytically_, to all partial derivatives of your model with respect to any of its parameters. This enables faster convergence to the solution, more efficient exploration of the parameter space including the sampling of posterior distributions, and new ways to mitigate degeneracies that affect gravitational lensing.
 
 This highly modular framework offers a way to merge all modeling paradigms explored in the literature, into a single tool:
 
@@ -69,23 +69,24 @@ The following dependencies will be installed automatically.
 
 ### External package requirements
 
-We tested `herculens` with the versions mentioned in parenthesis. It does not mean that it breaks for newer versions though.
+`herculens` has been tested with the versions mentioned in parenthesis. It could still work well with newer versions though.
 
 #### Necessary
-- `jax` (0.2.13)
+- [`jax`](https://github.com/google/jax) (0.2.13)
 - `jaxlib` (0.1.67)
 - `numpy` (1.20.3)
 - `scipy` (1.6.3)
 
 #### Optional
-- `optax` (0.0.9), for advanced gradient descent algorithms 
-- `numpyro` (0.7.1), for HMC sampling
-- `blackjax` (0.7.1), for `jax`-based HMC sampling integrated with 
-- `dynesty` (1.1), for nested sampling
-- `jaxns` (1.1), for `jax`-based nested sampling
-- `emcee` (3.0.2), for Ensemble MCMC sampling
-- `lenstronomy` (1.9.3), for particle swarm optimization
-- `palettable` (3.3.0), for nicer colormaps for plots
+- [`optax`](https://github.com/deepmind/optax) (0.0.9), for advanced gradient descent algorithms 
+- [`numpyro`](https://github.com/pyro-ppl/numpyro) (0.7.1), for HMC sampling
+- [`blackjax`](https://github.com/blackjax-devs/blackjax) (0.7.1), for `jax`-based HMC sampling integrated with 
+- [`dynesty`](https://github.com/joshspeagle/dynesty) (1.1), for nested sampling
+- [`jaxns`](https://github.com/Joshuaalbert/jaxns) (1.1), for `jax`-based nested sampling
+- [`emcee`](https://github.com/dfm/emcee) (3.0.2), for Ensemble MCMC sampling
+- [`gigalens`](https://github.com/giga-lens/gigalens) (0.1.8), for a `jax` implementation of Shapelets
+- [`lenstronomy`](https://github.com/sibirrer/lenstronomy) (1.9.3), for interpolated Shapelets (via `gigalens`) and particle swarm optimization
+- [`palettable`](https://github.com/jiffyclub/palettable) (3.3.0), for nicer colormaps for plots
 
 To run the notebooks, `jupyter` and `matplotlib` are also necessary.
 
