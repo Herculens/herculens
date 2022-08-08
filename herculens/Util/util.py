@@ -152,6 +152,27 @@ def grid_from_coordinate_transform(nx, ny, Mpix2coord, ra_at_xy_0, dec_at_xy_0):
     dec_grid = x_grid * Mpix2coord[1, 0] + y_grid * Mpix2coord[1, 1] + dec_at_xy_0
     return ra_grid, dec_grid
 
+def subgrid_from_coordinate_transform(nx, ny, Mpix2coord, ra_at_xy_0, dec_at_xy_0, subgrid_res=2):
+    """
+    return a grid in x and y coordinates that satisfy the coordinate system
+
+
+    :param nx: number of pixels in x-axis
+    :param ny: number of pixels in y-axis
+    :param Mpix2coord: transformation matrix (2x2) of pixels into coordinate displacements
+    :param ra_at_xy_0: RA coordinate at (x,y) = (0,0)
+    :param dec_at_xy_0: DEC coordinate at (x,y) = (0,0)
+    :return: RA coordinate grid, DEC coordinate grid
+    """
+    nx_sub, ny_sub = int(nx * subgrid_res), int(ny * subgrid_res)
+    # delta_pix = np.sqrt(np.abs(np.linalg.det(Mpix2coord)))
+    # delta_pix_sub = delta_pix / subgrid_res_
+    Mcoord2pix = np.linalg.inv(Mpix2coord)
+    x_at_radec_0, y_at_radec_0 = map_coord2pix(-ra_at_xy_0, -dec_at_xy_0, x_0=0, y_0=0, M=Mcoord2pix)
+    Mpix2coord_sub = Mpix2coord / float(subgrid_res)
+    ra_at_xy_0_sub, dec_at_xy_0_sub = map_coord2pix(x_at_radec_0, y_at_radec_0, x_0=0, y_0=0, M=Mpix2coord_sub)
+    return grid_from_coordinate_transform(nx_sub, ny_sub, Mpix2coord_sub, -ra_at_xy_0_sub, -dec_at_xy_0_sub)
+
 def averaging(grid, numGrid, numPix):
     """
     resize 2d pixel grid with numGrid to numPix and averages over the pixels

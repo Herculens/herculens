@@ -53,8 +53,6 @@ class Numerics(object):
                 kernel_super = psf.kernel_point_source_supersampled(supersampling_factor, 
                                                                     iterative_supersampling=iterative_kernel_supersampling)
                 if convolution_kernel_size is not None:
-                    kernel_super = psf.kernel_point_source_supersampled(supersampling_factor,
-                                                                        iterative_supersampling=iterative_kernel_supersampling)
                     kernel_super = self._supersampling_cut_kernel(kernel_super, convolution_kernel_size,
                                                                   supersampling_factor)
                 self._conv = SubgridKernelConvolution(kernel_super, supersampling_factor,

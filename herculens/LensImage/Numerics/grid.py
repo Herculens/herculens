@@ -39,7 +39,9 @@ class RegularGrid(Coordinates1D):
         self._nx = nx
         self._ny = ny
         self._x_grid, self._y_grid = self.coordinate_grid(nx, ny)
-        x_grid_sub, y_grid_sub = util.make_subgrid(self._x_grid, self._y_grid, self._supersampling_factor)
+        x_grid_sub, y_grid_sub = util.subgrid_from_coordinate_transform(self._nx, self._nx,
+                                                                   transform_pix2angle, ra_at_xy_0, dec_at_xy_0,
+                                                                   subgrid_res=self._supersampling_factor)
         self._ra_subgrid = x_grid_sub
         self._dec_subgrid = y_grid_sub
 
@@ -99,9 +101,5 @@ class RegularGrid(Coordinates1D):
         :param ny: y-axis of 2d grid
         :return:
         """
-        # TODO: Find a better way than ops.index_update()
         nx, ny = self._nx * self._supersampling_factor, self._ny * self._supersampling_factor
-        grid1d = np.zeros((nx * ny))
-        indices = np.arange(nx * ny)
-        grid1d = ops.index_update(grid1d, ops.index[indices], array)
-        return util.array2image(grid1d, nx, ny)
+        return util.array2image(array, nx, ny)
