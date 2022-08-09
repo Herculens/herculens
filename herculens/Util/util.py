@@ -31,7 +31,8 @@ def map_coord2pix(ra, dec, x_0, y_0, M):
     :param M: 2x2 matrix to transform angular to pixel coordinates
     :return: transformed coordinate systems of input ra and dec
     """
-    x, y = M.dot(np.array([ra, dec]))
+    #x, y = M.dot(np.array([ra, dec]))
+    x, y = jnp.array(M).dot(jnp.array([ra, dec]))
     return x + x_0, y + y_0
 
 def array2image(array, nx=0, ny=0):
