@@ -23,6 +23,7 @@ class PixelatedPotential(object):
     def __init__(self):
         """Lensing potential on a fixed coordinate grid."""
         super(PixelatedPotential, self).__init__()
+        self.pixel_grid = None
         self.x_coords, self.y_coords = None, None
 
     def function(self, x, y, pixels):
@@ -73,8 +74,14 @@ class PixelatedPotential(object):
         psi_xy = interp(y, x, dx=1, dy=1)
         return psi_xx, psi_yy, psi_xy
 
-    def set_data_pixel_grid(self, pixel_axes):
-        self.x_coords, self.y_coords = pixel_axes
+    # def set_data_pixel_grid(self, pixel_axes):
+    #     self.x_coords, self.y_coords = pixel_axes
+
+    def set_pixel_grid(self, pixel_grid):
+        self.pixel_grid = pixel_grid
+        x_coords, y_coords = pixel_grid.pixel_axes
+        self.x_coords, self.y_coords = x_coords, y_coords
+        # self.x_coords, self.y_coords = pixel_grid.map_coord2pix(x_coords, y_coords)
 
 
 
@@ -88,6 +95,7 @@ class PixelatedPotentialDirac(object):
         """Dirac impulse in potential on a fixed coordinate grid."""
         super(PixelatedPotentialDirac, self).__init__()
         self.pp = PixelatedPotential()
+        self.pixel_grid = None
 
     def function(self, x, y, psi, center_x, center_y):
         """Interpolated evaluation of the lensing potential.
@@ -157,9 +165,15 @@ class PixelatedPotentialDirac(object):
         """
         raise NotImplementedError("Computation of Hessian terms for PixelatedPotentialDirac is not implemented.")
 
-    def set_data_pixel_grid(self, pixel_axes):
-        self.pp.set_data_pixel_grid(pixel_axes)
-        x_coords, y_coords = pixel_axes
-        # save half the grid step size in y and y directions
-        self.hss_x = np.abs(x_coords[0] - x_coords[1]) / 2.
-        self.hss_y = np.abs(y_coords[0] - y_coords[1]) / 2.
+    # def set_data_pixel_grid(self, pixel_axes):
+    #     self.pp.set_data_pixel_grid(pixel_axes)
+    #     x_coords, y_coords = pixel_axes
+    #     # save half the grid step size in y and y directions
+    #     self.hss_x = np.abs(x_coords[0] - x_coords[1]) / 2.
+    #     self.hss_y = np.abs(y_coords[0] - y_coords[1]) / 2.
+
+    def set_pixel_grid(self, pixel_grid):
+        self.pp.set_pixel_grid(pixel_grid)
+        self.hss_x = np.abs(self.pp.x_coords[0] - self.pp.x_coords[1]) / 2.
+        self.hss_y = np.abs(self.pp.y_coords[0] - self.pp.y_coords[1]) / 2.
+        self.pixel_grid = self.pp.pixel_grid

@@ -128,12 +128,12 @@ class Plotter(object):
                 if reproject_pixelated_models:
                     # we need to make sure it's jax.numpy array for source_surface_brightness when using PIXELATED source profile
                     kwargs_source[src_idx]['pixels'] = jnp.asarray(kwargs_source[src_idx]['pixels'])
-                    x_grid_src, y_grid_src = lens_image.Grid.model_pixel_coordinates('source')
+                    x_grid_src, y_grid_src = lens_image.SourceModel.pixel_grid.pixel_coordinates
                     source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
                     source_model *= lens_image.Grid.pixel_area
                 else:
                     source_model = kwargs_source[src_idx]['pixels']
-                src_extent = lens_image.Grid.model_pixel_extent('source')
+                src_extent = lens_image.SourceModel.pixel_grid.extent
             elif hasattr(self, '_ref_source') and self._ref_src_grid_name is not None:
                 x_grid_src, y_grid_src = lens_image.Grid.model_pixel_coordinates(self._ref_src_grid_name)
                 source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
@@ -154,7 +154,7 @@ class Plotter(object):
                         x_axes_ref = np.linspace(extent[0], extent[1], npix_ref)
                         y_axes_ref = np.linspace(extent[2], extent[3], npix_ref)
                     if lens_image.SourceModel.has_pixels:
-                        x_axes_src, y_axes_src = lens_image.Grid.model_pixel_axes('source')
+                        x_axes_src, y_axes_src = lens_image.SourceModel.pixel_grid.pixel_axes
                     else:
                         npix_src = len(source_model)
                         x_axes_src = np.linspace(extent[0], extent[1], npix_src)

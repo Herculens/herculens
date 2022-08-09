@@ -29,6 +29,7 @@ class Pixelated(object):
         else:
             self._interp_class = BicubicInterpolator
         self.data_pixel_area = None
+        self.pixel_grid = None
         self.x_coords, self.y_coords = None, None
         self._extrapol_bool = allow_extrapolation
 
@@ -78,6 +79,9 @@ class Pixelated(object):
         f_y = interp(y, x, dx=1) / self.data_pixel_area
         return f_x, f_y  # returned units 
     
-    def set_data_pixel_grid(self, pixel_axes, data_pixel_area):
+    def set_pixel_grid(self, pixel_grid, data_pixel_area):
         self.data_pixel_area = data_pixel_area
-        self.x_coords, self.y_coords = pixel_axes
+        x_coords, y_coords = pixel_grid.pixel_axes
+        # self.x_coords, self.y_coords = pixel_grid.map_coord2pix(x_coords, y_coords)
+        self.x_coords, self.y_coords = x_coords, y_coords
+        self.pixel_grid = pixel_grid

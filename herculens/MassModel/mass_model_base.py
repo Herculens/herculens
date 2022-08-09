@@ -31,7 +31,7 @@ class MassProfileBase(object):
             Lens model profile types.
 
         """
-        self.func_list = self._load_model_instances(lens_model_list)
+        self.func_list, self._pix_idx = self._load_model_instances(lens_model_list)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
         self._kwargs_pixelated = kwargs_pixelated
@@ -39,11 +39,13 @@ class MassProfileBase(object):
     def _load_model_instances(self, lens_model_list):
         func_list = []
         imported_classes = {}
-        for lens_type in lens_model_list:
+        pix_idx = None
+        for idx, lens_type in enumerate(lens_model_list):
             # These models require a new instance per profile as certain pre-computations
             # are relevant per individual profile
             if lens_type in ['PIXELATED', 'PIXELATED_DIRAC']:
                 mass_model_class = self._import_class(lens_type)
+                pix_idx = idx
             else:
                 if lens_type not in imported_classes.keys():
                     mass_model_class = self._import_class(lens_type)
@@ -51,7 +53,7 @@ class MassProfileBase(object):
                 else:
                     mass_model_class = imported_classes[lens_type]
             func_list.append(mass_model_class)
-        return func_list
+        return func_list, pix_idx
 
     @staticmethod
     def _import_class(lens_type):
@@ -89,40 +91,35 @@ class MassProfileBase(object):
 
     @property
     def has_pixels(self):
-        return ('PIXELATED' in self._model_list) or ('PIXELATED_DIRAC' in self._model_list)
+        return self._pix_idx is not None
 
     @property
     def pixel_grid_settings(self):
         return self._kwargs_pixelated
 
-    def set_pixel_grid(self, pixel_axes):
-        for i, func in enumerate(self.func_list):
-            if self._model_list[i] in ['PIXELATED', 'PIXELATED_DIRAC']:
-                func.set_data_pixel_grid(pixel_axes)
+    def set_pixel_grid(self, pixel_grid):
+        self.func_list[self.pixelated_index].set_pixel_grid(pixel_grid)
+
+    @property
+    def pixel_grid(self):
+        if not self.has_pixels:
+            return None
+        return self.func_list[self.pixelated_index].pixel_grid
 
     @property
     def pixelated_index(self):
-        if not hasattr(self, '_pix_idx'):
-            try:
-                self._pix_idx = self._model_list.index('PIXELATED')
-            except ValueError:
-                try:
-                    self._pix_idx = self._model_list.index('PIXELATED_DIRAC')
-                except ValueError:
-                    self._pix_idx = None
+        # TODO: support multiple pixelated profiles
         return self._pix_idx
 
     @property
     def pixelated_coordinates(self):
-        idx = self.pixelated_index
-        if idx is None:
+        if not self.has_pixels:
             return None, None
         return self.func_list[idx].x_coords, self.func_list[idx].y_coords
 
     @property
     def pixelated_shape(self):
-        x_coords, y_coords = self.pixelated_coordinates
-        if x_coords is None:
+        if not self.has_pixels:
             return None
-        else:
-            return (len(y_coords), len(x_coords))
+        x_coords, y_coords = self.pixelated_coordinates
+        return (len(y_coords), len(x_coords))

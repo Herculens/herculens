@@ -542,7 +542,7 @@ class Parameters(object):
         # pixelated models
         if name[:2] == 's_':  
             latex = r"$s_{" + r"{}".format(int(name[2:])) + r"}$"
-        if name[:2] == 'l_':  
+        elif name[:2] == 'l_':  
             latex = r"$l_{" + r"{}".format(int(name[2:])) + r"}$"
         elif name[:4] == 'psi_':  
             latex = r"$\psi_{" + r"{}".format(int(name[4:])) + r"}$"

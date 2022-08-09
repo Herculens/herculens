@@ -38,35 +38,38 @@ class LensImage(object):
         self.PSF = psf_class
         self.Noise = noise_class
         self.PSF.set_pixel_size(self.Grid.pixel_width)
-        if kwargs_numerics is None:
-            kwargs_numerics = {}
-        self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
+        
         if lens_mass_model_class is None:
             from herculens.MassModel.mass_model import MassModel
             lens_mass_model_class = MassModel(lens_model_list=[])
         self.MassModel = lens_mass_model_class
         if self.MassModel.has_pixels:
-            self.Grid.create_model_grid(**self.MassModel.pixel_grid_settings, name='lens',
-                                        overwrite=recompute_model_grids)
-            self.MassModel.set_pixel_grid(self.Grid.model_pixel_axes('lens'))
+            if self.MassModel.pixel_grid is None or recompute_model_grids:
+                pixel_grid = self.Grid.create_model_grid(**self.MassModel.pixel_grid_settings)
+                self.MassModel.set_pixel_grid(pixel_grid)
+        
         if source_model_class is None:
             from herculens.LightModel.light_model import LightModel
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
         if self.SourceModel.has_pixels:
-            self.Grid.create_model_grid(**self.SourceModel.pixel_grid_settings, name='source',
-                                        overwrite=recompute_model_grids)
-            self.SourceModel.set_pixel_grid(self.Grid.model_pixel_axes('source'), self.Grid.pixel_area)
+            if self.SourceModel.pixel_grid is None or recompute_model_grids:
+                pixel_grid = self.Grid.create_model_grid(**self.SourceModel.pixel_grid_settings)
+                self.SourceModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
+        
         if lens_light_model_class is None:
             from herculens.LightModel.light_model import LightModel
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class
         if self.LensLightModel.has_pixels:
-            self.Grid.create_model_grid(**self.LensLightModel.pixel_grid_settings, name='lens_light',
-                                        overwrite=recompute_model_grids)
-            self.LensLightModel.set_pixel_grid(self.Grid.model_pixel_axes('lens_light'), self.Grid.pixel_area)
-        self._kwargs_numerics = kwargs_numerics
+            if self.LensLightModel.pixel_grid is None or recompute_model_grids:
+                pixel_grid = self.Grid.create_model_grid(**self.LensLightModel.pixel_grid_settings)
+                self.LensLightModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
 
+        if kwargs_numerics is None:
+            kwargs_numerics = {}
+        self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
+        
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, de_lensed=False, k=None, k_lens=None):
         """
