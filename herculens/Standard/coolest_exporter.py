@@ -1,0 +1,69 @@
+# Handles coordinate systems
+# 
+# Copyright (c) 2022, herculens developers and contributors
+
+
+__author__ =  'aymgal'
+
+
+from herculens.Standard import coolest_util
+
+from lensmodelapi.io import APISerializer
+from lensmodelapi.api.coordinates import CoordinatesOrigin
+from lensmodelapi.api.lensing_entity_list import LensingEntityList
+from lensmodelapi.api.likelihood_list import LikelihoodList
+from lensmodelapi.api.regularization_list import RegularizationList
+# from lensmodelapi.api.cosmology import Cosmology
+
+
+class COOLESTexporter(object):
+    """Class that handles conversion from a Herculens model to the COOLEST file system"""
+
+    def __init__(self, template_file_name, **kwargs_serializer):
+        self._base_file_name = template_file_name
+        self._serializer = APISerializer(template_file_name, **kwargs_serializer)
+        self._load_coolest_object()
+
+    @property
+    def coolest_object(self):
+        return self._coolest
+
+    def export_model(self, parameters, loss=None):
+        coolest = self._load_coolest_object()
+        coolest = self._update_lensing_entities(coolest, parameters)
+        # coolest = self._update_loss_info(loss)
+        
+    def _load_coolest_object(self):
+        std_obj = self._serializer.json_load()
+        if std_obj.standard.upper() != 'COOLEST':
+            raise ValueError("The JSON file is not a COOLEST template file.")
+        self._coolest = std_obj
+
+    def update_from_model(self, lens_image, parameters, lensing_entity_mapping):
+        lensing_entities = self.create_lensing_entities(lens_image, parameters,
+                                                        lensing_entity_mapping)
+        self._coolest.lensing_entities = lensing_entities
+
+    @staticmethod
+    def create_lensing_entities(lens_image, parameters, lensing_entity_mapping):
+        # TODO: check if multi-plane lensing
+
+        # initialize list of lensing entities
+        entities = []
+
+        # iterate over the lensing entities (galaxies or external shears)
+        for entity_name, kwargs_mapping in lensing_entity_mapping.items():
+            entity_type = kwargs_mapping.pop('type')
+            if entity_type == 'external_shear':
+                entity = coolest_util.create_extshear_model(lens_image, entity_name, 
+                                                            **kwargs_mapping)
+            elif entity_type == 'galaxy':
+                entity = coolest_util.create_galaxy_model(lens_image, entity_name, 
+                                                          **kwargs_mapping)
+            else:
+                raise ValueError(f"Unknown lensing entity type '{entity_type}'.")
+
+            entities.append(entity)
+
+        return LensingEntityList(*entities)
+
