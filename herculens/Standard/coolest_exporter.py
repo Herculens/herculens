@@ -27,11 +27,6 @@ class COOLESTexporter(object):
     @property
     def coolest_object(self):
         return self._coolest
-
-    def export_model(self, parameters, loss=None):
-        coolest = self._load_coolest_object()
-        coolest = self._update_lensing_entities(coolest, parameters)
-        # coolest = self._update_loss_info(loss)
         
     def _load_coolest_object(self):
         std_obj = self._serializer.json_load()
@@ -40,12 +35,16 @@ class COOLESTexporter(object):
         self._coolest = std_obj
 
     def update_from_model(self, lens_image, parameters, lensing_entity_mapping):
-        lensing_entities = self.create_lensing_entities(lens_image, parameters,
-                                                        lensing_entity_mapping)
+        lensing_entities = self.create_lensing_entities(lens_image, lensing_entity_mapping)
+        lensing_entities = self.update_parameters(lensing_entities, parameters, lensing_entity_mapping)
         self._coolest.lensing_entities = lensing_entities
 
+    def update_from_loss(self, loss):
+        # TODO: update LikelihoodList and RegularizationList from Herculens' loss
+        raise NotImplementedError("update_from_loss() not yet implemented.")
+
     @staticmethod
-    def create_lensing_entities(lens_image, parameters, lensing_entity_mapping):
+    def create_lensing_entities(lens_image, lensing_entity_mapping):
         # TODO: check if multi-plane lensing
 
         # initialize list of lensing entities
