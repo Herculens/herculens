@@ -417,7 +417,7 @@ class Parameters(object):
                             raise ValueError("Basis functions can only be in the source or lens light.")
                         if len(amps) != num_param:
                             raise ValueError("Number of functions' amplitudes is not the on expected.")
-                        args += amps
+                        args += np.asarray(amps).flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
         return args

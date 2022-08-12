@@ -112,6 +112,10 @@ class Sersic(SersicUtil):
         f_y = alpha * y_ / r
         return f_x, f_y
 
+    @property
+    def num_amplitudes(self):
+        return 1
+
 
 class SersicElliptic(SersicUtil):
     """
@@ -173,3 +177,7 @@ class SersicElliptic(SersicUtil):
         
         f_x, f_y = jnp.vectorize(_grad_function)(x, y)
         return f_x, f_y
+
+    @property
+    def num_amplitudes(self):
+        return 1
