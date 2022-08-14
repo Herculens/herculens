@@ -9,7 +9,7 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 from herculens.MassModel.Profiles import (gaussian_potential, point_mass, multipole,
                                            shear, sie, sis, nie, epl, pixelated)
-from herculens.Util.util import convert_bool_list
+from herculens.Util import util
 
 __all__ = ['MassModelBase']
 
@@ -25,7 +25,7 @@ SUPPORTED_MODELS = [
 
 class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, kwargs_pixelated={}):
+    def __init__(self, lens_model_list, kwargs_pixelated=None):
         """Create a MassProfileBase object.
 
         Parameters
@@ -37,6 +37,8 @@ class MassModelBase(object):
         self.func_list, self._pix_idx = self._load_model_instances(lens_model_list)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
+        if kwargs_pixelated is None:
+            kwargs_pixelated = {}
         self._kwargs_pixelated = kwargs_pixelated
 
     def _load_model_instances(self, lens_model_list):
@@ -88,9 +90,8 @@ class MassModelBase(object):
                        f"Supported types are {SUPPORTED_MODELS}")
             raise ValueError(err_msg)
 
-    def _bool_list(self, k=None):
-        """See `Util.util.convert_bool_list`."""
-        return convert_bool_list(n=self._num_func, k=k)
+    def _bool_list(self, k):
+        return util.convert_bool_list(n=self._num_func, k=k)
 
     @property
     def has_pixels(self):

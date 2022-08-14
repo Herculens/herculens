@@ -7,7 +7,9 @@ __author__ = 'austinpeel', 'aymgal'
 
 import numpy as np
 import jax.numpy as jnp
+
 from herculens.Util.jax_util import BilinearInterpolator, BicubicInterpolator
+from herculens.Util import util
 
 
 __all__= ['Pixelated']
@@ -28,16 +30,20 @@ class Pixelated(object):
             self._interp_class = BilinearInterpolator
         else:
             self._interp_class = BicubicInterpolator
-        self.data_pixel_area = None
-        self.pixel_grid = None
-        self.x_coords, self.y_coords = None, None
+        self._data_pixel_area = None
+        self._pixel_grid = None
+        self._x_coords, self._y_coords = None, None
         self._extrapol_bool = allow_extrapolation
 
     @property
     def num_amplitudes(self):
-        if self.x_coords is None:
+        if self._x_coords is None:
             raise ValueError("No coordinates axes have been set for pixelated profile.")
-        return self.x_coords.size
+        return self._x_coords.size
+
+    @property
+    def pixel_grid(self):
+        return self._pixel_grid
 
     def function(self, x, y, pixels):
         """Interpolated evaluation of a pixelated light profile.
@@ -56,11 +62,14 @@ class Pixelated(object):
             Interpolation method, either 'bilinear' or 'bicubic'.
 
         """
-        # Warning: assuming same pixel size across all the image!
-        interp = self._interp_class(self.y_coords, self.x_coords, pixels,
+        # ensure the coordinates are cartesian by converting angular to pixel units
+        x_, y_ = self.pixel_grid.map_coord2pix(x, y)
+        # setup interpolation, assuming cartesian grid
+        interp = self._interp_class(self._y_coords, self._x_coords, pixels,
                                     allow_extrapolation=self._extrapol_bool)
-        # we normalize the interpolated array for correct units when evaluated by LensImage methods
-        f = interp(y, x) / self.data_pixel_area
+        # evaluate the interpolator
+        # and normalize for correct units when evaluated by LensImage methods
+        f = interp(y_, x_) / self._data_pixel_area
         return f
 
     def derivatives(self, x, y, pixels):
@@ -74,14 +83,22 @@ class Pixelated(object):
             Values of the surface brightness at fixed coordinate grid positions (surf. bright. units / arcsec)
 
         """
-        interp = self._interp_class(self.y_coords, self.x_coords, pixels)
-        f_x = interp(y, x, dy=1) / self.data_pixel_area
-        f_y = interp(y, x, dx=1) / self.data_pixel_area
+        # ensure the coordinates are cartesian by converting angular to pixel units
+        x_, y_ = self.pixel_grid.map_coord2pix(x, y)
+        # setup interpolation, assuming cartesian grid
+        interp = self._interp_class(self._y_coords, self._x_coords, pixels)
+        # evaluate the interpolator
+        f_x = interp(y, x, dy=1) / self._data_pixel_area
+        f_y = interp(y, x, dx=1) / self._data_pixel_area
         return f_x, f_y  # returned units 
     
     def set_pixel_grid(self, pixel_grid, data_pixel_area):
-        self.data_pixel_area = data_pixel_area
-        x_coords, y_coords = pixel_grid.pixel_axes
-        # self.x_coords, self.y_coords = pixel_grid.map_coord2pix(x_coords, y_coords)
-        self.x_coords, self.y_coords = x_coords, y_coords
-        self.pixel_grid = pixel_grid
+        self._data_pixel_area = data_pixel_area
+        self._pixel_grid = pixel_grid
+        # ensure the coordinates are cartesian by converting angular to pixel units
+        x_grid, y_grid = self.pixel_grid.pixel_coordinates
+        x_grid, y_grid = self.pixel_grid.map_coord2pix(util.image2array(x_grid), 
+                                                       util.image2array(y_grid))
+        self._x_coords = util.array2image(x_grid)[0, :]
+        self._y_coords = util.array2image(y_grid)[:, 0]
+        

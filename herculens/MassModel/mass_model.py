@@ -18,7 +18,7 @@ __all__ = ['MassModel']
 
 class MassModel(MassModelBase):
     """An arbitrary list of lens models."""
-    def __init__(self, mass_model_list, kwargs_pixelated={}):
+    def __init__(self, mass_model_list, kwargs_pixelated=None):
         """Create a MassModel object.
 
         Parameters
@@ -26,13 +26,6 @@ class MassModel(MassModelBase):
         mass_model_list : list of str
             Lens model profile names.
         kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
-
-        Notes
-        -----
-        The original MassModel class in lenstronomy has many more inputs and
-        supports much more functionality. It has been reduced here to the bare
-        minimum in order to test JAX autodiff through a lensing pipeline.
-
         """
         self.profile_type_list = mass_model_list
         super().__init__(self.profile_type_list, kwargs_pixelated=kwargs_pixelated)

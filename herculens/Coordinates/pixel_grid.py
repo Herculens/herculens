@@ -188,9 +188,6 @@ class PixelGrid(Coordinates):
 
         # in case it's the same region as the base coordinate grid
         if unchanged_count == 3:
-            x_grid = np.copy(self._x_grid)
-            y_grid = np.copy(self._y_grid)
-            self._model_grids[name] = (x_grid, y_grid)
             return copy.deepcopy(self)
 
         pixel_width = self.pixel_width * float(pixel_scale_factor_)
