@@ -6,7 +6,10 @@ __author__ = 'austinpeel', 'aymgal'
 
 
 import numpy as np
+import jax
 import jax.numpy as jnp
+from jax import jit, grad, jacfwd, jacrev, jvp, vmap
+# from functools import partial
 
 from herculens.Util.jax_util import BicubicInterpolator
 from herculens.Util import util
@@ -21,9 +24,13 @@ class PixelatedPotential(object):
     upper_limit_default = {'pixels': 1e10}
     fixed_default = {key: False for key in param_names}
 
-    def __init__(self):
+    def __init__(self, derivative_mode='autodiff'):
         """Lensing potential on a fixed coordinate grid."""
+        if derivative_mode not in ['interpol', 'autodiff']:
+            raise ValueError(f"Unknown derivatives mode '{derivative_mode}' "
+                             "(supported: 'interpol', 'autodiff').")
         super(PixelatedPotential, self).__init__()
+        self._deriv_mode = derivative_mode
         self._pixel_grid = None
         self._x_coords, self._y_coords = None, None
 
@@ -43,13 +50,21 @@ class PixelatedPotential(object):
 
         """
         # ensure the coordinates are cartesian by converting angular to pixel units
-        x_, y_ = self.pixel_grid.map_coord2pix(x, y)
+        x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
+        x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
         # Due to matching scipy's interpolation, we need to switch x and y
         # coordinates as well as transpose
         interp = BicubicInterpolator(self._y_coords, self._x_coords, pixels)
-        return interp(y_, x_)
+        f = interp(y_, x_)
+        return f
 
     def derivatives(self, x, y, pixels):
+        if self._deriv_mode == 'interpol':
+            return self.derivatives_interpol(x, y, pixels)
+        elif self._deriv_mode == 'autodiff':
+            return self.derivatives_autodiff(x, y, pixels)
+
+    def derivatives_interpol(self, x, y, pixels):
         """Spatial first derivatives of the lensing potential.
 
         Parameters
@@ -61,11 +76,31 @@ class PixelatedPotential(object):
 
         """
         # ensure the coordinates are cartesian by converting angular to pixel units
-        x_, y_ = self.pixel_grid.map_coord2pix(x, y)
+        x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
+        x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
         interp = BicubicInterpolator(self._y_coords, self._x_coords, pixels)
-        return interp(y_, x_, dy=1), interp(y_, x_, dx=1)
+        f_x = interp(y_, x_, dy=1)
+        f_y = interp(y_, x_, dx=1)
+        return f_x, f_y
+
+    def derivatives_autodiff(self, x, y, pixels):
+        def function(params):
+            res = self.function(params[0], params[1], pixels)[0]
+            return res
+        grad_func = grad(function)
+        param_array = jnp.array([x.flatten(), y.flatten()]).T
+        res = vmap(grad_func)(param_array)
+        f_x = res[:, 0].reshape(*x.shape)
+        f_y = res[:, 1].reshape(*x.shape)
+        return f_x, f_y
 
     def hessian(self, x, y, pixels):
+        if self._deriv_mode == 'interpol':
+            return self.hessian_interpol(x, y, pixels)
+        elif self._deriv_mode == 'autodiff':
+            return self.hessian_autodiff(x, y, pixels)
+
+    def hessian_interpol(self, x, y, pixels):
         """Spatial second derivatives of the lensing potential.
 
         Parameters
@@ -77,22 +112,36 @@ class PixelatedPotential(object):
 
         """
         # ensure the coordinates are cartesian by converting angular to pixel units
-        x_, y_ = self.pixel_grid.map_coord2pix(x, y)
+        x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
+        x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
         interp = BicubicInterpolator(self._y_coords, self._x_coords, pixels)
         # TODO Why doesn't this follow the pattern of the first derivatives ?
-        psi_xx = interp(y_, x_, dx=2)
-        psi_yy = interp(y_, x_, dy=2)
-        psi_xy = interp(y_, x_, dx=1, dy=1)
-        return psi_xx, psi_yy, psi_xy
+        f_xx = interp(y_, x_, dx=2)
+        f_yy = interp(y_, x_, dy=2)
+        f_xy = interp(y_, x_, dx=1, dy=1)
+        return f_xx, f_yy, f_xy
+
+    def hessian_autodiff(self, x, y, pixels):
+        def function(params):
+            res = self.function(params[0], params[1], pixels)[0]
+            return res
+        hessian_func = jacfwd(jacrev(function))
+        param_array = jnp.array([x.flatten(), y.flatten()]).T
+        res = vmap(hessian_func)(param_array)
+        f_xx = res[:, 0, 0].reshape(*x.shape)
+        f_xy = res[:, 0, 1].reshape(*x.shape)
+        # f_yx = res[:, 1, 0].reshape(*x.shape)
+        f_yy = res[:, 1, 1].reshape(*x.shape)
+        return f_xx, f_yy, f_xy
 
     def set_pixel_grid(self, pixel_grid):
         self._pixel_grid = pixel_grid
         # ensure the coordinates are cartesian by converting angular to pixel units
         x_grid, y_grid = self.pixel_grid.pixel_coordinates
-        x_grid, y_grid = self.pixel_grid.map_coord2pix(util.image2array(x_grid), 
-                                                       util.image2array(y_grid))
-        self._x_coords = util.array2image(x_grid)[0, :]
-        self._y_coords = util.array2image(y_grid)[:, 0]
+        x_grid, y_grid = self.pixel_grid.map_coord2pix(util.image2array(x_grid), util.image2array(y_grid))
+        x_grid, y_grid = util.array2image(x_grid), util.array2image(y_grid)
+        self._x_coords = x_grid[0, :]
+        self._y_coords = y_grid[:, 0]
 
 
 

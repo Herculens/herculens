@@ -18,7 +18,7 @@ __all__ = ['MassModel']
 
 class MassModel(MassModelBase):
     """An arbitrary list of lens models."""
-    def __init__(self, mass_model_list, kwargs_pixelated=None):
+    def __init__(self, mass_model_list, kwargs_pixelated=None, pixel_derivative_mode='autodiff'):
         """Create a MassModel object.
 
         Parameters
@@ -28,7 +28,8 @@ class MassModel(MassModelBase):
         kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
         """
         self.profile_type_list = mass_model_list
-        super().__init__(self.profile_type_list, kwargs_pixelated=kwargs_pixelated)
+        super().__init__(self.profile_type_list, kwargs_pixelated=kwargs_pixelated,
+                         pixel_derivative_mode=pixel_derivative_mode)
 
     def ray_shooting(self, x, y, kwargs, k=None):
         """
