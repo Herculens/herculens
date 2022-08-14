@@ -7,12 +7,13 @@ __author__ = 'aymgal'
 
 
 import numpy as np
+import warnings
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
-def plot_minimize_history(parameters, opt_extra_fields, max_params=6):
+def plot_minimize_history(parameters, opt_extra_fields, max_num_params=6):
     # tood: implement support for multi-start optimization
     fig, axes = plt.subplots(1, 2, figsize=(10, 6))
     ax = axes[0]
@@ -20,14 +21,18 @@ def plot_minimize_history(parameters, opt_extra_fields, max_params=6):
     ax.set_ylabel("Loss")
     ax.set_xlabel("Iteration")
     ax = axes[1]
-    param_history = np.array(opt_extra_fields['param_history'])
-    for i in range(min(len(parameters.names), max_params)):
-        ax.plot(range(len(opt_extra_fields['loss_history'])), 
-                (param_history[:, i] - param_history[-1, i]) / param_history[-1, i], 
-                label=parameters.symbols[i])
-    ax.set_ylabel("Parameter trace")
-    ax.set_xlabel("Iteration")
-    ax.legend(loc='upper right')
+    if 'param_history' in opt_extra_fields:
+        param_history = np.array(opt_extra_fields['param_history'])
+        for i in range(min(len(parameters.names), max_num_params)):
+            ax.plot(range(len(opt_extra_fields['loss_history'])), 
+                    (param_history[:, i] - param_history[-1, i]) / param_history[-1, i], 
+                    label=parameters.symbols[i])
+        ax.set_ylabel("Parameter trace")
+        ax.set_xlabel("Iteration")
+        ax.legend(loc='upper right')
+    else:
+        import warnings.warn("No `'param_history'` found in the extra fields (use `return_param_history=True` in Optimizer).")
+        ax.axis('off')
     fig.tight_layout()
     plt.show()
 
