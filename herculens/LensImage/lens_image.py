@@ -41,7 +41,7 @@ class LensImage(object):
         
         if lens_mass_model_class is None:
             from herculens.MassModel.mass_model import MassModel
-            lens_mass_model_class = MassModel(lens_model_list=[])
+            lens_mass_model_class = MassModel(mass_model_list=[])
         self.MassModel = lens_mass_model_class
         if self.MassModel.has_pixels:
             if self.MassModel.pixel_grid is None or recompute_model_grids:

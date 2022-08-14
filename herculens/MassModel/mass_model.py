@@ -10,13 +10,13 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.MassModel.mass_model_base import MassProfileBase
+from herculens.MassModel.mass_model_base import MassModelBase
 
 
 __all__ = ['MassModel']
 
 
-class MassModel(MassProfileBase):
+class MassModel(MassModelBase):
     """An arbitrary list of lens models."""
     def __init__(self, mass_model_list, kwargs_pixelated={}):
         """Create a MassModel object.

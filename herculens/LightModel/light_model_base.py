@@ -160,14 +160,14 @@ class LightModelBase(object):
     def pixelated_coordinates(self):
         if not self.has_pixels:
             return None, None
-        return self.func_list[self.pixelated_index].pixel_grid.pixel_coordinates
+        return self.pixel_grid.pixel_coordinates
 
     @property
     def pixelated_shape(self):
         if not self.has_pixels:
             return None
-        x_coords, y_coords = self.pixelated_coordinates
-        return (len(y_coords), len(x_coords))
+        x_coords, _ = self.pixelated_coordinates
+        return x_coords.shape
 
     @property
     def num_amplitudes_list(self):

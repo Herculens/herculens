@@ -11,7 +11,7 @@ from herculens.MassModel.Profiles import (gaussian_potential, point_mass, multip
                                            shear, sie, sis, nie, epl, pixelated)
 from herculens.Util.util import convert_bool_list
 
-__all__ = ['MassProfileBase']
+__all__ = ['MassModelBase']
 
 SUPPORTED_MODELS = [
     'EPL', 'NIE', 'SIE', 'SIS', 'GAUSSIAN', 'POINT_MASS', 
@@ -20,7 +20,10 @@ SUPPORTED_MODELS = [
 ]
 
 
-class MassProfileBase(object):
+# TODO: create parent for methods shared between MassProfileBase and LightProfileBase
+
+
+class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
     def __init__(self, lens_model_list, kwargs_pixelated={}):
         """Create a MassProfileBase object.
@@ -115,11 +118,11 @@ class MassProfileBase(object):
     def pixelated_coordinates(self):
         if not self.has_pixels:
             return None, None
-        return self.func_list[idx].x_coords, self.func_list[idx].y_coords
+        return self.pixel_grid.pixel_coordinates
 
     @property
     def pixelated_shape(self):
         if not self.has_pixels:
             return None
-        x_coords, y_coords = self.pixelated_coordinates
-        return (len(y_coords), len(x_coords))
+        x_coords, _ = self.pixelated_coordinates
+        return x_coords.shape
