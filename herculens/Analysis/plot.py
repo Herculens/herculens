@@ -271,7 +271,7 @@ class Plotter(object):
             im = ax.imshow(residuals * likelihood_mask, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
             # im = ax.imshow((model - data) * likelihood_mask, cmap=self.cmap_res, extent=extent, norm=TwoSlopeNorm(0))
             ax.set_title(r"(f${}_{\rm model}$ - f${}_{\rm data})/\sigma$", fontsize=self.base_fontsize)
-            nice_colorbar_residuals(im, residuals, position='top', pad=0.4, size=0.2, 
+            nice_colorbar_residuals(im, residuals * likelihood_mask, position='top', pad=0.4, size=0.2, 
                                     vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                     colorbar_kwargs={'orientation': 'horizontal'})
             im.set_rasterized(True)
