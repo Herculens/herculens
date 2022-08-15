@@ -23,7 +23,7 @@ class Numerics(object):
     this classes manages the numerical options and computations of an image.
     The class has two main functions, re_size_convolve() and coordinates_evaluate()
     """
-    def __init__(self, pixel_grid, psf, supersampling_factor=1, 
+    def __init__(self, pixel_grid, psf, supersampling_factor=1, convolution_type='jax_scipy',
                  supersampling_convolution=False, iterative_kernel_supersampling=True,
                  supersampling_kernel_size=5, point_source_supersampling_factor=1, 
                  convolution_kernel_size=None, truncation=4):
@@ -61,7 +61,8 @@ class Numerics(object):
                 kernel = psf.kernel_point_source
                 kernel = self._supersampling_cut_kernel(kernel, convolution_kernel_size,
                                                         supersampling_factor=1)
-                self._conv = PixelKernelConvolution(kernel)
+                self._conv = PixelKernelConvolution(kernel, convolution_type=convolution_type,
+                                                    output_shape=(nx, ny))
 
         elif self._psf_type == 'GAUSSIAN':
             pixel_scale = pixel_grid.pixel_width
