@@ -22,7 +22,7 @@ class SIE(object):
     upper_limit_default = {'theta_E': 100, 'e1': 0.5, 'e2': 0.5, 'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
     
-    def __init__(self, backend_profile='EPL'):
+    def __init__(self, backend_profile='NIE'):
         if backend_profile == 'NIE':
             self.profile = NIE()
             self._fixed = 0.0000000001  # core 'scale' radius
