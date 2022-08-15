@@ -31,11 +31,6 @@ class NIE(object):
         super(NIE, self).__init__()
 
     def param_conv(self, theta_E, e1, e2, s_scale):
-        if self._static is True:
-            return self._b_static, self._s_static, self._q_static, self._phi_G_static
-        return self._param_conv(theta_E, e1, e2, s_scale)
-
-    def _param_conv(self, theta_E, e1, e2, s_scale):
         """
         convert parameters from 2*kappa = bIE [s2IE + r2(1 − e *cos(2*phi)]−1/2 to
         2*kappa=  b *(q2(s2 + x2) + y2􏰉)−1/2
