@@ -79,7 +79,7 @@ class MassModel(MassModelBase):
         if isinstance(k, int):
             return self.func_list[k].function(x, y, **kwargs[k])
         bool_list = self._bool_list(k)
-        potential = 0.
+        potential = np.zeros_like(x)
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 potential += func.function(x, y, **kwargs[i])
@@ -101,8 +101,9 @@ class MassModel(MassModelBase):
         # y = np.array(y, dtype=float)
         if isinstance(k, int):
             return self.func_list[k].derivatives(x, y, **kwargs[k])
+
         bool_list = self._bool_list(k)
-        f_x, f_y = 0., 0.
+        f_x, f_y = jnp.zeros_like(x), jnp.zeros_like(x)
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 f_x_i, f_y_i = func.derivatives(x, y, **kwargs[i])
@@ -128,7 +129,7 @@ class MassModel(MassModelBase):
             return f_xx, f_xy, f_xy, f_yy
 
         bool_list = self._bool_list(k)
-        f_xx, f_yy, f_xy = 0., 0., 0.
+        f_xx, f_yy, f_xy = jnp.zeros_like(x), jnp.zeros_like(x), jnp.zeros_like(x)
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 f_xx_i, f_yy_i, f_xy_i = func.hessian(x, y, **kwargs[i])

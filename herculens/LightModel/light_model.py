@@ -7,6 +7,8 @@
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
+import numpy as np
+import jax.numpy as jnp
 # from functools import partial
 # from jax import jit
 
@@ -52,9 +54,7 @@ class LightModel(LightModelBase):
             Position index of a single source model component.
 
         """
-        # x = jnp.array(x, dtype=float)
-        # y = jnp.array(y, dtype=float)
-        flux = 0.
+        flux = jnp.zeros_like(x)
         bool_list = self._bool_list(k)
         for i, func in enumerate(self.func_list):
             if bool_list[i]:
@@ -74,10 +74,9 @@ class LightModel(LightModelBase):
             Position index of a single source model component.
 
         """
-        x = jnp.array(x, dtype=float)
-        y = jnp.array(y, dtype=float)
-        # flux = jnp.zeros_like(x)
-        f_x, f_y = 0., 0.
+        # x = jnp.array(x, dtype=float)
+        # y = jnp.array(y, dtype=float)
+        flux = jnp.zeros_like(x)
         bool_list = self._bool_list(k)
         for i, func in enumerate(self.func_list):
             if bool_list[i]:
