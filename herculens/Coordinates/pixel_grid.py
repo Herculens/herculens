@@ -103,63 +103,6 @@ class PixelGrid(Coordinates):
         x_coords, y_coords = self.pixel_axes
         return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
 
-    # def model_pixel_coordinates(self, name):
-    #     """
-
-    #     :return: RA coords, DEC coords
-    #     """
-    #     if self._model_grids[name] is None:
-    #         return None
-    #     return self._model_grids[name][0], self._model_grids[name][1]
-
-    # def model_pixel_axes(self, name, pixel_unit=False):
-    #     """
-
-    #     :return: RA coords, DEC coords
-    #     """
-    #     if self._model_grids[name] is None:
-    #         return None
-    #     x_grid, y_grid = self.model_pixel_coordinates(name)
-    #     if pixel_unit is True:
-    #         x_grid, y_grid = self.map_coord2pix(name)
-    #     return x_grid[0, :], y_grid[:, 0]
-
-    # def model_pixel_extent(self, name):
-    #     """
-
-    #     :return: RA coords, DEC coords
-    #     """
-    #     if self._model_grids[name] is None:
-    #         return None
-    #     x_coords, y_coords = self.model_pixel_axes(name)
-    #     return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
-
-    # def model_pixel_shape(self, name):
-    #     """
-
-    #     :return: RA coords, DEC coords
-    #     """
-    #     if self._model_grids[name] is None:
-    #         return None
-    #     return self._model_grids[name][0].shape
-
-    # def model_pixel_width(self, name):
-    #     """
-
-    #     :return: RA coords, DEC coords
-    #     """
-    #     if self._model_grids[name] is None:
-    #         return None
-    #     extent = self.model_pixel_extent(name)
-    #     x_coords, y_coords = self.model_pixel_axes(name)
-    #     pix_width_x = np.abs(x_coords[1] - x_coords[0])
-    #     pix_width_y = np.abs(y_coords[1] - y_coords[0])
-    #     return np.sqrt(pix_width_x * pix_width_y)
-
-    # def remove_model_grid(self, name):
-    #     if name in self._model_grids:
-    #         del self._model_grids[name]
-
     def create_model_grid(self, pixel_scale_factor=None, grid_center=None, grid_shape=None):
         """
         :param pixel_scale_factor: multiplicative factor to go from original pixel width to new pixel width.
@@ -199,58 +142,7 @@ class PixelGrid(Coordinates):
         transform_pix2angle = self.transform_pix2angle / self.pixel_width * pixel_width
 
         cx, cy = int(nx / 2), int(ny / 2)
-        # if nx % 2 == 0:
-        #     cx += 0.5  # makes sure the center is in the middle of a pixel
-        # if ny % 2 == 0:
-        #     cy += 0.5  # makes sure the center is in the middle of a pixel
-
         cra, cdec = transform_pix2angle.dot(np.array([cx, cy]))
         ra_at_xy_0, dec_at_xy_0 = - cra + center_x, - cdec + center_y
 
         return PixelGrid(nx, ny, transform_pix2angle, ra_at_xy_0, dec_at_xy_0)
-
-    # def create_model_grid_simple(self, original_shape, original_extent, name='none', overwrite=False):
-    #     """
-    #     Simpler version typically for MOLET grids.
-    #     """
-    #     if not overwrite and name in self._model_grids:
-    #         return
-    #     nx, ny = original_shape
-    #     width = original_extent[1] - original_extent[0]
-    #     height = original_extent[3] - original_extent[2]
-    #     pixel_width = np.sqrt((width / nx) * (height / ny))
-    #     #semi_width  = (width - pixel_width)/2.
-    #     #semi_height = (height - pixel_width)/2.
-    #     extent = [
-    #         original_extent[0] + pixel_width/2., original_extent[1] - pixel_width/2.,
-    #         original_extent[2] + pixel_width/2., original_extent[3] - pixel_width/2.
-    #     ]
-    #     x_coords = np.linspace(extent[0], extent[1], nx) # * x_sign
-    #     y_coords = np.linspace(extent[2], extent[3], ny) # * y_sign
-    #     x_grid, y_grid = np.meshgrid(x_coords, y_coords)
-    #     self._model_grids[name] = (x_grid, y_grid)
-
-    # def create_model_grid_old(self, factor, name='none', mode='supersampling'):
-    #     if factor is None:
-    #         # avoid unnecessary computations
-    #         self._model_grids[name] = None
-    #         return
-    #     if factor < 1:
-    #         raise ValueError(f"{mode}-sampling factor must be equal to or greater than 1")
-    #     if factor == 1:
-    #         x_grid = np.copy(self._x_grid)
-    #         y_grid = np.copy(self._y_grid)
-    #     else:
-    #         if mode == 'supersampling':
-    #             nx = int(self._nx * factor)
-    #             ny = int(self._ny * factor)
-    #         elif mode == 'undersampling':
-    #             nx = int(self._nx / factor)
-    #             ny = int(self._ny / factor)
-    #         else:
-    #             raise ValueError(f"Mode '{mode}' for creating new coordinate grid is not supported")
-    #         extent = self.extent
-    #         x_coords = np.linspace(extent[0], extent[1], nx)
-    #         y_coords = np.linspace(extent[2], extent[3], ny)
-    #         x_grid, y_grid = np.meshgrid(x_coords, y_coords)
-    #     self._model_grids[name] = (x_grid, y_grid)

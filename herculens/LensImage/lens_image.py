@@ -8,7 +8,8 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
 import copy
-import jax.numpy as np
+import numpy as np
+import jax.numpy as jnp
 from functools import partial
 from jax import jit
 
@@ -86,7 +87,7 @@ class LensImage(object):
         :return: 2d array of surface brightness pixels
         """
         if len(self.SourceModel.profile_type_list) == 0:
-            return np.zeros((self.Grid.num_pixel_axes))
+            return jnp.zeros((self.Grid.num_pixel_axes))
         ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
         if de_lensed is True:
             source_light = self.SourceModel.surface_brightness(ra_grid_img, dec_grid_img, kwargs_source, k=k)
@@ -131,7 +132,7 @@ class LensImage(object):
         :param k_lens_light: list of bool or list of int to select which lens light profiles to include
         :return: 2d array of surface brightness pixels of the simulation
         """
-        model = np.zeros((self.Grid.num_pixel_axes))
+        model = jnp.zeros((self.Grid.num_pixel_axes))
         if source_add is True:
             model += self.source_surface_brightness(kwargs_source, kwargs_lens, unconvolved=unconvolved,
                                                     k=k_source, k_lens=k_lens)
