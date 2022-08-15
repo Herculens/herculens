@@ -24,7 +24,7 @@ class LensImage(object):
     def __init__(self, grid_class, psf_class, 
                  noise_class=None, lens_mass_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
-                 kwargs_numerics=None, recompute_model_grids=False):
+                 kwargs_numerics=None):
         """
         :param grid_class: coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
         :param psf_class: point spread function, instance of PSF() from herculens.Instrument.psf
@@ -45,27 +45,24 @@ class LensImage(object):
             lens_mass_model_class = MassModel(mass_model_list=[])
         self.MassModel = lens_mass_model_class
         if self.MassModel.has_pixels:
-            if self.MassModel.pixel_grid is None or recompute_model_grids:
-                pixel_grid = self.Grid.create_model_grid(**self.MassModel.pixel_grid_settings)
-                self.MassModel.set_pixel_grid(pixel_grid)
+            pixel_grid = self.Grid.create_model_grid(**self.MassModel.pixel_grid_settings)
+            self.MassModel.set_pixel_grid(pixel_grid)
         
         if source_model_class is None:
             from herculens.LightModel.light_model import LightModel
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
         if self.SourceModel.has_pixels:
-            if self.SourceModel.pixel_grid is None or recompute_model_grids:
-                pixel_grid = self.Grid.create_model_grid(**self.SourceModel.pixel_grid_settings)
-                self.SourceModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
+            pixel_grid = self.Grid.create_model_grid(**self.SourceModel.pixel_grid_settings)
+            self.SourceModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
         
         if lens_light_model_class is None:
             from herculens.LightModel.light_model import LightModel
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class
         if self.LensLightModel.has_pixels:
-            if self.LensLightModel.pixel_grid is None or recompute_model_grids:
-                pixel_grid = self.Grid.create_model_grid(**self.LensLightModel.pixel_grid_settings)
-                self.LensLightModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
+            pixel_grid = self.Grid.create_model_grid(**self.LensLightModel.pixel_grid_settings)
+            self.LensLightModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
 
         if kwargs_numerics is None:
             kwargs_numerics = {}
