@@ -34,9 +34,9 @@ class COOLESTexporter(object):
             raise ValueError("The JSON file is not a COOLEST template file.")
         self._coolest = std_obj
 
-    def update_from_model(self, lens_image, parameters, lensing_entity_mapping):
-        lensing_entities = self.create_lensing_entities(lens_image, lensing_entity_mapping)
-        lensing_entities = self.update_parameters(lensing_entities, parameters, lensing_entity_mapping)
+    def update_from_model(self, lens_image, lensing_entity_mapping, parameters=None):
+        lensing_entities = self.create_lensing_entities(lens_image, lensing_entity_mapping,
+                                                        parameters=parameters)
         self._coolest.lensing_entities = lensing_entities
 
     def update_from_loss(self, loss):
@@ -55,6 +55,7 @@ class COOLESTexporter(object):
             entity_type = kwargs_mapping.pop('type')
             if entity_type == 'external_shear':
                 entity = coolest_util.create_extshear_model(lens_image, entity_name, 
+                                                            parameters=parameters,
                                                             **kwargs_mapping)
             elif entity_type == 'galaxy':
                 entity = coolest_util.create_galaxy_model(lens_image, entity_name, 
@@ -65,4 +66,3 @@ class COOLESTexporter(object):
             entities.append(entity)
 
         return LensingEntityList(*entities)
-
