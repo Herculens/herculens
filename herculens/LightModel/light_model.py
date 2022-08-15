@@ -7,6 +7,9 @@
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
+# from functools import partial
+# from jax import jit
+
 from herculens.LightModel.light_model_base import LightModelBase
 from herculens.Util import util
 

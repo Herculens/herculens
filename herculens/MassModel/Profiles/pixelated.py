@@ -8,7 +8,7 @@ __author__ = 'austinpeel', 'aymgal'
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax import jit, grad, jacfwd, jacrev, jvp, vmap
+from jax import grad, jacfwd, jacrev, vmap
 # from functools import partial
 
 from herculens.Util.jax_util import BicubicInterpolator
@@ -29,7 +29,6 @@ class PixelatedPotential(object):
         if derivative_mode not in ['interpol', 'autodiff']:
             raise ValueError(f"Unknown derivatives mode '{derivative_mode}' "
                              "(supported: 'interpol', 'autodiff').")
-        super(PixelatedPotential, self).__init__()
         self._deriv_mode = derivative_mode
         self._pixel_grid = None
         self._x_coords, self._y_coords = None, None
