@@ -86,7 +86,6 @@ The following dependencies will be installed automatically.
 - [`emcee`](https://github.com/dfm/emcee) (3.0.2), for Ensemble MCMC sampling
 - [`gigalens`](https://github.com/giga-lens/gigalens) (0.1.8), for a `jax` implementation of Shapelets
 - [`lenstronomy`](https://github.com/sibirrer/lenstronomy) (1.9.3), for interpolated Shapelets (via `gigalens`) and particle swarm optimization
-- [`palettable`](https://github.com/jiffyclub/palettable) (3.3.0), for nicer colormaps for plots
 
 To run the notebooks, `jupyter` and `matplotlib` are also necessary.
 

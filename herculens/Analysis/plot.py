@@ -29,17 +29,7 @@ class Plotter(object):
     """
 
     # Define some custom colormaps
-    try:
-        import palettable
-    except ImportError:
-        cmap_base = plt.get_cmap('cubehelix')
-    else:
-        cmap_base = palettable.cubehelix.Cubehelix.make(name='flux_colormap',
-                                                        start=0.5,
-                                                        rotation=-1,
-                                                        gamma=0.8,
-                                                        sat=0.8,
-                                                        n=256).mpl_colormap
+    cmap_base = plt.get_cmap('magma')
     cmap_base.set_under('black')
     cmap_base.set_over('white')
     cmap_flux = copy.copy(cmap_base)
