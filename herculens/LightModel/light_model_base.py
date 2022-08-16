@@ -64,7 +64,7 @@ class LightModelBase(object):
             elif profile_type == 'PIXELATED':
                 if pix_idx is not None:
                     raise ValueError("Multiple pixelated profiles is currently not supported.")
-                func_list.append(pixelated.Pixelated(method=pixel_interpol, 
+                func_list.append(pixelated.Pixelated(interpolation_type=pixel_interpol, 
                                                      allow_extrapolation=pixel_allow_extrapolation))
                 pix_idx = idx
             elif profile_type == 'SHAPELETS':
