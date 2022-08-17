@@ -76,7 +76,7 @@ class LightModel(LightModelBase):
         """
         # x = jnp.array(x, dtype=float)
         # y = jnp.array(y, dtype=float)
-        flux = jnp.zeros_like(x)
+        f_x, f_y = jnp.zeros_like(x), jnp.zeros_like(x)
         bool_list = self._bool_list(k)
         for i, func in enumerate(self.func_list):
             if bool_list[i]:

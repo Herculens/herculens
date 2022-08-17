@@ -66,6 +66,7 @@ class LensImage(object):
         if kwargs_numerics is None:
             kwargs_numerics = {}
         self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
+        self.kwargs_numerics = kwargs_numerics
         
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, de_lensed=False, k=None, k_lens=None):
