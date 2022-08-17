@@ -29,13 +29,12 @@ class Plotter(object):
     """
 
     # Define some custom colormaps
-    cmap_base = plt.get_cmap('magma')
-    cmap_base.set_under('black')
-    cmap_base.set_over('white')
-    cmap_flux = copy.copy(cmap_base)
-    cmap_flux.set_bad(color='black')
-    cmap_flux_alt = copy.copy(cmap_base)
-    cmap_flux_alt.set_bad(color='#222222')  # to emphasize non-positive pixels in log scale
+    cmap_flux = copy.copy(plt.get_cmap('magma'))
+    cmap_flux.set_under('black')
+    cmap_flux.set_over('white')
+    cmap_flux.set_bad('black')
+    cmap_flux_alt = copy.copy(cmap_flux)
+    cmap_flux_alt.set_bad('#222222')  # to emphasize non-positive pixels in log scale
     cmap_res = plt.get_cmap('RdBu_r')
     cmap_corr = plt.get_cmap('RdYlGn')
     cmap_default = plt.get_cmap('viridis')
