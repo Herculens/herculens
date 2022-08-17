@@ -14,7 +14,7 @@ from scipy import ndimage
 from matplotlib.colors import Normalize, LogNorm, TwoSlopeNorm
 
 from herculens.Util.plot_util import nice_colorbar, nice_colorbar_residuals
-from herculens.Util import image_util
+
 
 # Some general default for plotting
 plt.rc('image', interpolation='none', origin='lower')  # for imshow
@@ -60,9 +60,8 @@ class Plotter(object):
     def set_data(self, data):
         self._data = data
 
-    def set_ref_source(self, ref_source, source_grid_name=None):
+    def set_ref_source(self, ref_source):
         self._ref_source = ref_source
-        self._ref_src_grid_name = source_grid_name
 
     def set_ref_lens_light(self, ref_lens_light):
         self._ref_lens_light = ref_lens_light
@@ -124,39 +123,20 @@ class Plotter(object):
                 else:
                     source_model = kwargs_source[src_idx]['pixels']
                 src_extent = lens_image.SourceModel.pixel_grid.extent
-            elif hasattr(self, '_ref_source') and self._ref_src_grid_name is not None:
-                x_grid_src, y_grid_src = lens_image.Grid.model_pixel_coordinates(self._ref_src_grid_name)
-                source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
-                source_model *= lens_image.Grid.pixel_area
-                src_extent = lens_image.Grid.model_pixel_extent(self._ref_src_grid_name)
             else:
                 source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
                 src_extent = extent
 
             if hasattr(self, '_ref_source'):
                 ref_source = self._ref_source
-                if source_model.size != ref_source.size:
-                    if self._ref_src_grid_name is not None:
-                        x_axes_ref, y_axes_ref = lens_image.Grid.model_pixel_axes(self._ref_src_grid_name)
-                    else:
-                        npix_ref = len(ref_source)
-                        # here we assume that the self._ref_source has the extent of the data (image plane)
-                        x_axes_ref = np.linspace(extent[0], extent[1], npix_ref)
-                        y_axes_ref = np.linspace(extent[2], extent[3], npix_ref)
-                    if lens_image.SourceModel.has_pixels:
-                        x_axes_src, y_axes_src = lens_image.SourceModel.pixel_grid.pixel_axes
-                    else:
-                        npix_src = len(source_model)
-                        x_axes_src = np.linspace(extent[0], extent[1], npix_src)
-                        y_axes_src = np.linspace(extent[2], extent[3], npix_src)
-                    ref_source = image_util.re_size_array(x_axes_ref, y_axes_ref, ref_source, x_axes_src, y_axes_src)
-                    if lens_image.Grid.x_is_inverted:
-                        ref_source = np.flip(ref_source, axis=1)
-                    if lens_image.Grid.y_is_inverted:
-                        ref_source = np.flip(ref_source, axis=0)
-                    warnings.warn("Reference source array has been interpolated to match model array.")
+                if source_model.shape != ref_source.shape:
+                    warnings.warn("Reference source does not have the same shape as model source.")
+                    show_source_diff = False
+                else:
+                    show_source_diff = True
             else:
                 ref_source = None
+                show_source_diff = False
 
         if show_lens_light:
             kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
@@ -168,25 +148,19 @@ class Plotter(object):
             
             if hasattr(self, '_ref_lens_light'):
                 ref_lens_light = self._ref_lens_light
-                if lens_light_model.size != ref_lens_light.size:
-                    npix_ref = len(ref_lens_light)
-                    x_axes_ref = np.linspace(extent[0], extent[1], npix_ref)
-                    y_axes_ref = np.linspace(extent[2], extent[3], npix_ref)
-                    if lens_image.SourceModel.has_pixels:
-                        x_axes, y_axes = lens_image.Grid.model_pixel_axes('lens_light')
-                    else:
-                        npix = len(lens_light_model)
-                        x_axes = np.linspace(extent[0], extent[1], npix)
-                        y_axes = np.linspace(extent[2], extent[3], npix)
-                    ref_lens_light = image_util.re_size_array(x_axes_ref, y_axes_ref, ref_source, x_axes, y_axes)
-                    warnings.warn("Reference lens light array has been interpolated to match model array.")
+                if lens_light_model.shape != ref_lens_light.shape:
+                    warnings.warn("Reference lens light does not have the same shape as model lens light.")
+                    show_lens_light_diff = False
+                else:
+                    show_lens_light_diff = True
             else:
                 ref_lens_light = None
+                show_lens_light_diff = False
 
         if show_lens_potential:
             kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
             pot_idx = lens_image.MassModel.pixelated_index
-            x_grid_lens, y_grid_lens = lens_image.Grid.model_pixel_coordinates('lens')
+            x_grid_lens, y_grid_lens = lens_image.MassModel.pixel_grid.pixel_coordinates
             alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_lens, y_grid_lens, 
                                                           kwargs_lens, k=pot_idx)
             kappa = lens_image.MassModel.kappa(x_grid_lens, y_grid_lens, 
@@ -204,6 +178,11 @@ class Plotter(object):
             # here we know that there are no perturbations in the reference potential
             if hasattr(self, '_ref_pixel_pot'):
                 ref_potential = self._ref_pixel_pot
+                if ref_potential.shape != potential_model.shape:
+                    warnings.warn("Reference potential does not have the same shape as model potential.")
+                    show_pot_diff = False
+                else:
+                    show_pot_diff = True
             
                 if shift_pixelated_potential == 'min':
                     min_in_mask = potential_model[potential_mask == 1].min()
@@ -223,8 +202,10 @@ class Plotter(object):
                     ref_mean_in_mask = ref_potential[potential_mask == 1].mean()
                     ref_potential = ref_potential - ref_mean_in_mask
                     print("delta_psi shift by mean values:", mean_in_mask, ref_mean_in_mask)
+
             else:
                 ref_potential = None
+                show_pot_diff = False
 
             if potential_mask is None:
                 # TODO: compute potential mask based on undersampled likelihood_mask
@@ -292,7 +273,7 @@ class Plotter(object):
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            if ref_source is not None:
+            if ref_source is not None and show_source_diff is True:
                 diff = source_model - ref_source
                 vmax_diff = ref_source.max() / 10.
                 im = ax.imshow(diff, extent=src_extent, 
@@ -368,7 +349,7 @@ class Plotter(object):
             ax.imshow(likelihood_mask_nans, extent=extent, cmap='gray_r', vmin=0, vmax=1)
 
             ax = axes[i_row, 2]
-            if ref_potential is not None:
+            if ref_potential is not None and show_pot_diff is True:
                 pot_abs_res = (ref_potential - potential_model) * potential_mask
                 vmax = np.max(np.abs(ref_potential)) / 2.
                 im = ax.imshow(pot_abs_res, extent=extent,
