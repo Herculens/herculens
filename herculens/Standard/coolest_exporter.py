@@ -44,7 +44,7 @@ class COOLESTexporter(object):
         raise NotImplementedError("update_from_loss() not yet implemented.")
 
     @staticmethod
-    def create_lensing_entities(lens_image, lensing_entity_mapping):
+    def create_lensing_entities(lens_image, lensing_entity_mapping, parameters=None):
         # TODO: check if multi-plane lensing
 
         # initialize list of lensing entities

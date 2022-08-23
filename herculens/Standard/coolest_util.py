@@ -5,6 +5,8 @@
 __author__ = 'aymgal'
 
 
+import numpy as np
+
 from herculens.Util import param_util
 
 from lensmodelapi.api.galaxy import Galaxy
@@ -32,17 +34,12 @@ def create_extshear_model(lens_image, name, parameters=None,
         # get current values
         kwargs_lens = parameters.current_values(as_kwargs=True)['kwargs_lens']
         # add point estimate values to the ExternalShear object
-        for i, profile_name in enumerate(mass_profiles_in):
-            phi_ext, gamma_ext = h2c_extshear_values(profile_name, kwargs_lens[herculens_idx])
-            extshear.profiles[i].parameters['phi_ext'].set_point_estimate(float(phi_ext))
-            extshear.profiles[i].parameters['gamma_ext'].set_point_estimate(float(gamma_ext))
+        for ic, ih in enumerate(mass_profile_indices):
+            phi_ext, gamma_ext = h2c_extshear_values(mass_profiles_all[ih], kwargs_lens[ih])
+            extshear.mass_model[ic].parameters['phi_ext'].set_point_estimate(phi_ext)
+            extshear.mass_model[ic].parameters['gamma_ext'].set_point_estimate(gamma_ext)
 
     return extshear
-
-
-def h2c_extshear_values(profile_name, kwargs_profile):
-    if profile_name == 'SHEAR':
-        raise
 
 
 def create_galaxy_model(lens_image, name, 
@@ -76,9 +73,20 @@ def create_galaxy_model(lens_image, name,
     return galaxy
 
 
+def h2c_extshear_values(profile_name, kwargs_profile):
+    if profile_name == 'SHEAR':
+        gamma1, gamma2 = kwargs_profile['gamma1'], kwargs_profile['gamma2']
+        phi_ext, gamma_ext = param_util.shear_cartesian2polar(gamma1, gamma2)
+    elif profile_name == 'SHEAR_GAMMA_PSI':
+        phi_ext, gamma_ext = kwargs_profile['gamma1'], kwargs_profile['gamma2']
+    phi_ext   = check_type(phi_ext)
+    gamma_ext = check_type(gamma_ext)
+    phi_ext = h2c_position_angle(phi_ext)
+    return phi_ext, gamma_ext
+
 def h2c_extshear_profiles(profiles_herculens):
     profiles_coolest = []
-    for profile_herculens in profiles_herculens:
+    for i, profile_herculens in enumerate(profiles_herculens):
         if profile_herculens in ['SHEAR', 'SHEAR_GAMMA_PSI']:
             profiles_coolest.append('ExternalShear')
         else:
@@ -122,3 +130,37 @@ def h2c_light_profiles(profiles_herculens):
         else:
             raise ValueError(f"Unknown COOLEST mapping for light profile '{profile_herculens}'.")
     return profiles_coolest
+
+
+def h2c_position_angle(value):
+    """
+    Transform an angle in radian from Herculens into an angle in degree in the COOLEST conventions.
+    Based on @LyneVdV's implementation for lenstronomy.
+    """
+    value_conv = value * 180. / np.pi
+    value_conv = value_conv - 90.
+    if is_iterable(value):
+        for i, val in enumerate(value_conv):
+            if val <= -90.:
+                value_conv[i] += 180.
+    else:
+        if value_conv <= -90:
+            value_conv += 180.
+    return value_conv
+
+
+def check_type(value):
+    if is_iterable(value):
+        value_valid = np.asarray(value)
+    else:
+        value_valid = float(value)
+    return value_valid
+
+
+def is_iterable(value):
+    try:
+        _ = iter(value)  # test if value is iterable
+    except:
+        return False
+    else:
+        return True
