@@ -21,7 +21,8 @@ class COOLESTexporter(object):
 
     def __init__(self, template_file_name, **kwargs_serializer):
         self._base_file_name = template_file_name
-        self._serializer = APISerializer(template_file_name, **kwargs_serializer)
+        self._template_file_name = template_file_name
+        self._kwargs_serializer = kwargs_serializer
         self._load_coolest_object()
 
     @property
@@ -29,7 +30,8 @@ class COOLESTexporter(object):
         return self._coolest
         
     def _load_coolest_object(self):
-        std_obj = self._serializer.json_load()
+        serializer = APISerializer(self._template_file_name, **self._kwargs_serializer)
+        std_obj = serializer.json_load()
         if std_obj.standard.upper() != 'COOLEST':
             raise ValueError("The JSON file is not a COOLEST template file.")
         self._coolest = std_obj
@@ -59,6 +61,7 @@ class COOLESTexporter(object):
                                                             **kwargs_mapping)
             elif entity_type == 'galaxy':
                 entity = coolest_util.create_galaxy_model(lens_image, entity_name, 
+                                                          parameters=parameters,
                                                           **kwargs_mapping)
             else:
                 raise ValueError(f"Unknown lensing entity type '{entity_type}'.")

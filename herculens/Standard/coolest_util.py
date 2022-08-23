@@ -42,7 +42,7 @@ def create_extshear_model(lens_image, name, parameters=None,
     return extshear
 
 
-def create_galaxy_model(lens_image, name, 
+def create_galaxy_model(lens_image, name, parameters=None,
                         mass_profile_indices=None, 
                         light_profile_indices=None,
                         lensed=None, redshift=None):
@@ -70,7 +70,84 @@ def create_galaxy_model(lens_image, name,
                     mass_model=MassModel(*mass_profiles_out), 
                     light_model=LightModel(*light_profiles_out),
                     redshift=redshift)
+
+    if parameters is not None:
+        if mass_profile_indices is not None:
+            update_galaxy_mass_model(galaxy, parameters, mass_profile_indices, mass_profiles_out)
+        if light_profile_indices is not None:
+            update_galaxy_light_model(galaxy, parameters, light_profile_indices, light_profiles_out, lensed)
+
     return galaxy
+
+
+def update_galaxy_mass_model(galaxy, parameters, profile_indices, profile_names):
+    # get current values
+    kwargs_list = parameters.current_values(as_kwargs=True)['kwargs_lens']
+    # add point estimate values
+    for ic, ih in enumerate(profile_indices):
+        if profile_names[ic] == 'SIE':
+            h2c_SIE_values(galaxy.mass_model[ic], kwargs_list[ih])
+        else:
+            raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
+
+
+def update_galaxy_light_model(galaxy, parameters, profile_indices, profile_names, lensed):
+    # get current values
+    kwargs_all = parameters.current_values(as_kwargs=True)
+    if lensed:
+        kwargs_list = kwargs_all['kwargs_source']
+    else:
+        kwargs_list = kwargs_all['kwargs_lens_light']
+    # add point estimate values
+    for ic, ih in enumerate(profile_indices):
+        if profile_names[ic] == 'Sersic':
+            h2c_Sersic_values(galaxy.light_model[ic], kwargs_list[ih])
+        else:
+            raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
+
+
+def h2c_SIE_values(profile, kwargs):
+    theta_E  = check_type(kwargs['theta_E'])
+    center_x = check_type(kwargs['center_x'])
+    center_y = check_type(kwargs['center_y'])
+    e1 = kwargs.get('e1', None)
+    e2 = kwargs.get('e2', None)
+    if e1 is None or e2 is None:
+        phi, q = 0., 1.  # spherical case
+    else:
+        phi, q = param_util.ellipticity2phi_q(e1, e2)
+        phi = h2c_position_angle(phi)
+        phi = check_type(phi)
+        q = check_type(q)
+    profile.parameters['theta_E'].set_point_estimate(theta_E)
+    profile.parameters['center_x'].set_point_estimate(center_x)
+    profile.parameters['center_y'].set_point_estimate(center_y)
+    profile.parameters['phi'].set_point_estimate(phi)  # or set it to 'fixed' if SIS
+    profile.parameters['q'].set_point_estimate(q)  # or set it to 'fixed' if SIS
+
+
+def h2c_Sersic_values(profile, kwargs):
+    amp = check_type(kwargs['amp'])
+    R_sersic = check_type(kwargs['R_sersic'])
+    n_sersic = check_type(kwargs['n_sersic'])
+    center_x = check_type(kwargs['center_x'])
+    center_y = check_type(kwargs['center_y'])
+    e1 = kwargs.get('e1', None)
+    e2 = kwargs.get('e2', None)
+    if e1 is None or e2 is None:
+        phi, q = 0., 1.  # spherical case
+    else:
+        phi, q = param_util.ellipticity2phi_q(e1, e2)
+        phi = h2c_position_angle(phi)
+        phi = check_type(phi)
+        q = check_type(q)
+    profile.parameters['A'].set_point_estimate(amp)
+    profile.parameters['R_sersic'].set_point_estimate(R_sersic)
+    profile.parameters['n_sersic'].set_point_estimate(n_sersic)
+    profile.parameters['center_x'].set_point_estimate(center_x)
+    profile.parameters['center_y'].set_point_estimate(center_y)
+    profile.parameters['phi'].set_point_estimate(phi)  # or set it to 'fixed' if SIS
+    profile.parameters['q'].set_point_estimate(q)  # or set it to 'fixed' if SIS
 
 
 def h2c_extshear_values(profile_name, kwargs_profile):
@@ -83,6 +160,7 @@ def h2c_extshear_values(profile_name, kwargs_profile):
     gamma_ext = check_type(gamma_ext)
     phi_ext = h2c_position_angle(phi_ext)
     return phi_ext, gamma_ext
+
 
 def h2c_extshear_profiles(profiles_herculens):
     profiles_coolest = []
@@ -150,6 +228,8 @@ def h2c_position_angle(value):
 
 
 def check_type(value):
+    if value is None:
+        return None
     if is_iterable(value):
         value_valid = np.asarray(value)
     else:
