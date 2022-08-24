@@ -82,6 +82,7 @@ class Plotter(object):
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
                       reproject_pixelated_models=False, shift_pixelated_potential='none',
                       likelihood_mask=None, potential_mask=None,
+                      kwargs_grid_source=None,
                       lock_colorbars=False,
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       k_lens=None, # TEMP
@@ -122,6 +123,12 @@ class Plotter(object):
                 else:
                     source_model = kwargs_source[src_idx]['pixels']
                 src_extent = lens_image.SourceModel.pixel_grid.extent
+            elif kwargs_grid_source is not None:
+                grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
+                x_grid_src, y_grid_src = grid_src.pixel_coordinates
+                source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
+                source_model *= lens_image.Grid.pixel_area
+                src_extent = grid_src.extent
             else:
                 source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
                 src_extent = extent
