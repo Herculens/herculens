@@ -27,6 +27,10 @@ class Shapelets(object):
         self._func_type = function_type
 
     @property
+    def maximum_order(self):
+        return self._n_max
+
+    @property
     def num_amplitudes(self):
         if self._func_type == 'gaussian':
             return int((self._n_max+1) * (self._n_max+2) / 2)

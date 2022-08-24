@@ -73,14 +73,14 @@ def create_galaxy_model(lens_image, name, parameters=None,
 
     if parameters is not None:
         if mass_profile_indices is not None:
-            update_galaxy_mass_model(galaxy, parameters, mass_profile_indices, mass_profiles_out)
+            update_galaxy_mass_model(galaxy, lens_image, parameters, mass_profile_indices, mass_profiles_out)
         if light_profile_indices is not None:
-            update_galaxy_light_model(galaxy, parameters, light_profile_indices, light_profiles_out, lensed)
+            update_galaxy_light_model(galaxy, lens_image, parameters, light_profile_indices, light_profiles_out, lensed)
 
     return galaxy
 
 
-def update_galaxy_mass_model(galaxy, parameters, profile_indices, profile_names):
+def update_galaxy_mass_model(galaxy, lens_image, parameters, profile_indices, profile_names):
     # get current values
     kwargs_list = parameters.current_values(as_kwargs=True)['kwargs_lens']
     # add point estimate values
@@ -91,7 +91,7 @@ def update_galaxy_mass_model(galaxy, parameters, profile_indices, profile_names)
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
 
-def update_galaxy_light_model(galaxy, parameters, profile_indices, profile_names, lensed):
+def update_galaxy_light_model(galaxy, lens_image, parameters, profile_indices, profile_names, lensed):
     # get current values
     kwargs_all = parameters.current_values(as_kwargs=True)
     if lensed:
@@ -102,6 +102,9 @@ def update_galaxy_light_model(galaxy, parameters, profile_indices, profile_names
     for ic, ih in enumerate(profile_indices):
         if profile_names[ic] == 'Sersic':
             h2c_Sersic_values(galaxy.light_model[ic], kwargs_list[ih])
+        elif profile_names[ic] == 'Shapelets':
+            h2c_Shapelets_values(galaxy.light_model[ic], kwargs_list[ih],
+                                 lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. n_max 
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
@@ -148,6 +151,19 @@ def h2c_Sersic_values(profile, kwargs):
     profile.parameters['center_y'].set_point_estimate(center_y)
     profile.parameters['phi'].set_point_estimate(phi)  # or set it to 'fixed' if SIS
     profile.parameters['q'].set_point_estimate(q)  # or set it to 'fixed' if SIS
+
+
+def h2c_Shapelets_values(profile, kwargs, profile_herculens):
+    amps = check_type(kwargs['amps'])
+    beta = check_type(kwargs['beta'])
+    center_x = check_type(kwargs['center_x'])
+    center_y = check_type(kwargs['center_y'])
+    n_max = int(check_type(profile_herculens.maximum_order))
+    profile.parameters['amps'].set_point_estimate(amps)
+    profile.parameters['beta'].set_point_estimate(beta)
+    profile.parameters['center_x'].set_point_estimate(center_x)
+    profile.parameters['center_y'].set_point_estimate(center_y)
+    profile.n_max = n_max
 
 
 def h2c_extshear_values(profile_name, kwargs_profile):
@@ -231,7 +247,7 @@ def check_type(value):
     if value is None:
         return None
     if is_iterable(value):
-        value_valid = np.asarray(value)
+        value_valid = np.asarray(value)  #.tolist()
     else:
         value_valid = float(value)
     return value_valid
