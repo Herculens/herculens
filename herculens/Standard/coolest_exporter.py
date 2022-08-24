@@ -35,15 +35,15 @@ class COOLESTexporter(object):
                                                         parameters=parameters)
         self._coolest.lensing_entities = lensing_entities
 
+    def update_from_loss(self, loss):
+        # TODO: update LikelihoodList and RegularizationList from Herculens' loss
+        raise NotImplementedError("update_from_loss() not yet implemented.")
+
     def update_metadata(self, mode='MAP', **meta_kwargs):
         self._coolest.meta['mode'] = mode.upper()
         self._coolest.meta['code_name'] = 'Herculens'
         self._coolest.meta['code_version'] = herculens.__version__
         self._coolest.meta.update(meta_kwargs)
-
-    def update_from_loss(self, loss):
-        # TODO: update LikelihoodList and RegularizationList from Herculens' loss
-        raise NotImplementedError("update_from_loss() not yet implemented.")
 
     @staticmethod
     def create_lensing_entities(lens_image, lensing_entity_mapping, parameters=None):

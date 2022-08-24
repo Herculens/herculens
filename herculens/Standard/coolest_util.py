@@ -73,9 +73,9 @@ def create_galaxy_model(lens_image, name, parameters=None,
 
     if parameters is not None:
         if mass_profile_indices is not None:
-            update_galaxy_mass_model(galaxy, lens_image, parameters, mass_profile_indices, mass_profiles_out)
+            update_galaxy_mass_model(galaxy, lens_image, parameters, mass_profile_indices, mass_profiles_in)
         if light_profile_indices is not None:
-            update_galaxy_light_model(galaxy, lens_image, parameters, light_profile_indices, light_profiles_out, lensed)
+            update_galaxy_light_model(galaxy, lens_image, parameters, light_profile_indices, light_profiles_in, lensed)
 
     return galaxy
 
@@ -87,6 +87,10 @@ def update_galaxy_mass_model(galaxy, lens_image, parameters, profile_indices, pr
     for ic, ih in enumerate(profile_indices):
         if profile_names[ic] == 'SIE':
             h2c_SIE_values(galaxy.mass_model[ic], kwargs_list[ih])
+        elif profile_names[ic] == 'SIS':
+            h2c_SIE_values(galaxy.mass_model[ic], kwargs_list[ih], spherical=True)
+        elif profile_names[ic] in ['EPL', 'PEMD']:
+            h2c_EPL_values(galaxy.mass_model[ic], kwargs_list[ih])
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
@@ -100,24 +104,26 @@ def update_galaxy_light_model(galaxy, lens_image, parameters, profile_indices, p
         kwargs_list = kwargs_all['kwargs_lens_light']
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
-        if profile_names[ic] == 'Sersic':
+        if profile_names[ic] == 'SERSIC_ELLIPSE':
             h2c_Sersic_values(galaxy.light_model[ic], kwargs_list[ih])
-        elif profile_names[ic] == 'Shapelets':
+        elif profile_names[ic] == 'SERSIC':
+            h2c_Sersic_values(galaxy.light_model[ic], kwargs_list[ih], spherical=True)
+        elif profile_names[ic] == 'SHAPELETS':
             h2c_Shapelets_values(galaxy.light_model[ic], kwargs_list[ih],
                                  lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. n_max 
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
 
-def h2c_SIE_values(profile, kwargs):
+def h2c_SIE_values(profile, kwargs, spherical=False):
     theta_E  = check_type(kwargs['theta_E'])
     center_x = check_type(kwargs['center_x'])
     center_y = check_type(kwargs['center_y'])
-    e1 = kwargs.get('e1', None)
-    e2 = kwargs.get('e2', None)
-    if e1 is None or e2 is None:
-        phi, q = 0., 1.  # spherical case
+    if spherical:
+        phi, q = 0., 1.
     else:
+        e1 = check_type(kwargs['e1'])
+        e2 = check_type(kwargs['e2'])
         phi, q = param_util.ellipticity2phi_q(e1, e2)
         phi = h2c_position_angle(phi)
         phi = check_type(phi)
@@ -125,32 +131,64 @@ def h2c_SIE_values(profile, kwargs):
     profile.parameters['theta_E'].set_point_estimate(theta_E)
     profile.parameters['center_x'].set_point_estimate(center_x)
     profile.parameters['center_y'].set_point_estimate(center_y)
-    profile.parameters['phi'].set_point_estimate(phi)  # or set it to 'fixed' if SIS
-    profile.parameters['q'].set_point_estimate(q)  # or set it to 'fixed' if SIS
+    profile.parameters['phi'].set_point_estimate(phi)
+    profile.parameters['q'].set_point_estimate(q)
+    if spherical:
+        profile.parameters['phi'].fix()
+        profile.parameters['q'].fix()
 
 
-def h2c_Sersic_values(profile, kwargs):
+def h2c_EPL_values(profile, kwargs, spherical=False):
+    theta_E  = check_type(kwargs['theta_E'])
+    gamma    = check_type(kwargs['gamma'])
+    center_x = check_type(kwargs['center_x'])
+    center_y = check_type(kwargs['center_y'])
+    if spherical:
+        phi, q = 0., 1.
+    else:
+        e1 = check_type(kwargs['e1'])
+        e2 = check_type(kwargs['e2'])
+        phi, q = param_util.ellipticity2phi_q(e1, e2)
+        phi = h2c_position_angle(phi)
+        phi = check_type(phi)
+        q = check_type(q)
+    profile.parameters['theta_E'].set_point_estimate(theta_E)
+    profile.parameters['gamma'].set_point_estimate(gamma)
+    profile.parameters['center_x'].set_point_estimate(center_x)
+    profile.parameters['center_y'].set_point_estimate(center_y)
+    profile.parameters['phi'].set_point_estimate(phi)
+    profile.parameters['q'].set_point_estimate(q)
+    if spherical:
+        profile.parameters['phi'].fix()
+        profile.parameters['q'].fix()
+
+
+def h2c_Sersic_values(profile, kwargs, spherical=False):
     amp = check_type(kwargs['amp'])
     R_sersic = check_type(kwargs['R_sersic'])
     n_sersic = check_type(kwargs['n_sersic'])
     center_x = check_type(kwargs['center_x'])
     center_y = check_type(kwargs['center_y'])
-    e1 = kwargs.get('e1', None)
-    e2 = kwargs.get('e2', None)
-    if e1 is None or e2 is None:
+    if spherical:
         phi, q = 0., 1.  # spherical case
     else:
+        e1 = check_type(kwargs['e1'])
+        e2 = check_type(kwargs['e2'])
         phi, q = param_util.ellipticity2phi_q(e1, e2)
         phi = h2c_position_angle(phi)
         phi = check_type(phi)
         q = check_type(q)
+    R_sersic = convert_major_axis_radius(R_sersic, q)
     profile.parameters['A'].set_point_estimate(amp)
     profile.parameters['R_sersic'].set_point_estimate(R_sersic)
     profile.parameters['n_sersic'].set_point_estimate(n_sersic)
     profile.parameters['center_x'].set_point_estimate(center_x)
     profile.parameters['center_y'].set_point_estimate(center_y)
-    profile.parameters['phi'].set_point_estimate(phi)  # or set it to 'fixed' if SIS
-    profile.parameters['q'].set_point_estimate(q)  # or set it to 'fixed' if SIS
+    profile.parameters['phi'].set_point_estimate(phi)
+    profile.parameters['q'].set_point_estimate(q)
+    if spherical:
+        profile.parameters['phi'].fix()
+        profile.parameters['q'].fix()
 
 
 def h2c_Shapelets_values(profile, kwargs, profile_herculens):
@@ -243,11 +281,14 @@ def h2c_position_angle(value):
     return value_conv
 
 
+def convert_major_axis_radius(r, q):
+    return r * np.sqrt(q)
+
 def check_type(value):
     if value is None:
         return None
     if is_iterable(value):
-        value_valid = np.asarray(value)  #.tolist()
+        value_valid = np.asarray(value)
     else:
         value_valid = float(value)
     return value_valid
