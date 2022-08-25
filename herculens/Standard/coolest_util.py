@@ -6,12 +6,14 @@ __author__ = 'aymgal'
 
 
 import numpy as np
+from astropy.io import fits
 
 from herculens.Util import param_util
 
 from lensmodelapi.api.galaxy import Galaxy
 from lensmodelapi.api.external_shear import ExternalShear
 from lensmodelapi.api.mass_light_model import MassModel, LightModel
+from lensmodelapi.api.fits_file import FitsFile
 # from lensmodelapi.api.parameter import PointEstimate
 # from lensmodelapi.api.probabilities import PosteriorStatistics 
 
@@ -196,12 +198,21 @@ def h2c_Shapelets_values(profile, kwargs, profile_herculens):
     beta = check_type(kwargs['beta'])
     center_x = check_type(kwargs['center_x'])
     center_y = check_type(kwargs['center_y'])
-    n_max = int(check_type(profile_herculens.maximum_order))
+    n_max = check_type(profile_herculens.maximum_order)
     profile.parameters['amps'].set_point_estimate(amps)
     profile.parameters['beta'].set_point_estimate(beta)
     profile.parameters['center_x'].set_point_estimate(center_x)
     profile.parameters['center_y'].set_point_estimate(center_y)
-    profile.n_max = n_max
+    profile.parameters['n_max'].set_point_estimate(int(n_max))
+    profile.parameters['n_max'].fix()
+
+
+def h2c_pixelated_values(profile, kwargs, profile_herculens):
+    pixels = check_type(kwargs['pixels'])
+    x_grid, y_grid = profile_herculens.pixel_grid.pixel_coordinates
+    fits_filename = ''
+    hdu_list = 
+    profile.data = FitsFile(fits_path)
 
 
 def h2c_extshear_values(profile_name, kwargs_profile):
