@@ -13,7 +13,7 @@ from herculens.Util import param_util
 from lensmodelapi.api.galaxy import Galaxy
 from lensmodelapi.api.external_shear import ExternalShear
 from lensmodelapi.api.mass_light_model import MassModel, LightModel
-from lensmodelapi.api.fits_file import FitsFile
+from lensmodelapi.api.fits_file import MultiExtFitsFile
 # from lensmodelapi.api.parameter import PointEstimate
 # from lensmodelapi.api.probabilities import PosteriorStatistics 
 
@@ -113,6 +113,9 @@ def update_galaxy_light_model(galaxy, lens_image, parameters, profile_indices, p
         elif profile_names[ic] == 'SHAPELETS':
             h2c_Shapelets_values(galaxy.light_model[ic], kwargs_list[ih],
                                  lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. n_max 
+        elif profile_names[ic] == 'PIXELATED':
+            h2c_pixelated_values(galaxy.light_model[ic], kwargs_list[ih],
+                                 lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. pixel_grid 
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
@@ -208,11 +211,36 @@ def h2c_Shapelets_values(profile, kwargs, profile_herculens):
 
 
 def h2c_pixelated_values(profile, kwargs, profile_herculens):
-    pixels = check_type(kwargs['pixels'])
+    pixel_values = check_type(kwargs['pixels'])
     x_grid, y_grid = profile_herculens.pixel_grid.pixel_coordinates
-    fits_filename = ''
-    hdu_list = 
-    profile.data = FitsFile(fits_path)
+    pixel_scale = float(profile_herculens.pixel_grid.pixel_width)
+    matrix = profile_herculens.pixel_grid.transform_pix2angle / 3600.  # arcsec -> degree
+    CD1_1 = float(matrix[0, 0]) 
+    CD1_2 = float(matrix[0, 1])
+    CD2_1 = float(matrix[1, 0])
+    CD2_2 = float(matrix[1, 1])
+    
+    primary_hdr = fits.Header()
+    primary_hdr['PIXSCALE'] = pixel_scale
+    primary_hdr['CD1_1'] = CD1_1
+    primary_hdr['CD1_2'] = CD1_2
+    primary_hdr['CD2_1'] = CD2_1
+    primary_hdr['CD2_2'] = CD2_2
+    primary_hdu = fits.PrimaryHDU(pixel_values, header=primary_hdr)  # or ImageHDU?
+    columns = fits.ColDefs([
+        fits.Column(name='id', format='J', array=np.arange(x_grid.size)),
+        fits.Column(name='x', format='D', array=x_grid.flatten()),
+        fits.Column(name='y', format='D', array=y_grid.flatten()),
+        fits.Column(name='flux', format='D', array=pixel_values.flatten())
+    ])
+    pixels_hdu = fits.BinTableHDU.from_columns(columns)
+    hdu_list = fits.HDUList([primary_hdu, pixels_hdu])
+
+    fits_filename = 'model_pixels.fits'
+    hdu_list.writeto(fits_filename, overwrite=True)
+    
+    fits_path = fits_filename
+    profile.pixels = MultiExtFitsFile(fits_path)
 
 
 def h2c_extshear_values(profile_name, kwargs_profile):
