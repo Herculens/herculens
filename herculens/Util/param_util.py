@@ -148,3 +148,12 @@ def transform_e1e2_square_average(x, y, e1, e2, center_x, center_y):
     x_ = (cos_phi * x_shift + sin_phi * y_shift) * jnp.sqrt(1 - e)
     y_ = (-sin_phi * x_shift + cos_phi * y_shift) * jnp.sqrt(1 + e)
     return x_, y_
+
+
+def statistics_from_samples(samples, losses):
+    min_loss_idx = np.argmin(losses)
+    map_values = samples[min_loss_idx, :]
+    mean_values = np.mean(samples, axis=0)
+    perc_16, perc_50, perc_84 = np.percentile(samples, q=[16, 50, 84], axis=0)
+    median_values = perc_50
+    return map_values, mean_values, median_values, perc_16, perc_84

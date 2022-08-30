@@ -15,7 +15,7 @@ from lensmodelapi.api.external_shear import ExternalShear
 from lensmodelapi.api.mass_light_model import MassModel, LightModel
 from lensmodelapi.api.fits_file import MultiExtFitsFile
 # from lensmodelapi.api.parameter import PointEstimate
-# from lensmodelapi.api.probabilities import PosteriorStatistics 
+from lensmodelapi.api.probabilities import PosteriorStatistics
 
 
 # Notes: `h2c` is a shorthand for `herculens2coolest`
@@ -89,6 +89,11 @@ def update_galaxy_mass_model(galaxy, lens_image, parameters, profile_indices, pr
     for ic, ih in enumerate(profile_indices):
         if profile_names[ic] == 'SIE':
             h2c_SIE_values(galaxy.mass_model[ic], kwargs_list[ih])
+            if parameters.samples is not None:
+                kwargs_samples = parameters.samples(as_kwargs=True)
+                kwargs_list_samples_ih = [kwargs['kwargs_lens'][ih] for kwargs in kwargs_samples]
+                h2c_SIE_posteriors(galaxy.mass_model[ic], kwargs_list_samples_ih)
+                
         elif profile_names[ic] == 'SIS':
             h2c_SIE_values(galaxy.mass_model[ic], kwargs_list[ih], spherical=True)
         elif profile_names[ic] in ['EPL', 'PEMD']:
@@ -118,6 +123,29 @@ def update_galaxy_light_model(galaxy, lens_image, parameters, profile_indices, p
                                  lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. pixel_grid 
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
+
+
+def h2c_SIE_values(profile, kwargs, spherical=False):
+    theta_E  = check_type(kwargs['theta_E'])
+    center_x = check_type(kwargs['center_x'])
+    center_y = check_type(kwargs['center_y'])
+    if spherical:
+        phi, q = 0., 1.
+    else:
+        e1 = check_type(kwargs['e1'])
+        e2 = check_type(kwargs['e2'])
+        phi, q = param_util.ellipticity2phi_q(e1, e2)
+        phi = h2c_position_angle(phi)
+        phi = check_type(phi)
+        q = check_type(q)
+    profile.parameters['theta_E'].set_point_estimate(theta_E)
+    profile.parameters['center_x'].set_point_estimate(center_x)
+    profile.parameters['center_y'].set_point_estimate(center_y)
+    profile.parameters['phi'].set_point_estimate(phi)
+    profile.parameters['q'].set_point_estimate(q)
+    if spherical:
+        profile.parameters['phi'].fix()
+        profile.parameters['q'].fix()
 
 
 def h2c_SIE_values(profile, kwargs, spherical=False):

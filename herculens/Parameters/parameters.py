@@ -17,6 +17,7 @@ from herculens.LightModel.Profiles import pixelated as pixelated_light
 from herculens.LightModel.Profiles import gaussian, sersic, uniform, shapelets
 from herculens.MassModel.mass_model_base import SUPPORTED_MODELS as MASS_MODELS
 from herculens.LightModel.light_model_base import SUPPORTED_MODELS as LIGHT_MODELS
+from herculens.Util import model_util
 
 
 __all__ = ['Parameters']
@@ -159,13 +160,43 @@ class Parameters(object):
         else:
             return deepcopy(self._map_values) if copy else self._map_values
 
+    def samples(self, as_kwargs=False):
+        if not hasattr(self, '_samples'):
+            return None
+        if as_kwargs:
+            if hasattr(self, '_kwargs_samples'):
+                num_samples = self._samples.shape[0]
+                self._kwargs_samples = [self.args2kwargs(self._samples[i, :]) for i in range(num_samples)]
+            return self._kwargs_samples
+        else:
+            return self._samples
+
+    @property
+    def covariance_matrix(self):
+        if not hasattr(self, '_cov_matrix'):
+            return None
+        return self._cov_matrix
+
     def set_best_fit(self, args):
         self._map_values = args
         self._kwargs_map = self.args2kwargs(self._map_values)
     
-    def set_posterior(self, samples):
-        self._map_values = np.median(samples, axis=0)
+    def set_posterior(self, samples, losses):
+        min_loss_idx = np.argmin(losses)
+        self._map_values = samples[min_loss_idx, :]
         self._kwargs_map = self.args2kwargs(self._map_values)
+        self._samples = samples
+        # compute covariance matrix from samples
+
+    def set_covariance_matrix(self, cov_matrix, num_samples=10000, seed=None):
+        self._cov_matrix = cov_matrix
+        samples = model_util.draw_samples_from_covariance(self.best_fit_values(),
+                                                          self._cov_matrix,
+                                                          num_samples=num_samples, 
+                                                          seed=seed)
+        self._samples = samples
+        if hasattr(self, '_kwargs_samples'):
+
 
     def update_fixed(self, kwargs_fixed, kwargs_prior=None):
         # TODO: fill current and init values with values that were previously fixed, if needed
@@ -330,6 +361,10 @@ class Parameters(object):
             delattr(self, '_names')
         if hasattr(self, '_symbols'):
             delattr(self, '_symbols')
+        if hasattr(self, '_samples'):
+            delattr(self, '_samples')
+        if hasattr(self, '_kwargs_samples'):
+            delattr(self, '_kwargs_samples')
 
     def _update_fixed_with_joint(self, kwargs_fixed, kwargs_joint):
         kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens', 'lens_with_lens')
@@ -531,7 +566,7 @@ class Parameters(object):
                         names_k = [f"amp_{i}" for i in range(num_param)]
                     else:
                         names_k = [name]
-                    names += [f"{n}-{short_id}-{k}" for n in names_k]  # assign a 
+                    names += [f"{n}-{short_id}-{k}" for n in names_k]  # assign a unique identifier
         return names
 
     @staticmethod

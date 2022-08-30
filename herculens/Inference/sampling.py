@@ -93,7 +93,7 @@ class Sampler(Inference):
             samples = samples.reshape(s0*s1, s2)
             logL = logL.flatten()
 
-        self._param.set_posterior(samples)
+        self._param.set_posterior(samples, logL)
         extra_fields = {
             'step_size': step_size,
             'inverse_mass_matrix': inv_mass_matrix,
@@ -150,7 +150,7 @@ class Sampler(Inference):
             samples = samples.T
             #raise RuntimeError(f"HMC samples do not have correct shape, {samples.shape} instead of {expected_shape}")
         logL = np.asarray(logL)
-        self._param.set_posterior(samples)
+        self._param.set_posterior(samples, logL)
         return samples, logL, extra_fields, runtime
 
     @staticmethod
@@ -192,7 +192,7 @@ class Sampler(Inference):
         samples = sampler.get_chain(discard=num_warmup, thin=1, flat=True)
         logL = sampler.get_log_prob(flat=True, discard=num_warmup, thin=1)
         extra_fields = None
-        self._param.set_posterior(samples)
+        self._param.set_posterior(samples, logL)
         return samples, logL, extra_fields, runtime
 
     @staticmethod

@@ -34,7 +34,7 @@ def plot_minimize_history(parameters, opt_extra_fields, max_num_params=6):
         warnings.warn("No `'param_history'` found in the extra fields (use `return_param_history=True` in Optimizer).")
         ax.axis('off')
     fig.tight_layout()
-    plt.show()
+    return fig
 
 def std_colorbar(mappable, label=None, fontsize=12, label_kwargs={}, **colorbar_kwargs):
     cb = plt.colorbar(mappable, **colorbar_kwargs)
