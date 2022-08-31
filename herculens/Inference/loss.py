@@ -138,7 +138,7 @@ class Loss(Differentiable):
 
     def _init_likelihood(self, likelihood_type, likelihood_mask, mask_from_source_plane):
         if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
-            self._ll_mask = model_util.mask_from_pixelated_source(self._image, self._param)
+            self._ll_mask = model_util.mask_from_source_area(self._image, self._param)
         elif likelihood_mask is None:
             self._ll_mask = np.ones_like(self._data)
         else:
