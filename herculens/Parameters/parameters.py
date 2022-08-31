@@ -195,8 +195,6 @@ class Parameters(object):
                                                           num_samples=num_samples, 
                                                           seed=seed)
         self._samples = samples
-        if hasattr(self, '_kwargs_samples'):
-
 
     def update_fixed(self, kwargs_fixed, kwargs_prior=None):
         # TODO: fill current and init values with values that were previously fixed, if needed
