@@ -80,7 +80,7 @@ class Plotter(object):
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, 
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
-                      reproject_pixelated_models=False, shift_pixelated_potential='none',
+                      shift_pixelated_potential='none',
                       likelihood_mask=None, potential_mask=None,
                       kwargs_grid_source=None,
                       lock_colorbars=False,
@@ -114,14 +114,7 @@ class Plotter(object):
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
             if lens_image.SourceModel.has_pixels:
                 src_idx = lens_image.SourceModel.pixelated_index
-                if reproject_pixelated_models:
-                    # we need to make sure it's jax.numpy array for source_surface_brightness when using PIXELATED source profile
-                    kwargs_source[src_idx]['pixels'] = jnp.asarray(kwargs_source[src_idx]['pixels'])
-                    x_grid_src, y_grid_src = lens_image.SourceModel.pixel_grid.pixel_coordinates
-                    source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
-                    source_model *= lens_image.Grid.pixel_area
-                else:
-                    source_model = kwargs_source[src_idx]['pixels']
+                source_model = kwargs_source[src_idx]['pixels']
                 src_extent = lens_image.SourceModel.pixel_grid.extent
             elif kwargs_grid_source is not None:
                 grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
@@ -172,11 +165,7 @@ class Plotter(object):
             kappa = lens_image.MassModel.kappa(x_grid_lens, y_grid_lens, 
                                                kwargs_lens, k=pot_idx)
             #kappa = ndimage.gaussian_filter(kappa, 1)
-            if reproject_pixelated_models:
-                potential_model = lens_image.MassModel.potential(x_grid_lens, y_grid_lens,
-                                                                 kwargs_lens, k=pot_idx)
-            else:
-                potential_model = kwargs_lens[pot_idx]['pixels']
+            potential_model = kwargs_lens[pot_idx]['pixels']
             
             if potential_mask is None:
                 potential_mask = np.ones_like(potential_model)
