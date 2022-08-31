@@ -56,7 +56,7 @@ class Loss(Differentiable):
     _supported_prior = ('uniform', 'gaussian')
 
     def __init__(self, data, image_class, param_class, 
-                 likelihood_type='chi2', likelihood_mask=None, mask_from_source_plane=False,
+                 likelihood_type='chi2', likelihood_mask=None, 
                  regularization_terms=None, regularization_strengths=None, 
                  regularization_weights=None, regularization_masks=None,
                  prior_terms=None, starlet_second_gen=False, index_analytical_potential=None):
@@ -67,7 +67,7 @@ class Loss(Differentiable):
         self._check_choices(likelihood_type, prior_terms, 
                             regularization_terms, regularization_strengths, 
                             regularization_weights, regularization_masks)
-        self._init_likelihood(likelihood_type, likelihood_mask, mask_from_source_plane)
+        self._init_likelihood(likelihood_type, likelihood_mask)
         self._init_regularizations(regularization_terms, 
                                    regularization_strengths, 
                                    regularization_weights, 
@@ -136,10 +136,8 @@ class Loss(Differentiable):
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' lens profile")
 
-    def _init_likelihood(self, likelihood_type, likelihood_mask, mask_from_source_plane):
-        if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
-            self._ll_mask = model_util.mask_from_source_area(self._image, self._param)
-        elif likelihood_mask is None:
+    def _init_likelihood(self, likelihood_type, likelihood_mask):
+        if likelihood_mask is None:
             self._ll_mask = np.ones_like(self._data)
         else:
             self._ll_mask = likelihood_mask.astype(float)
