@@ -1,5 +1,6 @@
-numpy
-scipy
-jax
-jaxlib
+numpy==1.21.6
+scipy==1.7.3
+jax==0.3.17
+jaxlib==0.3.14
 matplotlib
+findiff

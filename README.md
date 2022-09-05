@@ -72,18 +72,18 @@ The following dependencies will be installed automatically.
 `herculens` has been tested with the versions mentioned in parenthesis. It could still work well with newer versions though.
 
 #### Necessary
-- [`jax`](https://github.com/google/jax) (0.2.13)
-- `jaxlib` (0.1.67)
-- `numpy` (1.20.3)
-- `scipy` (1.6.3)
+- [`jax`](https://github.com/google/jax) (0.3.17)
+- `jaxlib` (0.3.14)
+- `numpy` (1.21.6)
+- `scipy` (1.7.3)
 
 #### Optional
-- [`optax`](https://github.com/deepmind/optax) (0.0.9), for advanced gradient descent algorithms 
-- [`numpyro`](https://github.com/pyro-ppl/numpyro) (0.7.1), for HMC sampling
-- [`blackjax`](https://github.com/blackjax-devs/blackjax) (0.2.1), for `jax`-based HMC sampling integrated with 
+- [`optax`](https://github.com/deepmind/optax) (0.1.3), for advanced gradient descent algorithms 
+- [`numpyro`](https://github.com/pyro-ppl/numpyro) (0.10), for HMC sampling
+- [`blackjax`](https://github.com/blackjax-devs/blackjax) (0.8.3), for `jax`-based HMC sampling integrated with 
 - [`dynesty`](https://github.com/joshspeagle/dynesty) (1.1), for nested sampling
 - [`jaxns`](https://github.com/Joshuaalbert/jaxns) (1.1), for `jax`-based nested sampling
-- [`emcee`](https://github.com/dfm/emcee) (3.0.2), for Ensemble MCMC sampling
+- [`emcee`](https://github.com/dfm/emcee) (3.1.2), for Ensemble MCMC sampling
 - [`gigalens`](https://github.com/giga-lens/gigalens) (0.1.8), for a `jax` implementation of Shapelets
 - [`lenstronomy`](https://github.com/sibirrer/lenstronomy) (1.9.3), for interpolated Shapelets (via `gigalens`) and particle swarm optimization
 
