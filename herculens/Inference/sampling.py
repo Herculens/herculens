@@ -9,9 +9,9 @@ import time
 import numpy as np
 from functools import partial
 import jax
-import blackjax.hmc as blackjax_hmc
-import blackjax.nuts as blackjax_nuts
-import blackjax.stan_warmup as stan_warmup
+from blackjax.kernels import hmc as blackjax_hmc
+from blackjax.kernels import nuts as blackjax_nuts
+from blackjax import window_adaptation
 from numpyro.infer import HMC as numpyro_HMC
 from numpyro.infer import NUTS as numpyro_NUTS
 from numpyro.infer import MCMC as numpyro_MCMC
@@ -36,53 +36,63 @@ class Sampler(Inference):
 
     def hmc_blackjax(self, seed, num_warmup=100, num_samples=100, num_chains=1, 
                      restart_from_init=False, sampler_type='NUTS', use_stan_warmup=True,
-                     step_size=1e-3, inv_mass_matrix=None, num_integ_steps=30):
+                     step_size=1e-3, inv_mass_matrix=None):
         rng_key = jax.random.PRNGKey(seed)
         logprob = self._loss.function
         init_positions = self._param.current_values(as_kwargs=False, restart=restart_from_init)
-        if inv_mass_matrix is None:
-            # default inverse mass matrix is only 1s
-            inv_mass_matrix = np.ones(self._param.num_parameters)
+
 
         start = time.time()
-
-        if use_stan_warmup is True:
-            rng_key, rng_subkey = jax.random.split(rng_key)
-            # here for simplicity we use standard HMC
-            # TODO: use NUTS also for Stan warmup?
-            init_state_warmup = blackjax_hmc.new_state(init_positions, logprob)
-            num_integ_steps_warmup = 30
-            kernel_generator = lambda step_size, inverse_mass_matrix: blackjax_hmc.kernel(
-                logprob, step_size, inverse_mass_matrix, num_integ_steps_warmup
-            )
-            # update step size and inverse mass matrix during warmup with Stan
-            warmup_state, (step_size, inv_mass_matrix), warmup_info = stan_warmup.run(
-                rng_subkey,
-                kernel_generator,
-                init_state_warmup,
-                num_warmup,
-            )
-            # reset number of samples so we don't warmup again in the final inference
-            num_warmup = 0
-        
         if sampler_type.lower() == 'hmc':
-            new_state_func = blackjax_hmc.new_state
-            kernel = blackjax_hmc.kernel(logprob, step_size, inv_mass_matrix, num_integ_steps)
-        elif sampler_type.lower() == 'nuts':
-            new_state_func = blackjax_nuts.new_state
-            kernel = blackjax_nuts.kernel(logprob, step_size, inv_mass_matrix)
+            samplerclass = blackjax_hmc 
+            samplerinstance = samplerclass(logprob, step_size, inv_mass_matrix, 
+                                           num_samples)
+        elif sampler_type.lower()=='nuts':
+            samplerclass = blackjax_nuts 
+            samplerinstance = samplerclass(logprob, step_size, inv_mass_matrix)
         else:
             raise ValueError(f"Sampler/kernel type '{sampler_type}' is not supported ('NUTS' or 'HMC' only).")
 
+
+        
+        if use_stan_warmup:
+            rng_key, rng_subkey = jax.random.split(rng_key)
+            # here for simplicity we use NUTS
+            
+
+            # update step size and inverse mass matrix during warmup with Stan
+            warmup = window_adaptation(
+                blackjax_nuts,
+                logprob, 
+                num_steps=num_warmup,
+            )
+            warmup_state, kernel, _ = warmup.run(
+                rng_key,
+                init_positions,
+            )
+            # reset number of samples so we don't warmup again in the final inference
+            num_warmup = 0
+        else:
+            if inv_mass_matrix is None:
+                # default inverse mass matrix is only 1s
+                inv_mass_matrix = np.ones(self._param.num_parameters)
+
+            kernel = jax.jit(samplerinstance.step)
+        
+        
+        new_state_func = samplerinstance.init 
         if num_chains == 1:
-            init_states = new_state_func(init_positions, logprob)
+            init_states = new_state_func(init_positions)
         else:
             init_positions = np.repeat(np.expand_dims(init_positions, axis=0), num_chains, axis=0)
-            init_states = jax.vmap(new_state_func, in_axes=(0, None))(init_positions, logprob)
+            init_states = jax.vmap(new_state_func, in_axes=(0, None))(init_positions)
+        
+        
         # run the inference
         states, infos = self._run_blackjax_inference(
             rng_key, kernel, init_states, num_warmup + num_samples, num_chains
         )
+        
         samples = states.position.block_until_ready()
         logL = infos.energy
         runtime = time.time() - start
@@ -106,9 +116,11 @@ class Sampler(Inference):
     @staticmethod
     def _run_blackjax_inference(rng_key, kernel, initial_state, 
                                 num_samples, num_chains):
+        @jax.jit
         def one_step_single_chain(state, rng_key):
             state, info = kernel(rng_key, state)
             return state, (state, info)
+        @jax.jit
         def one_step_multi_chains(states, rng_key):
             keys = jax.random.split(rng_key, num_chains)
             states, infos = jax.vmap(kernel)(keys, states)
