@@ -80,7 +80,7 @@ The following dependencies will be installed automatically.
 #### Optional
 - [`optax`](https://github.com/deepmind/optax) (0.0.9), for advanced gradient descent algorithms 
 - [`numpyro`](https://github.com/pyro-ppl/numpyro) (0.7.1), for HMC sampling
-- [`blackjax`](https://github.com/blackjax-devs/blackjax) (0.7.1), for `jax`-based HMC sampling integrated with 
+- [`blackjax`](https://github.com/blackjax-devs/blackjax) (0.2.1), for `jax`-based HMC sampling integrated with 
 - [`dynesty`](https://github.com/joshspeagle/dynesty) (1.1), for nested sampling
 - [`jaxns`](https://github.com/Joshuaalbert/jaxns) (1.1), for `jax`-based nested sampling
 - [`emcee`](https://github.com/dfm/emcee) (3.0.2), for Ensemble MCMC sampling
