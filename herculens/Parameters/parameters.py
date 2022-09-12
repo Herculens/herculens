@@ -8,7 +8,8 @@ __author__ = 'aymgal'
 from copy import deepcopy
 import numpy as np
 import jax.numpy as jnp
-from jax import lax
+from jax import lax, jit
+from functools import partial
 
 from herculens.MassModel.Profiles import pixelated as pixelated_lens
 from herculens.MassModel.Profiles import (epl, sie, sis, nie, shear, point_mass, 
@@ -208,6 +209,7 @@ class Parameters(object):
             self._kwargs_prior = kwargs_prior
         self._update_arrays()
 
+    # @partial(jit, static_argnums=(0,))
     def args2kwargs(self, args):
         i = 0
         args = jnp.atleast_1d(args)
@@ -223,18 +225,7 @@ class Parameters(object):
         kwargs = {'kwargs_lens': kwargs_lens, 'kwargs_source': kwargs_source, 'kwargs_lens_light': kwargs_lens_light}
         return kwargs
 
-    @staticmethod
-    def _join_params(kwargs_list_1, kwargs_list_2, joint_setting_list):
-        for setting in joint_setting_list:
-            (i_1, k_2), param_list = setting
-            for param_names in param_list:
-                if isinstance(param_names, (tuple, list)) and len(param_names) > 1:
-                    param_name_1, param_name_2 = param_names
-                else:
-                    param_name_1 = param_name_2 = param_names
-                kwargs_list_2[k_2][param_name_2] = kwargs_list_1[i_1][param_name_1]
-        return kwargs_list_2
-
+    # @partial(jit, static_argnums=(0,))
     def kwargs2args(self, kwargs):
         args = self._set_params(kwargs, 'mass_model_list', 'kwargs_lens')
         args += self._set_params(kwargs, 'source_model_list', 'kwargs_source')
@@ -384,6 +375,18 @@ class Parameters(object):
                     param_name_1 = param_name_2 = param_names
                 kwargs_fixed_updt[kwargs_key][k_2][param_name_2] = 0
         return kwargs_fixed_updt
+
+    @staticmethod
+    def _join_params(kwargs_list_1, kwargs_list_2, joint_setting_list):
+        for setting in joint_setting_list:
+            (i_1, k_2), param_list = setting
+            for param_names in param_list:
+                if isinstance(param_names, (tuple, list)) and len(param_names) > 1:
+                    param_name_1, param_name_2 = param_names
+                else:
+                    param_name_1 = param_name_2 = param_names
+                kwargs_list_2[k_2][param_name_2] = kwargs_list_1[i_1][param_name_1]
+        return kwargs_list_2
 
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
         kwargs_list = []
