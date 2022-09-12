@@ -206,7 +206,7 @@ class Loss(Differentiable):
                     self._st_src_lambda_hf = float(strength[0])
                     self._st_src_lambda = float(strength[1])
 
-            if term == 'l1_starlet_lens_light':
+            elif term == 'l1_starlet_lens_light':
                 n_pix_ll = min(*self._image.LensLightModel.pixelated_shape)
                 n_scales = int(np.log2(n_pix_ll))  # maximum allowed number of scales
                 self._starlet_ll = WaveletTransform(n_scales, wavelet_type='starlet',
@@ -262,7 +262,7 @@ class Loss(Differentiable):
                 # self._st_pot_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if weights.shape[0] != n_scales+1:
                     raise ValueError(f"The weights do not contain enough wavelet scales"
-                                     f" (should be {n_scales} inc. coarsest).")
+                                     f" (should be {n_scales+1} inc. coarsest).")
                 self._st_pot_weigths = weights
                 if isinstance(strength, (int, float)):
                     self._st_pot_lambda = float(strength)
@@ -280,7 +280,7 @@ class Loss(Differentiable):
                 # self._bl_pot_norm = self._battle_pot.scale_norms[0]  # consider only first scale
                 if weights.shape[0] != n_scales+1:
                     raise ValueError(f"The weights do not contain enogh wavelet scales"
-                                     f" (should be {n_scales} inc. coarsest).")
+                                     f" (should be {n_scales+1} inc. coarsest).")
                 self._bl_pot_weigths = weights
                 if isinstance(strength, (tuple, list)):
                     raise ValueError("You can only specify one regularization "
