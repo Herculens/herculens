@@ -32,7 +32,8 @@ class Pixelated(object):
     _interp_types = ['fast_bilinear', 'bilinear', 'bicubic']
     _deriv_types = ['interpol', 'autodiff']
 
-    def __init__(self, interpolation_type='fast_bilinear', allow_extrapolation=True, derivative_type='autodiff'):
+    def __init__(self, interpolation_type='fast_bilinear', allow_extrapolation=True, 
+                 derivative_type='interpol'):
         if interpolation_type not in self._interp_types:
             raise ValueError(f"Invalid method ('{interpolation_type}'). Must be in {self._interp_types}.")
         if derivative_type not in self._deriv_types:
