@@ -103,5 +103,5 @@ class RegularGrid(Coordinates1D):
         nx, ny = self._nx * self._supersampling_factor, self._ny * self._supersampling_factor
         grid1d = np.zeros((nx * ny))
         indices = np.arange(nx * ny)
-        grid1d = ops.index_update(grid1d, ops.index[indices], array)
+        grid1d = grid1d.at[indices].set(array)
         return util.array2image(grid1d, nx, ny)
