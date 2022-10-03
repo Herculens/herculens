@@ -38,9 +38,12 @@ class Sampler(Inference):
                      restart_from_init=False, sampler_type='NUTS', use_stan_warmup=True,
                      step_size=1e-3, inv_mass_matrix=None):
         rng_key = jax.random.PRNGKey(seed)
-        logprob = self._loss.function
+        logprob = self.log_probability
         init_positions = self._param.current_values(as_kwargs=False, restart=restart_from_init)
 
+        if inv_mass_matrix is None:
+            # default the inverse mass matrix is the identity matrix
+            inv_mass_matrix = np.ones(self._param.num_parameters)
 
         start = time.time()
         if sampler_type.lower() == 'hmc':
@@ -72,11 +75,8 @@ class Sampler(Inference):
             )
             # reset number of samples so we don't warmup again in the final inference
             num_warmup = 0
-        else:
-            if inv_mass_matrix is None:
-                # default inverse mass matrix is only 1s
-                inv_mass_matrix = np.ones(self._param.num_parameters)
 
+        else:
             kernel = jax.jit(samplerinstance.step)
         
         
@@ -103,7 +103,7 @@ class Sampler(Inference):
             samples = samples.reshape(s0*s1, s2)
             logL = logL.flatten()
 
-        self._param.set_posterior(samples, logL)
+        self._param.set_posterior_samples(samples, logL)
         extra_fields = {
             'step_size': step_size,
             'inverse_mass_matrix': inv_mass_matrix,
@@ -162,7 +162,7 @@ class Sampler(Inference):
             samples = samples.T
             #raise RuntimeError(f"HMC samples do not have correct shape, {samples.shape} instead of {expected_shape}")
         logL = np.asarray(logL)
-        self._param.set_posterior(samples, logL)
+        self._param.set_posterior_samples(samples, logL)
         return samples, logL, extra_fields, runtime
 
     @staticmethod
@@ -204,7 +204,7 @@ class Sampler(Inference):
         samples = sampler.get_chain(discard=num_warmup, thin=1, flat=True)
         logL = sampler.get_log_prob(flat=True, discard=num_warmup, thin=1)
         extra_fields = None
-        self._param.set_posterior(samples, logL)
+        self._param.set_posterior_samples(samples, logL)
         return samples, logL, extra_fields, runtime
 
     @staticmethod

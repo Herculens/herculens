@@ -33,11 +33,15 @@ def create_extshear_model(lens_image, name, parameters=None,
     extshear = ExternalShear(name, mass_model=MassModel(*mass_profiles_out), redshift=redshift)
 
     if parameters is not None:
-        # get current values
-        kwargs_lens = parameters.current_values(as_kwargs=True)['kwargs_lens']
+        kwargs_all = parameters.best_fit_values(as_kwargs=True)
+        # if parameters.samples is not None:
+        #     kwargs_all_samples = parameters.samples(as_kwargs=True, group_by_param=True)
+        # else:
+        #     kwargs_all_samples = None
+
         # add point estimate values to the ExternalShear object
         for ic, ih in enumerate(mass_profile_indices):
-            phi_ext, gamma_ext = h2c_extshear_values(mass_profiles_all[ih], kwargs_lens[ih])
+            phi_ext, gamma_ext = h2c_extshear_values(mass_profiles_all[ih], kwargs_all['kwargs_lens'][ih])
             extshear.mass_model[ic].parameters['phi_ext'].set_point_estimate(phi_ext)
             extshear.mass_model[ic].parameters['gamma_ext'].set_point_estimate(gamma_ext)
 
@@ -74,25 +78,31 @@ def create_galaxy_model(lens_image, name, parameters=None,
                     redshift=redshift)
 
     if parameters is not None:
+        kwargs_all = parameters.best_fit_values(as_kwargs=True)
+        if parameters.samples is not None:
+            kwargs_all_samples = parameters.samples(as_kwargs=True, group_by_param=True)
+        else:
+            kwargs_all_samples = None
+
         if mass_profile_indices is not None:
-            update_galaxy_mass_model(galaxy, lens_image, parameters, mass_profile_indices, mass_profiles_in)
+            update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
+                                     mass_profile_indices, mass_profiles_in)
         if light_profile_indices is not None:
-            update_galaxy_light_model(galaxy, lens_image, parameters, light_profile_indices, light_profiles_in, lensed)
+            update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
+                                      light_profile_indices, light_profiles_in, lensed)
 
     return galaxy
 
 
-def update_galaxy_mass_model(galaxy, lens_image, parameters, profile_indices, profile_names):
-    # get current values
-    kwargs_list = parameters.current_values(as_kwargs=True)['kwargs_lens']
+def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, profile_indices, profile_names):
+    kwargs_list = kwargs_all['kwargs_lens']
+    kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples['kwargs_lens']
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
         if profile_names[ic] == 'SIE':
             h2c_SIE_values(galaxy.mass_model[ic], kwargs_list[ih])
-            # if parameters.samples is not None:
-            #     kwargs_samples = parameters.samples(as_kwargs=True)
-            #     kwargs_list_samples_ih = [kwargs['kwargs_lens'][ih] for kwargs in kwargs_samples]
-            #     h2c_SIE_posteriors(galaxy.mass_model[ic], kwargs_list_samples_ih)
+            if kwargs_list_samples is not None:
+                h2c_SIE_posteriors(galaxy.mass_model[ic], kwargs_list_samples[ih])
                 
         elif profile_names[ic] == 'SIS':
             h2c_SIE_values(galaxy.mass_model[ic], kwargs_list[ih], spherical=True)
@@ -102,19 +112,24 @@ def update_galaxy_mass_model(galaxy, lens_image, parameters, profile_indices, pr
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
 
-def update_galaxy_light_model(galaxy, lens_image, parameters, profile_indices, profile_names, lensed):
+def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, profile_indices, profile_names, lensed):
     # get current values
-    kwargs_all = parameters.current_values(as_kwargs=True)
     if lensed:
         kwargs_list = kwargs_all['kwargs_source']
+        kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples['kwargs_source']
     else:
         kwargs_list = kwargs_all['kwargs_lens_light']
+        kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples['kwargs_lens_light']
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
         if profile_names[ic] == 'SERSIC_ELLIPSE':
             h2c_Sersic_values(galaxy.light_model[ic], kwargs_list[ih])
+            if kwargs_list_samples is not None:
+                h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_list_samples[ih])
         elif profile_names[ic] == 'SERSIC':
             h2c_Sersic_values(galaxy.light_model[ic], kwargs_list[ih], spherical=True)
+            if kwargs_list_samples is not None:
+                h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_list_samples[ih], spherical=True)
         elif profile_names[ic] == 'SHAPELETS':
             h2c_Shapelets_values(galaxy.light_model[ic], kwargs_list[ih],
                                  lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. n_max 
@@ -126,9 +141,12 @@ def update_galaxy_light_model(galaxy, lens_image, parameters, profile_indices, p
 
 
 def h2c_SIE_values(profile, kwargs, spherical=False):
-    theta_E  = check_type(kwargs['theta_E'])
+    theta_E = check_type(kwargs['theta_E'])
+    profile.parameters['theta_E'].set_point_estimate(theta_E)
     center_x = check_type(kwargs['center_x'])
+    profile.parameters['center_x'].set_point_estimate(center_x)
     center_y = check_type(kwargs['center_y'])
+    profile.parameters['center_y'].set_point_estimate(center_y)
     if spherical:
         phi, q = 0., 1.
     else:
@@ -138,38 +156,25 @@ def h2c_SIE_values(profile, kwargs, spherical=False):
         phi = h2c_position_angle(phi)
         phi = check_type(phi)
         q = check_type(q)
-    profile.parameters['theta_E'].set_point_estimate(theta_E)
-    profile.parameters['center_x'].set_point_estimate(center_x)
-    profile.parameters['center_y'].set_point_estimate(center_y)
     profile.parameters['phi'].set_point_estimate(phi)
     profile.parameters['q'].set_point_estimate(q)
     if spherical:
         profile.parameters['phi'].fix()
         profile.parameters['q'].fix()
 
-
-# def h2c_SIE_posteriors(profile, kwargs_samples, spherical=False):
-#     theta_E_mean = np.mean([])
-#     theta_E  = check_type(kwargs['theta_E'])
-#     center_x = check_type(kwargs['center_x'])
-#     center_y = check_type(kwargs['center_y'])
-#     if spherical:
-#         phi, q = 0., 1.
-#     else:
-#         e1 = check_type(kwargs['e1'])
-#         e2 = check_type(kwargs['e2'])
-#         phi, q = param_util.ellipticity2phi_q(e1, e2)
-#         phi = h2c_position_angle(phi)
-#         phi = check_type(phi)
-#         q = check_type(q)
-#     profile.parameters['theta_E'].set_point_estimate(theta_E)
-#     profile.parameters['center_x'].set_point_estimate(center_x)
-#     profile.parameters['center_y'].set_point_estimate(center_y)
-#     profile.parameters['phi'].set_point_estimate(phi)
-#     profile.parameters['q'].set_point_estimate(q)
-#     if spherical:
-#         profile.parameters['phi'].fix()
-#         profile.parameters['q'].fix()
+def h2c_SIE_posteriors(profile, kwargs_samples, spherical=False):
+    profile.parameters['theta_E'].set_posterior(prepare_posterior(kwargs_samples['theta_E']))
+    profile.parameters['center_x'].set_posterior(prepare_posterior(kwargs_samples['center_x']))
+    profile.parameters['center_y'].set_posterior(prepare_posterior(kwargs_samples['center_y']))
+    if spherical:
+        phi, q = 0., 1.
+    else:
+        e1 = kwargs_samples['e1']
+        e2 = kwargs_samples['e2']
+        phi, q = param_util.ellipticity2phi_q_numpy(e1, e2)
+        phi = h2c_position_angle(phi)
+    profile.parameters['phi'].set_posterior(prepare_posterior(phi))
+    profile.parameters['q'].set_posterior(prepare_posterior(q))
 
 
 def h2c_EPL_values(profile, kwargs, spherical=False):
@@ -223,6 +228,24 @@ def h2c_Sersic_values(profile, kwargs, spherical=False):
     if spherical:
         profile.parameters['phi'].fix()
         profile.parameters['q'].fix()
+
+def h2c_Sersic_posteriors(profile, kwargs_samples, spherical=False):
+    profile.parameters['A'].set_posterior(prepare_posterior(kwargs_samples['amp']))
+    profile.parameters['n_sersic'].set_posterior(prepare_posterior(kwargs_samples['n_sersic']))
+    profile.parameters['center_x'].set_posterior(prepare_posterior(kwargs_samples['center_x']))
+    profile.parameters['center_y'].set_posterior(prepare_posterior(kwargs_samples['center_y']))
+    if spherical:
+        phi, q = 0., 1.  # spherical case
+    else:
+        e1 = kwargs_samples['e1']
+        e2 = kwargs_samples['e2']
+        phi, q = param_util.ellipticity2phi_q_numpy(e1, e2)
+        phi = h2c_position_angle(phi)
+    R_sersic = kwargs_samples['R_sersic']
+    R_sersic = convert_major_axis_radius(R_sersic, q)
+    profile.parameters['R_sersic'].set_posterior(prepare_posterior(kwargs_samples['R_sersic']))
+    profile.parameters['phi'].set_posterior(prepare_posterior(phi))
+    profile.parameters['q'].set_posterior(prepare_posterior(q))
 
 
 def h2c_Shapelets_values(profile, kwargs, profile_herculens):
@@ -349,8 +372,22 @@ def h2c_position_angle(value):
     return value_conv
 
 
+def prepare_posterior(samples):
+    if isinstance(samples, (int, float)) or len(samples) == 1:
+        mean = samples
+        perc = None, None, None
+    else:
+        mean, perc = np.mean(samples), np.percentile(samples, q=[16, 50, 84])
+    posterior = PosteriorStatistics(mean=check_type(mean),
+                                    median=check_type(perc[1]),
+                                    percentile_16th=check_type(perc[0]),
+                                    percentile_84th=check_type(perc[2]))
+    return posterior
+
+
 def convert_major_axis_radius(r, q):
     return r * np.sqrt(q)
+
 
 def check_type(value):
     if value is None:

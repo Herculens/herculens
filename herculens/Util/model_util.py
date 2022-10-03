@@ -517,8 +517,6 @@ def estimate_model_covariance(lens_image, parameters, samples, return_cross_cova
         data_samples = draw_samples_from_covariance(data_mean_proxy, data_cov, num_samples=len(model_samples))
         data_vector  = np.mean(data_samples - data_samples.mean(axis=0), axis=0)
         model_vector = np.mean(model_samples - model_samples.mean(axis=0), axis=0)
-        print("D", data_vector.shape)
-        print("M", model_vector.shape)
         data_model_cross_cov = np.outer(data_vector, model_vector)
         return model_var_map, model_cov, data_model_cross_cov
     else:

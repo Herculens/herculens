@@ -161,41 +161,43 @@ class Parameters(object):
         else:
             return deepcopy(self._map_values) if copy else self._map_values
 
-    def samples(self, as_kwargs=False):
+    def samples(self, as_kwargs=False, group_by_param=False):
         if not hasattr(self, '_samples'):
             return None
         if as_kwargs:
-            if hasattr(self, '_kwargs_samples'):
-                num_samples = self._samples.shape[0]
-                self._kwargs_samples = [self.args2kwargs(self._samples[i, :]) for i in range(num_samples)]
-            return self._kwargs_samples
-        else:
-            return self._samples
+            # TODO: save in cache + create separate class ParametersSamples to handle this in a cleaner way
+            num_samples = self._samples.shape[0]
+            kwargs_samples = [self.args2kwargs(self._samples[i, :]) for i in range(num_samples)]
+            if group_by_param:
+                kwargs_samples = self._group_kwargs_samples_by_param(kwargs_samples)
+            return kwargs_samples
+        return self._samples
 
     @property
     def covariance_matrix(self):
-        if not hasattr(self, '_cov_matrix'):
+        if hasattr(self, '_cov_matrix'):
+            return self._cov_matrix
+        elif hasattr(self, '_samples'):
+            raise NotImplementedError("Estimate covariance from samples is not yet supported.")
+        else:
             return None
-        return self._cov_matrix
 
     def set_best_fit(self, args):
         self._map_values = args
         self._kwargs_map = self.args2kwargs(self._map_values)
     
-    def set_posterior(self, samples, losses):
+    def set_posterior_samples(self, samples, losses):
         min_loss_idx = np.argmin(losses)
         self._map_values = samples[min_loss_idx, :]
         self._kwargs_map = self.args2kwargs(self._map_values)
         self._samples = samples
-        # compute covariance matrix from samples
 
-    def set_covariance_matrix(self, cov_matrix, num_samples=10000, seed=None):
+    def set_posterior_covariance(self, cov_matrix, num_samples=1000, seed=None):
         self._cov_matrix = cov_matrix
-        samples = model_util.draw_samples_from_covariance(self.best_fit_values(),
-                                                          self._cov_matrix,
-                                                          num_samples=num_samples, 
-                                                          seed=seed)
-        self._samples = samples
+        self._samples = model_util.draw_samples_from_covariance(self.best_fit_values(),
+                                                                self._cov_matrix,
+                                                                num_samples=num_samples, 
+                                                                seed=seed)
 
     def update_fixed(self, kwargs_fixed, kwargs_prior=None):
         # TODO: fill current and init values with values that were previously fixed, if needed
@@ -209,7 +211,7 @@ class Parameters(object):
             self._kwargs_prior = kwargs_prior
         self._update_arrays()
 
-    # @partial(jit, static_argnums=(0,))
+    @partial(jit, static_argnums=(0,))
     def args2kwargs(self, args):
         i = 0
         args = jnp.atleast_1d(args)
@@ -225,7 +227,7 @@ class Parameters(object):
         kwargs = {'kwargs_lens': kwargs_lens, 'kwargs_source': kwargs_source, 'kwargs_lens_light': kwargs_lens_light}
         return kwargs
 
-    # @partial(jit, static_argnums=(0,))
+    @partial(jit, static_argnums=(0,))
     def kwargs2args(self, kwargs):
         args = self._set_params(kwargs, 'mass_model_list', 'kwargs_lens')
         args += self._set_params(kwargs, 'source_model_list', 'kwargs_source')
@@ -537,6 +539,21 @@ class Parameters(object):
                     self._kwargs_init[kwargs_key][k][name] = deepcopy(kwargs_fixed_k_old[name])
                     if self.optimized:
                         self._kwargs_map[kwargs_key][k][name] = deepcopy(kwargs_fixed_k_old[name])
+
+    @partial(jit, static_argnums=(0,))
+    def _group_kwargs_samples_by_param(self, kwargs_samples):
+        kwargs_samples_grouped = {}
+        num_samples = len(kwargs_samples)
+        for kwargs_model_key, kwargs_model in kwargs_samples[0].items():
+            kwargs_samples_grouped[kwargs_model_key] = []
+            for k in range(len(kwargs_model)):
+                kwargs_samples_grouped[kwargs_model_key].append({})
+                for param_name in kwargs_samples[0][kwargs_model_key][k].keys():
+                    kwargs_samples_grouped[kwargs_model_key][k][param_name] = []
+                    for i in range(num_samples):
+                        param_values_i = kwargs_samples[i][kwargs_model_key][k][param_name]
+                        kwargs_samples_grouped[kwargs_model_key][k][param_name].append(param_values_i)
+        return kwargs_samples_grouped
 
     def _set_names(self, kwargs_model_key, kwargs_key):
         names = []
