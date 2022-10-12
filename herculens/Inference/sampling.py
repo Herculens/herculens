@@ -9,12 +9,8 @@ import time
 import numpy as np
 from functools import partial
 import jax
-from blackjax.kernels import hmc as blackjax_hmc
-from blackjax.kernels import nuts as blackjax_nuts
-from blackjax import window_adaptation
-from numpyro.infer import HMC as numpyro_HMC
-from numpyro.infer import NUTS as numpyro_NUTS
-from numpyro.infer import MCMC as numpyro_MCMC
+import blackjax
+import numpyro
 #from numpyro.infer.util import ParamInfo
 from emcee import EnsembleSampler
 
@@ -30,15 +26,15 @@ __all__ = ['Sampler']
 class Sampler(Inference):
     """Class that handles sampling tasks, i.e. approximating posterior distributions of parameters.
     It currently supports:
-    - Hamiltonian Monte Carlo from numpyro
-    - Ensemble Affine Invariant MCMC from emcee
+    - Hamiltonian Monte Carlo using blackjax or numpyro
+    - Ensemble Affine Invariant MCMC using emcee
     """
 
-    def hmc_blackjax(self, seed, num_warmup=100, num_samples=100, num_chains=1, 
-                     restart_from_init=False, sampler_type='NUTS', use_stan_warmup=True,
+    def hmc_blackjax(self, seed, num_warmup=100, num_samples=100, #num_chains=1, 
+                     restart_from_init=False, sampler_type='NUTS', use_window_adaptation=True,
                      step_size=1e-3, inv_mass_matrix=None):
         rng_key = jax.random.PRNGKey(seed)
-        logprob = self.log_probability
+        log_prob_fn = self.log_probability
         init_positions = self._param.current_values(as_kwargs=False, restart=restart_from_init)
 
         if inv_mass_matrix is None:
@@ -47,29 +43,24 @@ class Sampler(Inference):
 
         start = time.time()
         if sampler_type.lower() == 'hmc':
-            samplerclass = blackjax_hmc 
-            samplerinstance = samplerclass(logprob, step_size, inv_mass_matrix, 
-                                           num_samples)
+            sampler = blackjax.hmc(log_prob_fn, step_size, inv_mass_matrix, num_samples)
         elif sampler_type.lower()=='nuts':
-            samplerclass = blackjax_nuts 
-            samplerinstance = samplerclass(logprob, step_size, inv_mass_matrix)
+            sampler = blackjax.nuts(log_prob_fn, step_size, inv_mass_matrix)
         else:
             raise ValueError(f"Sampler/kernel type '{sampler_type}' is not supported ('NUTS' or 'HMC' only).")
 
-
-        
-        if use_stan_warmup:
+        if use_window_adaptation:
             rng_key, rng_subkey = jax.random.split(rng_key)
             # here for simplicity we use NUTS
             
 
             # update step size and inverse mass matrix during warmup with Stan
-            warmup = window_adaptation(
-                blackjax_nuts,
-                logprob, 
+            window_adaptation = blackjax.window_adaptation(
+                blackjax.nuts,
+                log_prob_fn, 
                 num_steps=num_warmup,
             )
-            warmup_state, kernel, _ = warmup.run(
+            init_state, kernel, _ = window_adaptation.run(
                 rng_key,
                 init_positions,
             )
@@ -77,20 +68,12 @@ class Sampler(Inference):
             num_warmup = 0
 
         else:
-            kernel = jax.jit(samplerinstance.step)
-        
-        
-        new_state_func = samplerinstance.init 
-        if num_chains == 1:
-            init_states = new_state_func(init_positions)
-        else:
-            init_positions = np.repeat(np.expand_dims(init_positions, axis=0), num_chains, axis=0)
-            init_states = jax.vmap(new_state_func, in_axes=(0, None))(init_positions)
-        
+            kernel = jax.jit(sampler.step)
+            init_state = sampler.init(init_positions)
         
         # run the inference
         states, infos = self._run_blackjax_inference(
-            rng_key, kernel, init_states, num_warmup + num_samples, num_chains
+            rng_key, kernel, init_state, num_warmup + num_samples, num_chains
         )
         
         samples = states.position.block_until_ready()
@@ -114,23 +97,14 @@ class Sampler(Inference):
         return samples, logL, extra_fields, runtime
 
     @staticmethod
-    def _run_blackjax_inference(rng_key, kernel, initial_state, 
-                                num_samples, num_chains):
+    def _run_blackjax_inference(rng_key, kernel, initial_state, num_samples):
         @jax.jit
         def one_step_single_chain(state, rng_key):
             state, info = kernel(rng_key, state)
             return state, (state, info)
-        @jax.jit
-        def one_step_multi_chains(states, rng_key):
-            keys = jax.random.split(rng_key, num_chains)
-            states, infos = jax.vmap(kernel)(keys, states)
-            return states, (states, infos)
 
         keys = jax.random.split(rng_key, num_samples)
-        if num_chains == 1:
-            _, (states, infos) = jax.lax.scan(one_step_single_chain, initial_state, keys)
-        else:
-            _, (states, infos) = jax.lax.scan(one_step_multi_chains, initial_state, keys)
+        _, (states, infos) = jax.lax.scan(one_step_single_chain, initial_state, keys)
         return states, infos
 
     def hmc_numpyro(self, seed, num_warmup=100, num_samples=100, num_chains=1, 
@@ -139,11 +113,13 @@ class Sampler(Inference):
         rng_key = jax.random.PRNGKey(seed)
 
         if sampler_type.lower() == 'hmc':
-            kernel = numpyro_HMC(potential_fn=self.potential_fn, kinetic_fn=self.kinetic_fn, 
-                                 **sampler_kwargs)
+            kernel = numpyro.infer.HMC(potential_fn=self.potential_fn, 
+                                       kinetic_fn=self.kinetic_fn, 
+                                       **sampler_kwargs)
         elif sampler_type.lower() == 'nuts': # NUTS stands for 'no U-turn sampler'
-            kernel = numpyro_NUTS(potential_fn=self.potential_fn, kinetic_fn=self.kinetic_fn, 
-                                  **sampler_kwargs)
+            kernel = numpyro.infer.NUTS(potential_fn=self.potential_fn, 
+                                        kinetic_fn=self.kinetic_fn, 
+                                        **sampler_kwargs)
         else:
             raise ValueError(f"Sampler/kernel type '{sampler_type}' is not supported ('NUTS' or 'HMC' only).")
         
@@ -170,8 +146,8 @@ class Sampler(Inference):
         # NOTE: disabling the progress-bar can speed up the sampling
         if num_chains > 1:
             init_params = np.repeat(np.expand_dims(init_params, axis=0), num_chains, axis=0)
-        mcmc = numpyro_MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples, 
-                            num_chains=num_chains, progress_bar=progress_bar)
+        mcmc = numpyro.infer.MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples,
+                                  num_chains=num_chains, progress_bar=progress_bar)
         mcmc.run(rng_key, init_params=init_params, extra_fields=('potential_energy', 'energy', 'r', 'accept_prob'))
         #mcmc.print_summary(exclude_deterministic=False)
         samples = mcmc.get_samples(group_by_chain=False)
