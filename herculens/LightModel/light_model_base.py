@@ -10,8 +10,7 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.LightModel.Profiles import (sersic, pixelated, uniform, 
-                                           gaussian, shapelets)
+from herculens.LightModel.Profiles import (sersic, pixelated, uniform, gaussian)
 from herculens.Util import util
 
 __all__ = ['LightModelBase']
@@ -68,6 +67,7 @@ class LightModelBase(object):
                                                      allow_extrapolation=pixel_allow_extrapolation))
                 pix_idx = idx
             elif profile_type == 'SHAPELETS':
+                from herculens.LightModel.Profiles import shapelets # prevent importing GigaLens if not used
                 func_list.append(shapelets.Shapelets(shapelets_n_max))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
