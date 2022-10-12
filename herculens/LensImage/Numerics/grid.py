@@ -8,7 +8,6 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
 import jax.numpy as np
-from jax import ops  # Try to avoid index updates eventually
 from herculens.Util import util
 from herculens.Util import image_util
 from herculens.Coordinates.coord_transforms import Coordinates1D
