@@ -15,7 +15,14 @@ __year__ = '2021'
 __url__ = 'https://github.com/austinpeel/jax-strong-lensing'
 __description__ = 'JAX-enabled autodifferentiable strong lens modelling'
 __python__ = '>=3.7'
-__requires__ = ['numpy', 'scipy', 'jax', 'jaxlib', 'findiff']  # Package dependencies
+__requires__ = [
+    'numpy>=1.20.3', 
+    'scipy>=1.6.3', 
+    'jax>=0.3.14', 
+    'jaxlib>=0.3.14', 
+    'matplotlib>=3.0.0',
+    'findiff==0.8.9',
+]  # Package dependencies
 
 # Default package properties
 __license__ = 'MIT'

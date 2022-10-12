@@ -1,6 +1,10 @@
-numpy==1.21.6
-scipy==1.7.3
-jax==0.3.17
-jaxlib==0.3.14
-matplotlib
-findiff
+numpy>=1.20.3
+scipy>=1.6.3
+jax>=0.3.14
+jaxlib>=0.3.14
+matplotlib>=3.0.0
+findiff==0.8.9
+
+# the following packages are optional (pay attention at the versions) 
+#blackjax==0.9.6
+#numpyro==0.10.1
