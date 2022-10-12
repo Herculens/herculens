@@ -20,6 +20,7 @@ __requires__ = [
     'scipy>=1.6.3', 
     'jax>=0.3.14', 
     'jaxlib>=0.3.14', 
+    'optax==0.0.9',
     'matplotlib>=3.0.0',
     'findiff==0.8.9',
 ]  # Package dependencies
