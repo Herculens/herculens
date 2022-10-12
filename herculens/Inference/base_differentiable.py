@@ -6,7 +6,7 @@ __author__ = 'aymgal'
 
 
 from functools import partial
-from jax import jit, grad, jacfwd, jacrev, jvp
+from jax import jit, grad, jacfwd, jacrev, jvp, value_and_grad
 
 
 __all__ = ['Differentiable']
@@ -30,6 +30,10 @@ class Differentiable(object):
     def gradient(self, args):
         """gradient (first derivative) of the loss function"""
         return grad(self._func)(args)
+
+    @partial(jit, static_argnums=(0,))
+    def value_and_gradient(self, args):
+        return value_and_grad(self._func)(args)
 
     @partial(jit, static_argnums=(0,))
     def hessian(self, args):
