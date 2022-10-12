@@ -5,7 +5,6 @@
 __author__ = 'aymgal'
 
 import jax.numpy as jnp
-from gigalens.jax.profiles.light.shapelets import Shapelets as ShapeletsGigaLens
 
 
 __all__= ['Shapelets']
@@ -19,6 +18,8 @@ class Shapelets(object):
     fixed_default = {key: False for key in param_names}
 
     def __init__(self, n_max, function_type='gaussian'):
+        from gigalens.jax.profiles.light.shapelets import Shapelets as ShapeletsGigaLens
+        
         if function_type == 'gaussian':
             self._n_max = n_max
             self._backend = ShapeletsGigaLens(self._n_max, use_lstsq=False, interpolate=False)
