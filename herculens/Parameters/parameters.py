@@ -211,7 +211,7 @@ class Parameters(object):
             self._kwargs_prior = kwargs_prior
         self._update_arrays()
 
-    @partial(jit, static_argnums=(0,))
+    # @partial(jit, static_argnums=(0,))
     def args2kwargs(self, args):
         i = 0
         args = jnp.atleast_1d(args)
@@ -227,7 +227,7 @@ class Parameters(object):
         kwargs = {'kwargs_lens': kwargs_lens, 'kwargs_source': kwargs_source, 'kwargs_lens_light': kwargs_lens_light}
         return kwargs
 
-    @partial(jit, static_argnums=(0,))
+    # @partial(jit, static_argnums=(0,))
     def kwargs2args(self, kwargs):
         args = self._set_params(kwargs, 'mass_model_list', 'kwargs_lens')
         args += self._set_params(kwargs, 'source_model_list', 'kwargs_source')
