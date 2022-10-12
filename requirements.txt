@@ -3,3 +3,4 @@ scipy
 jax
 jaxlib
 matplotlib
+findiff
