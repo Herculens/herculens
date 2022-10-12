@@ -9,10 +9,6 @@ import time
 import numpy as np
 from functools import partial
 import jax
-import blackjax
-import numpyro
-#from numpyro.infer.util import ParamInfo
-from emcee import EnsembleSampler
 
 from herculens.Inference.base_inference import Inference
 
@@ -31,8 +27,10 @@ class Sampler(Inference):
     """
 
     def hmc_blackjax(self, seed, num_warmup=100, num_samples=100, #num_chains=1, 
-                     restart_from_init=False, sampler_type='NUTS', use_window_adaptation=True,
+                     restart_from_init=False, sampler_type='NUTS', use_stan_warmup=True,
                      step_size=1e-3, inv_mass_matrix=None):
+        import blackjax
+
         rng_key = jax.random.PRNGKey(seed)
         log_prob_fn = self.log_probability
         init_positions = self._param.current_values(as_kwargs=False, restart=restart_from_init)
@@ -44,12 +42,12 @@ class Sampler(Inference):
         start = time.time()
         if sampler_type.lower() == 'hmc':
             sampler = blackjax.hmc(log_prob_fn, step_size, inv_mass_matrix, num_samples)
-        elif sampler_type.lower()=='nuts':
+        elif sampler_type.lower() == 'nuts':
             sampler = blackjax.nuts(log_prob_fn, step_size, inv_mass_matrix)
         else:
             raise ValueError(f"Sampler/kernel type '{sampler_type}' is not supported ('NUTS' or 'HMC' only).")
 
-        if use_window_adaptation:
+        if use_stan_warmup and sampler_type.lower() == 'nuts':
             rng_key, rng_subkey = jax.random.split(rng_key)
             # here for simplicity we use NUTS
             
@@ -72,9 +70,13 @@ class Sampler(Inference):
             init_state = sampler.init(init_positions)
         
         # run the inference
-        states, infos = self._run_blackjax_inference(
-            rng_key, kernel, init_state, num_warmup + num_samples, num_chains
-        )
+        @jax.jit
+        def one_step_single_chain(state, rng_key):
+            state, info = kernel(rng_key, state)
+            return state, (state, info)
+
+        keys = jax.random.split(rng_key, num_warmup + num_samples)
+        _, (states, infos) = jax.lax.scan(one_step_single_chain, init_state, keys)
         
         samples = states.position.block_until_ready()
         logL = infos.energy
@@ -96,20 +98,12 @@ class Sampler(Inference):
         }
         return samples, logL, extra_fields, runtime
 
-    @staticmethod
-    def _run_blackjax_inference(rng_key, kernel, initial_state, num_samples):
-        @jax.jit
-        def one_step_single_chain(state, rng_key):
-            state, info = kernel(rng_key, state)
-            return state, (state, info)
-
-        keys = jax.random.split(rng_key, num_samples)
-        _, (states, infos) = jax.lax.scan(one_step_single_chain, initial_state, keys)
-        return states, infos
-
     def hmc_numpyro(self, seed, num_warmup=100, num_samples=100, num_chains=1, 
                     restart_from_init=False, sampler_type='NUTS', 
                     progress_bar=True, sampler_kwargs={}):
+        import numpyro
+        #from numpyro.infer.util import ParamInfo
+
         rng_key = jax.random.PRNGKey(seed)
 
         if sampler_type.lower() == 'hmc':
@@ -128,8 +122,17 @@ class Sampler(Inference):
         #init_params = ParamInfo(init_params, potential_fn(init_params), kinetic_fn(init_params))
         num_dims = len(init_params)
         start = time.time()
-        samples, extra_fields = self._run_numpyro_inference(kernel, init_params, rng_key, 
-                                                            num_warmup, num_samples, num_chains, progress_bar)
+        
+        # NOTE: disabling the progress-bar can speed up the sampling
+        if num_chains > 1:
+            init_params = np.repeat(np.expand_dims(init_params, axis=0), num_chains, axis=0)
+        mcmc = numpyro.infer.MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples,
+                                  num_chains=num_chains, progress_bar=progress_bar)
+        mcmc.run(rng_key, init_params=init_params, extra_fields=('potential_energy', 'energy', 'r', 'accept_prob'))
+        #mcmc.print_summary(exclude_deterministic=False)
+        samples = mcmc.get_samples(group_by_chain=False)
+        extra_fields = mcmc.get_extra_fields()
+
         runtime = time.time() - start
         logL = - extra_fields['potential_energy']
         samples = np.asarray(samples)
@@ -141,19 +144,6 @@ class Sampler(Inference):
         self._param.set_posterior_samples(samples, logL)
         return samples, logL, extra_fields, runtime
 
-    @staticmethod
-    def _run_numpyro_inference(kernel, init_params, rng_key, num_warmup, num_samples, num_chains, progress_bar):
-        # NOTE: disabling the progress-bar can speed up the sampling
-        if num_chains > 1:
-            init_params = np.repeat(np.expand_dims(init_params, axis=0), num_chains, axis=0)
-        mcmc = numpyro.infer.MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples,
-                                  num_chains=num_chains, progress_bar=progress_bar)
-        mcmc.run(rng_key, init_params=init_params, extra_fields=('potential_energy', 'energy', 'r', 'accept_prob'))
-        #mcmc.print_summary(exclude_deterministic=False)
-        samples = mcmc.get_samples(group_by_chain=False)
-        extra_fields = mcmc.get_extra_fields()
-        return samples, extra_fields
-
     def mcmc_emcee(self, log_likelihood_fn, init_stds, walker_ratio=10, 
                    num_warmup=100, num_samples=100, 
                    restart_from_init=False, num_threads=1, progress_bar=True):
@@ -161,6 +151,8 @@ class Sampler(Inference):
         emcee MCMC sampling
         Warning: `log_likelihood_fn` needs to be non.jitted (emcee pickles this function, which is incomptabile with JAX objetcs)
         """
+        import emcee
+
         if num_threads > 1:
             from lenstronomy.Sampling.Pool.pool import choose_pool  # TODO: remove this dependence
             pool = choose_pool(mpi=False, processes=num_threads, use_dill=True)
@@ -173,8 +165,8 @@ class Sampler(Inference):
                                             np.asarray(init_stds), 
                                             size=num_walkers, dist='normal')
         start = time.time()
-        sampler = EnsembleSampler(num_walkers, num_dims, log_likelihood_fn,
-                                  pool=pool, backend=None)
+        sampler = emcee.EnsembleSampler(num_walkers, num_dims, log_likelihood_fn,
+                                        pool=pool, backend=None)
         sampler.run_mcmc(init_params, num_warmup + num_samples, progress=progress_bar)
         runtime = time.time() - start
         samples = sampler.get_chain(discard=num_warmup, thin=1, flat=True)
