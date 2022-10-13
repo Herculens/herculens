@@ -50,7 +50,7 @@ New notebooks will be added soon in order to showcase other features of the pack
 
 ### Manual installation
 
-The package will be soon available through PyPi directly, but it is as easy to install it manually.
+The package will be soon available through PyPi directly, but it is as easy to install it manually. It has been texted against Python 3.7, but should work with Python 3.8 or more recent versions.
 
 Good practice is to create a new python environment:
 ```sh
@@ -69,25 +69,7 @@ The following dependencies will be installed automatically.
 
 ### External package requirements
 
-`herculens` has been tested with the versions mentioned in parenthesis. It could still work well with newer versions though.
-
-#### Necessary
-- [`jax`](https://github.com/google/jax) (0.3.17)
-- `jaxlib` (0.3.14)
-- `numpy` (1.21.6)
-- `scipy` (1.7.3)
-
-#### Optional
-- [`optax`](https://github.com/deepmind/optax) (0.1.3), for advanced gradient descent algorithms 
-- [`numpyro`](https://github.com/pyro-ppl/numpyro) (0.10), for HMC sampling
-- [`blackjax`](https://github.com/blackjax-devs/blackjax) (0.8.3), for `jax`-based HMC sampling integrated with 
-- [`dynesty`](https://github.com/joshspeagle/dynesty) (1.1), for nested sampling
-- [`jaxns`](https://github.com/Joshuaalbert/jaxns) (1.1), for `jax`-based nested sampling
-- [`emcee`](https://github.com/dfm/emcee) (3.1.2), for Ensemble MCMC sampling
-- [`gigalens`](https://github.com/giga-lens/gigalens) (0.1.8), for a `jax` implementation of Shapelets
-- [`lenstronomy`](https://github.com/sibirrer/lenstronomy) (1.9.3), for interpolated Shapelets (via `gigalens`) and particle swarm optimization
-
-To run the notebooks, `jupyter` and `matplotlib` are also necessary.
+The [`requirements.txt`](requirements.txt) file lists all required and optional package dependencies, along with their specific versions.
 
 
 
