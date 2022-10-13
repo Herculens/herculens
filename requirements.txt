@@ -1,6 +1,15 @@
-numpy
-scipy
-jax
-jaxlib
-matplotlib
-findiff
+numpy>=1.20.3
+scipy>=1.6.3
+jax>=0.3.14
+jaxlib>=0.3.14
+optax>=0.1.0
+chex>=0.1.4
+matplotlib>=3.0.0
+findiff==0.8.9
+
+# the following packages are optional (pay attention at the versions) 
+#blackjax==0.9.6     # for HMC sampling
+#numpyro==0.10.1     # for JAX-based HMC sampling integrated with 
+#emcee==3.0.2        # for Ensemble MCMC sampling
+#gigalens==0.1.8     # for a JAX implementation of Shapelets
+#lenstronomy>=1.9.0  # for interpolated Shapelets (via `gigalens`), or for Particle Swarm Optimization

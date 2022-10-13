@@ -8,6 +8,7 @@ __author__ = 'aymgal', 'austinpeel'
 import time
 import warnings
 import numpy as np
+import jax
 import optax
 from scipy import optimize
 from scipy.optimize import Bounds
@@ -166,7 +167,15 @@ class Optimizer(Inference):
         # Initialise optimizer state
         params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
         opt_state = optim.init(params)
-        prev_params, prev_loss = params, 1e10
+        prev_params, prev_loss_val = params, 1e10
+
+        @jax.jit
+        def gradient_step(params, opt_state):
+            #loss_val, grads = jax.value_and_grad(self._loss)(params)
+            loss_val, grads = self._loss.value_and_gradient(params)
+            updates, opt_state = optim.update(grads, opt_state, params)
+            params = optax.apply_updates(params, updates)
+            return params, opt_state, loss_val
 
         # Gradient descent loop
         param_history = []
@@ -175,15 +184,13 @@ class Optimizer(Inference):
         for i in self._for_loop(range(max_iterations), progress_bar, 
                                 total=max_iterations, 
                                 desc=f"optax.{algorithm}"):
-            updates, opt_state = optim.update(self._loss.gradient(params), opt_state, params)
-            params = optax.apply_updates(params, updates)
-            loss = self._loss(params)
+            params, opt_state, loss_val = gradient_step(params, opt_state)
             if stop_at_loss_increase and i > min_iterations and loss > prev_loss:
-                params, loss = prev_params, prev_loss
+                params, loss_val = prev_params, prev_loss_val
                 break
             else:
-                loss_history.append(loss)  # TODO: use jax.value_and_grad instead? but does it jit the gradient??
-                prev_params, prev_loss = params, loss
+                loss_history.append(loss_val)  # TODO: use jax.value_and_grad instead? but does it jit the gradient??
+                prev_params, prev_loss_val = params, loss_val
             if return_param_history is True:
                 param_history.append(params)
         runtime = time.time() - start_time

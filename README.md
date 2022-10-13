@@ -22,7 +22,7 @@ Currently, `herculens` supports several of the most widely-used analytical profi
 
 ## `JAX`-based automatic differentiation and code compilation 
 
-`herculens` is based on the powerful framework of **differentiable programming**. The code is entirely based on the automatic differentiation and compilation features of [`JAX`](https://github.com/google/jax). This simply means that you have access, _analytically_, to all partial derivatives of your model with respect to any of its parameters. This enables faster convergence to the solution, more efficient exploration of the parameter space including the sampling of posterior distributions, and new ways to mitigate degeneracies that affect gravitational lensing.
+`herculens` is based on the powerful framework of **differentiable programming**. The code is entirely based on the automatic differentiation and compilation features of [JAX](https://jax.readthedocs.io/en/latest/#). This simply means that you have access, _analytically_, to all partial derivatives of your model with respect to any of its parameters. This enables faster convergence to the solution, more efficient exploration of the parameter space including the sampling of posterior distributions, and new ways to mitigate degeneracies that affect gravitational lensing.
 
 This highly modular framework offers a way to merge all modeling paradigms explored in the literature, into a single tool:
 
@@ -50,7 +50,7 @@ New notebooks will be added soon in order to showcase other features of the pack
 
 ### Manual installation
 
-The package will be soon available through PyPi directly, but it is as easy to install it manually.
+The package will be soon available through PyPi directly, but it is as easy to install it manually. It has been texted against Python 3.7, but should work with Python 3.8 or more recent versions.
 
 Good practice is to create a new python environment:
 ```sh
@@ -69,25 +69,7 @@ The following dependencies will be installed automatically.
 
 ### External package requirements
 
-We tested `herculens` with the versions mentioned in parenthesis. It does not mean that it breaks for newer versions though.
-
-#### Necessary
-- `jax` (0.2.13)
-- `jaxlib` (0.1.67)
-- `numpy` (1.20.3)
-- `scipy` (1.6.3)
-
-#### Optional
-- `optax` (0.0.9), for advanced gradient descent algorithms 
-- `numpyro` (0.7.1), for HMC sampling
-- `blackjax` (0.7.1), for `jax`-based HMC sampling integrated with 
-- `dynesty` (1.1), for nested sampling
-- `jaxns` (1.1), for `jax`-based nested sampling
-- `emcee` (3.0.2), for Ensemble MCMC sampling
-- `lenstronomy` (1.9.3), for particle swarm optimization
-- `palettable` (3.3.0), for nicer colormaps for plots
-
-To run the notebooks, `jupyter` and `matplotlib` are also necessary.
+The [`requirements.txt`](requirements.txt) file lists all required and optional package dependencies, along with their specific versions.
 
 
 

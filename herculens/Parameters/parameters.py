@@ -8,15 +8,17 @@ __author__ = 'aymgal'
 from copy import deepcopy
 import numpy as np
 import jax.numpy as jnp
-from jax import lax
+from jax import lax, jit
+from functools import partial
 
 from herculens.MassModel.Profiles import pixelated as pixelated_lens
 from herculens.MassModel.Profiles import (epl, sie, sis, nie, shear, point_mass, 
                                           gaussian_potential, multipole)
 from herculens.LightModel.Profiles import pixelated as pixelated_light
-from herculens.LightModel.Profiles import gaussian, sersic, uniform
+from herculens.LightModel.Profiles import gaussian, sersic, uniform, shapelets
 from herculens.MassModel.mass_model_base import SUPPORTED_MODELS as MASS_MODELS
 from herculens.LightModel.light_model_base import SUPPORTED_MODELS as LIGHT_MODELS
+from herculens.Util import model_util
 
 
 __all__ = ['Parameters']
@@ -50,7 +52,7 @@ class Parameters(object):
             (lens_light_index2, lens_index2), [param3, param4, ...]
         ],
         ...
-    ]'lens_with_lens_light' : [(lens_light_index, lens_index), [param1, param2, ...]]
+    ]
     """
 
     _unif_prior_penalty = 1e10
@@ -159,13 +161,43 @@ class Parameters(object):
         else:
             return deepcopy(self._map_values) if copy else self._map_values
 
+    def samples(self, as_kwargs=False, group_by_param=False):
+        if not hasattr(self, '_samples'):
+            return None
+        if as_kwargs:
+            # TODO: save in cache + create separate class ParametersSamples to handle this in a cleaner way
+            num_samples = self._samples.shape[0]
+            kwargs_samples = [self.args2kwargs(self._samples[i, :]) for i in range(num_samples)]
+            if group_by_param:
+                kwargs_samples = self._group_kwargs_samples_by_param(kwargs_samples)
+            return kwargs_samples
+        return self._samples
+
+    @property
+    def covariance_matrix(self):
+        if hasattr(self, '_cov_matrix'):
+            return self._cov_matrix
+        elif hasattr(self, '_samples'):
+            raise NotImplementedError("Estimate covariance from samples is not yet supported.")
+        else:
+            return None
+
     def set_best_fit(self, args):
         self._map_values = args
         self._kwargs_map = self.args2kwargs(self._map_values)
     
-    def set_posterior(self, samples):
-        self._map_values = np.median(samples, axis=0)
+    def set_posterior_samples(self, samples, losses):
+        min_loss_idx = np.argmin(losses)
+        self._map_values = samples[min_loss_idx, :]
         self._kwargs_map = self.args2kwargs(self._map_values)
+        self._samples = samples
+
+    def set_posterior_covariance(self, cov_matrix, num_samples=1000, seed=None):
+        self._cov_matrix = cov_matrix
+        self._samples = model_util.draw_samples_from_covariance(self.best_fit_values(),
+                                                                self._cov_matrix,
+                                                                num_samples=num_samples, 
+                                                                seed=seed)
 
     def update_fixed(self, kwargs_fixed, kwargs_prior=None):
         # TODO: fill current and init values with values that were previously fixed, if needed
@@ -179,6 +211,7 @@ class Parameters(object):
             self._kwargs_prior = kwargs_prior
         self._update_arrays()
 
+    # @partial(jit, static_argnums=(0,))
     def args2kwargs(self, args):
         i = 0
         args = jnp.atleast_1d(args)
@@ -194,18 +227,7 @@ class Parameters(object):
         kwargs = {'kwargs_lens': kwargs_lens, 'kwargs_source': kwargs_source, 'kwargs_lens_light': kwargs_lens_light}
         return kwargs
 
-    @staticmethod
-    def _join_params(kwargs_list_1, kwargs_list_2, joint_setting_list):
-        for setting in joint_setting_list:
-            (i_1, k_2), param_list = setting
-            for param_names in param_list:
-                if isinstance(param_names, (tuple, list)) and len(param_names) > 1:
-                    param_name_1, param_name_2 = param_names
-                else:
-                    param_name_1 = param_name_2 = param_names
-                kwargs_list_2[k_2][param_name_2] = kwargs_list_1[i_1][param_name_1]
-        return kwargs_list_2
-
+    # @partial(jit, static_argnums=(0,))
     def kwargs2args(self, kwargs):
         args = self._set_params(kwargs, 'mass_model_list', 'kwargs_lens')
         args += self._set_params(kwargs, 'source_model_list', 'kwargs_source')
@@ -282,6 +304,8 @@ class Parameters(object):
                 profile_class = uniform.Uniform
             elif model == 'PIXELATED':
                 profile_class = pixelated_light.Pixelated
+            elif model == 'SHAPELETS':
+                profile_class = shapelets.Shapelets
         elif kwargs_key == 'kwargs_lens':
             if model not in MASS_MODELS:
                 raise ValueError("'{model}' is not supported.")
@@ -328,6 +352,10 @@ class Parameters(object):
             delattr(self, '_names')
         if hasattr(self, '_symbols'):
             delattr(self, '_symbols')
+        if hasattr(self, '_samples'):
+            delattr(self, '_samples')
+        if hasattr(self, '_kwargs_samples'):
+            delattr(self, '_kwargs_samples')
 
     def _update_fixed_with_joint(self, kwargs_fixed, kwargs_joint):
         kwargs_fixed = self._update_fixed_with_joint_one(kwargs_fixed, kwargs_joint, 'kwargs_lens', 'lens_with_lens')
@@ -350,6 +378,18 @@ class Parameters(object):
                 kwargs_fixed_updt[kwargs_key][k_2][param_name_2] = 0
         return kwargs_fixed_updt
 
+    @staticmethod
+    def _join_params(kwargs_list_1, kwargs_list_2, joint_setting_list):
+        for setting in joint_setting_list:
+            (i_1, k_2), param_list = setting
+            for param_names in param_list:
+                if isinstance(param_names, (tuple, list)) and len(param_names) > 1:
+                    param_name_1, param_name_2 = param_names
+                else:
+                    param_name_1 = param_name_2 = param_names
+                kwargs_list_2[k_2][param_name_2] = kwargs_list_1[i_1][param_name_1]
+        return kwargs_list_2
+
     def _get_params(self, args, i, kwargs_model_key, kwargs_key):
         kwargs_list = []
         for k, model in enumerate(self.kwargs_model[kwargs_model_key]):
@@ -367,6 +407,14 @@ class Parameters(object):
                             n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                         num_param = int(n_pix_x * n_pix_y)
                         kwargs['pixels'] = args[i:i + num_param].reshape(n_pix_x, n_pix_y)
+                    elif model == 'SHAPELETS' and name == 'amps':
+                        if kwargs_key == 'kwargs_source':
+                            num_param = self._image.SourceModel.num_amplitudes_list[k]
+                        elif kwargs_key == 'kwargs_lens_light':
+                            num_param = self._image.LensLightModel.num_amplitudes_list[k]
+                        else:
+                            raise ValueError("Basis functions can only be in the source or lens light.")
+                        kwargs['amps'] = args[i:i + num_param]
                     else:
                         num_param = 1
                         kwargs[name] = args[i]
@@ -397,6 +445,17 @@ class Parameters(object):
                         elif pixels.shape != (n_pix_x, n_pix_y):
                             raise ValueError("Pixelated array is inconsistent with pixelated grid.")
                         args += pixels.flatten().tolist()
+                    elif model == 'SHAPELETS' and name == 'amps':
+                        amps = kwargs_profile['amps']
+                        if kwargs_key == 'kwargs_source':
+                            num_param = self._image.SourceModel.num_amplitudes_list[k]
+                        elif kwargs_key == 'kwargs_lens_light':
+                            num_param = self._image.LensLightModel.num_amplitudes_list[k]
+                        else:
+                            raise ValueError("Basis functions can only be in the source or lens light.")
+                        if len(amps) != num_param:
+                            raise ValueError("Number of functions' amplitudes is not the on expected.")
+                        args += np.asarray(amps).flatten().tolist()
                     else:
                         args.append(kwargs_profile[name])
         return args
@@ -422,6 +481,11 @@ class Parameters(object):
                         elif kwargs_key == 'kwargs_lens_light':
                             n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                         num_param = int(n_pix_x * n_pix_y)
+                    elif model == 'SHAPELETS' and name == 'amps':
+                        if kwargs_key == 'kwargs_source':
+                            num_param = self._image.SourceModel.num_amplitudes_list[k]
+                        elif kwargs_key == 'kwargs_lens_light':
+                            num_param = self._image.LensLightModel.num_amplitudes_list[k]
                     else:
                         num_param = 1
                     
@@ -447,7 +511,7 @@ class Parameters(object):
                             widths.append(np.nan)
 
                     elif prior_type == 'gaussian':
-                        if model == 'PIXELATED':
+                        if model in ['PIXELATED', 'SHAPELETS']:
                             raise ValueError(f"'gaussian' prior for '{model}' model is not supported")
                         else:
                             types.append(prior_type)
@@ -476,6 +540,21 @@ class Parameters(object):
                     if self.optimized:
                         self._kwargs_map[kwargs_key][k][name] = deepcopy(kwargs_fixed_k_old[name])
 
+    @partial(jit, static_argnums=(0,))
+    def _group_kwargs_samples_by_param(self, kwargs_samples):
+        kwargs_samples_grouped = {}
+        num_samples = len(kwargs_samples)
+        for kwargs_model_key, kwargs_model in kwargs_samples[0].items():
+            kwargs_samples_grouped[kwargs_model_key] = []
+            for k in range(len(kwargs_model)):
+                kwargs_samples_grouped[kwargs_model_key].append({})
+                for param_name in kwargs_samples[0][kwargs_model_key][k].keys():
+                    kwargs_samples_grouped[kwargs_model_key][k][param_name] = []
+                    for i in range(num_samples):
+                        param_values_i = kwargs_samples[i][kwargs_model_key][k][param_name]
+                        kwargs_samples_grouped[kwargs_model_key][k][param_name].append(param_values_i)
+        return kwargs_samples_grouped
+
     def _set_names(self, kwargs_model_key, kwargs_key):
         names = []
         short_id = kwargs_key.replace('kwargs_', '')
@@ -488,18 +567,24 @@ class Parameters(object):
                         if kwargs_key == 'kwargs_lens':
                             n_pix_x, n_pix_y = self._image.MassModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
-                            names_k = [f"d_{i}" for i in range(num_param)]  # 'd' for deflector
+                            names_k = [f"psi_{i}" for i in range(num_param)]  # 'psi' for deflector
                         elif kwargs_key == 'kwargs_source':
                             n_pix_x, n_pix_y = self._image.SourceModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
                             names_k = [f"s_{i}" for i in range(num_param)]  # 's' for source
-                        elif kwargs_key == 'kwargs_lens':
+                        elif kwargs_key == 'kwargs_lens_light':
                             n_pix_x, n_pix_y = self._image.LensLightModel.pixelated_shape
                             num_param = int(n_pix_x * n_pix_y)
-                            names_k = [f"dpsi_{i}" for i in range(num_param)]  # 'dpsi' for potential corrections
+                            names_k = [f"l_{i}" for i in range(num_param)]  # 'l' for potential
+                    elif model == 'SHAPELETS' and name == 'amps':
+                        if kwargs_key == 'kwargs_source':
+                            num_param = self._image.SourceModel.num_amplitudes_list[k]
+                        elif kwargs_key == 'kwargs_lens':
+                            num_param = self._image.LensLightModel.num_amplitudes_list[k]
+                        names_k = [f"amp_{i}" for i in range(num_param)]
                     else:
                         names_k = [name]
-                    names += [f"{n}-{short_id}-{k}" for n in names_k]  # assign a 
+                    names += [f"{n}-{short_id}-{k}" for n in names_k]  # assign a unique identifier
         return names
 
     @staticmethod
@@ -508,14 +593,12 @@ class Parameters(object):
         name, model_type, profile_idx = name_raw.split('-')   # encapsulate this line in a well-named method
 
         # pixelated models
-        if name[:2] == 'd_':  
-            latex = r"$d_{" + r"{}".format(int(name[2:])) + r"}$"
-        elif name[:2] == 's_':  
+        if name[:2] == 's_':  
             latex = r"$s_{" + r"{}".format(int(name[2:])) + r"}$"
-        elif name[:5] == 'dpsi_':  
-            latex = r"$\delta\psi_{" + r"{}".format(int(name[5:])) + r"}$"
-        elif name == 'pixels':
-            latex = r"{\rm pixels}"
+        elif name[:2] == 'l_':  
+            latex = r"$l_{" + r"{}".format(int(name[2:])) + r"}$"
+        elif name[:4] == 'psi_':  
+            latex = r"$\psi_{" + r"{}".format(int(name[4:])) + r"}$"
 
         # analytical models
         elif name == 'theta_E':
@@ -554,8 +637,6 @@ class Parameters(object):
             latex = r"$a_m$"
         elif name == 'phi_m':
             latex = r"$\phi_m$"
-        elif name == 'psi':
-            latex = r"\psi"
         else:
             raise ValueError("latex symbol for variable '{}' is unknown".format(name))
         return latex

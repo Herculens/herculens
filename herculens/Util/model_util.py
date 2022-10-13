@@ -39,7 +39,7 @@ def mask_from_source_area(lens_image, parameters):
 
 
 def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
-                            threshold=0.1, smoothing=0):
+                            threshold=0.1, smoothing=0, kwargs_numerics=None):
     # imports are here to avoid issues with circular imports
     from herculens.LensImage.lens_image import LensImage
     from herculens.LightModel.light_model import LightModel
@@ -49,7 +49,8 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
                          "if no parameters are provided.")
     if parameters is not None:
         kwargs_param = parameters.current_values(as_kwargs=True)
-        source_model = lens_image.source_surface_brightness(kwargs_param['kwargs_source'], de_lensed=True, unconvolved=True)
+        source_model = lens_image.source_surface_brightness(kwargs_param['kwargs_source'], 
+                                                            de_lensed=True, unconvolved=True)
     source_model = np.array(source_model)
     if smoothing > 0:
         source_model = ndimage.gaussian_filter(source_model, sigma=smoothing)
@@ -57,13 +58,12 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
     binary_source[binary_source < threshold] = 0.
     binary_source[binary_source >= threshold] = 1.
     grid = copy.deepcopy(lens_image.Grid)
-    grid.remove_model_grid('source')
     lens_image_pixel = LensImage(grid, lens_image.PSF, 
                                  noise_class=lens_image.Noise,
                                  lens_mass_model_class=lens_image.MassModel,
                                  source_model_class=LightModel(['PIXELATED']),
                                  lens_light_model_class=lens_image.LensLightModel,
-                                 kwargs_numerics=lens_image._kwargs_numerics)
+                                 kwargs_numerics=kwargs_numerics)
     kwargs_param_mask = copy.deepcopy(kwargs_param)
     kwargs_param_mask['kwargs_source'] = [{'pixels': jnp.array(binary_source)}]
     model_mask = lens_image_pixel.source_surface_brightness(kwargs_param_mask['kwargs_source'], 
@@ -141,7 +141,6 @@ def halo_sensitivity_map(macro_lens_image, macro_parameters, data,
     halo_mass_model = MassModel(halo_mass_model_list)
 
     grid = copy.deepcopy(macro_lens_image.Grid)
-    #grid.remove_model_grid('lens')
     psf = copy.deepcopy(macro_lens_image.PSF)
     noise = copy.deepcopy(macro_lens_image.Noise)
     halo_lens_image = LensImage(grid, psf, noise_class=noise,
@@ -234,7 +233,7 @@ def pixel_pot_noise_map(lens_image, kwargs_res, k_src=None, cut=1e-5):
 
     # rescaled to potential grid
     x_in, y_in = lens_image.Grid.pixel_axes
-    x_out, y_out = lens_image.Grid.model_pixel_axes('lens')
+    x_out, y_out = lens_image.MassModel.pixel_grid.pixel_axes
     potential_noise_map = image_util.re_size_array(x_in, y_in, potential_noise_map, x_out, y_out)
     
     return potential_noise_map
@@ -303,7 +302,7 @@ def pixel_pot_noise_map_deriv(lens_image, kwargs_res, k_src=None, cut=1e-5,
 
     # rebin to potential grid
     x_in, y_in = lens_image.Grid.pixel_axes
-    x_out, y_out = lens_image.Grid.model_pixel_axes('lens')
+    x_out, y_out = lens_image.MassModel.pixel_grid.pixel_axes
     potential_noise_map = image_util.re_size_array(x_in, y_in, potential_noise_map, x_out, y_out)
 
     # rescale to each wavelet scale
@@ -358,7 +357,7 @@ def data_noise_to_wavelet_potential(data, lens_image, kwargs_res, k_src=None,
     # extract coordinates grid, in image plane, ray-shot to source plane, and for the pixelated potential
     x_grid_d, y_grid_d = lens_image.Grid.pixel_coordinates
     x_grid_rs, y_grid_rs = mass_model.ray_shooting(x_grid_d, y_grid_d, kwargs_lens)
-    x_grid_psi, y_grid_psi = lens_image.Grid.model_pixel_coordinates('lens')
+    x_grid_psi, y_grid_psi = lens_image.MassModel.pixel_grid.pixel_coordinates
 
     # number of pixels and wavelet scales
     nx_d, ny_d = x_grid_d.shape
@@ -518,8 +517,6 @@ def estimate_model_covariance(lens_image, parameters, samples, return_cross_cova
         data_samples = draw_samples_from_covariance(data_mean_proxy, data_cov, num_samples=len(model_samples))
         data_vector  = np.mean(data_samples - data_samples.mean(axis=0), axis=0)
         model_vector = np.mean(model_samples - model_samples.mean(axis=0), axis=0)
-        print("D", data_vector.shape)
-        print("M", model_vector.shape)
         data_model_cross_cov = np.outer(data_vector, model_vector)
         return model_var_map, model_cov, data_model_cross_cov
     else:

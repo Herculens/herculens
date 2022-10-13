@@ -9,9 +9,11 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 import numpy as np
 import jax.numpy as jnp
-from jax.scipy import signal
+import jax.scipy as jsp
+
 from herculens.Util.jax_util import GaussianFilter
 from herculens.Util import util, kernel_util, image_util
+from herculens.Util.linear_util import build_convolution_matrix
 
 
 __all__ = ['PixelKernelConvolution', 'SubgridKernelConvolution', 'GaussianConvolution']
@@ -19,16 +21,29 @@ __all__ = ['PixelKernelConvolution', 'SubgridKernelConvolution', 'GaussianConvol
 
 class PixelKernelConvolution(object):
     """
-    class to compute convolutions for a given pixelized kernel (fft, grid)
+    class to compute convolutions for a given pixelized kernel
     """
-    def __init__(self, kernel):
+
+    _conv_types = ['jax_scipy', 'matrix']
+
+    def __init__(self, kernel, convolution_type='jax_scipy', output_shape=None):
         """
 
         :param kernel: 2d array, convolution kernel
-        :param convolution_type: string, 'fft', 'grid', 'fft_static' mode of 2d convolution
         """
         self._kernel = kernel
-        self._type = convolution_type
+        if convolution_type not in self._conv_types:
+            raise ValueError(f"Convolution type '{convolution_type}' not supported "
+                             f"(should in {self._conv_types}).")
+        self._conv_type = convolution_type
+        if self._conv_type == 'matrix':
+            if output_shape is None:
+                raise ValueError("An output shape must be provided to build the convolution matrix.")
+            self._conv_matrix  = build_convolution_matrix(kernel, output_shape)
+            self._output_shape = output_shape
+        else:
+            self._conv_matrix  = None
+            self._output_shape = None
 
     def pixel_kernel(self, num_pix=None):
         """
@@ -47,8 +62,10 @@ class PixelKernelConvolution(object):
         :param image: 2d array (image) to be convolved
         :return: fft convolution
         """
-        image_conv = signal.convolve2d(image, self._kernel, mode='same')
-        return image_conv
+        if self._conv_type == 'jax_scipy':
+            return jsp.signal.convolve2d(image, self._kernel, mode='same')
+        elif self._conv_type == 'matrix':
+            return self._conv_matrix.dot(image.flatten()).reshape(*self._output_shape)
 
     def re_size_convolve(self, image_low_res, image_high_res=None):
         """
@@ -58,12 +75,17 @@ class PixelKernelConvolution(object):
         """
         return self.convolution2d(image_low_res)
 
+    @property
+    def convolution_matrix(self):
+        return self._conv_matrix
+
+
 
 class SubgridKernelConvolution(object):
     """
     class to compute the convolution on a supersampled grid with partial convolution computed on the regular grid
     """
-    def __init__(self, kernel_supersampled, supersampling_factor, supersampling_kernel_size=None, convolution_type='fft_static'):
+    def __init__(self, kernel_supersampled, supersampling_factor, supersampling_kernel_size=None):
         """
 
         :param kernel_supersampled: kernel in supersampled pixels
@@ -81,8 +103,8 @@ class SubgridKernelConvolution(object):
             kernel_low_res, kernel_high_res = kernel_util.split_kernel(kernel_supersampled, supersampling_kernel_size,
                                                                        self._supersampling_factor)
             self._low_res_convolution = True
-        self._low_res_conv = PixelKernelConvolution(kernel_low_res, convolution_type=convolution_type)
-        self._high_res_conv = PixelKernelConvolution(kernel_high_res, convolution_type=convolution_type)
+        self._low_res_conv = PixelKernelConvolution(kernel_low_res)
+        self._high_res_conv = PixelKernelConvolution(kernel_high_res)
 
     def convolution2d(self, image):
         """

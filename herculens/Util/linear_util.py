@@ -3,7 +3,7 @@
 # Copyright (c) 2021, herculens developers and contributors
 # Copyright (c) 2020, SLITronomy developers and contributors
 
-__author__ = 'austinpeel', 'aymgal'
+__author__ = 'austinpeel', 'gvernard', 'aymgal'
 
 
 import numpy as np

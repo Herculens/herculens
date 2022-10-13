@@ -7,6 +7,7 @@
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
+import numpy as np
 import jax.numpy as jnp
 from jax import lax
 
@@ -43,6 +44,31 @@ def ellipticity2phi_q(e1, e2):
     phi = jnp.arctan2(e2, e1) / 2
     c = jnp.sqrt(e1**2 + e2**2)
     c = jnp.minimum(c, 0.9999)
+    q = (1. - c) / (1. + c)
+    return phi, q
+
+def ellipticity2phi_q_numpy(e1, e2):
+    """Transform complex ellipticity components to position angle and axis ratio.
+
+    Parameters
+    ----------
+    e1, e2 : float or array_like
+        Ellipticity components.
+
+    Returns
+    -------
+    phi, q : same type as e1, e2
+        Position angle (rad) and axis ratio (semi-minor / semi-major axis)
+
+    """
+    # replace value by low float instead to avoid NaNs
+    e1_ = np.copy(e1)
+    e1_[e1 == 0.] == 1e-4
+    e2_ = np.copy(e2)
+    e2_[e2 == 0.] == 1e-4
+    phi = np.arctan2(e2_, e1_) / 2
+    c = np.sqrt(e1_**2 + e2_**2)
+    c = np.minimum(c, 0.9999)
     q = (1. - c) / (1. + c)
     return phi, q
 
@@ -148,3 +174,12 @@ def transform_e1e2_square_average(x, y, e1, e2, center_x, center_y):
     x_ = (cos_phi * x_shift + sin_phi * y_shift) * jnp.sqrt(1 - e)
     y_ = (-sin_phi * x_shift + cos_phi * y_shift) * jnp.sqrt(1 + e)
     return x_, y_
+
+
+def statistics_from_samples(samples, losses):
+    min_loss_idx = np.argmin(losses)
+    map_values = samples[min_loss_idx, :]
+    mean_values = np.mean(samples, axis=0)
+    perc_16, perc_50, perc_84 = np.percentile(samples, q=[16, 50, 84], axis=0)
+    median_values = perc_50
+    return map_values, mean_values, median_values, perc_16, perc_84

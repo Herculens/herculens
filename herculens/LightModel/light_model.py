@@ -7,7 +7,14 @@
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
+import numpy as np
+import jax.numpy as jnp
+# from functools import partial
+# from jax import jit
+
 from herculens.LightModel.light_model_base import LightModelBase
+from herculens.Util import util
+
 
 __all__ = ['LightModel']
 
@@ -24,11 +31,56 @@ class LightModel(LightModelBase):
     for a given set of parameters.
 
     """
-    def __init__(self, light_model_list, deflection_scaling_list=None,
-                 source_redshift_list=None, smoothing=0.001,
-                 pixel_interpol='bilinear', pixel_allow_extrapolation=False, kwargs_pixelated={}):
+    def __init__(self, light_model_list, smoothing=0.001,
+                 pixel_interpol='bilinear', kwargs_pixelated=None, 
+                 shapelets_n_max=4, **kwargs):
         """Create a LightModel object."""
-        super(LightModel, self).__init__(light_model_list, smoothing, 
+        self.profile_type_list = light_model_list
+        super(LightModel, self).__init__(self.profile_type_list, smoothing=smoothing,
                                          pixel_interpol=pixel_interpol, 
-                                         pixel_allow_extrapolation=pixel_allow_extrapolation,
-                                         kwargs_pixelated=kwargs_pixelated)
+                                         kwargs_pixelated=kwargs_pixelated,
+                                         shapelets_n_max=shapelets_n_max, **kwargs)
+
+    def surface_brightness(self, x, y, kwargs_list, k=None):
+        """Total source flux at a given position.
+
+        Parameters
+        ----------
+        x, y : float or array_like
+            Position coordinate(s) in arcsec relative to the image center.
+        kwargs_list : list
+            List of parameter dictionaries corresponding to each source model.
+        k : int, optional
+            Position index of a single source model component.
+
+        """
+        flux = jnp.zeros_like(x)
+        bool_list = self._bool_list(k)
+        for i, func in enumerate(self.func_list):
+            if bool_list[i]:
+                flux += func.function(x, y, **kwargs_list[i])
+        return flux
+
+    def spatial_derivatives(self, x, y, kwargs_list, k=None):
+        """Spatial derivatives of the source flux at a given position (along x and y directions).
+
+        Parameters
+        ----------
+        x, y : float or array_like
+            Position coordinate(s) in arcsec relative to the image center.
+        kwargs_list : list
+            List of parameter dictionaries corresponding to each source model.
+        k : int, optional
+            Position index of a single source model component.
+
+        """
+        # x = jnp.array(x, dtype=float)
+        # y = jnp.array(y, dtype=float)
+        f_x, f_y = jnp.zeros_like(x), jnp.zeros_like(x)
+        bool_list = self._bool_list(k)
+        for i, func in enumerate(self.func_list):
+            if bool_list[i]:
+                f_x_, f_y_ = func.derivatives(x, y, **kwargs_list[i])
+                f_x += f_x_
+                f_y += f_y_
+        return f_x, f_y

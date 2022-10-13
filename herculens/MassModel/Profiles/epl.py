@@ -183,8 +183,8 @@ class EPLMajorAxis(object):
         alpha = 2. / (1. + q) * (b / R)**t * jax_util.R_omega(z, t, q, nmax=20)
 
         # return real and imaginary part
-        alpha_real = jnp.nan_to_num(alpha.real, posinf=10**10, neginf=-10**10)
-        alpha_imag = jnp.nan_to_num(alpha.imag, posinf=10**10, neginf=-10**10)
+        alpha_real = jnp.nan_to_num(alpha.real, posinf=1e8, neginf=-1e8)
+        alpha_imag = jnp.nan_to_num(alpha.imag, posinf=1e8, neginf=-1e8)
 
         return alpha_real, alpha_imag
 
@@ -200,7 +200,7 @@ class EPLMajorAxis(object):
 
         # convergence, eq. (2)
         kappa = (2. - t) / 2. * (b / R)**t
-        kappa = jnp.nan_to_num(kappa, posinf=10**10, neginf=-10**10)
+        kappa = jnp.nan_to_num(kappa, posinf=1e8, neginf=-1e8)
 
         # deflection via method
         alpha_x, alpha_y = self.derivatives(x, y, b, t, q)
@@ -208,8 +208,8 @@ class EPLMajorAxis(object):
         # shear, eq. (17), corrected version from arXiv/corrigendum
         gamma_1 = (1. - t) * (alpha_x * cos - alpha_y * sin) / r - kappa * cos2
         gamma_2 = (1. - t) * (alpha_y * cos + alpha_x * sin) / r - kappa * sin2
-        gamma_1 = jnp.nan_to_num(gamma_1, posinf=10**10, neginf=-10**10)
-        gamma_2 = jnp.nan_to_num(gamma_2, posinf=10**10, neginf=-10**10)
+        gamma_1 = jnp.nan_to_num(gamma_1, posinf=1e8, neginf=-1e8)
+        gamma_2 = jnp.nan_to_num(gamma_2, posinf=1e8, neginf=-1e8)
 
         # second derivatives from convergence and shear
         f_xx = kappa + gamma_1

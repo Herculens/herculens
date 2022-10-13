@@ -9,9 +9,9 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 from herculens.MassModel.Profiles import (gaussian_potential, point_mass, multipole,
                                            shear, sie, sis, nie, epl, pixelated)
-from herculens.Util.util import convert_bool_list
+from herculens.Util import util
 
-__all__ = ['MassProfileBase']
+__all__ = ['MassModelBase']
 
 SUPPORTED_MODELS = [
     'EPL', 'NIE', 'SIE', 'SIS', 'GAUSSIAN', 'POINT_MASS', 
@@ -20,9 +20,12 @@ SUPPORTED_MODELS = [
 ]
 
 
-class MassProfileBase(object):
+# TODO: create parent for methods shared between MassProfileBase and LightProfileBase
+
+
+class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, kwargs_pixelated={}):
+    def __init__(self, lens_model_list, kwargs_pixelated=None, pixel_derivative_mode='autodiff'):
         """Create a MassProfileBase object.
 
         Parameters
@@ -31,19 +34,23 @@ class MassProfileBase(object):
             Lens model profile types.
 
         """
-        self.func_list = self._load_model_instances(lens_model_list)
+        self.func_list, self._pix_idx = self._load_model_instances(lens_model_list, pixel_derivative_mode)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
+        if kwargs_pixelated is None:
+            kwargs_pixelated = {}
         self._kwargs_pixelated = kwargs_pixelated
-
-    def _load_model_instances(self, lens_model_list):
+        
+    def _load_model_instances(self, lens_model_list, pixel_derivative_mode):
         func_list = []
         imported_classes = {}
-        for lens_type in lens_model_list:
+        pix_idx = None
+        for idx, lens_type in enumerate(lens_model_list):
             # These models require a new instance per profile as certain pre-computations
             # are relevant per individual profile
             if lens_type in ['PIXELATED', 'PIXELATED_DIRAC']:
-                mass_model_class = self._import_class(lens_type)
+                mass_model_class = self._import_class(lens_type, pixel_derivative_mode=pixel_derivative_mode)
+                pix_idx = idx
             else:
                 if lens_type not in imported_classes.keys():
                     mass_model_class = self._import_class(lens_type)
@@ -51,10 +58,10 @@ class MassProfileBase(object):
                 else:
                     mass_model_class = imported_classes[lens_type]
             func_list.append(mass_model_class)
-        return func_list
+        return func_list, pix_idx
 
     @staticmethod
-    def _import_class(lens_type):
+    def _import_class(lens_type, pixel_derivative_mode=None):
         """Get the lens profile class of the corresponding type."""
         if lens_type == 'GAUSSIAN':
             return gaussian_potential.Gaussian()
@@ -75,7 +82,7 @@ class MassProfileBase(object):
         elif lens_type == 'MULTIPOLE':
             return multipole.Multipole()
         elif lens_type == 'PIXELATED':
-            return pixelated.PixelatedPotential()
+            return pixelated.PixelatedPotential(pixel_derivative_mode)
         elif lens_type == 'PIXELATED_DIRAC':
             return pixelated.PixelatedPotentialDirac()
         else:
@@ -83,46 +90,40 @@ class MassProfileBase(object):
                        f"Supported types are {SUPPORTED_MODELS}")
             raise ValueError(err_msg)
 
-    def _bool_list(self, k=None):
-        """See `Util.util.convert_bool_list`."""
-        return convert_bool_list(n=self._num_func, k=k)
+    def _bool_list(self, k):
+        return util.convert_bool_list(n=self._num_func, k=k)
 
     @property
     def has_pixels(self):
-        return ('PIXELATED' in self._model_list) or ('PIXELATED_DIRAC' in self._model_list)
+        return self._pix_idx is not None
 
     @property
     def pixel_grid_settings(self):
         return self._kwargs_pixelated
 
-    def set_pixel_grid(self, pixel_axes):
-        for i, func in enumerate(self.func_list):
-            if self._model_list[i] in ['PIXELATED', 'PIXELATED_DIRAC']:
-                func.set_data_pixel_grid(pixel_axes)
+    def set_pixel_grid(self, pixel_grid):
+        self.func_list[self.pixelated_index].set_pixel_grid(pixel_grid)
+
+    @property
+    def pixel_grid(self):
+        if not self.has_pixels:
+            return None
+        return self.func_list[self.pixelated_index].pixel_grid
 
     @property
     def pixelated_index(self):
-        if not hasattr(self, '_pix_idx'):
-            try:
-                self._pix_idx = self._model_list.index('PIXELATED')
-            except ValueError:
-                try:
-                    self._pix_idx = self._model_list.index('PIXELATED_DIRAC')
-                except ValueError:
-                    self._pix_idx = None
+        # TODO: support multiple pixelated profiles
         return self._pix_idx
 
     @property
     def pixelated_coordinates(self):
-        idx = self.pixelated_index
-        if idx is None:
+        if not self.has_pixels:
             return None, None
-        return self.func_list[idx].x_coords, self.func_list[idx].y_coords
+        return self.pixel_grid.pixel_coordinates
 
     @property
     def pixelated_shape(self):
-        x_coords, y_coords = self.pixelated_coordinates
-        if x_coords is None:
+        if not self.has_pixels:
             return None
-        else:
-            return (len(y_coords), len(x_coords))
+        x_coords, _ = self.pixelated_coordinates
+        return x_coords.shape

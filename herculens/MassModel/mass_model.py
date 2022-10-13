@@ -10,15 +10,15 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.MassModel.mass_model_base import MassProfileBase
+from herculens.MassModel.mass_model_base import MassModelBase
 
 
 __all__ = ['MassModel']
 
 
-class MassModel(MassProfileBase):
+class MassModel(MassModelBase):
     """An arbitrary list of lens models."""
-    def __init__(self, mass_model_list, kwargs_pixelated={}):
+    def __init__(self, mass_model_list, kwargs_pixelated=None, pixel_derivative_mode='autodiff'):
         """Create a MassModel object.
 
         Parameters
@@ -26,16 +26,10 @@ class MassModel(MassProfileBase):
         mass_model_list : list of str
             Lens model profile names.
         kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
-
-        Notes
-        -----
-        The original MassModel class in lenstronomy has many more inputs and
-        supports much more functionality. It has been reduced here to the bare
-        minimum in order to test JAX autodiff through a lensing pipeline.
-
         """
         self.profile_type_list = mass_model_list
-        super().__init__(self.profile_type_list, kwargs_pixelated=kwargs_pixelated)
+        super().__init__(self.profile_type_list, kwargs_pixelated=kwargs_pixelated,
+                         pixel_derivative_mode=pixel_derivative_mode)
 
     def ray_shooting(self, x, y, kwargs, k=None):
         """
@@ -85,7 +79,7 @@ class MassModel(MassProfileBase):
         if isinstance(k, int):
             return self.func_list[k].function(x, y, **kwargs[k])
         bool_list = self._bool_list(k)
-        potential = 0.
+        potential = np.zeros_like(x)
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 potential += func.function(x, y, **kwargs[i])
@@ -107,8 +101,9 @@ class MassModel(MassProfileBase):
         # y = np.array(y, dtype=float)
         if isinstance(k, int):
             return self.func_list[k].derivatives(x, y, **kwargs[k])
+
         bool_list = self._bool_list(k)
-        f_x, f_y = 0., 0.
+        f_x, f_y = jnp.zeros_like(x), jnp.zeros_like(x)
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 f_x_i, f_y_i = func.derivatives(x, y, **kwargs[i])
@@ -134,7 +129,7 @@ class MassModel(MassProfileBase):
             return f_xx, f_xy, f_xy, f_yy
 
         bool_list = self._bool_list(k)
-        f_xx, f_yy, f_xy = 0., 0., 0.
+        f_xx, f_yy, f_xy = jnp.zeros_like(x), jnp.zeros_like(x), jnp.zeros_like(x)
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 f_xx_i, f_yy_i, f_xy_i = func.hessian(x, y, **kwargs[i])

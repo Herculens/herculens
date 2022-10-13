@@ -37,8 +37,6 @@ class FisherCovariance(object):
                                                     return_cross_covariance=return_cross_covariance)
 
     def draw_samples(self, num_samples=10000, seed=None):
-        if seed is not None:
-            np.random.seed(seed)
         return model_util.draw_samples_from_covariance(self._param.best_fit_values(),
                                                        self.covariance_matrix,
                                                        num_samples=num_samples, seed=seed)

@@ -10,20 +10,24 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.LightModel.Profiles import sersic, pixelated, uniform, gaussian
-from herculens.Util.util import convert_bool_list
+from herculens.LightModel.Profiles import (sersic, pixelated, uniform, gaussian)
+from herculens.Util import util
 
 __all__ = ['LightModelBase']
 
 
-SUPPORTED_MODELS = ['GAUSSIAN', 'GAUSSIAN_ELLIPSE', 'SERSIC', 'SERSIC_ELLIPSE', 'UNIFORM', 'PIXELATED']
+SUPPORTED_MODELS = [
+    'GAUSSIAN', 'GAUSSIAN_ELLIPSE', 
+    'SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC',
+    'SHAPELETS', 'UNIFORM', 'PIXELATED'
+]
 
 
 class LightModelBase(object):
     """Base class for source and lens light models."""
     def __init__(self, light_model_list, smoothing=0.001,
-                 pixel_interpol='bilinear', pixel_allow_extrapolation=False,
-                 kwargs_pixelated={}):
+                 pixel_interpol='bilinear', kwargs_pixelated=None, 
+                 shapelets_n_max=4, pixel_allow_extrapolation=False):
         """Create a LightModelBase object.
 
         Parameters
@@ -41,9 +45,9 @@ class LightModelBase(object):
             Settings related to the creation of the pixelated grid. See herculens.PixelGrid.create_model_grid for details 
 
         """
-        self.profile_type_list = light_model_list
         func_list = []
-        for profile_type in light_model_list:
+        pix_idx = None
+        for idx, profile_type in enumerate(light_model_list):
             if profile_type == 'GAUSSIAN':
                 func_list.append(gaussian.Gaussian())
             elif profile_type == 'GAUSSIAN_ELLIPSE':
@@ -57,13 +61,23 @@ class LightModelBase(object):
             elif profile_type == 'UNIFORM':
                 func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
-                func_list.append(pixelated.Pixelated(method=pixel_interpol, allow_extrapolation=pixel_allow_extrapolation))
+                if pix_idx is not None:
+                    raise ValueError("Multiple pixelated profiles is currently not supported.")
+                func_list.append(pixelated.Pixelated(interpolation_type=pixel_interpol, 
+                                                     allow_extrapolation=pixel_allow_extrapolation))
+                pix_idx = idx
+            elif profile_type == 'SHAPELETS':
+                from herculens.LightModel.Profiles import shapelets # prevent importing GigaLens if not used
+                func_list.append(shapelets.Shapelets(shapelets_n_max))
             else:
                 err_msg = (f"No light model of type {profile_type} found. " +
                            f"Supported types are: {SUPPORTED_MODELS}")
                 raise ValueError(err_msg)
         self.func_list = func_list
         self._num_func = len(self.func_list)
+        self._pix_idx = pix_idx
+        if kwargs_pixelated is None:
+            kwargs_pixelated = {}
         self._kwargs_pixelated = kwargs_pixelated
 
     @property
@@ -71,87 +85,46 @@ class LightModelBase(object):
         """Get parameter names as a list of strings for each light model."""
         return [func.param_names for func in self.func_list]
 
-    def surface_brightness(self, x, y, kwargs_list, k=None):
-        """Total source flux at a given position.
-
-        Parameters
-        ----------
-        x, y : float or array_like
-            Position coordinate(s) in arcsec relative to the image center.
-        kwargs_list : list
-            List of parameter dictionaries corresponding to each source model.
-        k : int, optional
-            Position index of a single source model component.
-
-        """
-        # x = jnp.array(x, dtype=float)
-        # y = jnp.array(y, dtype=float)
-        flux = 0.
-        bool_list = convert_bool_list(self._num_func, k=k)
-        for i, func in enumerate(self.func_list):
-            if bool_list[i]:
-                flux += func.function(x, y, **kwargs_list[i])
-        return flux
-
-    def spatial_derivatives(self, x, y, kwargs_list, k=None):
-        """Spatial derivatives of the source flux at a given position (along x and y directions).
-
-        Parameters
-        ----------
-        x, y : float or array_like
-            Position coordinate(s) in arcsec relative to the image center.
-        kwargs_list : list
-            List of parameter dictionaries corresponding to each source model.
-        k : int, optional
-            Position index of a single source model component.
-
-        """
-        x = jnp.array(x, dtype=float)
-        y = jnp.array(y, dtype=float)
-        # flux = jnp.zeros_like(x)
-        f_x, f_y = 0., 0.
-        bool_list = convert_bool_list(self._num_func, k=k)
-        for i, func in enumerate(self.func_list):
-            if bool_list[i]:
-                f_x_, f_y_ = func.derivatives(x, y, **kwargs_list[i])
-                f_x += f_x_
-                f_y += f_y_
-        return f_x, f_y
+    def _bool_list(self, k):
+        return util.convert_bool_list(n=self._num_func, k=k)
 
     @property
     def has_pixels(self):
-        return ('PIXELATED' in self.profile_type_list)
+        return self._pix_idx is not None
 
     @property
     def pixel_grid_settings(self):
         return self._kwargs_pixelated
 
-    def set_pixel_grid(self, pixel_axes, data_pixel_area):
-        for i, func in enumerate(self.func_list):
-            if self.profile_type_list[i] == 'PIXELATED':
-                func.set_data_pixel_grid(pixel_axes, data_pixel_area)
+    def set_pixel_grid(self, pixel_grid, data_pixel_area):
+        self.func_list[self.pixelated_index].set_pixel_grid(pixel_grid, data_pixel_area)
+
+    @property
+    def pixel_grid(self):
+        if not self.has_pixels:
+            return None
+        return self.func_list[self.pixelated_index].pixel_grid
 
     @property
     def pixelated_index(self):
-        # TODO: what if there are more than one PIXELATED profiles?
-        if not hasattr(self, '_pix_idx'):
-            try:
-                self._pix_idx = self.profile_type_list.index('PIXELATED')
-            except ValueError:
-                self._pix_idx = None
+        # TODO: support multiple pixelated profiles
         return self._pix_idx
 
     @property
     def pixelated_coordinates(self):
-        idx = self.pixelated_index
-        if idx is None:
+        if not self.has_pixels:
             return None, None
-        return self.func_list[idx].x_coords, self.func_list[idx].y_coords
+        return self.pixel_grid.pixel_coordinates
 
     @property
     def pixelated_shape(self):
-        x_coords, y_coords = self.pixelated_coordinates
-        if x_coords is None:
+        if not self.has_pixels:
             return None
-        else:
-            return (len(y_coords), len(x_coords))
+        x_coords, _ = self.pixelated_coordinates
+        return x_coords.shape
+
+    @property
+    def num_amplitudes_list(self):
+        return [func.num_amplitudes for func in self.func_list]
+
+
