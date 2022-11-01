@@ -138,8 +138,7 @@ class SIS(object):
         """
         return self.profile.density_lens(r, theta_E)
 
-    @staticmethod
-    def density(r, rho0):
+    def density(self, r, rho0):
         """
         computes the density
         :param r: radius in angles
@@ -148,8 +147,7 @@ class SIS(object):
         """
         return self.profile.density(rho0)
 
-    @staticmethod
-    def density_2d(x, y, rho0, center_x=0, center_y=0):
+    def density_2d(self, x, y, rho0, center_x=0, center_y=0):
         """
         projected density
         :param x:
