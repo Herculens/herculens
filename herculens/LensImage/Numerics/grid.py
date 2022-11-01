@@ -69,6 +69,14 @@ class RegularGrid(Coordinates1D):
         return self._nx * self._supersampling_factor, self._ny * self._supersampling_factor
 
     @property
+    def num_grid_points(self):
+        """
+        effective number of points along each axes, after supersampling
+        :return: number of pixels per axis, nx*supersampling_factor ny*supersampling_factor
+        """
+        return self._nx * self._supersampling_factor * self._ny * self._supersampling_factor
+
+    @property
     def supersampling_factor(self):
         """
         :return: factor (per axis) of super-sampling relative to a pixel

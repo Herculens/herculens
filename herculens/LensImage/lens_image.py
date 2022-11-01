@@ -66,10 +66,9 @@ class LensImage(object):
         if kwargs_numerics is None:
             kwargs_numerics = {}
         self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
-        self.kwargs_numerics = kwargs_numerics
         
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
-                                  unconvolved=False, de_lensed=False, k=None, k_lens=None):
+                                  unconvolved=False, supersampled=False, de_lensed=False, k=None, k_lens=None):
         """
 
         computes the source surface brightness distribution
@@ -91,10 +90,11 @@ class LensImage(object):
         else:
             ra_grid_src, dec_grid_src = self.MassModel.ray_shooting(ra_grid_img, dec_grid_img, kwargs_lens, k=k_lens)
             source_light = self.SourceModel.surface_brightness(ra_grid_src, dec_grid_src, kwargs_source, k=k)
-        source_light_final = self.ImageNumerics.re_size_convolve(source_light, unconvolved=unconvolved)
-        return source_light_final
+        if not supersampled:
+            source_light = self.ImageNumerics.re_size_convolve(source_light, unconvolved=unconvolved)
+        return source_light
 
-    def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False, k=None):
+    def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False, supersampled=False, k=None):
         """
 
         computes the lens surface brightness distribution
@@ -106,13 +106,14 @@ class LensImage(object):
         """
         ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
         lens_light = self.LensLightModel.surface_brightness(ra_grid_img, dec_grid_img, kwargs_lens_light, k=k)
-        lens_light_final = self.ImageNumerics.re_size_convolve(lens_light, unconvolved=unconvolved)
-        return lens_light_final
+        if not supersampled:
+            lens_light = self.ImageNumerics.re_size_convolve(lens_light, unconvolved=unconvolved)
+        return lens_light
 
-    @partial(jit, static_argnums=(0, 4, 5, 6, 7, 8, 9))
+    @partial(jit, static_argnums=(0, 4, 5, 6, 7, 8, 9, 10))
     def model(self, kwargs_lens=None, kwargs_source=None,
-              kwargs_lens_light=None, unconvolved=False, source_add=True,
-              lens_light_add=True, k_lens=None, k_source=None, k_lens_light=None):
+              kwargs_lens_light=None, unconvolved=False, supersampled=False,
+              source_add=True, lens_light_add=True, k_lens=None, k_source=None, k_lens_light=None):
         """
         Create the 2D model image from parameter values.
         Note: due to JIT compilation, the first call to this method will be slower.
@@ -122,6 +123,7 @@ class LensImage(object):
         :param kwargs_lens_light: list of keyword arguments corresponding to different lens light surface brightness profiles
         :param kwargs_ps: keyword arguments corresponding to "other" parameters, such as external shear and point source image positions
         :param unconvolved: if True: returns the unconvolved light distribution (prefect seeing)
+        :param supersampled: if True, returns the model on the higher resolution grid (WARNING: no convolution nor normalization is performed in this case!)
         :param source_add: if True, compute source, otherwise without
         :param lens_light_add: if True, compute lens light, otherwise without
         :param k_lens: list of bool or list of int to select which lens mass profiles to include
@@ -129,12 +131,19 @@ class LensImage(object):
         :param k_lens_light: list of bool or list of int to select which lens light profiles to include
         :return: 2d array of surface brightness pixels of the simulation
         """
-        model = jnp.zeros((self.Grid.num_pixel_axes))
+        # TODO: simplify treatment of convolution, downsampling and re-sizing
+        if not supersampled:
+            model = jnp.zeros((self.Grid.num_pixel_axes))
+        else:
+            model = jnp.zeros((self.ImageNumerics.grid_class.num_grid_points,))
         if source_add is True:
-            model += self.source_surface_brightness(kwargs_source, kwargs_lens, unconvolved=unconvolved,
+            model += self.source_surface_brightness(kwargs_source, kwargs_lens, 
+                                                    unconvolved=unconvolved, supersampled=supersampled,
                                                     k=k_source, k_lens=k_lens)
         if lens_light_add is True:
-            model += self.lens_surface_brightness(kwargs_lens_light, unconvolved=unconvolved, k=k_lens_light)
+            model += self.lens_surface_brightness(kwargs_lens_light, 
+                                                  unconvolved=unconvolved, supersampled=supersampled,
+                                                  k=k_lens_light)
         return model
 
     def simulation(self, add_poisson=True, add_gaussian=True, 
