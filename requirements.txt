@@ -6,6 +6,7 @@ optax>=0.1.0
 chex>=0.1.4
 matplotlib>=3.0.0
 findiff==0.8.9
+tqdm
 
 # the following packages are optional (pay attention at the versions) 
 #numpyro==0.10.1     # for HMC sampling
