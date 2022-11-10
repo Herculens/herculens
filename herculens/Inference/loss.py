@@ -183,7 +183,7 @@ class Loss(Differentiable):
         self._idx_pix_ll  = self._image.LensLightModel.pixelated_index
 
         regul_func_list = []
-        for term, strength, weights, masks in zip(regularization_terms, 
+        for term, strength, weights, mask in zip(regularization_terms, 
                                            regularization_strengths, 
                                            regularization_weights_fix,
                                            regularization_masks):
@@ -314,7 +314,7 @@ class Loss(Differentiable):
                 self._regul_k_lens = tuple([True if i != self._idx_ana_pot else False for i in range(len(self._image.MassModel.profile_type_list))])
                 self._weigths = weights
                 self._lambda  = float(strength)
-                self._mask    = masks
+                self._mask    = mask
                 self._x_lens, self._y_lens = self._image.Grid.model_pixel_coordinates('lens')
 
 
