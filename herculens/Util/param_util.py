@@ -41,7 +41,9 @@ def ellipticity2phi_q(e1, e2):
     # replace value by low float instead to avoid NaNs
     # e1 = lax.cond(e1 == 0.0, lambda _: 1e-4, lambda _: e1, operand=None)  # does not work with TFP!
     # e2 = lax.cond(e2 == 0.0, lambda _: 1e-4, lambda _: e2, operand=None)  # does not work with TFP!
-    phi = jnp.nan_to_num(jnp.arctan2(e2, e1)) / 2
+    e1 = jnp.where(e1 == 0., 1e-4, e1)
+    e2 = jnp.where(e2 == 0., 1e-4, e2)
+    phi = jnp.arctan2(e2, e1) / 2.
     c = jnp.sqrt(e1**2 + e2**2)
     c = jnp.minimum(c, 0.9999)
     q = (1. - c) / (1. + c)
