@@ -2,7 +2,7 @@
 # 
 # Copyright (c) 2021, herculens developers and contributors
 
-__author__ = 'austinpeel', 'aymgal'
+__author__ = 'austinpeel', 'aymgal', 'duxfrederic'
 
 
 from functools import partial
@@ -11,9 +11,9 @@ import numpy as np
 import jax.numpy as jnp
 from jax import jit, vmap, lax
 from jax.scipy.special import gammaln
-from jax.scipy.signal import convolve2d
 from jax.scipy.stats import norm
 from jax.lax import conv_general_dilated, conv_dimension_numbers
+
 
 
 def unjaxify_kwargs(kwargs_params):
@@ -101,6 +101,88 @@ class special(object):
         return sign * jnp.exp(gammaln(x))
 
 
+
+
+
+
+@partial(jit, static_argnums=(2,))
+def convolveSeparableDilated(image2D, kernel1D, dilation=1):
+    """
+     
+     Convolves an image contained in image2D with the 1D kernel kernel1D.
+     The operation is basically the following:
+         blured2D = image2D * (kernel1D ∧ kernel1D )
+     where ∧ is a wedge product, here a tensor product. 
+     
+     
+
+    Parameters
+    ----------
+    image2D : 2D array
+        imaged to be convolved with the kernel.
+    kernel1D : 1D array
+        kernel to convolve the image with..
+    dilation : TYPE, optional
+        makes the spacial extent of the kernel bigger. The default is 1.
+
+    Returns
+    -------
+    2D array
+        image convoluted by the kernel.
+
+    """
+    
+    # padding
+    b = int(kernel1D.size // 2) * dilation
+    padded = jnp.pad(image2D, ((b, b), (b, b)), mode='edge')
+    # Fred D.: THIS PADDING IS DANGEROUS AS IT WILL OVERFLOW MEMORY VERY QUICKLY
+    # I LEAVE IT AS ORIGINALLY IMPLEMENTED AS I DO NOT WANT TO CHANGE THE
+    # OUTPUT OF THE WAVELET TRANSFORM (this could have impact on the science)
+    
+    
+    # specify the row and column operations for the jax convolution routine:
+    image = jnp.expand_dims(padded, (2,))
+    # shape (Nx, Ny, 1) -- (N, W, C)
+    # we treat the Nx as the batch number!! (because it is a 1D convolution 
+    # over the rows)
+    kernel = jnp.expand_dims(kernel1D, (0,2,))
+    # here we have kernel shape ~(I,W,O)
+    # so: 
+    # (Nbatch, Width, Channel) * (Inputdim, Widthkernel, Outputdim) 
+    #                                            -> (Nbatch, Width, Channel)
+    # where Nbatch is our number of rows.
+    dimension_numbers = ('NWC', 'IWO', 'NWC')
+    dn = conv_dimension_numbers(image.shape, 
+                                kernel.shape, 
+                                dimension_numbers)
+    # with these conv_general_dilated knows how to handle the different
+    # axes:
+    rowblur = conv_general_dilated(image, kernel,
+                                   window_strides=(1,),
+                                   padding='VALID',
+                                   rhs_dilation=(dilation,),
+                                   dimension_numbers=dn)
+    
+    # now we do the same for the columns, hence this time we have
+    # (Height, Nbatch, Channel) * (Inputdim, Widthkernel, Outputdim) 
+    #                                            -> (Height, Nbatch, Channel)
+    # where Nbatch is our number of columns.
+    dimension_numbers = ('HNC', 'IHO', 'HNC')
+    dn = conv_dimension_numbers(image.shape, 
+                                kernel.shape, 
+                                dimension_numbers)
+    
+    rowcolblur = conv_general_dilated(rowblur, kernel,
+                                      window_strides=(1,),
+                                      padding='VALID',
+                                      rhs_dilation=(dilation,),
+                                      dimension_numbers=dn)
+    
+    return rowcolblur[:,:,0]
+
+
+
+
 class GaussianFilter(object):
     """JAX-friendly Gaussian filter."""
     def __init__(self, sigma, truncate=4.0):
@@ -131,8 +213,8 @@ class GaussianFilter(object):
             return jnp.array([[1.]])
 
         # Compute the kernel
-        x, y = jnp.indices((npix, npix))  # pixel coordinates
-        kernel = norm.pdf(jnp.hypot(x - self.radius, y - self.radius) / sigma)
+        x = jnp.ravel(jnp.indices((npix,)))  # pixel coordinates
+        kernel = norm.pdf((x-self.radius) / sigma)
         kernel /= kernel.sum()
 
         return kernel
@@ -149,9 +231,7 @@ class GaussianFilter(object):
         # Convolve
         # pad_mode = ['constant', 'edge'][mode == 'nearest']
         # image_padded = jnp.pad(image, pad_width=radius, mode=pad_mode)
-        image_padded = jnp.pad(image, pad_width=self.radius, mode='edge')
-        return convolve2d(image_padded, self.kernel, mode='valid')
-
+        return convolveSeparableDilated(image, self.kernel)
 
 class WaveletTransform(object):
     """
@@ -168,7 +248,7 @@ class WaveletTransform(object):
         self._second_gen = second_gen
         if wavelet_type == 'starlet':
             self._h = jnp.array([1, 4, 6, 4, 1]) / 16.
-            self._fac = 2
+            self._fac = 2 # basically len(self._h)//2 
         elif wavelet_type == 'battle-lemarie-1':
             self._h = jnp.array([-0.000122686, -0.000224296, 0.000511636, 
                         0.000923371, -0.002201945, -0.003883261, 0.009990599, 
@@ -180,11 +260,11 @@ class WaveletTransform(object):
             self._fac = 11
         elif wavelet_type == 'battle-lemarie-3':
             self._h = jnp.array([0.000146098, -0.000232304, -0.000285414, 
-                          0.000462093, 0.000559952, -0.000927187, -0.001103748, 
-                          0.00188212, 0.002186714, -0.003882426, -0.00435384, 
-                          0.008201477, 0.008685294, -0.017982291, -0.017176331, 
-                          0.042068328, 0.032080869, -0.110036987, -0.050201753, 
-                          0.433923147, 0.766130398, 0.433923147, -0.050201753, 
+                           0.000462093, 0.000559952, -0.000927187, -0.001103748, 
+                           0.00188212, 0.002186714, -0.003882426, -0.00435384, 
+                           0.008201477, 0.008685294, -0.017982291, -0.017176331, 
+                           0.042068328, 0.032080869, -0.110036987, -0.050201753, 
+                           0.433923147, 0.766130398, 0.433923147, -0.050201753, 
                           -0.110036987, 0.032080869, 0.042068328, -0.017176331, 
                           -0.017982291, 0.008685294, 0.008201477, -0.00435384, 
                           -0.003882426, 0.002186714, 0.00188212, -0.001103748, 
@@ -194,6 +274,13 @@ class WaveletTransform(object):
             self._fac = 20
         else:
             raise ValueError(f"'{wavelet_type}' starlet transform is not supported")
+            
+        if self._second_gen:
+            self.decompose = self._decompose_2nd_gen 
+            self.reconstruct = self._reconstruct_2nd_gen
+        else:
+            self.decompose = self._decompose_1st_gen
+            self.reconstruct = self._reconstruct_1st_gen
 
     @property
     def scale_norms(self):
@@ -204,161 +291,110 @@ class WaveletTransform(object):
             self._norms = jnp.sqrt(jnp.sum(wt_dirac**2, axis=(1, 2,)))
         return self._norms
 
+    
     @partial(jit, static_argnums=(0,))
-    def decompose(self, image):
-        """Decompose an image into the chosen wavelet basis"""
-        if self._second_gen is True:
-            return self._decompose_2nd_gen(image)
-        else:
-            return self._decompose_1st_gen(image)
-
-    @partial(jit, static_argnums=(0,))
-    def reconstruct(self, coeffs):
-        """Reconstruct an image from wavelet decomposition coefficients"""
-        if self._second_gen is True:
-            return self._reconstruct_2nd_gen(coeffs)
-        else:
-            return self._reconstruct_1st_gen(coeffs)
-
     def _decompose_1st_gen(self, image):
+        """Decompose an image into the chosen wavelet basis"""
         # Validate input
         assert self._n_scales >= 0, "nscales must be a non-negative integer"
         if self._n_scales == 0:
             return image
 
         # Preparations
-        image = jnp.expand_dims(image, (0, 3))
-        kernel = jnp.expand_dims(jnp.outer(self._h, self._h), (2, 3))
-        dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
-        dn = conv_dimension_numbers(image.shape, kernel.shape, dimension_numbers)
+        image = jnp.copy(image)
+        kernel = self._h.copy()
 
-        # Compute the first scale
-        c0 = image
-        padded = jnp.pad(c0, ((0, 0), (self._fac, self._fac), (self._fac, self._fac), (0, 0)), mode='edge')
-        c1 = conv_general_dilated(padded, kernel,
-                                  window_strides=(1, 1),
-                                  padding='VALID',
-                                  rhs_dilation=(1, 1),
-                                  dimension_numbers=dn)
-        w0 = (c0 - c1)[0,:,:,0]  # Wavelet coefficients
+        # Compute the first scale:
+        c1 = convolveSeparableDilated(image, kernel)
+        # Wavelet coefficients:
+        w0 = (image - c1)  
         result = jnp.expand_dims(w0, 0)
         cj = c1
-
+        
         # Compute the remaining scales
-        for ii in range(1, self._n_scales):
-            b = self._fac**(ii + 1)  # padding pixels
-            padded = jnp.pad(cj, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
-            cj1 = conv_general_dilated(padded, kernel,
-                                       window_strides=(1, 1),
-                                       padding='VALID',
-                                       rhs_dilation=(self._fac**ii, self._fac**ii),
-                                       dimension_numbers=dn)
+        # at each scale, the kernel becomes larger ( a trou ) using the
+        # dilation argument in the jax wrapper for convolution.
+        for step in range(1, self._n_scales):
+            cj1 = convolveSeparableDilated(cj, kernel, dilation=self._fac**step)
             # wavelet coefficients
-            wj = (cj - cj1)[0,:,:,0]
+            wj = (cj - cj1)
             result = jnp.concatenate((result, jnp.expand_dims(wj, 0)), axis=0)
             cj = cj1
-
+        
         # Append final coarse scale
-        result = jnp.concatenate((result, cj[:,:,:,0]), axis=0)
+        result = jnp.concatenate((result, jnp.expand_dims(cj, axis=0)), axis=0)
         return result
-
+    
+    @partial(jit, static_argnums=(0,))
     def _decompose_2nd_gen(self, image):
+        """Decompose an image into the chosen wavelet basis"""
         # Validate input
         assert self._n_scales >= 0, "nscales must be a non-negative integer"
         if self._n_scales == 0:
             return image
 
         # Preparations
-        image = jnp.expand_dims(image, (0, 3))
-        kernel = jnp.expand_dims(jnp.outer(self._h, self._h), (2, 3))
-        dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
-        dn = conv_dimension_numbers(image.shape, kernel.shape, dimension_numbers)
+        image = jnp.copy(image)
+        kernel = self._h.copy()
 
-        # Compute the first scale
-        c0 = image
-        padded = jnp.pad(c0, ((0, 0), (self._fac, self._fac), (self._fac, self._fac), (0, 0)), mode='edge')
-        c1 = conv_general_dilated(padded, kernel,
-                                  window_strides=(1, 1),
-                                  padding='VALID',
-                                  rhs_dilation=(1, 1),
-                                  dimension_numbers=dn)
-        padded = jnp.pad(c1, ((0, 0), (self._fac, self._fac), (self._fac, self._fac), (0, 0)), mode='edge')
-        c1p = conv_general_dilated(padded, kernel,
-                                  window_strides=(1, 1),
-                                  padding='VALID',
-                                  rhs_dilation=(1, 1),
-                                  dimension_numbers=dn)
-        w0 = (c0 - c1p)[0,:,:,0]  # Wavelet coefficients
+        # Compute the first scale:
+        c1 = convolveSeparableDilated(image, kernel)
+        c1p = convolveSeparableDilated(c1, kernel)
+        # Wavelet coefficients:
+        w0 = (image - c1p)  
         result = jnp.expand_dims(w0, 0)
         cj = c1
-
+        
         # Compute the remaining scales
-        for ii in range(1, self._n_scales):
-            b = self._fac**(ii + 1)  # padding pixels
-            padded = jnp.pad(cj, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
-            cj1 = conv_general_dilated(padded, kernel,
-                                       window_strides=(1, 1),
-                                       padding='VALID',
-                                       rhs_dilation=(self._fac**ii, self._fac**ii),
-                                       dimension_numbers=dn)
-            padded = jnp.pad(cj1, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
-            cj1p = conv_general_dilated(padded, kernel,
-                                       window_strides=(1, 1),
-                                       padding='VALID',
-                                       rhs_dilation=(self._fac**ii, self._fac**ii),
-                                       dimension_numbers=dn)
+        # at each scale, the kernel becomes larger ( a trou ) using the
+        # dilation argument in the jax wrapper for convolution.
+        for step in range(1, self._n_scales):
+            cj1  = convolveSeparableDilated(cj, kernel, dilation=self._fac**step)
+            cj1p = convolveSeparableDilated(cj1, kernel, dilation=self._fac**step)
             # wavelet coefficients
-            wj = (cj - cj1p)[0,:,:,0]
+            wj = (cj - cj1p)
             result = jnp.concatenate((result, jnp.expand_dims(wj, 0)), axis=0)
             cj = cj1
-
+        
         # Append final coarse scale
-        result = jnp.concatenate((result, cj[:,:,:,0]), axis=0)
+        result = jnp.concatenate((result, jnp.expand_dims(cj, axis=0)), axis=0)
         return result
 
+
+    @partial(jit, static_argnums=(0,))
     def _reconstruct_1st_gen(self, coeffs):
         return jnp.sum(coeffs, axis=0)
-
+    
+    
+    @partial(jit, static_argnums=(0,))
     def _reconstruct_2nd_gen(self, coeffs):
         # Validate input
-        assert coeffs.shape[0] == self._n_scales+1, "Wavelet coefficients are not consistent with number of scales"
+        assert coeffs.shape[0] == self._n_scales+1, \
+               "Wavelet coefficients are not consistent with number of scales"
         if self._n_scales == 0:
             return coeffs[0, :, :]
-
-        # Preparations
-        image_shape = (1, coeffs.shape[1], coeffs.shape[2], 1)
-        kernel = jnp.expand_dims(jnp.outer(self._h, self._h), (2, 3))
-        dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
-        dn = conv_dimension_numbers(image_shape, kernel.shape, dimension_numbers)
-
+        
+        kernel = self._h
+        
         # Start with the last scale 'J-1'
-        cJ = jnp.expand_dims(coeffs[self._n_scales, :, :], (0, 3))
-        b = self._fac**(self._n_scales-1 + 1)  # padding pixels
-        padded = jnp.pad(cJ, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
-        cJp = conv_general_dilated(padded, kernel,
-                                    window_strides=(1, 1),
-                                    padding='VALID',
-                                    rhs_dilation=(self._fac**(self._n_scales-1), self._fac**(self._n_scales-1)),
-                                    dimension_numbers=dn)
-        wJ = jnp.expand_dims(coeffs[self._n_scales-1, :, :], (0, 3))
-        cj = cJp + wJ
+        cJ = coeffs[self._n_scales, :, :]
+        cJp = convolveSeparableDilated(cJ, kernel, 
+                                       dilation=self._fac**(self._n_scales-1))
+        
 
+        wJ = coeffs[self._n_scales-1, :, :]
+        cj = cJp + wJ
+        
         # Compute the remaining scales
         for ii in range(self._n_scales-2, -1, -1):
             cj1 = cj
-
-            b = self._fac**(ii + 1)  # padding pixels
-            padded = jnp.pad(cj1, ((0, 0), (b, b), (b, b), (0, 0)), mode='edge')
-            cj1p = conv_general_dilated(padded, kernel,
-                                       window_strides=(1, 1),
-                                       padding='VALID',
-                                       rhs_dilation=(self._fac**ii, self._fac**ii),
-                                       dimension_numbers=dn)
-            wj1 = jnp.expand_dims(coeffs[ii, :, :], (0, 3))
+            cj1p = convolveSeparableDilated(cj1, kernel, dilation=self._fac**ii)
+            wj1 = coeffs[ii, :, :]
             cj = cj1p + wj1
 
-        result = cj[0, :, :, 0]
+        result = cj
         return result
+
 
 
 class BilinearInterpolator(object):
@@ -574,3 +610,7 @@ class BicubicInterpolator(object):
                           operand=None)
         return result
         
+    
+    
+    
+    
