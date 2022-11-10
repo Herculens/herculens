@@ -10,12 +10,12 @@ from astropy.io import fits
 
 from herculens.Util import param_util
 
-from lensmodelapi.api.galaxy import Galaxy
-from lensmodelapi.api.external_shear import ExternalShear
-from lensmodelapi.api.mass_light_model import MassModel, LightModel
-from lensmodelapi.api.fits_file import MultiExtFitsFile
-# from lensmodelapi.api.parameter import PointEstimate
-from lensmodelapi.api.probabilities import PosteriorStatistics
+from coolest.template.classes.galaxy import Galaxy
+from coolest.template.classes.external_shear import ExternalShear
+from coolest.template.classes.mass_light_model import MassModel, LightModel
+from coolest.template.classes.fits_file import FitsFile
+# from coolest.template.classes.parameter import PointEstimate
+from coolest.template.classes.probabilities import PosteriorStatistics
 
 
 # Notes: `h2c` is a shorthand for `herculens2coolest`
@@ -292,7 +292,7 @@ def h2c_pixelated_values(profile, kwargs, profile_herculens):
     hdu_list.writeto(fits_filename, overwrite=True)
     
     fits_path = fits_filename
-    profile.pixels = MultiExtFitsFile(fits_path)
+    profile.pixels = FitsFile(fits_path)
 
 
 def h2c_extshear_values(profile_name, kwargs_profile):
