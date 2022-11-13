@@ -256,7 +256,4 @@ class RegularGrid(Coordinates1D):
         """
         # TODO: Find a better way than ops.index_update()
         nx, ny = self._nx * self._supersampling_factor, self._ny * self._supersampling_factor
-        grid1d = np.zeros((nx * ny))
-        indices = np.arange(nx * ny)[self._compute_indexes]
-        grid1d = ops.index_update(grid1d, ops.index[indices], array)
-        return util.array2image(grid1d, nx, ny)
+        return util.array2image(array, nx, ny)

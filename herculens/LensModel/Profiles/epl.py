@@ -210,8 +210,10 @@ class EPLMajorAxis(LensProfileBase):
         alpha = 2. / (1. + q) * (b / R)**t * func_util.R_omega(z, t, q, nmax=20)
 
         # return real and imaginary part
-        alpha_real = jnp.nan_to_num(alpha.real, posinf=10**10, neginf=-10**10)
-        alpha_imag = jnp.nan_to_num(alpha.imag, posinf=10**10, neginf=-10**10)
+        # alpha_real = jnp.nan_to_num(alpha.real, posinf=10**10, neginf=-10**10)
+        # alpha_imag = jnp.nan_to_num(alpha.imag, posinf=10**10, neginf=-10**10)
+        alpha_real = alpha.real
+        alpha_imag = alpha.imag
 
         return alpha_real, alpha_imag
 
