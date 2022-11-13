@@ -94,6 +94,18 @@ def shear_cartesian2polar(gamma1, gamma2):
     phi = jnp.arctan2(gamma2, gamma1) / 2
     gamma = jnp.sqrt(gamma1 ** 2 + gamma2 ** 2)
     return phi, gamma
+
+def shear_cartesian2polar_numpy(gamma1, gamma2):
+    """
+    :param gamma1: cartesian shear component
+    :param gamma2: cartesian shear component
+    :return: shear angle, shear strength
+    """
+    gamma1 = np.array(gamma1)
+    gamma2 = np.array(gamma2)
+    phi = np.arctan2(gamma2, gamma1) / 2
+    gamma = np.sqrt(gamma1 ** 2 + gamma2 ** 2)
+    return phi, gamma
     
 def cart2polar(x, y, center_x=0, center_y=0):
     """
