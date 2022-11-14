@@ -7,6 +7,7 @@
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
+import numpy as np
 import jax.numpy as jnp
 from jax import lax
 
@@ -38,11 +39,38 @@ def ellipticity2phi_q(e1, e2):
 
     """
     # replace value by low float instead to avoid NaNs
-    e1 = lax.cond(e1 == 0.0, lambda _: 1e-4, lambda _: e1, operand=None)
-    e2 = lax.cond(e2 == 0.0, lambda _: 1e-4, lambda _: e2, operand=None)
-    phi = jnp.arctan2(e2, e1) / 2
+    # e1 = lax.cond(e1 == 0.0, lambda _: 1e-4, lambda _: e1, operand=None)  # does not work with TFP!
+    # e2 = lax.cond(e2 == 0.0, lambda _: 1e-4, lambda _: e2, operand=None)  # does not work with TFP!
+    e1 = jnp.where(e1 == 0., 1e-4, e1)
+    e2 = jnp.where(e2 == 0., 1e-4, e2)
+    phi = jnp.arctan2(e2, e1) / 2.
     c = jnp.sqrt(e1**2 + e2**2)
     c = jnp.minimum(c, 0.9999)
+    q = (1. - c) / (1. + c)
+    return phi, q
+
+def ellipticity2phi_q_numpy(e1, e2):
+    """Transform complex ellipticity components to position angle and axis ratio.
+
+    Parameters
+    ----------
+    e1, e2 : float or array_like
+        Ellipticity components.
+
+    Returns
+    -------
+    phi, q : same type as e1, e2
+        Position angle (rad) and axis ratio (semi-minor / semi-major axis)
+
+    """
+    # replace value by low float instead to avoid NaNs
+    e1_ = np.copy(e1)
+    e1_[e1 == 0.] == 1e-4
+    e2_ = np.copy(e2)
+    e2_[e2 == 0.] == 1e-4
+    phi = np.arctan2(e2_, e1_) / 2
+    c = np.sqrt(e1_**2 + e2_**2)
+    c = np.minimum(c, 0.9999)
     q = (1. - c) / (1. + c)
     return phi, q
 

@@ -8,7 +8,6 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
 import jax.numpy as np
-from jax import ops  # Try to avoid index updates eventually
 from herculens.Util import util
 from herculens.Util import image_util
 from herculens.Coordinates.coord_transforms import Coordinates1D
@@ -68,6 +67,14 @@ class RegularGrid(Coordinates1D):
         :return: number of pixels per axis, nx*supersampling_factor ny*supersampling_factor
         """
         return self._nx * self._supersampling_factor, self._ny * self._supersampling_factor
+
+    @property
+    def num_grid_points(self):
+        """
+        effective number of points along each axes, after supersampling
+        :return: number of pixels per axis, nx*supersampling_factor ny*supersampling_factor
+        """
+        return self._nx * self._supersampling_factor * self._ny * self._supersampling_factor
 
     @property
     def supersampling_factor(self):

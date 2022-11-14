@@ -9,11 +9,11 @@ __author__ =  'aymgal'
 import herculens
 from herculens.Standard import coolest_util
 
-from lensmodelapi.io import APISerializer
-from lensmodelapi.api.coordinates import CoordinatesOrigin
-from lensmodelapi.api.lensing_entity_list import LensingEntityList
-from lensmodelapi.api.likelihood_list import LikelihoodList
-from lensmodelapi.api.regularization_list import RegularizationList
+from coolest.template.json import JSONSerializer
+from coolest.template.classes.coordinates import CoordinatesOrigin
+from coolest.template.classes.lensing_entity_list import LensingEntityList
+from coolest.template.classes.likelihood_list import LikelihoodList
+from coolest.template.classes.regularization_list import RegularizationList
 # from lensmodelapi.api.cosmology import Cosmology
 
 
@@ -79,14 +79,14 @@ class COOLESTexporter(object):
         template_file_name = self._template_file_name + '-herculens'
         if suffix is not None:
             template_file_name += '_' + suffix
-        serializer = APISerializer(template_file_name, obj=self._coolest, 
+        serializer = JSONSerializer(template_file_name, obj=self._coolest, 
                                    **self._kwargs_serializer)
-        serializer.json_dump()
-        serializer.json_dump_simple()
+        serializer.dump()
+        serializer.dump_simple()
 
     def _load_coolest_object(self):
-        serializer = APISerializer(self._template_file_name, **self._kwargs_serializer)
-        std_obj = serializer.json_load()
+        serializer = JSONSerializer(self._template_file_name, **self._kwargs_serializer)
+        std_obj = serializer.load()
         if std_obj.standard.upper() != 'COOLEST':
             raise ValueError("The JSON file is not a COOLEST template file.")
         self._coolest = std_obj

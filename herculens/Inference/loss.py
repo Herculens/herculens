@@ -56,7 +56,7 @@ class Loss(Differentiable):
     _supported_prior = ('uniform', 'gaussian')
 
     def __init__(self, data, image_class, param_class, 
-                 likelihood_type='chi2', likelihood_mask=None, mask_from_source_plane=False,
+                 likelihood_type='chi2', likelihood_mask=None, 
                  regularization_terms=None, regularization_strengths=None, 
                  regularization_weights=None, regularization_masks=None,
                  prior_terms=None, starlet_second_gen=False, index_analytical_potential=None):
@@ -67,7 +67,7 @@ class Loss(Differentiable):
         self._check_choices(likelihood_type, prior_terms, 
                             regularization_terms, regularization_strengths, 
                             regularization_weights, regularization_masks)
-        self._init_likelihood(likelihood_type, likelihood_mask, mask_from_source_plane)
+        self._init_likelihood(likelihood_type, likelihood_mask)
         self._init_regularizations(regularization_terms, 
                                    regularization_strengths, 
                                    regularization_weights, 
@@ -136,10 +136,8 @@ class Loss(Differentiable):
                     raise ValueError(f"Regularization term '{term}' is only "
                                      "compatible with a 'PIXELATED' lens profile")
 
-    def _init_likelihood(self, likelihood_type, likelihood_mask, mask_from_source_plane):
-        if mask_from_source_plane is True and self._image.SourceModel.has_pixels:
-            self._ll_mask = model_util.mask_from_source_area(self._image, self._param)
-        elif likelihood_mask is None:
+    def _init_likelihood(self, likelihood_type, likelihood_mask):
+        if likelihood_mask is None:
             self._ll_mask = np.ones_like(self._data)
         else:
             self._ll_mask = likelihood_mask.astype(float)
@@ -185,7 +183,7 @@ class Loss(Differentiable):
         self._idx_pix_ll  = self._image.LensLightModel.pixelated_index
 
         regul_func_list = []
-        for term, strength, weights, masks in zip(regularization_terms, 
+        for term, strength, weights, mask in zip(regularization_terms, 
                                            regularization_strengths, 
                                            regularization_weights_fix,
                                            regularization_masks):
@@ -208,7 +206,7 @@ class Loss(Differentiable):
                     self._st_src_lambda_hf = float(strength[0])
                     self._st_src_lambda = float(strength[1])
 
-            if term == 'l1_starlet_lens_light':
+            elif term == 'l1_starlet_lens_light':
                 n_pix_ll = min(*self._image.LensLightModel.pixelated_shape)
                 n_scales = int(np.log2(n_pix_ll))  # maximum allowed number of scales
                 self._starlet_ll = WaveletTransform(n_scales, wavelet_type='starlet',
@@ -264,7 +262,7 @@ class Loss(Differentiable):
                 # self._st_pot_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if weights.shape[0] != n_scales+1:
                     raise ValueError(f"The weights do not contain enough wavelet scales"
-                                     f" (should be {n_scales} inc. coarsest).")
+                                     f" (should be {n_scales+1} inc. coarsest).")
                 self._st_pot_weigths = weights
                 if isinstance(strength, (int, float)):
                     self._st_pot_lambda = float(strength)
@@ -282,7 +280,7 @@ class Loss(Differentiable):
                 # self._bl_pot_norm = self._battle_pot.scale_norms[0]  # consider only first scale
                 if weights.shape[0] != n_scales+1:
                     raise ValueError(f"The weights do not contain enogh wavelet scales"
-                                     f" (should be {n_scales} inc. coarsest).")
+                                     f" (should be {n_scales+1} inc. coarsest).")
                 self._bl_pot_weigths = weights
                 if isinstance(strength, (tuple, list)):
                     raise ValueError("You can only specify one regularization "
@@ -316,7 +314,7 @@ class Loss(Differentiable):
                 self._regul_k_lens = tuple([True if i != self._idx_ana_pot else False for i in range(len(self._image.MassModel.profile_type_list))])
                 self._weigths = weights
                 self._lambda  = float(strength)
-                self._mask    = masks
+                self._mask    = mask
                 self._x_lens, self._y_lens = self._image.Grid.model_pixel_coordinates('lens')
 
 
