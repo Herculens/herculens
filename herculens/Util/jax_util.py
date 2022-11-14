@@ -1,5 +1,5 @@
 # Classes and functions to use with JAX
-# 
+#
 # Copyright (c) 2021, herculens developers and contributors
 
 __author__ = 'austinpeel', 'aymgal'
@@ -18,7 +18,7 @@ from jax.lax import conv_general_dilated, conv_dimension_numbers
 
 def unjaxify_kwargs(kwargs_params):
     """
-    Utility to convert all JAX's device arrays contained in a model kwargs 
+    Utility to convert all JAX's device arrays contained in a model kwargs
     to standard floating point or numpy arrays.
     """
     kwargs_params_new = deepcopy(kwargs_params)
@@ -51,7 +51,7 @@ def R_omega(z, t, q, nmax):
     """
     # Set the maximum number of iterations
     # nmax = 10
-    
+
     # Compute constant factors
     f = (1. - q) / (1. + q)
     ei2phi = z / z.conjugate()
@@ -170,25 +170,25 @@ class WaveletTransform(object):
             self._h = jnp.array([1, 4, 6, 4, 1]) / 16.
             self._fac = 2
         elif wavelet_type == 'battle-lemarie-1':
-            self._h = jnp.array([-0.000122686, -0.000224296, 0.000511636, 
-                        0.000923371, -0.002201945, -0.003883261, 0.009990599, 
-                        0.016974805, -0.051945337, -0.06910102, 0.39729643, 
-                        0.817645956, 0.39729643, -0.06910102, -0.051945337, 
+            self._h = jnp.array([-0.000122686, -0.000224296, 0.000511636,
+                        0.000923371, -0.002201945, -0.003883261, 0.009990599,
+                        0.016974805, -0.051945337, -0.06910102, 0.39729643,
+                        0.817645956, 0.39729643, -0.06910102, -0.051945337,
                         0.016974805, 0.009990599, -0.003883261, -0.002201945,
                         0.000923371, 0.000511636, -0.000224296, -0.000122686])
             self._h /= 1.4140825479999999  # sum of coefficients above
             self._fac = 11
         elif wavelet_type == 'battle-lemarie-3':
-            self._h = jnp.array([0.000146098, -0.000232304, -0.000285414, 
-                          0.000462093, 0.000559952, -0.000927187, -0.001103748, 
-                          0.00188212, 0.002186714, -0.003882426, -0.00435384, 
-                          0.008201477, 0.008685294, -0.017982291, -0.017176331, 
-                          0.042068328, 0.032080869, -0.110036987, -0.050201753, 
-                          0.433923147, 0.766130398, 0.433923147, -0.050201753, 
-                          -0.110036987, 0.032080869, 0.042068328, -0.017176331, 
-                          -0.017982291, 0.008685294, 0.008201477, -0.00435384, 
-                          -0.003882426, 0.002186714, 0.00188212, -0.001103748, 
-                          -0.000927187, 0.000559952, 0.000462093, -0.000285414, 
+            self._h = jnp.array([0.000146098, -0.000232304, -0.000285414,
+                          0.000462093, 0.000559952, -0.000927187, -0.001103748,
+                          0.00188212, 0.002186714, -0.003882426, -0.00435384,
+                          0.008201477, 0.008685294, -0.017982291, -0.017176331,
+                          0.042068328, 0.032080869, -0.110036987, -0.050201753,
+                          0.433923147, 0.766130398, 0.433923147, -0.050201753,
+                          -0.110036987, 0.032080869, 0.042068328, -0.017176331,
+                          -0.017982291, 0.008685294, 0.008201477, -0.00435384,
+                          -0.003882426, 0.002186714, 0.00188212, -0.001103748,
+                          -0.000927187, 0.000559952, 0.000462093, -0.000285414,
                           -0.000232304, 0.000146098])
             self._h /= 1.4141580200000003  # sum of coefficients above
             self._fac = 20
@@ -373,17 +373,20 @@ class BilinearInterpolator(object):
 
     """
     def __init__(self, x, y, z, allow_extrapolation=True):
+        self.x = jnp.array(x)
+        self.y = jnp.array(y)
         self.z = jnp.array(z)  # z
-        if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
-            self.x = jnp.array(x)
-        else:
-            self.x = jnp.array(np.sort(x))
-            self.z = jnp.flip(self.z, axis=0)
-        if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
-            self.y = jnp.array(y)
-        else:
-            self.y = jnp.array(np.sort(y))
-            self.z = jnp.flip(self.z, axis=1)
+
+        # if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
+        #     self.x = jnp.array(x)
+        # else:
+        #     self.x = jnp.array(np.sort(x))
+        #     self.z = jnp.flip(self.z, axis=0)
+        # if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
+        #     self.y = jnp.array(y)
+        # else:
+        #     self.y = jnp.array(np.sort(y))
+        #     self.z = jnp.flip(self.z, axis=1)
         self._extrapol_bool = allow_extrapolation
 
     def __call__(self, x, y, dx=0, dy=0):
@@ -452,9 +455,9 @@ class BilinearInterpolator(object):
         else:
             result = a2 + a3 * x
         # if extrapolation is not allowed, then we mask out values outside the original bounding box
-        result = lax.cond(self._extrapol_bool, 
-                          lambda _: result, 
-                          lambda _: result * (x >= self.x[0]) * (x <= self.x[-1]) * (y >= self.y[0]) * (y <= self.y[-1]), 
+        result = lax.cond(self._extrapol_bool,
+                          lambda _: result,
+                          lambda _: result * (x >= self.x[0]) * (x <= self.x[-1]) * (y >= self.y[0]) * (y <= self.y[-1]),
                           operand=None)
         return result
 
@@ -467,17 +470,20 @@ class BicubicInterpolator(object):
 
     """
     def __init__(self, x, y, z, zx=None, zy=None, zxy=None, allow_extrapolation=True):
-        self.z = jnp.array(z)
-        if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
-            self.x = jnp.array(x)
-        else:
-            self.x = jnp.array(np.sort(x))
-            self.z = jnp.flip(self.z, axis=1)
-        if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
-            self.y = jnp.array(y)
-        else:
-            self.y = jnp.array(np.sort(y))
-            self.z = jnp.flip(self.z, axis=0)
+        self.x = jnp.array(x)
+        self.y = jnp.array(y)
+        self.z = jnp.array(z)  # z
+
+        # if np.all(np.diff(x) >= 0):  # check if sorted in increasing order
+        #     self.x = jnp.array(x)
+        # else:
+        #     self.x = jnp.array(np.sort(x))
+        #     self.z = jnp.flip(self.z, axis=0)
+        # if np.all(np.diff(y) >= 0):  # check if sorted in increasing order
+        #     self.y = jnp.array(y)
+        # else:
+        #     self.y = jnp.array(np.sort(y))
+        #     self.z = jnp.flip(self.z, axis=1)
 
         # Assume uniform coordinate spacing
         self.dx = self.x[1] - self.x[0]
@@ -568,9 +574,8 @@ class BicubicInterpolator(object):
         result = jnp.dot(uu, jnp.dot(a, vv))
 
         # if extrapolation is not allowed, then we mask out values outside the original bounding box
-        result = lax.cond(self._extrapol_bool, 
-                          lambda _: result, 
-                          lambda _: result * (x >= self.x[0]) * (x <= self.x[-1]) * (y >= self.y[0]) * (y <= self.y[-1]), 
+        result = lax.cond(self._extrapol_bool,
+                          lambda _: result,
+                          lambda _: result * (x >= self.x[0]) * (x <= self.x[-1]) * (y >= self.y[0]) * (y <= self.y[-1]),
                           operand=None)
         return result
-        

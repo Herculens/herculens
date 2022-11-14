@@ -1,5 +1,5 @@
 # Defines the point spread function model
-# 
+#
 # Copyright (c) 2021, herculens developers and contributors
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the Data module from lenstronomy (version 1.9.3)
@@ -23,7 +23,7 @@ class PSF(object):
     """
 
     def __init__(self, psf_type='NONE', fwhm=None, truncation=5,
-                 pixel_size=None, kernel_point_source=None, 
+                 pixel_size=None, kernel_point_source=None,
                  kernel_supersampling_factor=1):
         """Create a PSF object.
 
@@ -31,7 +31,6 @@ class PSF(object):
         ----------
         psf_type : str, {'NONE', 'PIXEL', 'GAUSSIAN'}
             Type of PSF model. Default is 'NONE'.
-            !! NOTE ONLY NONE AND GAUSSIAN ARE CURRENTLY IMPLEMENTED !!
         fwhm : float, optional
             Full width at half maximum, only required for 'GAUSSIAN' type.
             Default is 'NONE'.
@@ -100,7 +99,7 @@ class PSF(object):
             self._blurring_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, data_shape)
         return self._blurring_matrix
 
-    def kernel_point_source_supersampled(self, supersampling_factor, updata_cache=True, 
+    def kernel_point_source_supersampled(self, supersampling_factor, updata_cache=True,
                                          iterative_supersampling=True):
         """
         generates (if not already available) a supersampled PSF with ood numbers of pixels centered
@@ -124,7 +123,7 @@ class PSF(object):
                     num_iter = 5  # default value in lenstronomy
                 else:
                     num_iter = 0
-                kernel = kernel_util.subgrid_kernel(self.kernel_point_source, supersampling_factor, 
+                kernel = kernel_util.subgrid_kernel(self.kernel_point_source, supersampling_factor,
                                                     odd=True, num_iter=num_iter)
                 n = len(self.kernel_point_source)
                 n_new = n * supersampling_factor
@@ -153,7 +152,7 @@ class PSF(object):
         self._pixel_size = deltaPix
         if self.psf_type == 'GAUSSIAN' and hasattr(self, '_kernel_point_source'):
             del self._kernel_point_source
-            
+
     @property
     def fwhm(self):
         """
@@ -161,4 +160,3 @@ class PSF(object):
         :return: full width at half maximum of kernel (in units of pixel)
         """
         return self._fwhm
-        

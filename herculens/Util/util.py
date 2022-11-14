@@ -1,5 +1,5 @@
 # Utility functions
-# 
+#
 # Copyright (c) 2021, herculens developers and contributors
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the Util module from lenstronomy (version 1.9.3)
@@ -41,10 +41,10 @@ def array2image(array, nx=0, ny=0):
     Note: this only works when length of array is a perfect square, or else if
     nx and ny are provided
 
-    :param array: image values
+    :param array: 1d array of image values
     :type array: array of size n**2
     :returns:  2d array
-    :raises: AttributeError, KeyError
+    :raises: ValueError
     """
     if nx == 0 or ny == 0:
         # Avoid turning n into a JAX-traced object with jax.numpy.sqrt
@@ -165,7 +165,7 @@ def subgrid_from_coordinate_transform(nx, ny, Mpix2coord, ra_at_xy_0, dec_at_xy_
     """
     if subgrid_res == 1:
         return grid_from_coordinate_transform(nx, ny, Mpix2coord, ra_at_xy_0, dec_at_xy_0)
-    
+
     nx_sub, ny_sub = int(nx * subgrid_res), int(ny * subgrid_res)
     subgrid_res = float(subgrid_res)
     # delta_pix = np.sqrt(np.abs(np.linalg.det(Mpix2coord)))
@@ -177,7 +177,7 @@ def subgrid_from_coordinate_transform(nx, ny, Mpix2coord, ra_at_xy_0, dec_at_xy_
     x_at_radec_0_sub = x_at_radec_0 * subgrid_res - 0.5*(subgrid_res-1)
     y_at_radec_0_sub = y_at_radec_0 * subgrid_res - 0.5*(subgrid_res-1)
     # if subgrid_res % 2 == 0:
-    #     x_at_radec_0_sub 
+    #     x_at_radec_0_sub
     ra_at_xy_0_sub, dec_at_xy_0_sub = map_coord2pix(x_at_radec_0_sub, y_at_radec_0_sub, x_0=0, y_0=0, M=Mpix2coord_sub)
     return grid_from_coordinate_transform(nx_sub, ny_sub, Mpix2coord_sub, ra_at_xy_0_sub, dec_at_xy_0_sub)
 
@@ -300,4 +300,3 @@ def read_json(input_path):
         input_str = re.sub(re.compile("//.*?\n" ), "", input_str)
         json_in   = json.loads(input_str)
     return json_in
-    
