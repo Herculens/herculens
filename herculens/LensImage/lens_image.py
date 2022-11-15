@@ -79,7 +79,8 @@ class LensImage(object):
         self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **self.kwargs_numerics)
 
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
-                                  unconvolved=False, supersampled=False, de_lensed=False, k=None, k_lens=None):
+                                  unconvolved=False, supersampled=False,
+                                  de_lensed=False, k=None, k_lens=None):
         """
 
         computes the source surface brightness distribution
@@ -105,7 +106,8 @@ class LensImage(object):
             source_light = self.ImageNumerics.re_size_convolve(source_light, unconvolved=unconvolved)
         return source_light
 
-    def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False, supersampled=False, k=None):
+    def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False,
+                                supersampled=False, k=None):
         """
 
         computes the lens surface brightness distribution
@@ -140,8 +142,8 @@ class LensImage(object):
         return self.ImageNumerics.render_point_sources(theta_x, theta_y, amplitude)
 
     @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12))
-    def model(self, kwargs_lens=None, kwargs_source=None,
-              kwargs_lens_light=None, kwargs_point_source=None, unconvolved=False,
+    def model(self, kwargs_lens=None, kwargs_source=None, kwargs_lens_light=None,
+              kwargs_point_source=None, unconvolved=False, supersampled=False,
               source_add=True, lens_light_add=True, point_source_add=True,
               k_lens=None, k_source=None, k_lens_light=None, k_point_source=None):
         """
@@ -170,13 +172,20 @@ class LensImage(object):
             model = jnp.zeros((self.ImageNumerics.grid_class.num_grid_points,))
 
         if source_add:
-            model += self.source_surface_brightness(kwargs_source, kwargs_lens, unconvolved=unconvolved,
+            model += self.source_surface_brightness(kwargs_source, kwargs_lens,
+                                                    unconvolved=unconvolved,
+                                                    supersampled=supersampled,
                                                     k=k_source, k_lens=k_lens)
+
         if lens_light_add:
-            model += self.lens_surface_brightness(kwargs_lens_light, unconvolved=unconvolved, k=k_lens_light)
+            model += self.lens_surface_brightness(kwargs_lens_light,
+                                                  unconvolved=unconvolved,
+                                                  supersampled=supersampled,
+                                                  k=k_lens_light)
 
         if point_source_add:
-            model += self.point_source_image(kwargs_point_source, kwargs_lens, k=k_point_source)
+            model += self.point_source_image(kwargs_point_source, kwargs_lens,
+                                             k=k_point_source)
 
         return model
 
