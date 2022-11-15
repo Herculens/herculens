@@ -141,7 +141,7 @@ class LensImage(object):
         amplitude = self.PointSourceModel.image_amplitudes(kwargs_point_source, kwargs_lens, k)
         return self.ImageNumerics.render_point_sources(theta_x, theta_y, amplitude)
 
-    @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12))
+    @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13))
     def model(self, kwargs_lens=None, kwargs_source=None, kwargs_lens_light=None,
               kwargs_point_source=None, unconvolved=False, supersampled=False,
               source_add=True, lens_light_add=True, point_source_add=True,
