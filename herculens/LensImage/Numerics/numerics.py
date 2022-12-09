@@ -9,12 +9,12 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 import numpy as np
 import jax.numpy as jnp
+from jax.scipy.ndimage import map_coordinates
 from herculens.LensImage.Numerics.grid import RegularGrid
 from herculens.LensImage.Numerics.convolution import (PixelKernelConvolution,
                                                       SubgridKernelConvolution,
                                                       GaussianConvolution)
 from herculens.Util import kernel_util, util
-from herculens.Util.jax_util import BilinearInterpolator, BicubicInterpolator
 
 
 __all__ = ['Numerics']
@@ -22,7 +22,7 @@ __all__ = ['Numerics']
 
 class Numerics(object):
     """
-    this classes manages the numerical options and computations of an image.
+    This class manages the numerical options and computations of an image.
     The class has two main functions, re_size_convolve() and coordinates_evaluate()
     """
     def __init__(self, pixel_grid, psf, supersampling_factor=1, convolution_type='jax_scipy',
@@ -69,7 +69,6 @@ class Numerics(object):
                                                         supersampling_factor=1)
                 self._conv = PixelKernelConvolution(kernel, convolution_type=convolution_type,
                                                     output_shape=(nx, ny))
-
         elif self._psf_type == 'GAUSSIAN':
             pixel_scale = pixel_grid.pixel_width
             sigma = util.fwhm2sigma(psf.fwhm)
@@ -79,10 +78,13 @@ class Numerics(object):
             self._conv = None
         else:
             raise ValueError('psf_type %s not valid! Chose either NONE, GAUSSIAN or PIXEL.' % self._psf_type)
+
         if supersampling_convolution is True:
             self._high_res_return = True
         else:
             self._high_res_return = False
+
+        self._point_source_supersampling_factor = point_source_supersampling_factor
 
     def re_size_convolve(self, flux_array, unconvolved=False):
         """
@@ -115,48 +117,30 @@ class Numerics(object):
         Returns
         -------
         out : 2D array
-            Image of pixel grid resolution where the interpolated and re-normalized
-            PSF has been placed at the locations of the point sources.
+            Image at the pixel grid resolution where the (interpolated) PSF has
+            been placed at the locations of the point sources.
 
         """
-        result = jnp.zeros(self.original_grid.num_pixel_axes)
+        # TODO Account for supersampling
+        result = jnp.zeros(self._pixel_grid.num_pixel_axes)
 
         # Verify inputs
         theta_x = jnp.atleast_1d(theta_x)
         theta_y = jnp.atleast_1d(theta_y)
         amplitude = jnp.atleast_1d(amplitude)
 
-        # PSF coordinate space
-        nx, ny = self._psf.kernel_point_source.shape
-        width = self._psf._pixel_size
-        x_coords_psf = np.linspace(-0.5 * nx * width, 0.5 * nx * width, nx)
-        y_coords_psf = np.linspace(-0.5 * ny * width, 0.5 * ny * width, ny)
+        # Pixel positions of point sources in the image plane
+        x, y = self._pixel_grid.map_coord2pix(theta_x, theta_y)
 
-        x_coords_grid, y_coords_grid = self.original_grid.pixel_coordinates
-        for x0, y0, amp in zip(theta_x, theta_y, amplitude):
-            interp = BilinearInterpolator(x_coords_psf + x0, y_coords_psf + y0,
-                                         self._psf.kernel_point_source,
-                                         allow_extrapolation=False)
-            ps_image = interp(x_coords_grid, y_coords_grid)
-            ps_image /= ps_image.sum()
-            result += amp * ps_image
+        # PSF kernel
+        kernel = self._psf.kernel_point_source
+        nx, ny = self._pixel_grid.num_pixel_axes
+        xrange = jnp.arange(nx) + kernel.shape[0] // 2
+        yrange = jnp.arange(ny) + kernel.shape[1] // 2
 
-        # subgrid = self._supersampling_factor
-        # x_pos, y_pos = self._pixel_grid.map_coord2pix(ra_pos, dec_pos)
-        # # translate coordinates to higher resolution grid
-        # x_pos_subgird = x_pos * subgrid + (subgrid - 1) / 2.
-        # y_pos_subgrid = y_pos * subgrid + (subgrid - 1) / 2.
-        # kernel_point_source_subgrid = self._kernel_supersampled
-        # # initialize grid with higher resolution
-        # subgrid2d = np.zeros((self._nx*subgrid, self._ny*subgrid))
-        # # add_layer2image
-        # if len(x_pos) > len(amp):
-        #     raise ValueError('there are %s images appearing but only %s amplitudes provided!' % (len(x_pos), len(amp)))
-        # for i in range(len(x_pos)):
-        #     subgrid2d = image_util.add_layer2image(subgrid2d, x_pos_subgird[i], y_pos_subgrid[i], amp[i] * kernel_point_source_subgrid)
-        # # re-size grid to data resolution
-        # grid2d = image_util.re_size(subgrid2d, factor=subgrid)
-        # return grid2d*subgrid**2
+        for x0, y0, amp in zip(x, y, amplitude):
+            xy_grid = jnp.meshgrid(xrange - x0, yrange - y0)
+            result += amp * map_coordinates(kernel, xy_grid, order=1)
 
         return result
 
@@ -209,7 +193,3 @@ class Numerics(object):
         :return: grid class
         """
         return self._grid
-
-    @property
-    def original_grid(self):
-        return self._pixel_grid

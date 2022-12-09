@@ -124,7 +124,7 @@ class LensImage(object):
         return lens_light
 
     def point_source_image(self, kwargs_point_source, kwargs_lens, k=None):
-        """Compute the multiple images of PSF-convolved point sources.
+        """Compute PSF-convolved point sources rendered on the image plane.
 
         :param kwargs_point_source: list of keyword arguments corresponding to the point sources
         :param kwargs_lens: list of keyword arguments corresponding to the superposition of different lens profiles
@@ -134,11 +134,8 @@ class LensImage(object):
         if self.PointSourceModel is None:
             return jnp.zeros((self.Data.num_pixel_axes))
 
-        # ra_pos, dec_pos, amp = self.PointSource.point_source_list(kwargs_ps, kwargs_lens=kwargs_lens, k=k)
-        # ra_pos, dec_pos = self._displace_astrometry(ra_pos, dec_pos, kwargs_special=kwargs_special)
-        # point_source_image += self.ImageNumerics.point_source_rendering(ra_pos, dec_pos, amp)
-        theta_x, theta_y = self.PointSourceModel.image_positions(kwargs_point_source, kwargs_lens, k)
-        amplitude = self.PointSourceModel.image_amplitudes(kwargs_point_source, kwargs_lens, k)
+        theta_x, theta_y, amplitude = self.PointSourceModel.image_positions_and_amplitudes(kwargs_point_source, kwargs_lens, k)
+        # amplitude = self.PointSourceModel.image_amplitudes(kwargs_point_source, kwargs_lens, k)
         return self.ImageNumerics.render_point_sources(theta_x, theta_y, amplitude)
 
     @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13))
