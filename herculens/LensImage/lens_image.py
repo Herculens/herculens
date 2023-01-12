@@ -131,12 +131,15 @@ class LensImage(object):
         :param k: list of bool or list of int to select which point sources to include
         :return: 2d array at the image plane resolution of all multiple images of the point sources
         """
+        result = jnp.zeros((self.Grid.num_pixel_axes))
         if self.PointSourceModel is None:
-            return jnp.zeros((self.Data.num_pixel_axes))
+            return result
 
-        theta_x, theta_y, amplitude = self.PointSourceModel.image_positions_and_amplitudes(kwargs_point_source, kwargs_lens, k)
-        # amplitude = self.PointSourceModel.image_amplitudes(kwargs_point_source, kwargs_lens, k)
-        return self.ImageNumerics.render_point_sources(theta_x, theta_y, amplitude)
+        theta_x, theta_y, amplitude = self.PointSourceModel.get_multiple_images(kwargs_point_source, kwargs_lens, k)
+        for i in range(len(theta_x)):
+            result += self.ImageNumerics.render_point_sources(theta_x[i], theta_y[i], amplitude[i])
+
+        return result
 
     @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13))
     def model(self, kwargs_lens=None, kwargs_source=None, kwargs_lens_light=None,
