@@ -133,6 +133,11 @@ class Numerics(object):
         x, y = self._pixel_grid.map_coord2pix(theta_x, theta_y)
 
         # PSF kernel
+        if self._psf.kernel_point_source is None:
+            err_msg = ("PSF has no kernel_point_source. This can happen, for " +
+                "example, if `pixel_size` was not provided for type GAUSSIAN.")
+            raise ValueError(err_msg)
+
         kernel = self._psf.kernel_point_source
         nx, ny = self._pixel_grid.num_pixel_axes
         xrange = jnp.arange(nx) + kernel.shape[0] // 2

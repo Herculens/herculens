@@ -57,11 +57,17 @@ class PSF(object):
             # Validate required inputs
             if fwhm is None:
                 raise ValueError('Must set `fwhm` for GAUSSIAN `psf_type`')
+            if pixel_size is None:
+                raise ValueError('Must set `pixel_size` for GAUSSIAN `psf_type`')
 
             self._fwhm = fwhm
             self._sigma_gaussian = util.fwhm2sigma(self._fwhm)
             self._truncation = truncation
             self._kernel_supersampling_factor = 0
+            kernel = self.compute_gaussian_kernel(self._pixel_size, self.fwhm,
+                                                  self._truncation)
+            self._kernel_point_source = kernel
+
         elif self.psf_type == 'PIXEL':
             # Validate required inputs
             if kernel_point_source is None:
@@ -87,19 +93,6 @@ class PSF(object):
     def kernel_point_source(self):
         if hasattr(self, '_kernel_point_source'):
             return self._kernel_point_source
-
-        if self._pixel_size is None:
-            raise ValueError('Must first set `pixel_size`')
-
-        if self.psf_type == 'GAUSSIAN':
-            npix = round(self._truncation * self._fwhm / self._pixel_size)
-            # Ensure an odd number of pixels
-            npix += 1 - npix % 2
-            kernel = kernel_util.kernel_gaussian(npix, self._pixel_size,
-                                                 self._fwhm)
-            self._kernel_point_source = kernel
-
-        return self._kernel_point_source
 
     @property
     def kernel_pixel(self):
@@ -178,10 +171,43 @@ class PSF(object):
         pixel_size : float
             New pixel size in angular units (arc seconds).
 
+        Notes
+        -----
+        The `kernel_point_source` attribute is (re)computed according to the
+        new pixel size if the PSF type is GAUSSIAN.
+
         """
         self._pixel_size = pixel_size
-        if self.psf_type == 'GAUSSIAN' and hasattr(self, '_kernel_point_source'):
-            del self._kernel_point_source
+
+        if self.psf_type == 'GAUSSIAN':
+            kernel = self.compute_gaussian_kernel(self._pixel_size, self.fwhm,
+                                                  self._truncation)
+            self._kernel_point_source = kernel
+
+    def compute_gaussian_kernel(self, pixel_size, fwhm, truncation):
+        """Compute a Gaussian kernel matrix to serve as PSF.
+
+        Parameters
+        ----------
+        pixel_size : float
+            Pixel size in angular units (arc seconds).
+        fwhm : float
+            Full width at half maximum of the Gaussian in pixel units.
+        truncation : float
+            Truncation length (in units of sigma) for the Gaussian.
+
+        Returns
+        -------
+        out : array
+            2D Gaussian kernel matrix.
+
+        """
+        # Determine the number of pixels per side
+        npix = round(self._truncation * self.fwhm / self._pixel_size)
+        # Ensure an odd number
+        npix += 1 - npix % 2
+        # Evaluate the 2D Gaussian at the pixel positions
+        return kernel_util.kernel_gaussian(npix, self._pixel_size, self.fwhm)
 
     @property
     def fwhm(self):

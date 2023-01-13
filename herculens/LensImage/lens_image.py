@@ -37,7 +37,14 @@ class LensImage(object):
         self.Grid = grid_class
         self.PSF = psf_class
         self.Noise = noise_class
-        self.PSF.set_pixel_size(self.Grid.pixel_width)
+
+        # Require now that all relevant parameters of the PSF model are provided
+        # when it is instantiated (outside this object). This helps avoid JAX
+        # tracer errors due to, e.g., the PSF kernel size being computed for
+        # the first time inside the jitted model() method, where it would
+        # cause the kernel to become an abstract tracer
+        #
+        # self.PSF.set_pixel_size(self.Grid.pixel_width)
 
         if lens_mass_model_class is None:
             from herculens.MassModel.mass_model import MassModel

@@ -1,5 +1,5 @@
 # Handles different convolution methods
-# 
+#
 # Copyright (c) 2021, herculens developers and contributors
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the ImSim.Numerics module from lenstronomy (version 1.9.3)
@@ -138,7 +138,7 @@ class GaussianConvolution(object):
     class to perform a convolution a 2d Gaussian
     """
 
-    def __init__(self, sigma, pixel_scale, supersampling_factor=1, 
+    def __init__(self, sigma, pixel_scale, supersampling_factor=1,
                  supersampling_convolution=False, truncation=2):
         self._sigma = sigma / pixel_scale
         if supersampling_convolution is True:

@@ -1,5 +1,5 @@
 # Utility functions
-# 
+#
 # Copyright (c) 2021, herculens developers and contributors
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the Util module from lenstronomy (version 1.9.3)
@@ -146,8 +146,7 @@ def kernel_gaussian(kernel_numPix, deltaPix, fwhm):
     gaussian = Gaussian()
     kernel = gaussian.function(x_grid, y_grid, amp=1., sigma=sigma, center_x=0, center_y=0)
     kernel /= np.sum(kernel)
-    kernel = util.array2image(kernel)
-    return kernel
+    return kernel.reshape(kernel_numPix, kernel_numPix)
 
 def split_kernel(kernel_super, supersampling_kernel_size, supersampling_factor, normalized=True):
     """
