@@ -1,3 +1,5 @@
+# Copyright (c) 2023, herculens developers and contributors
+
 __author__ = 'austinpeel'
 
 import jax.numpy as jnp
@@ -19,7 +21,13 @@ class PointSource(object):
 
         Parameters
         ----------
-        TODO
+        point_source_type : str
+            Either 'LENSED_POSITIONS' or 'SOURCE_POSITION'.
+        mass_model : instance of `herculens.MassModel.mass_model.MassModel`
+            Model of the lensing mass used to map positions between the source
+            and image planes. Default is None.
+        image_plane : instance of `herculens.Coordinates.pixel_grid.PixelGrid`
+            Pixel grid used for triangulation in solving the lens equation.
 
         """
         self.type = point_source_type
@@ -31,7 +39,10 @@ class PointSource(object):
 
         Parameters
         ----------
-        TODO
+        kwargs_point_source : list of dict
+            Keyword arguments corresponding to the point source instances.
+        kwargs_lens : list of dict, optional
+            Keyword arguments for the lensing mass model. Default is None.
 
         """
         if self.type == 'IMAGE_POSITIONS':
@@ -55,7 +66,14 @@ class PointSource(object):
 
         Parameters
         ----------
-        TODO
+        theta_x : array_like
+            X position of points in the image plane [arcsec].
+        theta_y : array_like
+            Y position of points in the image plane [arcsec].
+        kwargs_point_source : list of dict
+            Keyword arguments corresponding to the point source instances.
+        kwargs_lens : list of dict, optional
+            Keyword arguments for the lensing mass model. Default is None.
 
         """
         amp = kwargs_point_source['amp']
@@ -70,7 +88,10 @@ class PointSource(object):
 
         Parameters
         ----------
-        TODO
+        kwargs_point_source : list of dict
+            Keyword arguments corresponding to the point source instances.
+        kwargs_lens : list of dict, optional
+            Keyword arguments for the lensing mass model. Default is None.
 
         """
         if self.type == 'IMAGE_POSITIONS':
@@ -88,7 +109,10 @@ class PointSource(object):
 
         Parameters
         ----------
-        TODO
+        kwargs_point_source : list of dict
+            Keyword arguments corresponding to the point source instances.
+        kwargs_lens : list of dict, optional
+            Keyword arguments for the lensing mass model. Default is None.
 
         """
         if self.type == 'IMAGE_POSITIONS':

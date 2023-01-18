@@ -1,3 +1,5 @@
+# Copyright (c) 2023, herculens developers and contributors
+
 __author__ = 'austinpeel'
 
 import jax.numpy as jnp
@@ -9,6 +11,9 @@ SUPPORTED_TYPES = ['IMAGE_POSITIONS', 'SOURCE_POSITION']
 
 class PointSourceModel(object):
     """Collection of point sources defined in the source or image plane."""
+
+    param_names = ['ra', 'dec', 'amp']
+
     def __init__(self, point_source_type_list, mass_model=None, image_plane=None):
         """Instantiate a point source model.
 
@@ -38,6 +43,8 @@ class PointSourceModel(object):
                 err_msg = (f"{ps_type} is not a valid point source type. " +
                     f"Supported types include {SUPPORTED_TYPES}")
                 raise ValueError(err_msg)
+
+        self.type_list = point_source_type_list
 
     def _indices_from_k(self, k):
         """Validate a proposed point source index.
