@@ -1,3 +1,5 @@
+# Copyright (c) 2023, herculens developers and contributors
+
 __author__ = 'austinpeel'
 
 import jax.numpy as jnp
@@ -107,6 +109,10 @@ class LensEquationSolver(object):
     def scale_triangles(self, triangles, scale_factor):
         """Scale triangles about their centroids.
 
+        Parameters
+        ----------
+        triangles : jax array of shape (N, 3, 2)
+            Vertices defining N triangles in the image plane.
         scale_factor : float
             Factor by which each triangle's area is scaled.
 
@@ -120,10 +126,10 @@ class LensEquationSolver(object):
 
         Parameters
         ----------
-        triangles : TODO
-            ...
+        triangles : jax array of shape (N, 3, 2)
+            Vertices defining N triangles in the image plane.
         niter : int
-            ...
+            Number of times to subdivide each triangle.
 
         """
         v1, v2, v3 = triangles.transpose(1, 0, 2)
@@ -150,11 +156,25 @@ class LensEquationSolver(object):
         return subtriangles.reshape(4**niter * len(triangles), 3, 2)
 
     def centroids(self, triangles):
-        """The centroid positions of triangles."""
+        """The centroid positions of a set of triangles.
+
+        Parameters
+        ----------
+        triangles : jax array of shape (N, 3, 2)
+            Vertices defining N triangles in the image plane.
+
+        """
         return triangles.sum(axis=1) / 3.
 
     def signed_areas(self, triangles):
-        """The signed area of triangles."""
+        """The signed area of a set of triangles.
+
+        Parameters
+        ----------
+        triangles : jax array of shape (N, 3, 2)
+            Vertices defining N triangles in the image plane.
+
+        """
         side1 = triangles[:, 1] - triangles[:, 0]
         side2 = triangles[:, 2] - triangles[:, 1]
         return 0.5 * jnp.cross(side1, side2)
@@ -172,11 +192,18 @@ class LensEquationSolver(object):
         kwargs_lens : dict
             Parameters defining the mass model.
         niter : int
-            ...
+            Number of
         scale_factor : float
-            ...
+            Factor by which to scale the selected triangle areas at each iteration.
         nsubdivisions : int
-            ...
+            Number of times to subdivide (into 4) the selected triangles at
+            each iteration.
+
+        Returns
+        -------
+        theta, beta : tuple of 2D jax arrays
+            Image plane positions and their source plane counterparts are
+            returned as arrays of shape (N, 2).
 
         """
         # Triangulate the image plane

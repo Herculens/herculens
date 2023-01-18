@@ -103,7 +103,7 @@ class Numerics(object):
         return image_conv * self._pixel_width ** 2
 
     def render_point_sources(self, theta_x, theta_y, amplitude):
-        """Put the PSF at the locations of lensed point sources in the image plane.
+        """Put the PSF at the locations of multiply imaged point sources.
 
         Parameters
         ----------
