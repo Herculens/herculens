@@ -12,7 +12,7 @@ __version__ = '.'.join(str(c) for c in version_info)
 __author__ = 'Austin Peel, Aymeric Galan'
 __email__ = 'austin.peel@epfl.ch'
 __year__ = '2021'
-__url__ = 'https://github.com/austinpeel/jax-strong-lensing'
+__url__ = 'https://github.com/austinpeel/herculens'
 __description__ = 'JAX-enabled autodifferentiable strong lens modelling'
 __python__ = '>=3.7'
 __requires__ = [

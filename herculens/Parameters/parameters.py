@@ -549,10 +549,11 @@ class Parameters(object):
             for k in range(len(kwargs_model)):
                 kwargs_samples_grouped[kwargs_model_key].append({})
                 for param_name in kwargs_samples[0][kwargs_model_key][k].keys():
-                    kwargs_samples_grouped[kwargs_model_key][k][param_name] = []
+                    samples = []
                     for i in range(num_samples):
                         param_values_i = kwargs_samples[i][kwargs_model_key][k][param_name]
-                        kwargs_samples_grouped[kwargs_model_key][k][param_name].append(param_values_i)
+                        samples.append(param_values_i)
+                    kwargs_samples_grouped[kwargs_model_key][k][param_name] = samples
         return kwargs_samples_grouped
 
     def _set_names(self, kwargs_model_key, kwargs_key):
