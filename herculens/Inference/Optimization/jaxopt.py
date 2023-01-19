@@ -49,8 +49,7 @@ class JaxoptOptimizer(BaseOptimizer):
         def _run(init_params):
             metrics.reset()
             res = solver.run(init_params)
-            return (res, self.func(res.params), 
-                    metrics.get_loss_history())
+            return res, metrics.get_loss_history()
 
         start = time.time()
         best_fit_list = []
@@ -63,11 +62,11 @@ class JaxoptOptimizer(BaseOptimizer):
                                 desc=f"jaxopt.{self._jaxopt_method}"):
             #init_params_n = init_samples[n, :]
             init_params_n = init_params
-            res, loss, loss_hist = _run(init_params_n)
+            res, loss_hist = _run(init_params_n)
             if loss_hist == []:
                 warnings.warn("The loss history does not contain any value")
             best_fit_list.append(res.params)
-            logL_best_fit_list.append(-loss)
+            logL_best_fit_list.append(-res.state.fun_val)
             loss_history_list.append(loss_hist)
             # param_history_list.append(param_hist)
 
