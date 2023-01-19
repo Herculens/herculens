@@ -40,12 +40,12 @@ class NumpyroModel(BaseProbModel):
         trace = self.get_trace(seed=seed)
         return {site['name']: site['value'] for site in trace.values() if not site['is_observed']}
 
-    def draw_samples(self, num_samples, obs=None, seed=0):
+    def draw_samples(self, num_samples, seed=0):
         batch_ndims = 0 if num_samples else 1
-        predictive = util.Predictive(handlers.condition(self.model, {'obs': obs}), 
+        predictive = util.Predictive(self.model, 
                                      num_samples=num_samples, 
                                      batch_ndims=batch_ndims)
         return predictive(jax.random.PRNGKey(seed))
 
     def render_model(self):
-        return numpyro.render_model(self.get_trace())
+        return numpyro.render_model(self.model)
