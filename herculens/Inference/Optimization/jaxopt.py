@@ -40,7 +40,7 @@ class JaxoptOptimizer(BaseOptimizer):
                                         callback=metrics, **solver_kwargs)
         else:
             solver = self._solver_class(self.func_optim, jit='auto', 
-                                        callback=metrics, **solver_kwargs)
+                                        **solver_kwargs)
 
         if num_multi_start > 1: 
             raise NotImplementedError("Multi-start optimization to be implemented.")
