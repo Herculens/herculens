@@ -9,7 +9,7 @@ import numpy as np
 import jax.numpy as jnp
 from jax import jit
 
-from herculens.Inference.base_differentiable import Differentiable
+from herculens.Inference.legacy.base_differentiable import Differentiable
 from herculens.Util.jax_util import WaveletTransform
 from herculens.Util import model_util
 

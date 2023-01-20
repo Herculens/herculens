@@ -10,7 +10,7 @@ import numpy as np
 from functools import partial
 import jax
 
-from herculens.Inference.base_inference import Inference
+from herculens.Inference.legacy.base_inference import Inference
 
 
 # TODO: create separate classes for each sampler
