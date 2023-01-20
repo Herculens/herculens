@@ -22,8 +22,14 @@ class NumpyroModel(BaseProbModel):
 
     @property
     def num_parameters(self):
-        sample = self.sample_prior(1, seed=0)
-        return len(sample)
+        if not hasattr(self, '_num_param'):
+            num_param = 0
+            for site in self.get_trace().values():
+                if (site['type'] == 'sample' and not site['is_observed']
+                    or site['type'] == 'param'):
+                    num_param += site['value'].size
+            self._num_param = num_param
+        return self._num_param
 
     def log_prob(self, params):
         # returns the logarithm of the data likelihood
