@@ -47,9 +47,9 @@ class NumpyroModel(BaseProbModel):
     def get_trace(self, seed=0):
         return handlers.trace(self.seeded_model(seed=seed)).get_trace()
 
-    # def get_sample(self, seed=0):
-    #     trace = self.get_trace(seed=seed)
-    #     return {site['name']: site['value'] for site in trace.values() if not site['is_observed']}
+    def get_sample(self, seed=0):
+        trace = self.get_trace(seed=seed)
+        return {site['name']: site['value'] for site in trace.values() if not site.get('is_observed', False)}
 
     def sample_prior(self, num_samples, seed=0):
         batch_ndims = 0 if num_samples else 1
