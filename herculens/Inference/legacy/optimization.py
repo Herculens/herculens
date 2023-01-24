@@ -15,7 +15,7 @@ from scipy.optimize import Bounds
 from tqdm import tqdm
 from copy import deepcopy
 
-from herculens.Inference.base_inference import Inference
+from herculens.Inference.legacy.base_inference import Inference
 
 __all__ = ['Optimizer']
 

@@ -56,6 +56,8 @@ class Loss(Differentiable):
                  starlet_second_gen=False, index_analytical_potential=None):
         self._image = lens_image
         self._prob_model = prob_model
+        if likelihood_mask is None:
+            likelihood_mask = np.ones(self._image.Grid.num_pixel_axes)
         self.likelihood_mask = likelihood_mask
         
         self._check_choices(regularization_terms, regularization_strengths, 

@@ -19,11 +19,7 @@ __all__ = ['JaxoptOptimizer']
 
 
 class JaxoptOptimizer(BaseOptimizer):
-    """Class that handles optimization tasks, i.e. finding best-fit point estimates of parameters
-    It currently handles:
-    - a subset of scipy.optimize.minimize routines, using first and second order derivatives when required
-    - a particle swarm optimizer (PSO), implemented in lenstronomy
-    """
+    """Wrapper to jaxopt's unconstrained optimizers"""
 
     def __init__(self, jaxopt_method, *args, **kwargs):
         mod = __import__('jaxopt', fromlist=[jaxopt_method])
@@ -34,19 +30,19 @@ class JaxoptOptimizer(BaseOptimizer):
     def run(self, init_params, multi_start_from_prior=False, num_multi_start=1,
             progress_bar=True, return_param_history=False, **solver_kwargs):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
-        metrics = MinimizeMetrics(self.func, with_param_history=return_param_history)
+        metrics = MinimizeMetrics(self.loss.function, with_param_history=return_param_history)
         if self._jaxopt_method == 'ScipyMinimize':
-            solver = self._solver_class(fun=self.func_optim, jit=True, 
+            solver = self._solver_class(fun=self.function_optim, jit=True, 
                                         callback=metrics, **solver_kwargs)
         else:
-            solver = self._solver_class(self.func_optim, jit='auto', 
-                                        callback=metrics, **solver_kwargs)
+            solver = self._solver_class(self.function_optim, jit='auto', 
+                                        **solver_kwargs)
 
         if num_multi_start > 1: 
             raise NotImplementedError("Multi-start optimization to be implemented.")
 
         # @jax.jit
-        def _run(init_params):
+        def solver_run(init_params):
             metrics.reset()
             res = solver.run(init_params)
             return res, metrics.get_loss_history()
@@ -62,7 +58,7 @@ class JaxoptOptimizer(BaseOptimizer):
                                 desc=f"jaxopt.{self._jaxopt_method}"):
             #init_params_n = init_samples[n, :]
             init_params_n = init_params
-            res, loss_hist = _run(init_params_n)
+            res, loss_hist = solver_run(init_params_n)
             if loss_hist == []:
                 warnings.warn("The loss history does not contain any value")
             best_fit_list.append(res.params)
