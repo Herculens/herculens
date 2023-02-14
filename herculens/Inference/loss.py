@@ -72,7 +72,7 @@ class Loss(Differentiable):
         """negative log(likelihood*prior*regularization)"""
         kwargs = self._prob_model.params2kwargs(args)
         log_prob = self._prob_model.log_prob(args)
-        log_reg = self.log_regularization(kwargs)
+        log_reg  = self.log_regularization(kwargs)
         loss = (- log_prob - log_reg)
         return jnp.nan_to_num(loss, nan=1e15, posinf=1e15, neginf=1e15)
 
@@ -119,16 +119,16 @@ class Loss(Differentiable):
             regularization_masks = [None]*len(regularization_terms)
 
         # TODO: implement regularization_weights for source regularization as well (for now it's only potential)
-        i = 0
-        regularization_weights_fix = []
-        for term in regularization_terms:
-            if 'potential' in term:
-                regularization_weights_fix.append(regularization_weights[i])
-                i += 1
-            else:
-                # TEMPORARY: just to populate weights for regularization terms other than potential
-                # waiting for the source and lens light weights to be handled as well.
-                regularization_weights_fix.append(None)
+        # i = 0
+        # regularization_weights_fix = []
+        # for term in regularization_terms:
+        #     if 'potential' in term:
+        #         regularization_weights_fix.append(regularization_weights[i])
+        #         i += 1
+        #     else:
+        #         # TEMPORARY: just to populate weights for regularization terms other than potential
+        #         # waiting for the source and lens light weights to be handled as well.
+        #         regularization_weights_fix.append(None)
 
         self._idx_pix_src = self._image.SourceModel.pixelated_index
         self._idx_pix_pot = self._image.MassModel.pixelated_index
@@ -136,9 +136,9 @@ class Loss(Differentiable):
 
         regul_func_list = []
         for term, strength, weights, mask in zip(regularization_terms, 
-                                           regularization_strengths, 
-                                           regularization_weights_fix,
-                                           regularization_masks):
+                                                 regularization_strengths, 
+                                                 regularization_weights,
+                                                 regularization_masks):
             # add the log-regularization function to the list
             regul_func_list.append(getattr(self, '_log_regul_'+term))
 
