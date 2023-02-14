@@ -42,9 +42,9 @@ class JaxoptOptimizer(BaseOptimizer):
             raise NotImplementedError("Multi-start optimization to be implemented.")
 
         # @jax.jit
-        def solver_run(init_params):
+        def solver_run(p):
             metrics.reset()
-            res = solver.run(init_params)
+            res = solver.run(p)
             return res, metrics.get_loss_history()
 
         start = time.time()
@@ -57,7 +57,7 @@ class JaxoptOptimizer(BaseOptimizer):
                                 total=num_multi_start, 
                                 desc=f"jaxopt.{self._jaxopt_method}"):
             #init_params_n = init_samples[n, :]
-            init_params_n = init_params
+            init_params_n = deepcopy(init_params)
             res, loss_hist = solver_run(init_params_n)
             if loss_hist == []:
                 warnings.warn("The loss history does not contain any value")

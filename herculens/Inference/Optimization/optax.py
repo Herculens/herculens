@@ -7,6 +7,7 @@ __author__ = 'aymgal', 'austinpeel'
 
 import time
 import numpy as np
+from copy import deepcopy
 import jax
 import optax
 
@@ -59,7 +60,7 @@ class OptaxOptimizer(BaseOptimizer):
 
         # Initialise optimizer state
         #params = self._param.current_values(as_kwargs=False, restart=restart_from_init, copy=True)
-        params = init_params
+        params = deepcopy(init_params)
         opt_state = optim.init(params)
         prev_params, prev_loss_val = params, 1e10
 
