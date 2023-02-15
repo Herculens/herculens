@@ -23,6 +23,25 @@ plt.rc('image', interpolation='none', origin='lower')  # for imshow
 __all__ = ['Plotter']
 
 
+# def clip(data, nsigma):
+#     """
+#     Iteratively removes data until all is within nsigma of the median, then returns the median and std
+#     author: Cameron Lemon
+#     """
+#     lennewdata = 0
+#     lenolddata = data.size
+#     while lenolddata>lennewdata:
+#         lenolddata = data.size
+#         data = data[np.where((data<np.nanmedian(data)+nsigma*np.nanstd(data))&(data>np.nanmedian(data)-nsigma*np.nanstd(data)))]
+#         lennewdata = data.size
+#     return np.median(data), np.std(data)
+# 18 h 08
+# bg, sigma = clip(data, 4.)
+# lenspixels = data[data>bg+3*sigma]
+# ax.imshow(data, origin='lower', cmap=cm, norm=LogNorm(vmax=np.nanpercentile(lenspixels, 95.), vmin=bg))
+
+
+
 class Plotter(object):
     """
     Utility class for easy plotting of optimisation results in summary panels.
