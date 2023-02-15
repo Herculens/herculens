@@ -20,6 +20,8 @@ __all__ = ['OptaxOptimizer']
 class OptaxOptimizer(BaseOptimizer):
     """Wrapper to optax's gradient descent optimizers"""
 
+    # TODO: output the loss value next the progressbar
+
     def run(self, init_params, algorithm='adabelief', max_iterations=100, min_iterations=None,
               init_learning_rate=1e-2, schedule_learning_rate=True, 
               stop_at_loss_increase=False, progress_bar=True, return_param_history=False):
@@ -29,7 +31,7 @@ class OptaxOptimizer(BaseOptimizer):
             # Exponential decay of the learning rate
             scheduler = optax.exponential_decay(
                 init_value=init_learning_rate, 
-                decay_rate=0.99, # TODO: this has never been fine-tuned (taken from optax examples)
+                decay_rate=0.99, # NOTE: this has never been fine-tuned (taken from optax examples)
                 transition_steps=max_iterations)
 
             if algorithm.lower() == 'adabelief':
