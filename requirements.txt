@@ -7,8 +7,9 @@ chex>=0.1.4
 matplotlib>=3.0.0
 findiff==0.8.9
 tqdm
+-e git://github.com/aymgal/utax.git@main#egg=utax
 
-# the following packages are optional (pay attention at the versions) 
+# the following packages are optional (pay attention to the versions) 
 #numpyro==0.10.1     # for HMC sampling
 #blackjax==0.9.6     # for JAX-based HMC sampling
 #emcee==3.0.2        # for Ensemble MCMC sampling
