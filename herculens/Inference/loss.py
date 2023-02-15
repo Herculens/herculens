@@ -147,10 +147,13 @@ class Loss(Differentiable):
                 n_scales = int(np.log2(n_pix_src))  # maximum allowed number of scales
                 self._starlet_src = WaveletTransform(n_scales, wavelet_type='starlet',
                                                      second_gen=starlet_second_gen)
-                wavelet_norms = self._starlet_src.scale_norms[:-1]  # ignore coarsest scale
-                self._st_src_norms = jnp.expand_dims(wavelet_norms, (1, 2))
+                if weights.shape[0] != n_scales+1:
+                    raise ValueError(f"The weights do not contain enough wavelet scales"
+                                     f" (should be {n_scales+1} inc. coarsest).")
+                self._st_src_weigths = weights
                 if isinstance(strength, (int, float)):
-                    self._st_src_lambda = self._st_src_lambda_hf = float(strength)
+                    self._st_src_lambda = float(strength)
+                    self._st_src_lambda_hf = float(strength)
                 elif isinstance(strength, (tuple, list)):
                     if len(strength) > 2:
                         raise ValueError("You can only specify two starlet regularization "
@@ -210,8 +213,6 @@ class Loss(Differentiable):
                 n_scales = int(np.log2(n_pix_pot))  # maximum allowed number of scales
                 self._starlet_pot = WaveletTransform(n_scales, wavelet_type='starlet',
                                                      second_gen=starlet_second_gen)
-                wavelet_norms = self._starlet_pot.scale_norms[:-1]  # ignore coarsest scale
-                # self._st_pot_norms = jnp.expand_dims(wavelet_norms, (1, 2))
                 if weights.shape[0] != n_scales+1:
                     raise ValueError(f"The weights do not contain enough wavelet scales"
                                      f" (should be {n_scales+1} inc. coarsest).")
@@ -274,14 +275,11 @@ class Loss(Differentiable):
         self.log_regularization = lambda kw: sum([func(kw) for func in regul_func_list])
 
     def _log_regul_l1_starlet_source(self, kwargs):
-        model = self._image.model(**kwargs)
-        noise_map = jnp.sqrt(self._image.Noise.C_D_model(model))  # TODO: do not take into account shot noise from lens light
-        noise_level = jnp.mean(noise_map[self.likelihood_mask == 1])
-
+        weights = self._st_src_weigths
         source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
-        st = self._starlet_src.decompose(source_model)[:-1]  # ignore coarsest scale
-        st_weighted_l1_hf = jnp.sum(self._st_src_norms[0] * noise_level * jnp.abs(st[0]))  # first scale (i.e. high frequencies)
-        st_weighted_l1 = jnp.sum(self._st_src_norms[1:] * noise_level * jnp.abs(st[1:]))  # other scales
+        st = self._starlet_src.decompose(source_model)
+        st_weighted_l1_hf = jnp.sum(jnp.abs(weights[0] * st[0]))  # first scale (i.e. high frequencies)
+        st_weighted_l1 = jnp.sum(jnp.abs(weights[1:-1] * st[1:-1]))  # other scales (except coarsest)
         return - (self._st_src_lambda_hf * st_weighted_l1_hf + self._st_src_lambda * st_weighted_l1)
 
     def _log_regul_l1_starlet_lens_light(self, kwargs):
