@@ -8,6 +8,7 @@ __author__ = 'aymgal'
 import numpy as np
 from astropy.io import fits
 
+from herculens.Inference.legacy.parameters import Parameters
 from herculens.Util import param_util
 
 from coolest.template.classes.galaxy import Galaxy
@@ -21,7 +22,7 @@ from coolest.template.classes.probabilities import PosteriorStatistics
 # Notes: `h2c` is a shorthand for `herculens2coolest`
 
 
-def create_extshear_model(lens_image, name, parameters=None,
+def create_extshear_model(lens_image, name, parameters=None, samples=None,
                           mass_profile_indices=None, 
                           redshift=None):
     # external shear
@@ -33,11 +34,16 @@ def create_extshear_model(lens_image, name, parameters=None,
     extshear = ExternalShear(name, mass_model=MassModel(*mass_profiles_out), redshift=redshift)
 
     if parameters is not None:
-        kwargs_list = parameters.best_fit_values(as_kwargs=True)['kwargs_lens']
-        if parameters.samples is not None:
-            kwargs_list_samples = parameters.samples(as_kwargs=True, group_by_param=True)['kwargs_lens']
-        else:
-            kwargs_list_samples = None
+        if isinstance(parameters, Parameters):
+            print("Using the legacy interface of the Parameters class")
+            kwargs_list = parameters.best_fit_values(as_kwargs=True)['kwargs_lens']
+            if parameters.samples is not None:
+                kwargs_list_samples = parameters.samples(as_kwargs=True, group_by_param=True)['kwargs_lens']
+            else:
+                kwargs_list_samples = None
+        elif isinstance(parameters, dict):
+            kwargs_list = parameters['kwargs_lens']
+            kwargs_list_samples = None if samples is None else samples['kwargs_lens']
 
         # add point estimate values to the ExternalShear object
         for ic, ih in enumerate(mass_profile_indices):
@@ -55,7 +61,7 @@ def create_extshear_model(lens_image, name, parameters=None,
     return extshear
 
 
-def create_galaxy_model(lens_image, name, parameters=None,
+def create_galaxy_model(lens_image, name, parameters=None, samples=None,
                         mass_profile_indices=None, 
                         light_profile_indices=None,
                         lensed=None, redshift=None):
@@ -85,11 +91,16 @@ def create_galaxy_model(lens_image, name, parameters=None,
                     redshift=redshift)
 
     if parameters is not None:
-        kwargs_all = parameters.best_fit_values(as_kwargs=True)
-        if parameters.samples is not None:
-            kwargs_all_samples = parameters.samples(as_kwargs=True, group_by_param=True)
-        else:
-            kwargs_all_samples = None
+        if isinstance(parameters, Parameters):
+            print("Using the legacy interface of the Parameters class")
+            kwargs_all = parameters.best_fit_values(as_kwargs=True)
+            if parameters.samples is not None:
+                kwargs_all_samples = parameters.samples(as_kwargs=True, group_by_param=True)
+            else:
+                kwargs_all_samples = None
+        elif isinstance(parameters, dict):
+            kwargs_all = parameters
+            kwargs_all_samples = samples
 
         if mass_profile_indices is not None:
             update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
