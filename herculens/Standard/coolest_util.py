@@ -5,6 +5,7 @@
 __author__ = 'aymgal'
 
 
+import os
 import numpy as np
 from astropy.io import fits
 
@@ -14,12 +15,12 @@ from herculens.Util import param_util
 from coolest.template.classes.galaxy import Galaxy
 from coolest.template.classes.external_shear import ExternalShear
 from coolest.template.classes.mass_light_model import MassModel, LightModel
-from coolest.template.classes.fits_file import FitsFile
+#from coolest.template.classes.grid import PixelatedRegularGrid
 # from coolest.template.classes.parameter import PointEstimate
 from coolest.template.classes.probabilities import PosteriorStatistics
 
 
-# Notes: `h2c` is a shorthand for `herculens2coolest`
+# NOTE: `h2c` is a shorthand for `herculens2coolest`
 
 
 def create_extshear_model(lens_image, name, parameters=None, samples=None,
@@ -62,9 +63,8 @@ def create_extshear_model(lens_image, name, parameters=None, samples=None,
 
 
 def create_galaxy_model(lens_image, name, parameters=None, samples=None,
-                        mass_profile_indices=None, 
-                        light_profile_indices=None,
-                        lensed=None, redshift=None):
+                        mass_profile_indices=None, light_profile_indices=None,
+                        lensed=None, redshift=None, file_dir=None):
     # mass model
     if mass_profile_indices is not None:
         mass_profiles_all = lens_image.MassModel.profile_type_list
@@ -104,15 +104,18 @@ def create_galaxy_model(lens_image, name, parameters=None, samples=None,
 
         if mass_profile_indices is not None:
             update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
-                                     mass_profile_indices, mass_profiles_in)
+                                     mass_profile_indices, mass_profiles_in, 
+                                     file_dir=file_dir)
         if light_profile_indices is not None:
             update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
-                                      light_profile_indices, light_profiles_in, lensed)
+                                      light_profile_indices, light_profiles_in, lensed,
+                                      file_dir=file_dir)
 
     return galaxy
 
 
-def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, profile_indices, profile_names):
+def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, 
+                             profile_indices, profile_names, file_dir=None):
     kwargs_list = kwargs_all['kwargs_lens']
     kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples['kwargs_lens']
     # add point estimate values
@@ -134,7 +137,8 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
             raise NotImplementedError(f"'{profile_name}' not yet supported.")
 
 
-def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, profile_indices, profile_names, lensed):
+def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, 
+                              profile_indices, profile_names, lensed, file_dir=None):
     # get current values
     if lensed:
         kwargs_list = kwargs_all['kwargs_source']
@@ -155,9 +159,10 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
         elif profile_names[ic] == 'SHAPELETS':
             h2c_Shapelets_values(galaxy.light_model[ic], kwargs_list[ih],
                                  lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. n_max 
-        # elif profile_names[ic] == 'PIXELATED':
-        #     h2c_pixelated_values(galaxy.light_model[ic], kwargs_list[ih],
-        #                          lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. pixel_grid 
+        elif profile_names[ic] == 'PIXELATED':
+            h2c_pixelated_values(galaxy.light_model[ic], kwargs_list[ih],
+                                 lens_image.SourceModel.func_list[ih],
+                                 file_dir=file_dir),  # TODO: improve access to e.g. pixel_grid 
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
@@ -267,37 +272,53 @@ def h2c_Shapelets_values(profile, kwargs, profile_herculens):
     profile.parameters['n_max'].fix()
 
 
-# def h2c_pixelated_values(profile, kwargs, profile_herculens):
-#     pixel_values = check_type(kwargs['pixels'])
-#     x_grid, y_grid = profile_herculens.pixel_grid.pixel_coordinates
-#     pixel_scale = float(profile_herculens.pixel_grid.pixel_width)
-#     matrix = profile_herculens.pixel_grid.transform_pix2angle / 3600.  # arcsec -> degree
-#     CD1_1 = float(matrix[0, 0]) 
-#     CD1_2 = float(matrix[0, 1])
-#     CD2_1 = float(matrix[1, 0])
-#     CD2_2 = float(matrix[1, 1])
-    
-#     primary_hdr = fits.Header()
-#     primary_hdr['PIXSCALE'] = pixel_scale
-#     primary_hdr['CD1_1'] = CD1_1
-#     primary_hdr['CD1_2'] = CD1_2
-#     primary_hdr['CD2_1'] = CD2_1
-#     primary_hdr['CD2_2'] = CD2_2
-#     primary_hdu = fits.PrimaryHDU(pixel_values, header=primary_hdr)  # or ImageHDU?
-#     columns = fits.ColDefs([
-#         fits.Column(name='id', format='J', array=np.arange(x_grid.size)),
-#         fits.Column(name='x', format='D', array=x_grid.flatten()),
-#         fits.Column(name='y', format='D', array=y_grid.flatten()),
-#         fits.Column(name='flux', format='D', array=pixel_values.flatten())
-#     ])
-#     pixels_hdu = fits.BinTableHDU.from_columns(columns)
-#     hdu_list = fits.HDUList([primary_hdu, pixels_hdu])
+def h2c_pixelated_values(profile, kwargs, profile_herculens, file_dir=None):
+    """Profile based on REGULAR grid of pixels"""
+    pixel_values = check_type(kwargs['pixels'])
+    x_grid, y_grid = profile_herculens.pixel_grid.pixel_coordinates
+    pixel_scale = float(profile_herculens.pixel_grid.pixel_width)
+    extent = profile_herculens.pixel_grid.extent
+    fov_x = [float(extent[0]), float(extent[1])]  # TODO check this
+    fov_y = [float(extent[2]), float(extent[3])]  # TODO check this
 
-#     fits_filename = 'model_pixels.fits'
-#     hdu_list.writeto(fits_filename, overwrite=True)
-    
-#     fits_path = fits_filename
-#     profile.pixels = FitsFile(fits_path)
+    matrix = profile_herculens.pixel_grid.transform_pix2angle / 3600.  # arcsec -> degree
+    CD1_1 = float(matrix[0, 0])
+    CD1_2 = float(matrix[0, 1])
+    CD2_1 = float(matrix[1, 0])
+    CD2_2 = float(matrix[1, 1])
+  
+    primary_hdr = fits.Header()
+    primary_hdr['PIXSCALE'] = pixel_scale
+    primary_hdr['CD1_1'] = CD1_1
+    primary_hdr['CD1_2'] = CD1_2
+    primary_hdr['CD2_1'] = CD2_1
+    primary_hdr['CD2_2'] = CD2_2
+    primary_hdu = fits.PrimaryHDU(pixel_values, header=primary_hdr)  # or ImageHDU?
+    #columns = fits.ColDefs([
+    #    fits.Column(name='id', format='J', array=np.arange(x_grid.size)),
+    #    fits.Column(name='x', format='D', array=x_grid.flatten()),
+    #    fits.Column(name='y', format='D', array=y_grid.flatten()),
+    #    fits.Column(name='flux', format='D', array=pixel_values.flatten())
+    #])
+    #pixels_hdu = fits.BinTableHDU.from_columns(columns)
+    hdu_list = fits.HDUList([primary_hdu])
+
+    fits_filename = 'source_pixels.fits'
+    if file_dir is None:
+        fits_path = fits_filename
+    else:
+        fits_path = os.path.join(file_dir, fits_filename)
+    hdu_list.writeto(fits_filename, overwrite=True)
+
+    #pixels = PixelatedRegularGrid(fits_filename, # relative path to fits file
+    #                              field_of_view_x=fov_x,
+    #                              field_of_view_y=fov_y,
+    #                              check_fits_file=True,
+    #                              fits_file_dir=file_dir)
+    profile.parameters['pixels'].set_grid(fits_filename, # relative path to fits file
+                                          field_of_view_x=fov_x,
+                                          field_of_view_y=fov_y,
+                                          check_fits_file=False)
 
 
 def h2c_extshear_values(profile, kwargs, g1g2_param=False):

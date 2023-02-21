@@ -33,6 +33,7 @@ class COOLESTexporter(object):
             output_coolest_file = os.path.abspath(output_coolest_file)
         self._input_coolest_file = input_coolest_file
         self._output_coolest_file = output_coolest_file
+        self._json_dir = os.path.dirname(output_coolest_file)
         self._kwargs_serializer = kwargs_serializer
         self._load_coolest_object()
 
@@ -43,7 +44,8 @@ class COOLESTexporter(object):
     def update_from_model(self, lens_image, lensing_entity_mapping, 
                           parameters=None, samples=None):
         lensing_entities = self.create_lensing_entities(lens_image, lensing_entity_mapping,
-                                                        parameters=parameters, samples=samples)
+                                                        parameters=parameters, samples=samples,
+                                                        json_dir=self._json_dir)
         self._coolest.lensing_entities = lensing_entities
 
     def update_from_loss(self, loss):
@@ -58,7 +60,7 @@ class COOLESTexporter(object):
 
     @staticmethod
     def create_lensing_entities(lens_image, lensing_entity_mapping, 
-                                parameters=None, samples=None):
+                                parameters=None, samples=None, json_dir=None):
         """
         lensing_entity_mapping: list of 2-tuples of the following format:
             ('name_of_the_entity', kwargs_mapping)
@@ -86,6 +88,7 @@ class COOLESTexporter(object):
                 entity = util.create_galaxy_model(lens_image, entity_name, 
                                                   parameters=parameters,
                                                   samples=samples,
+                                                  file_dir=json_dir,
                                                   **kwargs_mapping)
             else:
                 raise ValueError(f"Unknown lensing entity type '{entity_type}'.")
