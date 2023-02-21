@@ -22,12 +22,15 @@ from herculens.Util import jax_util, vkl_util
 
 
 def data_noise_to_wavelet_source(lens_image, kwargs_res, num_samples=10000, seed=0,
-                                 starlet_second_gen=False):
+                                 starlet_second_gen=False, noise_var=None):
 
     # get the data noise
-    model_image = lens_image.model(**kwargs_res)
-    nx, ny = model_image.shape
-    diag_cov_d = lens_image.Noise.C_D_model(model_image)
+    nx, ny = lens_image.Grid.num_pixel_axes
+    if noise_var is None:
+        model_image = lens_image.model(**kwargs_res)
+        diag_cov_d = lens_image.Noise.C_D_model(model_image)
+    else:
+        diag_cov_d = noise_var
     std_d = np.sqrt(diag_cov_d)[jnp.newaxis, :, :]
     
     # construct the lensing operator
