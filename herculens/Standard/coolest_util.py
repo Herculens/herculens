@@ -23,6 +23,45 @@ from coolest.template.classes.probabilities import PosteriorStatistics
 # NOTE: `h2c` is a shorthand for `herculens2coolest`
 
 
+def create_lensing_entities(lens_image, lensing_entity_mapping, 
+                            parameters=None, samples=None, json_dir=None):
+        """
+        lensing_entity_mapping: list of 2-tuples of the following format:
+            ('name_of_the_entity', kwargs_mapping)
+        where kwargs_mapping is settings for create_extshear_model and create_galaxy_model functions. 
+        """
+        # TODO: check if multi-plane lensing
+
+        if parameters is not None and isinstance(parameters, dict):
+            parameters = unjaxify_kwargs(parameters)
+        if samples is not None and isinstance(samples, dict):
+            samples = unjaxify_kwargs(samples)
+
+        # initialize list of lensing entities
+        entities = []
+
+        # iterate over the lensing entities (galaxies or external shears)
+        for entity_name, kwargs_mapping in lensing_entity_mapping:
+            entity_type = kwargs_mapping.pop('type')
+            if entity_type == 'external_shear':
+                entity = util.create_extshear_model(lens_image, entity_name, 
+                                                    parameters=parameters,
+                                                    samples=samples,
+                                                    **kwargs_mapping)
+            elif entity_type == 'galaxy':
+                entity = util.create_galaxy_model(lens_image, entity_name, 
+                                                  parameters=parameters,
+                                                  samples=samples,
+                                                  file_dir=json_dir,
+                                                  **kwargs_mapping)
+            else:
+                raise ValueError(f"Unknown lensing entity type '{entity_type}'.")
+
+            entities.append(entity)
+
+        return LensingEntityList(*entities)
+
+
 def create_extshear_model(lens_image, name, parameters=None, samples=None,
                           mass_profile_indices=None, 
                           redshift=None):
@@ -275,13 +314,19 @@ def h2c_Shapelets_values(profile, kwargs, profile_herculens):
 def h2c_pixelated_values(profile, kwargs, profile_herculens, file_dir=None):
     """Profile based on REGULAR grid of pixels"""
     pixel_values = check_type(kwargs['pixels'])
-    x_grid, y_grid = profile_herculens.pixel_grid.pixel_coordinates
-    pixel_scale = float(profile_herculens.pixel_grid.pixel_width)
-    extent = profile_herculens.pixel_grid.extent
-    fov_x = [float(extent[0]), float(extent[1])]  # TODO check this
-    fov_y = [float(extent[2]), float(extent[3])]  # TODO check this
+    h_grid = profile_herculens.pixel_grid
+    if h_grid.x_is_inverted:
+        raise NotImplementedError("Only increasing x coordinates is supported so far")
+    if h_grid.y_is_inverted:
+        raise NotImplementedError("Only increasing y coordinates is supported so far")
+    x_grid, y_grid = h_grid.pixel_coordinates
+    pixel_scale = float(h_grid.pixel_width)
+    half_pix = pixel_scale / 2.
+    extent = h_grid.extent
+    fov_x = [float(extent[0])-half_pix, float(extent[1])+half_pix]
+    fov_y = [float(extent[2])-half_pix, float(extent[3])+half_pix]
 
-    matrix = profile_herculens.pixel_grid.transform_pix2angle / 3600.  # arcsec -> degree
+    matrix = h_grid.transform_pix2angle / 3600.  # arcsec -> degree
     CD1_1 = float(matrix[0, 0])
     CD1_2 = float(matrix[0, 1])
     CD2_1 = float(matrix[1, 0])
