@@ -21,7 +21,9 @@ from herculens.Util import jax_util, vkl_util
 
 
 
-def data_noise_to_wavelet_source(lens_image, kwargs_res, num_samples=10000, seed=0,
+def data_noise_to_wavelet_source(lens_image, kwargs_res, 
+                                 wavelet_type_list=['starlet', 'battle-lemarie-3'],
+                                 num_samples=10000, seed=0,
                                  starlet_second_gen=False, noise_var=None):
 
     # get the data noise
@@ -48,11 +50,6 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res, num_samples=10000, seed
                                     kernel.shape,  # HWIO
                                     dimension_numbers)
     kernel_rot = jnp.rot90(jnp.rot90(kernel, axes=(0, 1)), axes=(0, 1))
-
-    # setup the wavelet transform
-    nxsrc, nysrc = lens_image.SourceModel.pixel_grid.num_pixel_axes
-    nscales = int(np.log2(min(nxsrc, nysrc)))
-    starlet = WaveletTransform(nscales, wavelet_type='starlet', second_gen=starlet_second_gen)
     
     def B_T(n):
         res = lax.conv_general_dilated(n[jnp.newaxis, :, :, jnp.newaxis], 
@@ -66,27 +63,45 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res, num_samples=10000, seed
     
     def F_T(n):
         return lensing_op.image2source_2d(n)
-    
-    def Phi_T(n):
-        return starlet.decompose(n)
-    
-    @vmap
-    def propagate_noise(n):
-        # multiply by the inverse of the data (diagonal) covariance matrix
-        n /= diag_cov_d
-        # transposed convolution
-        n = B_T(n)
-        # de-lens to source plane
-        n = F_T(n)
-        # transform to wavelet space
-        n = Phi_T(n)
-        #debug = noise_i.copy()
-        return n
-    
-    noise_samples = std_d * jax.random.normal(jax.random.PRNGKey(seed), shape=(num_samples, nx, ny))
-    noise_samples_prop = propagate_noise(noise_samples)
-    std_per_scale = jnp.std(noise_samples_prop, axis=0)
-    return std_per_scale, starlet
+
+    wavelet_class_list = []
+    std_per_scale_list = []
+
+    for wavelet_type in wavelet_type_list:
+
+        # setup the wavelet transform
+        nxsrc, nysrc = lens_image.SourceModel.pixel_grid.num_pixel_axes
+        if 'battle-lemarie' in wavelet_type:
+            nscales = 1  # we only care about the first scale for this one
+        else:
+            nscales = int(np.log2(min(nxsrc, nysrc)))  # max number of scales allowed
+        wavelet = WaveletTransform(nscales, wavelet_type=wavelet_type, second_gen=starlet_second_gen)
+        
+        def Phi_T(n):
+            return wavelet.decompose(n)
+        
+        @vmap
+        def propagate_noise(n):
+            # multiply by the inverse of the data (diagonal) covariance matrix
+            n /= diag_cov_d
+            # transposed convolution
+            n = B_T(n)
+            # de-lens to source plane
+            n = F_T(n)
+            # transform to wavelet space
+            n = Phi_T(n)
+            #debug = noise_i.copy()
+            return n
+        
+        noise_samples = std_d * jax.random.normal(jax.random.PRNGKey(seed), 
+                                                  shape=(num_samples, nx, ny))
+        noise_samples_prop = propagate_noise(noise_samples)
+        std_per_scale = jnp.std(noise_samples_prop, axis=0)
+
+        wavelet_class_list.append(wavelet)
+        std_per_scale_list.append(std_per_scale)
+
+    return std_per_scale_list, wavelet_class_list
 
 
 

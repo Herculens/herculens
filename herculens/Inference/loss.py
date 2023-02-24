@@ -181,10 +181,10 @@ class Loss(Differentiable):
             elif term == 'l1_battle_source':
                 n_scales = 1  # maximum allowed number of scales
                 self._battle_src = WaveletTransform(n_scales, wavelet_type='battle-lemarie-3')
-                self._bl_src_norm = self._battle_src.scale_norms[0]  # consider only first scale
                 if isinstance(strength, (tuple, list)):
                     raise ValueError("You can only specify one regularization "
                                      "strength for Battle-Lemarie regularization")
+                self._bl_src_weigths = weights
                 self._bl_src_lambda = float(strength)
 
             elif term == 'l1_battle_lens_light':
@@ -309,12 +309,10 @@ class Loss(Differentiable):
         return - (self._st_pot_lambda_hf * st_weighted_l1_hf + self._st_pot_lambda * st_weighted_l1)
 
     def _log_regul_l1_battle_source(self, kwargs):
-        model = self._image.model(**kwargs)
-        noise_map = jnp.sqrt(self._image.Noise.C_D_model(model))  # TODO: do not take into account shot noise from lens light
-        noise_level = jnp.mean(noise_map[self.likelihood_mask == 1])
+        weights = self._bl_src_weigths
         source_model = kwargs['kwargs_source'][self._idx_pix_src]['pixels']
-        bl = self._battle_src.decompose(source_model)[0]  # consider only first scale
-        bl_weighted_l1 = jnp.sum(self._bl_src_norm * noise_level * jnp.abs(bl))
+        bl = self._battle_src.decompose(source_model)
+        bl_weighted_l1 = jnp.sum(jnp.abs(weights[0] * bl[0]))  # only first scale
         return - self._bl_src_lambda * bl_weighted_l1
 
     def _log_regul_l1_battle_lens_light(self, kwargs):
