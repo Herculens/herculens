@@ -9,18 +9,71 @@ import os
 import numpy as np
 from astropy.io import fits
 
-from herculens.Inference.legacy.parameters import Parameters
+from herculens.Inference.legacy.parameters import Parameters as HerculensParameters
 from herculens.Util import param_util
+from herculens.Util.jax_util import unjaxify_kwargs
 
-from coolest.template.classes.galaxy import Galaxy
-from coolest.template.classes.external_shear import ExternalShear
-from coolest.template.classes.mass_light_model import MassModel, LightModel
-#from coolest.template.classes.grid import PixelatedRegularGrid
-# from coolest.template.classes.parameter import PointEstimate
-from coolest.template.classes.probabilities import PosteriorStatistics
+from coolest.template.lazy import *
 
 
 # NOTE: `h2c` is a shorthand for `herculens2coolest`
+
+
+def create_observation(data, lens_image, json_dir=None,
+                       noise_type='NoiseMap', model_noise_map=None, 
+                       fits_file_prefix="coolest"):
+    # saves the observed lens image on disk
+    obs_file_name = f"{fits_file_prefix}_obs.fits"
+    if json_dir is not None:
+        obs_fits_path = os.path.join(json_dir, obs_file_name)
+    else:
+        obs_fits_path = obs_file_name
+    save_image_to_fits(obs_fits_path, data, 
+                       header_cards=[('COOLEST', "Observed lens image")])
+    model_grid = lens_image.Grid
+    if model_grid.x_is_inverted or model_grid.y_is_inverted:
+        raise NotImplementedError("Grid orientation not yet supported")
+    extent = model_grid.extent
+    pix_scl = model_grid.pixel_width
+    fov_x = [extent[0] - pix_scl/2., extent[1] + pix_scl/2.]
+    fov_y = [extent[2] - pix_scl/2., extent[3] + pix_scl/2.]
+    pixels = PixelatedRegularGrid(obs_file_name,
+                                  field_of_view_x=fov_x,
+                                  field_of_view_y=fov_y)
+    
+    if noise_type == 'NoiseMap':
+        if model_noise_map is None:
+            raise ValueError(f"A noise map must be provided for noise type {noise_type}")
+        noise_map_file_name = f"{fits_file_prefix}_noise_map.fits"
+        if json_dir is not None:
+            noise_map_fits_path = os.path.join(json_dir, noise_map_file_name)
+        else:
+            noise_map_fits_path = noise_map_file_name
+        save_image_to_fits(noise_map_fits_path, model_noise_map, 
+                           header_cards=[('COOLEST', "Model noise map")])
+        noise_map = PixelatedRegularGrid(noise_map_file_name,
+                                         field_of_view_x=fov_x,
+                                         field_of_view_y=fov_y)
+        noise = NoiseMap(noise_map)
+    else:
+        raise NotImplementedError(f"Noise type {noise_type} not yet supported")
+    
+    exp_time = lens_image.Noise.exposure_map
+    if exp_time is not None and not isinstance(exp_time, (int, float)):
+        raise NotImplementedError("Only exposure *time* is supported")
+    
+    observation = Observation(pixels=pixels,
+                              exposure_time=exp_time,
+                              noise=noise,
+                              mag_zero_point=None,
+                              mag_sky_brightness=None)
+    return observation
+
+
+def save_image_to_fits(path, image, header_cards=[], overwrite=True):
+    header = fits.Header(cards=header_cards)
+    fits.writeto(path, image, header, overwrite=overwrite)
+    print(f"Saved image to FITS file {path}")
 
 
 def create_lensing_entities(lens_image, lensing_entity_mapping, 
@@ -44,12 +97,12 @@ def create_lensing_entities(lens_image, lensing_entity_mapping,
         for entity_name, kwargs_mapping in lensing_entity_mapping:
             entity_type = kwargs_mapping.pop('type')
             if entity_type == 'external_shear':
-                entity = util.create_extshear_model(lens_image, entity_name, 
+                entity = create_extshear_model(lens_image, entity_name, 
                                                     parameters=parameters,
                                                     samples=samples,
                                                     **kwargs_mapping)
             elif entity_type == 'galaxy':
-                entity = util.create_galaxy_model(lens_image, entity_name, 
+                entity = create_galaxy_model(lens_image, entity_name, 
                                                   parameters=parameters,
                                                   samples=samples,
                                                   file_dir=json_dir,
@@ -74,7 +127,7 @@ def create_extshear_model(lens_image, name, parameters=None, samples=None,
     extshear = ExternalShear(name, mass_model=MassModel(*mass_profiles_out), redshift=redshift)
 
     if parameters is not None:
-        if isinstance(parameters, Parameters):
+        if isinstance(parameters, HerculensParameters):
             print("Using the legacy interface of the Parameters class")
             kwargs_list = parameters.best_fit_values(as_kwargs=True)['kwargs_lens']
             if parameters.samples is not None:
@@ -130,7 +183,7 @@ def create_galaxy_model(lens_image, name, parameters=None, samples=None,
                     redshift=redshift)
 
     if parameters is not None:
-        if isinstance(parameters, Parameters):
+        if isinstance(parameters, HerculensParameters):
             print("Using the legacy interface of the Parameters class")
             kwargs_all = parameters.best_fit_values(as_kwargs=True)
             if parameters.samples is not None:

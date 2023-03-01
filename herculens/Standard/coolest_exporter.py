@@ -11,7 +11,6 @@ import shutil
 
 import herculens
 from herculens.Standard import coolest_util as util
-from herculens.Util.jax_util import unjaxify_kwargs
 
 from coolest.template.json import JSONSerializer
 from coolest.template.classes.coordinates import CoordinatesOrigin
@@ -24,18 +23,19 @@ from coolest.template.classes.regularization_list import RegularizationList
 class COOLESTexporter(object):
     """Class that handles conversion from a Herculens model to the COOLEST file system"""
 
-    def __init__(self, output_coolest_file, input_coolest_file=None, 
+    def __init__(self, output_basename, output_directory, input_coolest_file=None, 
                  empty_output_directory=False, **kwargs_serializer):
         if input_coolest_file is None:
             raise NotImplementedError("You must provide an input coolest file (for now)")
-            input_coolest_file = output_coolest_file
         if not os.path.isabs(input_coolest_file):
             input_coolest_file = os.path.abspath(input_coolest_file)
+        output_coolest_file = os.path.join(output_directory, output_basename)
         if not os.path.isabs(output_coolest_file):
             output_coolest_file = os.path.abspath(output_coolest_file)
         self._input_coolest_file = input_coolest_file
         self._output_coolest_file = output_coolest_file
         self._output_dir = os.path.dirname(output_coolest_file)
+        self._basename = output_basename
         self._kwargs_serializer = kwargs_serializer
         self._coolest = self._load_coolest_object()
         self._create_output_directory(empty_output_directory)
@@ -43,11 +43,13 @@ class COOLESTexporter(object):
     def _create_output_directory(self, empty_dir):
         if not os.path.exists(self._output_dir):
             os.makedirs(self._output_dir)
+            print(f"Created directory {self._output_dir}")
         elif empty_dir:
             shutil.rmtree(self._output_dir)
             os.makedirs(self._output_dir)
+            print(f"Emptied directory {self._output_dir}")
         elif not os.listdir(self._output_dir):
-            pass  # directory is already empty
+            print(f"Directory {self._output_dir} already empty; nothing to be done.")
         else:
             raise ValueError("Output directory already exists and is not empty "
                              "(use `empty_output_directory=True` for cleaning it)")
@@ -68,16 +70,19 @@ class COOLESTexporter(object):
         else:
             serializer.dump_simple()
 
-    def update_obs_and_instru(self, data, lens_image,
-                              noise_type='NoiseMap', 
-                              noise_map=None):
-        observation = util.create_observation(data, lens_image, noise_map=noise_map, 
-                                              json_dir=self._output_dir)
-        instrument = util.create_instrument(lens_image, 
-                                            json_dir=self._output_dir)
+    def update_from_data(self, data, lens_image,
+                         noise_type='NoiseMap', 
+                         noise_map=None):
+        observation = util.create_observation(data, lens_image, 
+                                              noise_type=noise_type,
+                                              model_noise_map=noise_map, 
+                                              json_dir=self._output_dir,
+                                              fits_file_prefix=self._basename)
+        #instrument = util.create_instrument(lens_image, 
+                                            #json_dir=self._output_dir)
         # overwites the attributes
         self._coolest.observation = observation
-        self._coolest.instrument = instrument
+        #self._coolest.instrument = instrument
 
     def update_from_model(self, lens_image, lensing_entity_mapping, 
                           parameters=None, samples=None):
