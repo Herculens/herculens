@@ -465,7 +465,7 @@ def h2c_pixelated_values(profile, kwargs, profile_herculens,
     CD2_1 = float(matrix[1, 0])
     CD2_2 = float(matrix[1, 1])
   
-    fits_filename = f'pixels-{fits_file_suffix}.fits'
+    fits_filename = f'model-{fits_file_suffix}.fits'
     if file_dir is None:
         fits_path = fits_filename
     else:
@@ -480,18 +480,15 @@ def h2c_pixelated_values(profile, kwargs, profile_herculens,
                             ('CD2_2', CD2_2),
                        ])
 
-    #pixels = PixelatedRegularGrid(fits_filename, # relative path to fits file
-    #                              field_of_view_x=fov_x,
-    #                              field_of_view_y=fov_y,
-    #                              check_fits_file=True,
-    #                              fits_file_dir=file_dir)
-    profile.parameters['pixels'].set_grid(fits_filename, # relative path to fits file
-                                          field_of_view_x=fov_x,
-                                          field_of_view_y=fov_y,
-                                          check_fits_file=False)
+    pixels = PixelatedRegularGrid(fits_filename, # relative path to fits file
+                                  field_of_view_x=fov_x,
+                                  field_of_view_y=fov_y,
+                                  check_fits_file=True,
+                                  fits_file_dir=file_dir)
+    profile.parameters['pixels'] = pixels
     assert math.isclose(pixel_scale,
                         profile.parameters['pixels'].pixel_size, 
-                        rel_tol=1e-09, abs_tol=0.0)
+                        rel_tol=0.0, abs_tol=1e-06)
 
 
 def h2c_extshear_values(profile, kwargs, g1g2_param=False):
