@@ -6,8 +6,11 @@ __author__ = 'aymgal'
 
 
 import os
+import shutil
+import math
 import numpy as np
 from astropy.io import fits
+import logging
 
 from herculens.Inference.legacy.parameters import Parameters as HerculensParameters
 from herculens.Util import param_util
@@ -15,15 +18,32 @@ from herculens.Util.jax_util import unjaxify_kwargs
 
 from coolest.template.lazy import *
 
+logging.basicConfig(format='%(levelname)s:%(message)s')
 
 # NOTE: `h2c` is a shorthand for `herculens2coolest`
 
 
+def create_output_directory(directory, empty_dir_bool):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        logging.warning(f"Created directory {directory}")
+    elif empty_dir_bool:
+        shutil.rmtree(directory)
+        os.makedirs(directory)
+        logging.warning(f"Emptied directory {directory}")
+    elif not os.listdir(directory):
+        logging.warning(f"Directory {directory} already empty; nothing to be done.")
+    else:
+        return False
+    return True
+
+
 def create_observation(data, lens_image, json_dir=None,
                        noise_type='NoiseMap', model_noise_map=None, 
-                       fits_file_prefix="coolest"):
+                       fits_file_suffix="coolest", 
+                       kwargs_obs=None, kwargs_noise=None):
     # saves the observed lens image on disk
-    obs_file_name = f"{fits_file_prefix}_obs.fits"
+    obs_file_name = f"obs-{fits_file_suffix}.fits"
     if json_dir is not None:
         obs_fits_path = os.path.join(json_dir, obs_file_name)
     else:
@@ -39,12 +59,15 @@ def create_observation(data, lens_image, json_dir=None,
     fov_y = [extent[2] - pix_scl/2., extent[3] + pix_scl/2.]
     pixels = PixelatedRegularGrid(obs_file_name,
                                   field_of_view_x=fov_x,
-                                  field_of_view_y=fov_y)
-    
+                                  field_of_view_y=fov_y,
+                                  fits_file_dir=json_dir)
+
+    if kwargs_noise is None:
+        kwargs_noise = {}
     if noise_type == 'NoiseMap':
         if model_noise_map is None:
             raise ValueError(f"A noise map must be provided for noise type {noise_type}")
-        noise_map_file_name = f"{fits_file_prefix}_noise_map.fits"
+        noise_map_file_name = f"noise_map-{fits_file_suffix}.fits"
         if json_dir is not None:
             noise_map_fits_path = os.path.join(json_dir, noise_map_file_name)
         else:
@@ -53,8 +76,11 @@ def create_observation(data, lens_image, json_dir=None,
                            header_cards=[('COOLEST', "Model noise map")])
         noise_map = PixelatedRegularGrid(noise_map_file_name,
                                          field_of_view_x=fov_x,
-                                         field_of_view_y=fov_y)
-        noise = NoiseMap(noise_map)
+                                         field_of_view_y=fov_y,
+                                         fits_file_dir=json_dir)
+        noise = NoiseMap(noise_map, **kwargs_noise)
+        assert math.isclose(pixels.pixel_size, noise_map.pixel_size,
+                            rel_tol=1e-09, abs_tol=0.0)
     else:
         raise NotImplementedError(f"Noise type {noise_type} not yet supported")
     
@@ -62,22 +88,71 @@ def create_observation(data, lens_image, json_dir=None,
     if exp_time is not None and not isinstance(exp_time, (int, float)):
         raise NotImplementedError("Only exposure *time* is supported")
     
+    if kwargs_obs is None:
+        kwargs_obs = {}
     observation = Observation(pixels=pixels,
                               exposure_time=exp_time,
                               noise=noise,
-                              mag_zero_point=None,
-                              mag_sky_brightness=None)
+                              **kwargs_obs)
     return observation
+
+
+def create_instrument(lens_image, observation, json_dir=None,
+                      psf_type='PixelatedPSF',
+                      fits_file_suffix="coolest",
+                      psf_description=None,
+                      kwargs_psf=None):
+    if psf_type == 'PixelatedPSF':
+        super_factor = lens_image.PSF.kernel_supersampling_factor
+        if super_factor > 1:
+            psf_kernel = lens_image.PSF.kernel_point_source_supersampled(super_factor)
+        elif super_factor == 1:
+            psf_kernel = lens_image.PSF.kernel_point_source
+        else:
+            raise ValueError(f"PSF supersampling factor of {super_factor} is unknown "
+                             f"for `psf_type` {psf_type}")
+        psf_file_name = f"psf-{fits_file_suffix}.fits"
+        if json_dir is not None:
+            psf_fits_path = os.path.join(json_dir, psf_file_name)
+        else:
+            psf_fits_path = psf_file_name
+        save_image_to_fits(psf_fits_path, psf_kernel, 
+                           header_cards=[('COOLEST', "Pixelated PSF kernel")])
+        pixel_size = lens_image.Grid.pixel_width / super_factor
+        nx, ny = psf_kernel.shape
+        fov_x = (0, nx * pixel_size)
+        fov_y = (0, ny * pixel_size)
+        pixels = PixelatedRegularGrid(psf_file_name,
+                                      field_of_view_x=fov_x,
+                                      field_of_view_y=fov_y,
+                                      fits_file_dir=json_dir)
+        if psf_description is None:
+            psf_description = ""
+        psf = PixelatedPSF(pixels, description=psf_description)
+    else:
+        raise NotImplementedError(f"Noise type {noise_type} not yet supported")
+
+    if kwargs_psf is None:
+        kwargs_psf = {}
+    instrument = Instrument(pixel_size,
+                            psf=psf,
+                            **kwargs_psf)
+
+    assert math.isclose(observation.pixels.pixel_size, instrument.pixel_size,
+                        rel_tol=1e-09, abs_tol=0.0)
+
+    return instrument
 
 
 def save_image_to_fits(path, image, header_cards=[], overwrite=True):
     header = fits.Header(cards=header_cards)
     fits.writeto(path, image, header, overwrite=overwrite)
-    print(f"Saved image to FITS file {path}")
+    logging.warning(f"Saved image to FITS file {path}")
 
 
 def create_lensing_entities(lens_image, lensing_entity_mapping, 
-                            parameters=None, samples=None, json_dir=None):
+                            parameters=None, samples=None, 
+                            json_dir=None, fits_file_suffix="coolest"):
         """
         lensing_entity_mapping: list of 2-tuples of the following format:
             ('name_of_the_entity', kwargs_mapping)
@@ -106,6 +181,7 @@ def create_lensing_entities(lens_image, lensing_entity_mapping,
                                                   parameters=parameters,
                                                   samples=samples,
                                                   file_dir=json_dir,
+                                                  fits_file_suffix="coolest",
                                                   **kwargs_mapping)
             else:
                 raise ValueError(f"Unknown lensing entity type '{entity_type}'.")
@@ -128,7 +204,7 @@ def create_extshear_model(lens_image, name, parameters=None, samples=None,
 
     if parameters is not None:
         if isinstance(parameters, HerculensParameters):
-            print("Using the legacy interface of the Parameters class")
+            logging.warning("Using the legacy interface of the Parameters class")
             kwargs_list = parameters.best_fit_values(as_kwargs=True)['kwargs_lens']
             if parameters.samples is not None:
                 kwargs_list_samples = parameters.samples(as_kwargs=True, group_by_param=True)['kwargs_lens']
@@ -156,7 +232,8 @@ def create_extshear_model(lens_image, name, parameters=None, samples=None,
 
 def create_galaxy_model(lens_image, name, parameters=None, samples=None,
                         mass_profile_indices=None, light_profile_indices=None,
-                        lensed=None, redshift=None, file_dir=None):
+                        lensed=None, redshift=None, 
+                        file_dir=None, fits_file_suffix="coolest"):
     # mass model
     if mass_profile_indices is not None:
         mass_profiles_all = lens_image.MassModel.profile_type_list
@@ -184,7 +261,7 @@ def create_galaxy_model(lens_image, name, parameters=None, samples=None,
 
     if parameters is not None:
         if isinstance(parameters, HerculensParameters):
-            print("Using the legacy interface of the Parameters class")
+            logging.warning("Using the legacy interface of the Parameters class")
             kwargs_all = parameters.best_fit_values(as_kwargs=True)
             if parameters.samples is not None:
                 kwargs_all_samples = parameters.samples(as_kwargs=True, group_by_param=True)
@@ -197,29 +274,32 @@ def create_galaxy_model(lens_image, name, parameters=None, samples=None,
         if mass_profile_indices is not None:
             update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                                      mass_profile_indices, mass_profiles_in, 
-                                     file_dir=file_dir)
+                                     file_dir=file_dir, fits_file_suffix=fits_file_suffix)
         if light_profile_indices is not None:
             update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                                       light_profile_indices, light_profiles_in, lensed,
-                                      file_dir=file_dir)
+                                      file_dir=file_dir, fits_file_suffix=fits_file_suffix)
 
     return galaxy
 
 
 def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, 
-                             profile_indices, profile_names, file_dir=None):
+                             profile_indices, profile_names, 
+                             file_dir=None, fits_file_suffix="coolest"):
     kwargs_list = kwargs_all['kwargs_lens']
     kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples['kwargs_lens']
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
         profile_name = profile_names[ic]
-        if profile_name in ['SIS', 'SIE', 'EPL']:
+        if profile_name in ['SIS', 'SIE', 'EPL', 'PEMD', 'SPEMD']:
             if profile_name == 'SIS':
                 isothermal, spherical = True, True
             elif profile_name == 'SIE':
                 isothermal, spherical = True, False
-            elif profile_name == 'EPL':
+            elif profile_name in ['EPL', 'PEMD']:
                 isothermal, spherical = False, False
+            elif profile_name == 'SPEMD':
+                raise NotImplementedError("SPEMD mass profile is not yet supported")
             h2c_powerlaw_values(galaxy.mass_model[ic], kwargs_list[ih], 
                                 isothermal=isothermal, spherical=spherical)
             if kwargs_list_samples is not None:
@@ -230,14 +310,12 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
 
 
 def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, 
-                              profile_indices, profile_names, lensed, file_dir=None):
+                              profile_indices, profile_names, lensed, 
+                              file_dir=None, fits_file_suffix="coolest"):
     # get current values
-    if lensed:
-        kwargs_list = kwargs_all['kwargs_source']
-        kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples['kwargs_source']
-    else:
-        kwargs_list = kwargs_all['kwargs_lens_light']
-        kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples['kwargs_lens_light']
+    light_comp = 'source' if lensed else 'lens_light'
+    kwargs_list = kwargs_all[f'kwargs_{light_comp}']
+    kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples[f'kwargs_{light_comp}']
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
         if profile_names[ic] == 'SERSIC_ELLIPSE':
@@ -250,11 +328,12 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
                 h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_list_samples[ih], spherical=True)
         elif profile_names[ic] == 'SHAPELETS':
             h2c_Shapelets_values(galaxy.light_model[ic], kwargs_list[ih],
-                                 lens_image.SourceModel.func_list[ih]),  # TODO: improve access to e.g. n_max 
+                                 lens_image.SourceModel.func_list[ih])  # TODO: improve access to e.g. n_max 
         elif profile_names[ic] == 'PIXELATED':
             h2c_pixelated_values(galaxy.light_model[ic], kwargs_list[ih],
                                  lens_image.SourceModel.func_list[ih],
-                                 file_dir=file_dir),  # TODO: improve access to e.g. pixel_grid 
+                                 file_dir=file_dir,
+                                 fits_file_suffix=light_comp+'-'+fits_file_suffix)  # TODO: improve access to e.g. pixel_grid 
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
@@ -364,7 +443,8 @@ def h2c_Shapelets_values(profile, kwargs, profile_herculens):
     profile.parameters['n_max'].fix()
 
 
-def h2c_pixelated_values(profile, kwargs, profile_herculens, file_dir=None):
+def h2c_pixelated_values(profile, kwargs, profile_herculens, 
+                         file_dir=None, fits_file_suffix="coolest"):
     """Profile based on REGULAR grid of pixels"""
     pixel_values = check_type(kwargs['pixels'])
     h_grid = profile_herculens.pixel_grid
@@ -385,28 +465,20 @@ def h2c_pixelated_values(profile, kwargs, profile_herculens, file_dir=None):
     CD2_1 = float(matrix[1, 0])
     CD2_2 = float(matrix[1, 1])
   
-    primary_hdr = fits.Header()
-    primary_hdr['PIXSCALE'] = pixel_scale
-    primary_hdr['CD1_1'] = CD1_1
-    primary_hdr['CD1_2'] = CD1_2
-    primary_hdr['CD2_1'] = CD2_1
-    primary_hdr['CD2_2'] = CD2_2
-    primary_hdu = fits.PrimaryHDU(pixel_values, header=primary_hdr)  # or ImageHDU?
-    #columns = fits.ColDefs([
-    #    fits.Column(name='id', format='J', array=np.arange(x_grid.size)),
-    #    fits.Column(name='x', format='D', array=x_grid.flatten()),
-    #    fits.Column(name='y', format='D', array=y_grid.flatten()),
-    #    fits.Column(name='flux', format='D', array=pixel_values.flatten())
-    #])
-    #pixels_hdu = fits.BinTableHDU.from_columns(columns)
-    hdu_list = fits.HDUList([primary_hdu])
-
-    fits_filename = 'source_pixels.fits'
+    fits_filename = f'pixels-{fits_file_suffix}.fits'
     if file_dir is None:
         fits_path = fits_filename
     else:
         fits_path = os.path.join(file_dir, fits_filename)
-    hdu_list.writeto(fits_filename, overwrite=True)
+    save_image_to_fits(fits_path, pixel_values, 
+                       header_cards=[
+                            ('COOLEST', "Pixelated surface brightness model"),
+                            ('PIXSCALE', pixel_scale),
+                            ('CD1_1', CD1_1),
+                            ('CD1_2', CD1_2),
+                            ('CD2_1', CD2_1),
+                            ('CD2_2', CD2_2),
+                       ])
 
     #pixels = PixelatedRegularGrid(fits_filename, # relative path to fits file
     #                              field_of_view_x=fov_x,
@@ -417,6 +489,9 @@ def h2c_pixelated_values(profile, kwargs, profile_herculens, file_dir=None):
                                           field_of_view_x=fov_x,
                                           field_of_view_y=fov_y,
                                           check_fits_file=False)
+    assert math.isclose(pixel_scale,
+                        profile.parameters['pixels'].pixel_size, 
+                        rel_tol=1e-09, abs_tol=0.0)
 
 
 def h2c_extshear_values(profile, kwargs, g1g2_param=False):
