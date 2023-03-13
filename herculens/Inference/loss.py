@@ -8,6 +8,7 @@ __author__ = 'aymgal', 'austinpeel'
 import numpy as np
 import jax.numpy as jnp
 from jax import jit
+import warnings
 
 from herculens.Inference.base_differentiable import Differentiable
 from herculens.Util.jax_util import WaveletTransform
@@ -50,14 +51,25 @@ class Loss(Differentiable):
     _supported_regul_lens_light = ('l1_starlet_lens_light', 'l1_battle_lens_light', 'positivity_lens_light')
     _supported_prior = ('uniform', 'gaussian')
 
-    def __init__(self, lens_image, prob_model, likelihood_mask=None, 
+    def __init__(self, lens_image, prob_model, likelihood_mask=None, constrained_space=False,
                  regularization_terms=None, regularization_strengths=None, 
                  regularization_weights=None, regularization_masks=None,
                  starlet_second_gen=False, index_analytical_potential=None):
+        """
+        :param constrained_space: whether or not considering that parameters
+        (input values to the loss function) are assumed to be in constrained or 
+        unconstrained space
+        """
         self._image = lens_image
         self._prob_model = prob_model
         if likelihood_mask is None:
             likelihood_mask = np.ones(self._image.Grid.num_pixel_axes)
+        if constrained_space is False and \
+            (regularization_terms is not None and len(regularization_terms) > 0):
+            warnings.warn("Unconstrained space optimization in combination with "
+                          "regularization terms in the loss function have not been"
+                          "rigorously tested. Use at your risk!")
+        self._constrained = constrained_space
         self.likelihood_mask = likelihood_mask
         
         self._check_choices(regularization_terms, regularization_strengths, 
@@ -70,10 +82,10 @@ class Loss(Differentiable):
 
     def _func(self, args):
         """negative log(likelihood*prior*regularization)"""
-        kwargs = self._prob_model.params2kwargs(args)
-        log_prob = self._prob_model.log_prob(args)
+        log_prob = self._prob_model.log_prob(args, constrained=self._constrained)
+        kwargs = self._prob_model.params2kwargs(args, transform=False)
         log_reg  = self.log_regularization(kwargs)
-        loss = (- log_prob - log_reg)
+        loss = - log_prob - log_reg
         return jnp.nan_to_num(loss, nan=1e15, posinf=1e15, neginf=1e15)
 
     def _check_choices(self, 
