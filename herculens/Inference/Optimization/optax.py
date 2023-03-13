@@ -8,7 +8,8 @@ __author__ = 'aymgal', 'austinpeel'
 import time
 import numpy as np
 from copy import deepcopy
-import jax
+from functools import partial
+from jax import jit
 import optax
 
 from herculens.Inference.Optimization.base_optim import BaseOptimizer
@@ -20,11 +21,15 @@ __all__ = ['OptaxOptimizer']
 class OptaxOptimizer(BaseOptimizer):
     """Wrapper to optax's gradient descent optimizers"""
 
+    def __init__(self, loss, projection_fn=None, **kwargs):
+        super().__init__(loss, **kwargs)
+        self._projection_fn = projection_fn
+
     # TODO: output the loss value next the progressbar
 
     def run(self, init_params, algorithm='adabelief', max_iterations=100, min_iterations=None,
-              init_learning_rate=1e-2, schedule_learning_rate=True, 
-              stop_at_loss_increase=False, progress_bar=True, return_param_history=False):
+            init_learning_rate=1e-2, schedule_learning_rate=True, 
+            stop_at_loss_increase=False, progress_bar=True, return_param_history=False):
         if min_iterations is None:
             min_iterations = max_iterations
         if schedule_learning_rate is True:
@@ -66,11 +71,12 @@ class OptaxOptimizer(BaseOptimizer):
         opt_state = optim.init(params)
         prev_params, prev_loss_val = params, 1e10
 
-        @jax.jit
+        @jit
         def gd_step(params, opt_state):
             loss_val, grads = self.function_optim_with_grad(params)
             updates, opt_state = optim.update(grads, opt_state, params)
             params = optax.apply_updates(params, updates)
+            params = self.apply_projections(params)
             return params, opt_state, loss_val
 
         # Gradient descent loop
@@ -85,7 +91,7 @@ class OptaxOptimizer(BaseOptimizer):
                 params, loss_val = prev_params, prev_loss_val
                 break
             else:
-                loss_history.append(loss_val)  # TODO: use jax.value_and_grad instead? but does it jit the gradient??
+                loss_history.append(loss_val)
                 prev_params, prev_loss_val = params, loss_val
             if return_param_history is True:
                 param_history.append(params)
@@ -96,3 +102,9 @@ class OptaxOptimizer(BaseOptimizer):
         if return_param_history is True:
             extra_fields['param_history'] = param_history
         return best_fit, logL_best_fit, extra_fields, runtime
+
+    @partial(jit, static_argnums=(0,))
+    def apply_projections(self, params):
+        if self._projection_fn is not None:
+            params = self._projection_fn(params)
+        return params
