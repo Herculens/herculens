@@ -13,6 +13,7 @@ from functools import partial
 from jax import jit
 
 from herculens.LensImage.Numerics.numerics import Numerics
+from herculens.LensImage.lensing_operator import LensingOperator
 
 
 __all__ = ['LensImage']
@@ -188,4 +189,12 @@ class LensImage(object):
         norm_res = self.normalized_residuals(data, model, mask=mask)
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
+
+    def get_lensing_operator(self, kwargs_lens):
+        if not hasattr(self, '_lensing_op'):
+            self._lensing_op = LensingOperator(self.MassModel,
+                                               self.Grid, # TODO: should be the model (from Numerics) grid at some point
+                                               self.SourceModel.pixel_grid)
+        self._lensing_op.compute_mapping(kwargs_lens)
+        return self._lensing_op
         

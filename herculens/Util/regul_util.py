@@ -8,22 +8,21 @@ __author__ = 'aymgal'
 import copy
 import numpy as np
 import time
-from scipy import signal
+from scipy import signal, stats
 import warnings
 
 import jax
 import jax.numpy as jnp
-from jax import lax, vmap
+from jax import lax, jit, vmap
 
 from utax.wavelet import WaveletTransform
-from herculens.LensImage.lensing_operator import LensingOperator
 from herculens.Util import jax_util, vkl_util
 
 
 
 def data_noise_to_wavelet_source(lens_image, kwargs_res, 
                                  wavelet_type_list=['starlet', 'battle-lemarie-3'],
-                                 num_samples=10000, seed=0,
+                                 num_samples=10000, sigma_clipping=True, seed=0,
                                  starlet_second_gen=False, noise_var=None):
 
     # get the data noise
@@ -33,13 +32,15 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
         diag_cov_d = lens_image.Noise.C_D_model(model_image)
     else:
         diag_cov_d = noise_var
-    std_d = np.sqrt(diag_cov_d)[jnp.newaxis, :, :]
+
+    if np.any(np.where(diag_cov_d < 0.)):
+        raise ValueError("Negative values in data covariance matrix")
     
+    # number of source pixels
+    nxsrc, nysrc = lens_image.SourceModel.pixel_grid.num_pixel_axes
+
     # construct the lensing operator
-    lensing_op = LensingOperator(lens_image.MassModel, 
-                                 lens_image.Grid, # TODO: should be the model (from Numerics) grid at some point
-                                 lens_image.SourceModel.pixel_grid)
-    lensing_op.compute_mapping(kwargs_res['kwargs_lens'])
+    lensing_op = lens_image.get_lensing_operator(kwargs_res['kwargs_lens'])
 
     # setup the transposed convolution
     kernel = jnp.copy(lens_image.PSF.kernel_point_source)
@@ -52,6 +53,7 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
     kernel_rot = jnp.rot90(jnp.rot90(kernel, axes=(0, 1)), axes=(0, 1))
     
     def B_T(n):
+        # transposed convolution
         res = lax.conv_general_dilated(n[jnp.newaxis, :, :, jnp.newaxis], 
                                        kernel_rot, 
                                        (1,1), #(k//2,k//2),  # window strides
@@ -62,6 +64,7 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
         return jnp.squeeze(res)
     
     def F_T(n):
+        # de-lensing operation
         return lensing_op.image2source_2d(n)
 
     wavelet_class_list = []
@@ -70,32 +73,36 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
     for wavelet_type in wavelet_type_list:
 
         # setup the wavelet transform
-        nxsrc, nysrc = lens_image.SourceModel.pixel_grid.num_pixel_axes
         if 'battle-lemarie' in wavelet_type:
             nscales = 1  # we only care about the first scale for this one
-        else:
+        elif 'starlet' in wavelet_type:
             nscales = int(np.log2(min(nxsrc, nysrc)))  # max number of scales allowed
         wavelet = WaveletTransform(nscales, wavelet_type=wavelet_type, second_gen=starlet_second_gen)
         
         def Phi_T(n):
+            # wavelet transform
             return wavelet.decompose(n)
         
-        @vmap
+        @jit
         def propagate_noise(n):
-            # multiply by the inverse of the data (diagonal) covariance matrix
-            n /= diag_cov_d
-            # transposed convolution
-            n = B_T(n)
-            # de-lens to source plane
-            n = F_T(n)
-            # transform to wavelet space
-            n = Phi_T(n)
-            #debug = noise_i.copy()
-            return n
-        
-        noise_samples = std_d * jax.random.normal(jax.random.PRNGKey(seed), 
-                                                  shape=(num_samples, nx, ny))
-        noise_samples_prop = propagate_noise(noise_samples)
+            # apply linear operators to propagate noise from image plane to source plane
+            tmp = F_T(B_T(n))
+            if sigma_clipping is True:
+                # here we replace values that are 3 times the std by the median value
+                thresh = 5. * jnp.std(tmp)
+                tmp = jnp.where((tmp < -thresh) | (tmp > thresh), x=thresh, y=tmp)
+            return Phi_T(tmp)
+
+        # draw many realizations of the noise, scaled by the inverse cov matrix
+        std_d_norm = 1. / np.sqrt(diag_cov_d) # = sigma * C_d^{-1}
+        std_d_norm = std_d_norm[jnp.newaxis, :, :]
+        noise_samples = std_d_norm * jax.random.normal(jax.random.PRNGKey(seed),
+                                                       shape=(num_samples, nx, ny))
+
+        # propagate the noise to wavelet space for each of them
+        noise_samples_prop = vmap(propagate_noise)(noise_samples)
+
+        # take the standard deviation
         std_per_scale = jnp.std(noise_samples_prop, axis=0)
 
         wavelet_class_list.append(wavelet)
