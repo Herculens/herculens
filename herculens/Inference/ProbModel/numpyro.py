@@ -60,7 +60,7 @@ def _unconstrain_reparam(params, site):
         value = transform(p)
 
         # NB: we add the determinant term only for sampled sites
-        # as it does not seem to work with param sites
+        # and only transformed parameter site values above 
         if site["type"] == "sample":
             log_det = transform.log_abs_det_jacobian(p, value)
             log_det = sum_rightmost(

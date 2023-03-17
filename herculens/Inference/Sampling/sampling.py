@@ -10,7 +10,7 @@ import numpy as np
 from functools import partial
 import jax
 
-from herculens.Inference.base_inference import Inference
+from herculens.Inference.Sampling.base_inference import Inference
 
 
 # TODO: create separate classes for each sampler
@@ -26,18 +26,16 @@ class Sampler(Inference):
     - Ensemble Affine Invariant MCMC using emcee
     """
 
-    def hmc_blackjax(self, seed, num_warmup=100, num_samples=100, #num_chains=1, 
-                     restart_from_init=False, sampler_type='NUTS', use_stan_warmup=True,
-                     step_size=1e-3, inv_mass_matrix=None):
+    def hmc_blackjax(self, seed, init_params, num_warmup=100, num_samples=100, #num_chains=1, 
+                     sampler_type='NUTS', use_stan_warmup=True, step_size=1e-3, inv_mass_matrix=None):
         import blackjax
 
         rng_key = jax.random.PRNGKey(seed)
         log_prob_fn = self.log_probability
-        init_positions = self._param.current_values(as_kwargs=False, restart=restart_from_init)
 
-        if inv_mass_matrix is None:
-            # default the inverse mass matrix is the identity matrix
-            inv_mass_matrix = np.ones(self._param.num_parameters)
+        #if inv_mass_matrix is None:
+        #    # default the inverse mass matrix is the identity matrix
+        #    inv_mass_matrix = np.ones(self._param.num_parameters)
 
         start = time.time()
         if sampler_type.lower() == 'hmc':
@@ -49,25 +47,23 @@ class Sampler(Inference):
 
         if use_stan_warmup and sampler_type.lower() == 'nuts':
             rng_key, rng_subkey = jax.random.split(rng_key)
-            # here for simplicity we use NUTS
             
-
             # update step size and inverse mass matrix during warmup with Stan
             window_adaptation = blackjax.window_adaptation(
-                blackjax.nuts,
-                log_prob_fn, 
+                blackjax.nuts,  # we also use NUTS for warmup
+                log_prob_fn,
                 num_steps=num_warmup,
             )
             init_state, kernel, _ = window_adaptation.run(
                 rng_key,
-                init_positions,
+                init_params,
             )
             # reset number of samples so we don't warmup again in the final inference
             num_warmup = 0
 
         else:
             kernel = jax.jit(sampler.step)
-            init_state = sampler.init(init_positions)
+            init_state = sampler.init(init_params)
         
         # run the inference
         @jax.jit
@@ -78,17 +74,16 @@ class Sampler(Inference):
         keys = jax.random.split(rng_key, num_warmup + num_samples)
         _, (states, infos) = jax.lax.scan(one_step_single_chain, init_state, keys)
         
-        samples = states.position.block_until_ready()
+        samples = states.position  #.block_until_ready()
         logL = infos.energy
         runtime = time.time() - start
 
-        if len(samples.shape) == 3:  # basically if num_chains > 1
-            # flatten the multiple chains
-            s0, s1, s2 = samples.shape
-            samples = samples.reshape(s0*s1, s2)
-            logL = logL.flatten()
+        # if len(samples.shape) == 3:  # basically if num_chains > 1
+        #     # flatten the multiple chains
+        #     s0, s1, s2 = samples.shape
+        #     samples = samples.reshape(s0*s1, s2)
+        #     logL = logL.flatten()
 
-        self._param.set_posterior_samples(samples, logL)
         extra_fields = {
             'step_size': step_size,
             'inverse_mass_matrix': inv_mass_matrix,
