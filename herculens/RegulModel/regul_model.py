@@ -48,10 +48,10 @@ class RegularizationModel(object):
     ]
     """
 
-    def __init__(self, method_list):
-        if method_list is None:
-            method_list = []
-        self.method_list, self.param_names = self._setup_methods(method_list)
+    _model_types = ['source', 'lens_light', 'lens_mass']
+
+    def __init__(self, method_type_list):
+        self.method_list, self.param_names = self._setup_methods(method_type_list)
 
     def initialize(self, lens_image, kwargs_params, **kwargs):
         for method in self.method_list:
@@ -77,45 +77,43 @@ class RegularizationModel(object):
         return weights_list
 
     @staticmethod
-    def _setup_methods(method_list):
-        method_list = []
-        param_names = []
-        if method_list is None:
-            return method_list, param_names
-        for model_type, profile_index, method in method_list:
-            if model_type in ['source', 'lens_light']:
-                if method == 'SPARSITY_STARLET':
-                    func = sparsity.SparsityStarlet(model_type, profile_index)
-                elif method == 'SPARSITY_STARLET_2':
-                    func = sparsity.SparsityStarlet(model_type, profile_index,
+    def _setup_methods(method_type_list):
+        method_list, param_names = [], []
+        for model_type, profile_index, method_type in method_type_list:
+            if model_type in ('source', 'lens_light'):
+                if method_type == 'SPARSITY_STARLET':
+                    method = sparsity.SparsityStarlet(model_type, profile_index)
+                elif method_type == 'SPARSITY_STARLET_2':
+                    method = sparsity.SparsityStarlet(model_type, profile_index,
                                                     starlet_second_gen=True)
-                elif method == 'SPARSITY_BLWAVELET':
-                    func = sparsity.SparsityBLWavelet(model_type, profile_index)
-                elif method == 'POSITIVITY':
-                    func = constraints.Positivity(model_type, profile_index)
-            else:
-                if method == 'SPARSITY_STARLET_POTENTIAL':
-                    func = sparsity.SparsityStarlet(model_type, profile_index,
+                elif method_type == 'SPARSITY_BLWAVELET':
+                    method = sparsity.SparsityBLWavelet(model_type, profile_index)
+                elif method_type == 'POSITIVITY':
+                    method = constraints.Positivity(model_type, profile_index)
+            elif model_type == 'lens_mass':
+                if method_type == 'SPARSITY_STARLET_POTENTIAL':
+                    method = sparsity.SparsityStarlet(model_type, profile_index,
                                                      mass_form='potential')
-                elif method == 'SPARSITY_STARLET_2_POTENTIAL':
-                    func = sparsity.SparsityStarlet(model_type, profile_index,
+                elif method_type == 'SPARSITY_STARLET_2_POTENTIAL':
+                    method = sparsity.SparsityStarlet(model_type, profile_index,
                                                      mass_form='potential',
                                                      starlet_second_gen=True)
-                elif method == 'SPARSITY_BLWAVELET_POTENTIAL':
-                    func = sparsity.SparsityBLWavelet(model_type, profile_index,
+                elif method_type == 'SPARSITY_BLWAVELET_POTENTIAL':
+                    method = sparsity.SparsityBLWavelet(model_type, profile_index,
                                                       mass_form='potential')
-                elif method == 'POSITIVITY_POTENTIAL':
-                    func = constraints.Positivity(model_type, profile_index,
+                elif method_type == 'POSITIVITY_POTENTIAL':
+                    method = constraints.Positivity(model_type, profile_index,
                                                   mass_form='potential')
-                elif method == 'NEGATIVITY_POTENTIAL':
-                    func = constraints.Negativity(model_type, profile_index,
+                elif method_type == 'NEGATIVITY_POTENTIAL':
+                    method = constraints.Negativity(model_type, profile_index,
                                                   mass_form='potential')
-                elif method == 'POSITIVITY_CONVERGENCE':
-                    func = constraints.Positivity(model_type, profile_index,
+                elif method_type == 'POSITIVITY_CONVERGENCE':
+                    method = constraints.Positivity(model_type, profile_index,
                                                   mass_form='convergence')
-                else:
-                    raise ValueError(f"Method '{method}' is unsupported for '{model_type}' model. "
-                                     f"Supported methods are: {SUPPORTED_MODELS[model_type]}")
-            method_list.append(func)
-            param_names.append(func.param_names)
+            else:
+                raise ValueError(f"Regularization method is unsupported "
+                                 f"(supported model types are {self._model_types} "
+                                 f"and supported methods are {SUPPORTED_MODELS[model_type]})")
+            method_list.append(method)
+            param_names.append(method.param_names)
         return method_list, param_names
