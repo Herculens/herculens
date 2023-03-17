@@ -190,11 +190,15 @@ class LensImage(object):
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
 
-    def get_lensing_operator(self, kwargs_lens):
+    def get_lensing_operator(self, kwargs_lens=None, update=False):
+        if self.SourceModel.pixel_grid is None:
+            raise ValueError("The lensing operator is only defined for source "
+                             "models associated to a grid of pixels")
         if not hasattr(self, '_lensing_op'):
             self._lensing_op = LensingOperator(self.MassModel,
                                                self.Grid, # TODO: should be the model (from Numerics) grid at some point
                                                self.SourceModel.pixel_grid)
-        self._lensing_op.compute_mapping(kwargs_lens)
+        if update is True or self._lensing_op.get_lens_mapping() is None:
+            self._lensing_op.compute_mapping(kwargs_lens)
         return self._lensing_op
         

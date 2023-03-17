@@ -24,7 +24,6 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
                                  wavelet_type_list=['starlet', 'battle-lemarie-3'],
                                  num_samples=10000, sigma_clipping=True, seed=0,
                                  starlet_second_gen=False, noise_var=None):
-
     # get the data noise
     nx, ny = lens_image.Grid.num_pixel_axes
     if noise_var is None:
@@ -40,12 +39,12 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
     nxsrc, nysrc = lens_image.SourceModel.pixel_grid.num_pixel_axes
 
     # construct the lensing operator
-    lensing_op = lens_image.get_lensing_operator(kwargs_res['kwargs_lens'])
+    lensing_op = lens_image.get_lensing_operator(kwargs_lens=kwargs_res['kwargs_lens'])
 
     # setup the transposed convolution
     kernel = jnp.copy(lens_image.PSF.kernel_point_source)
     nxk, nyk = kernel.shape
-    kernel = kernel[:, :, jnp.newaxis, jnp.newaxis] 
+    kernel = kernel[:, :, jnp.newaxis, jnp.newaxis]
     dimension_numbers = ('NHWC', 'HWIO', 'NHWC')
     dn = lax.conv_dimension_numbers((1, nx, ny, 1),  # NHWC
                                     kernel.shape,  # HWIO
@@ -88,7 +87,7 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
             # apply linear operators to propagate noise from image plane to source plane
             tmp = F_T(B_T(n))
             if sigma_clipping is True:
-                # here we replace values that are 3 times the std by the median value
+                # here we clip values that are 5 times the standard deviation
                 thresh = 5. * jnp.std(tmp)
                 tmp = jnp.where((tmp < -thresh) | (tmp > thresh), x=thresh, y=tmp)
             return Phi_T(tmp)

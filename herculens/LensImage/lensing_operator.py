@@ -91,6 +91,8 @@ class LensingOperator(object):
         return (self.SourcePlane.delta_pix / self.ImagePlane.delta_pix)**2
 
     def get_lens_mapping(self):
+        if not hasattr(self, '_mapping'):
+            return None
         return self._mapping, self._norm_image2source
 
     def delete_cache(self):
