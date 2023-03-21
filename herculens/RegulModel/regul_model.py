@@ -1,6 +1,7 @@
 # Defines regularization choices
 # 
-# Copyright (c) 2022, herculens developers and contributors
+# Copyright (c) 2023, herculens developers and contributors
+
 
 __author__ = 'aymgal'
 
@@ -85,7 +86,7 @@ class RegularizationModel(object):
                     method = sparsity.SparsityStarlet(model_type, profile_index)
                 elif method_type == 'SPARSITY_STARLET_2':
                     method = sparsity.SparsityStarlet(model_type, profile_index,
-                                                    starlet_second_gen=True)
+                                                      second_gen=True)
                 elif method_type == 'SPARSITY_BLWAVELET':
                     method = sparsity.SparsityBLWavelet(model_type, profile_index)
                 elif method_type == 'POSITIVITY':
@@ -96,20 +97,20 @@ class RegularizationModel(object):
                                                      mass_form='potential')
                 elif method_type == 'SPARSITY_STARLET_2_POTENTIAL':
                     method = sparsity.SparsityStarlet(model_type, profile_index,
-                                                     mass_form='potential',
-                                                     starlet_second_gen=True)
+                                                      mass_form='potential',
+                                                      second_gen=True)
                 elif method_type == 'SPARSITY_BLWAVELET_POTENTIAL':
                     method = sparsity.SparsityBLWavelet(model_type, profile_index,
                                                       mass_form='potential')
                 elif method_type == 'POSITIVITY_POTENTIAL':
                     method = constraints.Positivity(model_type, profile_index,
-                                                  mass_form='potential')
+                                                    mass_form='potential')
                 elif method_type == 'NEGATIVITY_POTENTIAL':
                     method = constraints.Negativity(model_type, profile_index,
-                                                  mass_form='potential')
+                                                    mass_form='potential')
                 elif method_type == 'POSITIVITY_CONVERGENCE':
                     method = constraints.Positivity(model_type, profile_index,
-                                                  mass_form='convergence')
+                                                    mass_form='convergence')
             else:
                 raise ValueError(f"Regularization method is unsupported "
                                  f"(supported model types are {self._model_types} "

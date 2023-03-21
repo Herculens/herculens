@@ -1,7 +1,7 @@
 # Defines the model of a strong lens
 # 
 # Copyright (c) 2022, herculens developers and contributors
-# based on the ImSim module from lenstronomy (version 1.9.3)
+
 
 __author__ = 'aymgal'
 

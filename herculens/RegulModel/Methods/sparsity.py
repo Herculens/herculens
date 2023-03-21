@@ -1,3 +1,8 @@
+# Defines regularization choices
+# 
+# Copyright (c) 2023, herculens developers and contributors
+
+
 __author__ = 'aymgal'
 
 
@@ -13,7 +18,7 @@ __all__ = [
 ]
 
 
-class BaseSparsityAnalysis(BaseRegulization):
+class BaseSparsityWaveletAnalysis(BaseRegulization):
 
     """
     Base class for regularization strategies imposing a sparsity constraint
@@ -43,7 +48,7 @@ class BaseSparsityAnalysis(BaseRegulization):
         self.weights = weights_list[0]
 
 
-class SparsityStarlet(BaseSparsityAnalysis):
+class SparsityStarlet(BaseSparsityWaveletAnalysis):
 
     param_names = ['lambda_0', 'lambda_1']
     lower_limit_default = {'lambda_0': 0, 'lambda_1': 0}
@@ -71,7 +76,7 @@ class SparsityStarlet(BaseSparsityAnalysis):
         return log_prob
 
 
-class SparsityBLWavelet(BaseSparsityAnalysis):
+class SparsityBLWavelet(BaseSparsityWaveletAnalysis):
 
     param_names = ['lambda_0']
     lower_limit_default = {'lambda_0': 0}

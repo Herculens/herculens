@@ -1,3 +1,8 @@
+# Defines regularization choices
+# 
+# Copyright (c) 2023, herculens developers and contributors
+
+
 __author__ = 'aymgal'
 
 

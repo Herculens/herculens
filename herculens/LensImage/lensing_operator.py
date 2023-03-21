@@ -114,8 +114,8 @@ class LensingOperator(object):
     def _compute_mapping_bilinear(self, kwargs_lens, resized_source_plane=True):
         """Compute the mapping between image and source plane pixels.
 
-        This method uses lenstronomy to ray-trace the image plane pixel
-        coordinates back to the source plane and regularize the resultig
+        This method ray-traces the image plane pixel
+        coordinates back to the source plane and regularizes the resultig
         positions to a grid. In contrast to the 'nearest' interpolation scheme,
         this mapping incorporates a bilinear weighting to interpolate flux on
         the source plane following Treu & Koopmans (2004).
@@ -147,7 +147,7 @@ class LensingOperator(object):
         ----------
         beta_x, beta_y : array-like
             Coordinates in the source plane of ray-traced points from the
-            image plane (obtained from lenstronomy).
+            image plane.
         grid_offset_x, grid_offset_y : float
             Amount by which to shift the source plane grid in each direction.
         warning : bool
@@ -279,8 +279,8 @@ class PlaneGrid(object):
         
         Parameters
         ----------
-        image_grid_class : [lenstronomy.ImSim.Numerics.grid].RegularGrid
-            RegularGrid instance
+        grid_class : herculens.Coordinates.pixel_grid.PixelGrid
+            PixelGrid instance
         """
         self._grid = grid_class
         #self._x_grid_1d, self._y_grid_1d = self._grid.coordinates_evaluate
