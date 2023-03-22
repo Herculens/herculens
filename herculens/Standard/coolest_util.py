@@ -18,7 +18,7 @@ from herculens.Util.jax_util import unjaxify_kwargs
 
 from coolest.template.lazy import *
 
-logging.basicConfig(format='%(levelname)s:%(message)s')
+logging.getLogger().setLevel(logging.INFO)
 
 # NOTE: `h2c` is a shorthand for `herculens2coolest`
 
@@ -26,13 +26,13 @@ logging.basicConfig(format='%(levelname)s:%(message)s')
 def create_output_directory(directory, empty_dir_bool):
     if not os.path.exists(directory):
         os.makedirs(directory)
-        logging.warning(f"Created directory {directory}")
+        logging.info(f"Created directory {directory}")
     elif empty_dir_bool:
         shutil.rmtree(directory)
         os.makedirs(directory)
-        logging.warning(f"Emptied directory {directory}")
+        logging.info(f"Emptied directory {directory}")
     elif not os.listdir(directory):
-        logging.warning(f"Directory {directory} already empty; nothing to be done.")
+        logging.info(f"Directory {directory} already empty; nothing to be done.")
     else:
         return False
     return True
@@ -147,7 +147,7 @@ def create_instrument(lens_image, observation, json_dir=None,
 def save_image_to_fits(path, image, header_cards=[], overwrite=True):
     header = fits.Header(cards=header_cards)
     fits.writeto(path, image, header, overwrite=overwrite)
-    logging.warning(f"Saved image to FITS file {path}")
+    logging.info(f"Saved image to FITS file {path}")
 
 
 def create_lensing_entities(lens_image, lensing_entity_mapping, 
@@ -204,7 +204,7 @@ def create_extshear_model(lens_image, name, parameters=None, samples=None,
 
     if parameters is not None:
         if isinstance(parameters, HerculensParameters):
-            logging.warning("Using the legacy interface of the Parameters class")
+            logging.info("Using the legacy interface of the Parameters class")
             kwargs_list = parameters.best_fit_values(as_kwargs=True)['kwargs_lens']
             if parameters.samples is not None:
                 kwargs_list_samples = parameters.samples(as_kwargs=True, group_by_param=True)['kwargs_lens']
@@ -261,7 +261,7 @@ def create_galaxy_model(lens_image, name, parameters=None, samples=None,
 
     if parameters is not None:
         if isinstance(parameters, HerculensParameters):
-            logging.warning("Using the legacy interface of the Parameters class")
+            logging.info("Using the legacy interface of the Parameters class")
             kwargs_all = parameters.best_fit_values(as_kwargs=True)
             if parameters.samples is not None:
                 kwargs_all_samples = parameters.samples(as_kwargs=True, group_by_param=True)
@@ -568,15 +568,16 @@ def h2c_position_angle(value):
     Transform an angle in radian from Herculens into an angle in degree in the COOLEST conventions.
     Based on @LyneVdV's implementation for lenstronomy.
     """
-    value_conv = value * 180. / np.pi
-    value_conv = value_conv - 90.
-    if is_iterable(value):
-        for i, val in enumerate(value_conv):
-            if val <= -90.:
-                value_conv[i] += 180.
-    else:
-        if value_conv <= -90:
-            value_conv += 180.
+    value_conv = value + np.pi / 2.
+    value_conv = value_conv * 180. / np.pi
+    logging.warning(f"ASSUMING X AXIS IS POSTIVE TOWARDS THE RIGHT!")
+    #if is_iterable(value):
+    #    for i, val in enumerate(value_conv):
+    #        if val <= -90.:
+    #            value_conv[i] += 180.
+    #else:
+    #    if value_conv <= -90:
+    #        value_conv += 180.
     return value_conv
 
 
