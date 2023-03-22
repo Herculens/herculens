@@ -17,6 +17,9 @@ class Differentiable(object):
     """Abstract class that defines a function with its derivatives, typically the loss function.
     """
 
+    def _func(self, args):
+        raise NotImplementedError
+
     @partial(jit, static_argnums=(0,))
     def __call__(self, args):
         """alias differentiable function"""
