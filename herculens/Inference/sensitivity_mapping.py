@@ -18,10 +18,10 @@ import jax.numpy as jnp
 from herculens.LightModel.light_model import LightModel
 from herculens.MassModel.mass_model import MassModel
 from herculens.LensImage.lens_image import LensImage
-from herculens.Parameters.parameters import Parameters
-from herculens.Inference.loss import Loss
-from herculens.Inference.optimization import Optimizer
-# from herculens.Parameters.covariance import FisherCovariance
+from herculens.Inference.legacy.parameters import Parameters
+from herculens.Inference.legacy.loss import Loss
+from herculens.Inference.legacy.optimization import Optimizer
+# from herculens.Inference.legacy.covariance import FisherCovariance
 from herculens.Util import util
 
 

@@ -9,7 +9,7 @@ __author__ = 'aymgal'
 import jax.numpy as jnp
 
 from herculens.RegulModel.Methods.base import BaseRegulization
-from herculens.Util import regul_util
+from herculens.RegulModel import regul_util
 
 
 __all__ = [
