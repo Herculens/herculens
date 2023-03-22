@@ -8,7 +8,8 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
 import numpy as np
-from herculens.Util import util, kernel_util, linear_util
+from herculens.Util import util, kernel_util
+from utax.convolution.functions import build_convolution_matrix
 
 
 __all__ = ['PSF']
