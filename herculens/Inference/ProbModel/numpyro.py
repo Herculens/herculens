@@ -71,20 +71,6 @@ class NumpyroModel(BaseProbModel):
     def render_model(self):
         return numpyro.render_model(self.model)
 
-    def params2kwargs(self, params, transform=False, constrained=True):
-        """
-        If transform=True, parameters will get transformed to their codomain.
-        If constrained=True, assumes that the input are in constrained space,
-        otherwise they are assumed to be in constrained values
-        """
-        if transform is False:
-            params_ = params
-        elif constrained is True:
-            params_ = self.unconstrain(params)
-        else:
-            params_ = self.constrain(params)
-        return self._params2kwargs(params_)
-
     def constrain(self, params):
         return numpyro_util.constrain_fn(self.model, (), {}, params)
 

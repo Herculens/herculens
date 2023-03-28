@@ -14,10 +14,7 @@ class BaseProbModel(object):
 
     def model(self):
         raise NotImplementedError("Must be implemented by user class")
-
-    def _params2kwargs(self, params):
-        raise NotImplementedError("Must be implemented by user class")
-
+        
     def params2kwargs(self, params):
         raise NotImplementedError("`params2kwargs` method must be implemented.")
 
