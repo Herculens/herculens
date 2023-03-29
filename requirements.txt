@@ -7,7 +7,7 @@ jaxopt>=0.5.5
 chex>=0.1.4
 matplotlib>=3.0.0
 findiff==0.8.9
--e git://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolution, interpolation, etc.)
+git+https://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolution, interpolation, etc.)
 
 # the following packages are optional (pay attention to the versions)
 #tqdm>=4.61.0        # for progress bars with certain optimizers and samplers

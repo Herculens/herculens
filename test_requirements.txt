@@ -1,3 +1,3 @@
 tqdm>=4.61.0        # for progress bars with certain optimizers and samplers
 numpyro>=0.10.1     # for SVI and HMC sampling
--e git://github.com/adam-coogan/jaxinterp2d@main#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
+git+https://github.com/adam-coogan/jaxinterp2d@main#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
