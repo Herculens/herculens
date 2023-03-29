@@ -57,15 +57,13 @@ class NumpyroModel(BaseProbModel):
         trace = self.get_trace(seed=seed)
         return {site['name']: site['value'] for site in trace.values() if not site.get('is_observed', False)}
 
-    def sample_prior(self, num_samples, seed=0, constrained=True):
+    def sample_prior(self, num_samples, seed=0):
         batch_ndims = 0 if num_samples else 1
         predictive = util.Predictive(self.model, 
                                      num_samples=num_samples, 
                                      batch_ndims=batch_ndims)
         samples = predictive(jax.random.PRNGKey(seed))
         del samples['obs']
-        if constrained is False:
-            samples = self.unconstrain(samples)
         return samples
 
     def render_model(self):
