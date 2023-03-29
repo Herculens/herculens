@@ -129,17 +129,9 @@ class Coordinates(object):
         :param pixel_unit: bool, if True, units of pixels in input, otherwise RA/DEC
         :return: updated data class with change in coordinate system
         """
-        self._shift_coordinates(x_shift, y_shift, pixel_unit)
+        return self._shift_coordinates(x_shift, y_shift, pixel_unit=pixel_unit)
 
     def _shift_coordinates(self, x_shift, y_shift, pixel_unit=False):
-        """
-
-        shifts the coordinate system
-        :param x_shif: shift in x (or RA)
-        :param y_shift: shift in y (or DEC)
-        :param pixel_unit: bool, if True, units of pixels in input, otherwise RA/DEC
-        :return: updated data class with change in coordinate system
-        """
         if pixel_unit:
             ra_shift, dec_shift = self.map_pix2coord(x_shift, y_shift)
             ra_shift -= self._ra_at_xy_0
