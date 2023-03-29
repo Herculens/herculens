@@ -16,4 +16,4 @@ git+https://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolut
 #emcee==3.0.2        # for Ensemble MCMC sampling
 #gigalens==0.1.8     # for a JAX implementation of Shapelets
 #lenstronomy>=1.9.0  # for interpolated Shapelets (via `gigalens`), or for Particle Swarm Optimization
-#-e git://github.com/adam-coogan/jaxinterp2d@main#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
+#-e git://github.com/adam-coogan/jaxinterp2d@master#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
