@@ -44,7 +44,7 @@ jobs:
     
     - name: Test with pytest
       run: |
-        pytest --cov-report lcov --cov=utax
+        pytest --cov-report lcov --cov=herculens
 
     - name: Coveralls
       uses: coverallsapp/github-action@master
