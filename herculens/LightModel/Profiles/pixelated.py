@@ -10,7 +10,6 @@ import numpy as np
 import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev, vmap
 
-from herculens.Util.jax_util import BilinearInterpolator, BicubicInterpolator
 from herculens.Util import util
 
 
@@ -52,8 +51,10 @@ class Pixelated(object):
                 self._interp_class = CartesianGrid
         if self._interp_class is None:
             if self._interp_type == 'bilinear':
+                from utax.interpolation import BilinearInterpolator
                 self._interp_class = BilinearInterpolator
             elif self._interp_type == 'bicubic':
+                from utax.interpolation import BicubicInterpolator
                 self._interp_class = BicubicInterpolator
         self._extrapol_bool = allow_extrapolation
 

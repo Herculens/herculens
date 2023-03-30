@@ -9,7 +9,8 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 import warnings
 import numpy as np
-from herculens.Util import util, kernel_util, linear_util
+from herculens.Util import util, kernel_util
+from utax.convolution.functions import build_convolution_matrix
 
 
 __all__ = ['PSF']
@@ -23,6 +24,7 @@ class PSF(object):
     PSF for point sources.
 
     """
+
     def __init__(self, psf_type='NONE', fwhm=None, truncation=5,
                  pixel_size=None, kernel_point_source=None,
                  kernel_supersampling_factor=1):
@@ -58,7 +60,8 @@ class PSF(object):
             if fwhm is None:
                 raise ValueError('Must set `fwhm` for GAUSSIAN `psf_type`')
             if pixel_size is None:
-                raise ValueError('Must set `pixel_size` for GAUSSIAN `psf_type`')
+                raise ValueError(
+                    'Must set `pixel_size` for GAUSSIAN `psf_type`')
 
             self._fwhm = fwhm
             self._sigma_gaussian = util.fwhm2sigma(self._fwhm)
@@ -71,18 +74,18 @@ class PSF(object):
         elif self.psf_type == 'PIXEL':
             # Validate required inputs
             if kernel_point_source is None:
-                raise ValueError('Must set `kernel_point_source` for PIXEL `psf_type`')
+                raise ValueError(
+                    'Must set `kernel_point_source` for PIXEL `psf_type`')
             if len(kernel_point_source) % 2 == 0:
-                raise ValueError('Kernel must have odd axis number, not ',
-                    np.shape(kernel_point_source))
-
-            self._kernel_point_source = kernel_point_source
+                raise ValueError(
+                    'kernel needs to have odd axis number, not ', np.shape(kernel_point_source))
             self._kernel_supersampling_factor = kernel_supersampling_factor
             if kernel_supersampling_factor > 1:
                 self._kernel_point_source_supersampled = kernel_point_source
-                subsampled = kernel_util.degrade_kernel(kernel_point_source,
-                    kernel_supersampling_factor)
-                self._kernel_point_source = subsampled / np.sum(subsampled)
+                kernel_point_source = kernel_util.degrade_kernel(
+                    self._kernel_point_source_supersampled, self._kernel_supersampling_factor)
+            self._kernel_point_source = kernel_point_source / \
+                np.sum(kernel_point_source)
         elif self.psf_type == 'NONE':
             self._kernel_point_source = np.zeros((3, 3))
             self._kernel_point_source[1, 1] = 1
@@ -104,15 +107,21 @@ class PSF(object):
         # WARNING kernel_util.pixel_kernel() is not implemented
         # Check where this method is used elsewhere to determine if it can be removed
         if not hasattr(self, '_kernel_pixel'):
-            self._kernel_pixel = kernel_util.pixel_kernel(self.kernel_point_source, subgrid_res=1)
+            self._kernel_pixel = kernel_util.pixel_kernel(
+                self.kernel_point_source, subgrid_res=1)
         return self._kernel_pixel
 
     def blurring_matrix(self, data_shape):
         num_pixels = data_shape[0] * data_shape[1]
         if not hasattr(self, '_blurring_matrix') or self._blurring_matrix.shape != (num_pixels, num_pixels):
             psf_kernel_2d = np.array(self.kernel_point_source)
-            self._blurring_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, data_shape)
+            self._blurring_matrix = linear_util.build_convolution_matrix(
+                psf_kernel_2d, data_shape)
         return self._blurring_matrix
+
+    @property
+    def kernel_supersampling_factor(self):
+        return self._kernel_supersampling_factor
 
     def kernel_point_source_supersampled(self, supersampling_factor, update_cache=True,
                                          iterative_supersampling=True):
@@ -132,7 +141,7 @@ class PSF(object):
 
         """
         if (hasattr(self, '_kernel_point_source_supersampled') and
-            self._kernel_supersampling_factor == supersampling_factor):
+                self._kernel_supersampling_factor == supersampling_factor):
             return self._kernel_point_source_supersampled
 
         if self.psf_type == 'GAUSSIAN':
@@ -145,12 +154,12 @@ class PSF(object):
         elif self.psf_type == 'PIXEL':
             num_iter = 5 if iterative_supersampling else 0
             kernel = kernel_util.subgrid_kernel(self.kernel_point_source,
-                supersampling_factor, odd=True, num_iter=num_iter)
+                                                supersampling_factor, odd=True, num_iter=num_iter)
             npix = len(self.kernel_point_source) * supersampling_factor
             npix -= (1 - npix % 2)
             if hasattr(self, '_kernel_point_source_supersampled'):
                 warnings.warn("Overwriting supersampled point source kernel " +
-                            "due to different subsampling size.")
+                              "due to different subsampling size.")
             result = kernel_util.cut_psf(kernel, psf_size=npix)
         elif self.psf_type == 'NONE':
             result = self._kernel_point_source

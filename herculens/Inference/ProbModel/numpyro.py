@@ -1,17 +1,19 @@
 # Defines the model of a strong lens
 # 
 # Copyright (c) 2022, herculens developers and contributors
-# based on the ImSim module from lenstronomy (version 1.9.3)
+
 
 __author__ = 'aymgal'
 
 
 import jax
+import jax.numpy as jnp
 import numpyro
 from numpyro import handlers
 from numpyro.infer import util
 
 from herculens.Inference.ProbModel.base_model import BaseProbModel
+from herculens.Inference.ProbModel import numpyro_util
 
 
 __all__ = ['NumpyroModel']
@@ -31,10 +33,14 @@ class NumpyroModel(BaseProbModel):
             self._num_param = num_param
         return self._num_param
 
-    def log_prob(self, params):
-        # returns the logarithm of the data likelihood
-        # plus the logarithm of the prior
-        log_prob, trace = util.log_density(self.model, (), {}, params)
+    def log_prob(self, params, constrained=False):
+        """returns the logarithm of the data likelihood plus the logarithm of the prior"""
+        if constrained is True:
+            # do this for optimisation in constrained space
+            log_prob, model_trace = util.log_density(self.model, (), {}, params)
+        else:
+            # do this for optimisation in unconstrained space
+            log_prob = - numpyro_util.potential_energy(self.model, (), {}, params)
         return log_prob
     
     def log_likelihood(self, params):
@@ -62,3 +68,9 @@ class NumpyroModel(BaseProbModel):
 
     def render_model(self):
         return numpyro.render_model(self.model)
+
+    def constrain(self, params):
+        return numpyro_util.constrain_fn(self.model, (), {}, params)
+
+    def unconstrain(self, params):
+        return numpyro_util.unconstrain_fn(self.model, (), {}, params)

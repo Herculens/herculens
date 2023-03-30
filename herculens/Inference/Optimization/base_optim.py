@@ -34,7 +34,7 @@ class BaseOptimizer(object):
     @partial(jit, static_argnums=(0,))
     def function_optim_with_grad(self, args):
         return value_and_grad(self.function_optim)(args)
-         
+    
     @staticmethod
     def _for_loop(iterable, progress_bar_bool, **tqdm_kwargs):
         if progress_bar_bool is True:

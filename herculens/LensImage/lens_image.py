@@ -13,6 +13,7 @@ from functools import partial
 from jax import jit
 
 from herculens.LensImage.Numerics.numerics import Numerics
+from herculens.LensImage.lensing_operator import LensingOperator
 
 
 __all__ = ['LensImage']
@@ -20,6 +21,7 @@ __all__ = ['LensImage']
 
 class LensImage(object):
     """Generate lensed images from source light, lens mass/light, and point source models."""
+
     def __init__(self, grid_class, psf_class,
                  noise_class=None, lens_mass_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
@@ -51,7 +53,8 @@ class LensImage(object):
             lens_mass_model_class = MassModel(mass_model_list=[])
         self.MassModel = lens_mass_model_class
         if self.MassModel.has_pixels:
-            pixel_grid = self.Grid.create_model_grid(**self.MassModel.pixel_grid_settings)
+            pixel_grid = self.Grid.create_model_grid(
+                **self.MassModel.pixel_grid_settings)
             self.MassModel.set_pixel_grid(pixel_grid)
 
         if source_model_class is None:
@@ -59,7 +62,8 @@ class LensImage(object):
             source_model_class = LightModel(light_model_list=[])
         self.SourceModel = source_model_class
         if self.SourceModel.has_pixels:
-            pixel_grid = self.Grid.create_model_grid(**self.SourceModel.pixel_grid_settings)
+            pixel_grid = self.Grid.create_model_grid(
+                **self.SourceModel.pixel_grid_settings)
             self.SourceModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
 
         if lens_light_model_class is None:
@@ -67,12 +71,15 @@ class LensImage(object):
             lens_light_model_class = LightModel(light_model_list=[])
         self.LensLightModel = lens_light_model_class
         if self.LensLightModel.has_pixels:
-            pixel_grid = self.Grid.create_model_grid(**self.LensLightModel.pixel_grid_settings)
-            self.LensLightModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
+            pixel_grid = self.Grid.create_model_grid(
+                **self.LensLightModel.pixel_grid_settings)
+            self.LensLightModel.set_pixel_grid(
+                pixel_grid, self.Grid.pixel_area)
 
         if point_source_model_class is None:
             from herculens.PointSourceModel.point_source_model import PointSourceModel
-            point_source_model_class = PointSourceModel(point_source_type_list=[], mass_model=self.MassModel)
+            point_source_model_class = PointSourceModel(
+                point_source_type_list=[], mass_model=self.MassModel)
         self.PointSourceModel = point_source_model_class
         # self.PointSource.update_lens_model(lens_model_class=lens_model_class)
         # x_center, y_center = self.Data.center
@@ -83,7 +90,8 @@ class LensImage(object):
         if kwargs_numerics is None:
             kwargs_numerics = {}
         self.kwargs_numerics = kwargs_numerics
-        self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **self.kwargs_numerics)
+        self.ImageNumerics = Numerics(
+            pixel_grid=self.Grid, psf=self.PSF, **self.kwargs_numerics)
 
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, supersampled=False,
@@ -105,12 +113,16 @@ class LensImage(object):
             return jnp.zeros((self.Grid.num_pixel_axes))
         ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
         if de_lensed is True:
-            source_light = self.SourceModel.surface_brightness(ra_grid_img, dec_grid_img, kwargs_source, k=k)
+            source_light = self.SourceModel.surface_brightness(
+                ra_grid_img, dec_grid_img, kwargs_source, k=k)
         else:
-            ra_grid_src, dec_grid_src = self.MassModel.ray_shooting(ra_grid_img, dec_grid_img, kwargs_lens, k=k_lens)
-            source_light = self.SourceModel.surface_brightness(ra_grid_src, dec_grid_src, kwargs_source, k=k)
+            ra_grid_src, dec_grid_src = self.MassModel.ray_shooting(
+                ra_grid_img, dec_grid_img, kwargs_lens, k=k_lens)
+            source_light = self.SourceModel.surface_brightness(
+                ra_grid_src, dec_grid_src, kwargs_source, k=k)
         if not supersampled:
-            source_light = self.ImageNumerics.re_size_convolve(source_light, unconvolved=unconvolved)
+            source_light = self.ImageNumerics.re_size_convolve(
+                source_light, unconvolved=unconvolved)
         return source_light
 
     def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False,
@@ -125,9 +137,11 @@ class LensImage(object):
         :return: 2d array of surface brightness pixels
         """
         ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
-        lens_light = self.LensLightModel.surface_brightness(ra_grid_img, dec_grid_img, kwargs_lens_light, k=k)
+        lens_light = self.LensLightModel.surface_brightness(
+            ra_grid_img, dec_grid_img, kwargs_lens_light, k=k)
         if not supersampled:
-            lens_light = self.ImageNumerics.re_size_convolve(lens_light, unconvolved=unconvolved)
+            lens_light = self.ImageNumerics.re_size_convolve(
+                lens_light, unconvolved=unconvolved)
         return lens_light
 
     def point_source_image(self, kwargs_point_source, kwargs_lens, k=None):
@@ -142,9 +156,11 @@ class LensImage(object):
         if self.PointSourceModel is None:
             return result
 
-        theta_x, theta_y, amplitude = self.PointSourceModel.get_multiple_images(kwargs_point_source, kwargs_lens, k)
+        theta_x, theta_y, amplitude = self.PointSourceModel.get_multiple_images(
+            kwargs_point_source, kwargs_lens, k)
         for i in range(len(theta_x)):
-            result += self.ImageNumerics.render_point_sources(theta_x[i], theta_y[i], amplitude[i])
+            result += self.ImageNumerics.render_point_sources(
+                theta_x[i], theta_y[i], amplitude[i])
 
         return result
 
@@ -208,9 +224,11 @@ class LensImage(object):
         The default is the arbtrary value 18, so it is the user task to change it for different realizations.
         """
         if self.Noise is None:
-            raise ValueError("Impossible to generate noise realisation because no noise class has been set")
+            raise ValueError(
+                "Impossible to generate noise realisation because no noise class has been set")
         model = self.model(**model_kwargs)
-        noise = self.Noise.realisation(model, noise_seed, add_poisson=add_poisson, add_gaussian=add_gaussian)
+        noise = self.Noise.realisation(
+            model, noise_seed, add_poisson=add_poisson, add_gaussian=add_gaussian)
         simu = model + noise
         self.Noise.set_data(simu)
         if compute_true_noise_map is True:
@@ -238,3 +256,16 @@ class LensImage(object):
         norm_res = self.normalized_residuals(data, model, mask=mask)
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
+
+    def get_lensing_operator(self, kwargs_lens=None, update=False):
+        if self.SourceModel.pixel_grid is None:
+            raise ValueError("The lensing operator is only defined for source "
+                             "models associated to a grid of pixels")
+        if not hasattr(self, '_lensing_op'):
+            self._lensing_op = LensingOperator(self.MassModel,
+                                               # TODO: should be the model (from Numerics) grid at some point
+                                               self.Grid,
+                                               self.SourceModel.pixel_grid)
+        if update is True or self._lensing_op.get_lens_mapping() is None:
+            self._lensing_op.compute_mapping(kwargs_lens)
+        return self._lensing_op

@@ -21,69 +21,76 @@ __all__ = ['JaxoptOptimizer']
 class JaxoptOptimizer(BaseOptimizer):
     """Wrapper to jaxopt's unconstrained optimizers"""
 
-    def __init__(self, jaxopt_method, *args, **kwargs):
-        mod = __import__('jaxopt', fromlist=[jaxopt_method])
-        self._solver_class = getattr(mod, jaxopt_method)
-        self._jaxopt_method = jaxopt_method
-        super().__init__(*args, **kwargs)
-
-    def run(self, init_params, multi_start_from_prior=False, num_multi_start=1,
-            progress_bar=True, return_param_history=False, **solver_kwargs):
+    def run_scipy(self, init_params, progress_bar=True, 
+                  return_param_history=False, **solver_kwargs):
         # TODO: should we call once / a few times all jitted functions before optimization, to potentially speed things up?
         metrics = MinimizeMetrics(self.loss.function, with_param_history=return_param_history)
-        if self._jaxopt_method == 'ScipyMinimize':
-            solver = self._solver_class(fun=self.function_optim, jit=True, 
-                                        callback=metrics, **solver_kwargs)
-        else:
-            solver = self._solver_class(self.function_optim, jit='auto', 
-                                        **solver_kwargs)
+        solver = jaxopt.ScipyMinimize(fun=self.function_optim, jit=True, 
+                                      callback=metrics, **solver_kwargs)
 
-        if num_multi_start > 1: 
-            raise NotImplementedError("Multi-start optimization to be implemented.")
-
-        # @jax.jit
-        def solver_run(init_params):
-            metrics.reset()
-            res = solver.run(init_params)
-            return res, metrics.get_loss_history()
-
+        init_params_ = deepcopy(init_params)
         start = time.time()
-        best_fit_list = []
-        logL_best_fit_list = []
-        loss_history_list = []
-        # param_history_list = []
-        extra_fields_list = []
-        for n in self._for_loop(range(num_multi_start), progress_bar, 
-                                total=num_multi_start, 
-                                desc=f"jaxopt.{self._jaxopt_method}"):
-            #init_params_n = init_samples[n, :]
-            init_params_n = init_params
-            res, loss_hist = solver_run(init_params_n)
-            if loss_hist == []:
-                warnings.warn("The loss history does not contain any value")
-            best_fit_list.append(res.params)
-            logL_best_fit_list.append(-res.state.fun_val)
-            loss_history_list.append(loss_hist)
-            # param_history_list.append(param_hist)
-
-        # select the best fit among the multi start runs
-        if num_multi_start > 1:
-            index = np.argmax(logL_best_fit_list)
-        else:
-            index = 0
-        best_fit = best_fit_list[index]
-        logL_best_fit = logL_best_fit_list[index]
-
+        # runs the optimizer
+        res = solver.run(init_params_)
+        # retrieve optimized parameters and loss value
+        best_fit = res.params
+        logL_best_fit = - self.loss.function(best_fit)
         runtime = time.time() - start
 
         extra_fields = {}
-        extra_fields['best_fit_index'] = index
-        extra_fields['loss_history'] = loss_history_list[index]
-        extra_fields['loss_history_list'] = loss_history_list
+        extra_fields['loss_history'] = metrics.get_loss_history()
         if return_param_history is True:
-            extra_fields['param_history'] = param_history_list[index]
-            extra_fields['param_history_list'] = param_history_list  # maybe too memory consuming?
+            extra_fields['param_history'] = metrics.get_param_history()
+        return best_fit, logL_best_fit, extra_fields, runtime
 
+    def run(self, init_params, method='BFGS', progress_bar=True, 
+            return_param_history=False, **solver_kwargs):
+        if method == 'BFGS':
+            solver = jaxopt.BFGS(self.function_optim, value_and_grad=False, 
+                                 **solver_kwargs)
+        elif method == 'LBFGS':
+            solver = jaxopt.LBFGS(self.function_optim, value_and_grad=False, 
+                                  **solver_kwargs)
+        else:
+            raise NotImplementedError
+
+        # # Defines and jits a single solver update
+        # @jax.jit
+        # def step(params_state, _):
+        #     params, state = params_state
+        #     params, state = solver.update(params, state)
+        #     loss_val = self.loss.function(params)
+        #     return (params, state), loss_val
+        # # Initialise optimizer state
+        # init_params_ = deepcopy(init_params)
+        # state = solver.init_state(init_params_)
+        # # Gradient descent loop
+        # max_iterations = solver_kwargs.pop('maxiter')
+        # param_history = []
+        # loss_history = []
+        # start_time = time.time()
+        # if progress_bar:
+        #     for i in self._for_loop(range(max_iterations), progress_bar, 
+        #                             total=max_iterations, 
+        #                             desc=f"jaxopt.{method}"):
+        #         (params, state), loss_val = step((params, state), None)
+        #         loss_history.append(loss_val)
+        #         if return_param_history is True:
+        #             param_history.append(params)
+        # else:
+        #     (params, state), loss_history = jax.lax.scan(step, (params, state), None, length=max_iterations)
+        # runtime = time.time() - start_time
+
+        start_time = time.time()
+        init_params_ = deepcopy(init_params)
+        params, state = solver.run(init_params_)
+        runtime = time.time() - start_time
+
+        best_fit = params
+        logL_best_fit = self.loss.function(best_fit)
+        extra_fields = {'loss_history': np.zeros(max_iterations)}
+        # if return_param_history is True:
+        #     extra_fields['param_history'] = param_history
         return best_fit, logL_best_fit, extra_fields, runtime
 
 

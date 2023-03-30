@@ -11,7 +11,8 @@ import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev, vmap
 # from functools import partial
 
-from herculens.Util.jax_util import BicubicInterpolator
+from utax.interpolation import BicubicInterpolator
+
 from herculens.Util import util
 
 

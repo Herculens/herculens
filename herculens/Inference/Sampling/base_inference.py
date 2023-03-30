@@ -19,9 +19,8 @@ class Inference(object):
     :param param_class: herculens.Parameters.parameters.Parameters instance
     """
 
-    def __init__(self, loss_class, param_class):
+    def __init__(self, loss_class):
         self._loss = loss_class
-        self._param = param_class
         self.kinetic_fn = None  # for numpyro HMC, will default to Euclidean kinetic energy
 
     @partial(jit, static_argnums=(0,))

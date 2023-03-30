@@ -11,9 +11,10 @@ import numpy as np
 import jax.numpy as jnp
 import jax.scipy as jsp
 
-from herculens.Util.jax_util import GaussianFilter
+from utax.convolution.classes import GaussianFilter
+from utax.convolution.functions import build_convolution_matrix
+
 from herculens.Util import util, kernel_util, image_util
-from herculens.Util.linear_util import build_convolution_matrix
 
 
 __all__ = ['PixelKernelConvolution', 'SubgridKernelConvolution', 'GaussianConvolution']
