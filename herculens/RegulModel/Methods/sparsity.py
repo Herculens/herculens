@@ -34,13 +34,16 @@ class BaseSparsityWaveletAnalysis(BaseRegulization):
 
     def initialize(self, lens_image, kwargs_params, **kwargs_weights):
         if self.model_type == 'source':
-            fn = regul_util.data_noise_to_wavelet_source
+            fn = regul_util.data_noise_to_wavelet_light
+        elif self.model_type == 'lens_light':
+            fn = regul_util.data_noise_to_wavelet_light
         elif self.model_type == 'lens_mass' and self._mass_form == 'potential':
             fn = regul_util.data_noise_to_wavelet_potential
         else:
             raise ValueError(f"Combination of {model_type} with "
                              f"lens mass '{self._mass_form}' is not supported")
         weights_list, transform_list = fn(lens_image, kwargs_params,
+                                          model_type=self.model_type,
                                           wavelet_type_list=[self._transform_name],  # TODO: improve interface
                                           starlet_second_gen=self._second_gen,
                                           **kwargs_weights)

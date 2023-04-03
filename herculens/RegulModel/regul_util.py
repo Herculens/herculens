@@ -20,10 +20,10 @@ from herculens.Util import jax_util, vkl_util
 
 
 
-def data_noise_to_wavelet_source(lens_image, kwargs_res, 
-                                 wavelet_type_list=['starlet', 'battle-lemarie-3'],
-                                 num_samples=10000, sigma_clipping=True, seed=0,
-                                 starlet_second_gen=False, noise_var=None):
+def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
+                                wavelet_type_list=['starlet', 'battle-lemarie-3'],
+                                num_samples=10000, sigma_clipping=True, seed=0,
+                                starlet_second_gen=False, noise_var=None):
     # get the data noise
     nx, ny = lens_image.Grid.num_pixel_axes
     if noise_var is None:
@@ -36,10 +36,21 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
         raise ValueError("Negative values in data covariance matrix")
     
     # number of source pixels
-    nxsrc, nysrc = lens_image.SourceModel.pixel_grid.num_pixel_axes
+    if model_type == 'source':
+        nx_out, ny_out = lens_image.SourceModel.pixel_grid.num_pixel_axes
+    elif model_type == 'lens_light':
+        nx_out, ny_out = lens_image.LensLightModel.pixel_grid.num_pixel_axes
+    else:
+        raise ValueError("This function only supports (pixelated) 'source' or 'lens_light' profiles")
 
-    # construct the lensing operator
-    lensing_op = lens_image.get_lensing_operator(kwargs_lens=kwargs_res['kwargs_lens'])
+    if model_type == 'source':
+        # construct the lensing operator
+        lensing_op = lens_image.get_lensing_operator(kwargs_lens=kwargs_res['kwargs_lens'])
+        def F_T(n): # de-lensing operation
+            return lensing_op.image2source_2d(n)
+    elif model_type == 'lens_light':
+        def F_T(n): # identity operation
+            return n
 
     # setup the transposed convolution
     kernel = jnp.copy(lens_image.PSF.kernel_point_source)
@@ -51,8 +62,7 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
                                     dimension_numbers)
     kernel_rot = jnp.rot90(jnp.rot90(kernel, axes=(0, 1)), axes=(0, 1))
     
-    def B_T(n):
-        # transposed convolution
+    def B_T(n): # transposed convolution
         res = lax.conv_general_dilated(n[jnp.newaxis, :, :, jnp.newaxis], 
                                        kernel_rot, 
                                        (1,1), #(k//2,k//2),  # window strides
@@ -61,10 +71,6 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
                                        (1,1),  # rhs/kernel dilation
                                        dn)     # dimension_numbers = lhs, rhs, out dimension permutation
         return jnp.squeeze(res)
-    
-    def F_T(n):
-        # de-lensing operation
-        return lensing_op.image2source_2d(n)
 
     wavelet_class_list = []
     std_per_scale_list = []
@@ -75,7 +81,7 @@ def data_noise_to_wavelet_source(lens_image, kwargs_res,
         if 'battle-lemarie' in wavelet_type:
             nscales = 1  # we only care about the first scale for this one
         elif 'starlet' in wavelet_type:
-            nscales = int(np.log2(min(nxsrc, nysrc)))  # max number of scales allowed
+            nscales = int(np.log2(min(nx_out, ny_out)))  # max number of scales allowed
         wavelet = WaveletTransform(nscales, wavelet_type=wavelet_type, second_gen=starlet_second_gen)
         
         def Phi_T(n):
