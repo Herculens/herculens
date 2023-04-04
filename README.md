@@ -41,7 +41,7 @@ This highly modular framework offers a way to merge all modeling paradigms explo
 Below you can find a few examples of synthetic problems that can be tackled with `herculens`:
 
 - [**Starting guide**: Lens modeling with gradient descent, Fisher analysis and Hamiltonian sampling](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Starting_guide.ipynb)
-- [Starting guide with a complex source: similar to the starting guide but with a more complex source galaxy](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Starting_guide.ipynb)
+- [Starting guide with a complex source: similar to the starting guide but with a more complex source galaxy](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Starting_guide_complex_source.ipynb)
 - [Reconstruction of a complex lensed galaxy with wavelets (and analytical profiles)](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Complex_source_with_wavelets.ipynb)
 - [Detection of a dark satellite as a localized deviation to the smooth lens potential](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Subhalo_detection_with_wavelets.ipynb)
 - [Bayesian wavelet modeling of a spiral galaxy with (Laplace) sparsifying priors](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Spiral_galaxy_Bayesian_sparsity_Laplace.ipynb)
