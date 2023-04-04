@@ -15,7 +15,7 @@ from scipy.optimize import Bounds
 from tqdm import tqdm
 from copy import deepcopy
 
-from herculens.Inference.base_inference import Inference
+from herculens.Inference.legacy.base_inference import Inference
 
 __all__ = ['Optimizer']
 
@@ -189,7 +189,7 @@ class Optimizer(Inference):
                 params, loss_val = prev_params, prev_loss_val
                 break
             else:
-                loss_history.append(loss_val)  # TODO: use jax.value_and_grad instead? but does it jit the gradient??
+                loss_history.append(loss_val)
                 prev_params, prev_loss_val = params, loss_val
             if return_param_history is True:
                 param_history.append(params)

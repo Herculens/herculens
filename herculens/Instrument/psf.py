@@ -8,7 +8,8 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
 import numpy as np
-from herculens.Util import util, kernel_util, linear_util
+from herculens.Util import util, kernel_util
+from utax.convolution.functions import build_convolution_matrix
 
 
 __all__ = ['PSF']
@@ -61,9 +62,9 @@ class PSF(object):
                 raise ValueError('kernel_point_source needs to be specified for PIXEL PSF type!')
             if len(kernel_point_source) % 2 == 0:
                 raise ValueError('kernel needs to have odd axis number, not ', np.shape(kernel_point_source))
+            self._kernel_supersampling_factor = kernel_supersampling_factor
             if kernel_supersampling_factor > 1:
                 self._kernel_point_source_supersampled = kernel_point_source
-                self._kernel_supersampling_factor = kernel_supersampling_factor
                 kernel_point_source = kernel_util.degrade_kernel(self._kernel_point_source_supersampled, self._kernel_supersampling_factor)
             self._kernel_point_source = kernel_point_source / np.sum(kernel_point_source)
         elif self.psf_type == 'NONE':
@@ -100,13 +101,17 @@ class PSF(object):
             self._blurring_matrix = linear_util.build_convolution_matrix(psf_kernel_2d, data_shape)
         return self._blurring_matrix
 
-    def kernel_point_source_supersampled(self, supersampling_factor, updata_cache=True, 
+    @property
+    def kernel_supersampling_factor(self):
+        return self._kernel_supersampling_factor
+
+    def kernel_point_source_supersampled(self, supersampling_factor, update_cache=True, 
                                          iterative_supersampling=True):
         """
         generates (if not already available) a supersampled PSF with ood numbers of pixels centered
 
         :param supersampling_factor: int >=1, supersampling factor relative to pixel resolution
-        :param updata_cache: boolean, if True, updates the cached supersampling PSF if generated.
+        :param update_cache: boolean, if True, updates the cached supersampling PSF if generated.
          Attention, this will overwrite a previously used supersampled PSF if the resolution is changing.
         :return: super-sampled PSF as 2d numpy array
         """
@@ -138,7 +143,7 @@ class PSF(object):
                 kernel_point_source_supersampled = self._kernel_point_source
             else:
                 raise ValueError('psf_type %s not valid!' % self.psf_type)
-            if updata_cache is True:
+            if update_cache is True:
                 self._kernel_point_source_supersampled = kernel_point_source_supersampled
                 self._kernel_supersampling_factor = supersampling_factor
         return kernel_point_source_supersampled

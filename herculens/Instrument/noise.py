@@ -36,10 +36,10 @@ class Noise(object):
         if exposure_time is not None:
             # make sure no negative exposure values are present no dividing by zero
             if isinstance(exposure_time, int) or isinstance(exposure_time, float):
-                if exposure_time <= 10 ** (-10):
-                    exposure_time = 10 ** (-10)
+                if exposure_time <= 1e-10:
+                    exposure_time = 1e-10
             else:
-                exposure_time[exposure_time <= 10 ** (-10)] = 10 ** (-10)
+                exposure_time[exposure_time <= 1e-10] = 1e-10
         elif noise_map is None:
             noise_map = self._background_rms * np.ones((nx, ny))
         self._exp_map = exposure_time
