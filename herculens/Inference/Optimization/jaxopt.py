@@ -52,7 +52,9 @@ class JaxoptOptimizer(BaseOptimizer):
             solver = jaxopt.LBFGS(self.function_optim, value_and_grad=False, 
                                   **solver_kwargs)
         elif method == 'LM':
-            solver = jaxopt.LevenbergMarquardt(self.function_optim, **solver_kwargs)
+            solver = jaxopt.LevenbergMarquardt(self.function_optim, 
+                                               jac_fun=jax.jit(jax.grad(self.function_optim)), 
+                                               **solver_kwargs)
         else:
             raise NotImplementedError
 
