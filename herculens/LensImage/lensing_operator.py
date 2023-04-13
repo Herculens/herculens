@@ -17,14 +17,14 @@ from jax.experimental import sparse as jsparse
 from herculens.Util import util
 
 
-__all__ = ['LensingOperator', 'PlaneGrid']
+__all__ = ['LensingOperator', 'PlaneGrid', 'MaskedPlaneGrid']
 
 
 class LensingOperator(object):
 
     """Defines the mapping of pixelated light profiles between image and source planes"""
 
-    def __init__(self, mass_model_class, image_grid_class, source_grid_class):
+    def __init__(self, mass_model_class, image_grid_class, source_grid_class, arc_mask=None):
         """Summary
         
         Parameters
@@ -42,28 +42,23 @@ class LensingOperator(object):
             Description
         """
         self.MassModel = mass_model_class
-        self.ImagePlane  = PlaneGrid(image_grid_class)
+        self.ImagePlane = MaskedPlaneGrid(image_grid_class, mask=arc_mask)
         self.SourcePlane = PlaneGrid(source_grid_class)
 
     @partial(jit, static_argnums=(0,))
     def source2image(self, source_1d):
-        lens_mapping, _ = self.get_lens_mapping()
         image = self._mapping @ source_1d
-        return image
+        return self.ImagePlane.place(image)
 
     @partial(jit, static_argnums=(0,))
     def source2image_2d(self, source):
         source_1d = util.image2array(source)
         return util.array2image(self.source2image(source_1d))
 
-    @partial(jit, static_argnums=(0,))
-    def lensing(self, source):
-        return self.source2image_2d(source)
-
     @partial(jit, static_argnums=(0, 2))
     def image2source(self, image_1d, no_flux_norm=False):
         """if no_flux_norm is True, do not normalize light flux to better visualize the mapping"""
-        source = self._mapping.T @ image_1d
+        source = self._mapping.T @ self.ImagePlane.extract(image_1d)
         if not no_flux_norm:
             source /= self._norm_image2source
         return source
@@ -72,6 +67,10 @@ class LensingOperator(object):
     def image2source_2d(self, image, no_flux_norm=False):
         image_1d = util.image2array(image)
         return util.array2image(self.image2source(image_1d, no_flux_norm=no_flux_norm))
+
+    @partial(jit, static_argnums=(0,))
+    def lensing(self, source):
+        return self.source2image_2d(source)
 
     @partial(jit, static_argnums=(0,))
     def lensing_transpose(self, image):
@@ -121,19 +120,19 @@ class LensingOperator(object):
         the source plane following Treu & Koopmans (2004).
 
         """
+        # Get image plane coordinates
+        theta_x, theta_y = self.image_plane_coordinates
+
         # Compute lens mapping from image to source coordinates
-        beta_x, beta_y = self.MassModel.ray_shooting(self.ImagePlane.theta_x,
-                                                     self.ImagePlane.theta_y,
-                                                     kwargs_lens)
+        beta_x, beta_y = self.MassModel.ray_shooting(theta_x, theta_y, kwargs_lens)
 
         # Determine source pixels and their appropriate weights
         indices, weights = self._find_source_pixels_bilinear(beta_x, beta_y, 0., 0.)
     
         # Build lensing matrix as a sparse matrix for saving memory
-        dense_shape = (self.ImagePlane.grid_size, self.SourcePlane.grid_size)        
+        dense_shape = (self.ImagePlane.grid_size, self.SourcePlane.grid_size)       
         lens_mapping = jsparse.BCOO((weights, np.stack(indices, axis=1)), 
-                                    shape=dense_shape, 
-                                    indices_sorted=True)
+                                    shape=dense_shape, indices_sorted=True)
 
         # Compue the flux normalization factors
         norm_image2source = np.maximum(1, lens_mapping.sum(axis=0).todense())
@@ -175,9 +174,10 @@ class LensingOperator(object):
         assert len(beta_x) == len(beta_y), "Input arrays must be the same size."
         num_beta = len(beta_x)
 
-        # Shift source plane grid if necessary
-        source_theta_x = self.SourcePlane.theta_x + grid_offset_x
-        source_theta_y = self.SourcePlane.theta_y + grid_offset_y
+        # Get source plane coordinates, shift them if necessary
+        source_theta_x, source_theta_y = self.source_plane_coordinates
+        source_theta_x += grid_offset_x
+        source_theta_y += grid_offset_y
 
         # Compute bin edges so that (theta_x, theta_y) lie at the grid centers
         num_pix = self.SourcePlane.num_pix
@@ -282,17 +282,14 @@ class PlaneGrid(object):
         grid_class : herculens.Coordinates.pixel_grid.PixelGrid
             PixelGrid instance
         """
-        self._grid = grid_class
-        #self._x_grid_1d, self._y_grid_1d = self._grid.coordinates_evaluate
-        x_grid_2d, y_grid_2d = self._grid.pixel_coordinates
+        x_grid_2d, y_grid_2d = grid_class.pixel_coordinates
         self._x_grid_1d, self._y_grid_1d = util.image2array(x_grid_2d), util.image2array(y_grid_2d)
-        self._delta_pix = abs(self._x_grid_1d[0]-self._x_grid_1d[1])
-        #self._delta_pix = self._grid.grid_points_spacing
-        num_pix_x, num_pix_y = self._grid.num_pixel_axes
+        self._delta_pix = grid_class.pixel_width
+        num_pix_x, num_pix_y = grid_class.num_pixel_axes
         if num_pix_x != num_pix_y:
             raise ValueError("Only square images are supported")
         self._num_pix = num_pix_x
-        self._subgrid_res = 1. # self._grid.supersampling_factor
+        self._subgrid_res = 1. # grid_class.supersampling_factor
 
     @property
     def num_pix(self):
@@ -304,7 +301,7 @@ class PlaneGrid(object):
 
     @property
     def grid_shape(self):
-        return (self.num_pix, self.num_pix)
+        return (self._num_pix, self._num_pix)
 
     @property
     def delta_pix(self):
@@ -319,20 +316,47 @@ class PlaneGrid(object):
         return self._y_grid_1d
 
     @property
-    def unit_image(self):
-        return np.ones(self.grid_shape)
-
-    @property
     def subgrid_resolution(self):
         return self._subgrid_res
 
-    def grid(self, two_dim=False):
-        if two_dim:
-            return util.array2image(self.theta_x), util.array2image(self.theta_y)
-        return self.theta_x, self.theta_y
 
-    def grid_pixels(self, two_dim=False):
-        theta_x_pix, theta_y_pix = self._grid.map_coord2pix(self.theta_x, self.theta_y)
-        if two_dim:
-            return util.array2image(theta_x_pix), util.array2image(theta_y_pix)
-        return theta_x_pix, theta_y_pix
+class MaskedPlaneGrid(PlaneGrid):
+
+    def __init__(self, grid_class, mask=None):
+        super(MaskedPlaneGrid, self).__init__(grid_class)
+        if mask is None:
+            self._no_mask = True
+            self._num_pix_eff = self._num_pix
+            # self._mask_1d = np.ones(self._num_pix**2).astype(bool)
+        else:
+            self._no_mask = False
+            self._mask_1d = mask.ravel().astype(bool)
+            self._num_pix_eff = np.count_nonzero(self._mask_1d)
+
+    @property
+    def theta_x(self):
+        return self._x_grid_1d if self._no_mask else self._x_grid_1d[self._mask_1d]
+
+    @property
+    def theta_y(self):
+        return self._y_grid_1d if self._no_mask else self._y_grid_1d[self._mask_1d]
+
+    @property
+    def num_pix(self):
+        raise self._num_pix if self._no_mask else None
+
+    @property
+    def grid_size(self):
+        return self._num_pix_eff
+
+    def place(self, values):
+        if self._no_mask:
+            return values
+        image = jnp.zeros(self._num_pix**2)
+        return image.at[self._mask_1d].set(values)
+
+    def extract(self, values):
+        if self._no_mask:
+            return values
+        return values[self._mask_1d]
+        
