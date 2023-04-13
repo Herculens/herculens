@@ -22,7 +22,7 @@ from herculens.Util import jax_util, vkl_util
 
 def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
                                 wavelet_type_list=['starlet', 'battle-lemarie-3'],
-                                num_samples=10000, sigma_clipping=True, seed=0,
+                                num_samples=10000, vmap_loop=True, sigma_clipping=True, seed=0,
                                 starlet_second_gen=False, noise_var=None, arc_mask=None):
     # get the data noise
     nx, ny = lens_image.Grid.num_pixel_axes
@@ -49,7 +49,8 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
             kwargs_lens=kwargs_res['kwargs_lens'], update=False, arc_mask=arc_mask,
         )
         def F_T(n): # de-lensing operation
-            return lensing_op.image2source_2d(n)
+            return lensing_op.lensing_transpose(n)
+
     elif model_type == 'lens_light':
         def F_T(n): # identity operation
             return n
@@ -86,8 +87,7 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
             nscales = int(np.log2(min(nx_out, ny_out)))  # max number of scales allowed
         wavelet = WaveletTransform(nscales, wavelet_type=wavelet_type, second_gen=starlet_second_gen)
         
-        def Phi_T(n):
-            # wavelet transform
+        def Phi_T(n): # wavelet transform
             return wavelet.decompose(n)
         
         @jit
@@ -97,7 +97,7 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
             if sigma_clipping is True:
                 # here we clip values that are 5 times the standard deviation
                 thresh = 5. * jnp.std(tmp)
-                tmp = jnp.where((tmp < -thresh) | (tmp > thresh), x=thresh, y=tmp)
+                tmp = jnp.where(jnp.abs(tmp) > thresh, x=thresh, y=tmp)
             return Phi_T(tmp)
 
         # draw many realizations of the noise, scaled by the inverse cov matrix
@@ -107,7 +107,13 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
                                                        shape=(num_samples, nx, ny))
 
         # propagate the noise to wavelet space for each of them
-        noise_samples_prop = vmap(propagate_noise)(noise_samples)
+        if vmap_loop is True:
+            noise_samples_prop = vmap(propagate_noise)(noise_samples)
+        else:
+            noise_samples_prop = []
+            for noise in noise_samples:
+                noise_samples_prop.append(propagate_noise(noise))
+            noise_samples_prop = jnp.array(noise_samples_prop)
 
         # take the standard deviation
         std_per_scale = jnp.std(noise_samples_prop, axis=0)
