@@ -23,7 +23,7 @@ from herculens.Util import jax_util, vkl_util
 def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
                                 wavelet_type_list=['starlet', 'battle-lemarie-3'],
                                 num_samples=10000, sigma_clipping=True, seed=0,
-                                starlet_second_gen=False, noise_var=None):
+                                starlet_second_gen=False, noise_var=None, arc_mask=None):
     # get the data noise
     nx, ny = lens_image.Grid.num_pixel_axes
     if noise_var is None:
@@ -45,7 +45,9 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
 
     if model_type == 'source':
         # construct the lensing operator
-        lensing_op = lens_image.get_lensing_operator(kwargs_lens=kwargs_res['kwargs_lens'])
+        lensing_op = lens_image.get_lensing_operator(
+            kwargs_lens=kwargs_res['kwargs_lens'], update=False, arc_mask=arc_mask,
+        )
         def F_T(n): # de-lensing operation
             return lensing_op.image2source_2d(n)
     elif model_type == 'lens_light':
