@@ -65,8 +65,8 @@ class JaxoptOptimizer(BaseOptimizer):
             return (params, state), loss_val
 
         # Initialise optimizer state
-        init_params_ = deepcopy(init_params)
-        state = solver.init_state(init_params_)
+        params = deepcopy(init_params)
+        state = solver.init_state(params)
 
         # Gradient descent loop
         maxiter = solver_kwargs.pop('maxiter')
@@ -86,10 +86,10 @@ class JaxoptOptimizer(BaseOptimizer):
             (params, state), loss_history = jax.lax.scan(step, (params, state), None, length=maxiter)
         runtime = time.time() - start_time
 
-        start_time = time.time()
-        init_params_ = deepcopy(init_params)
-        params, state = solver.run(init_params_)
-        runtime = time.time() - start_time
+        # start_time = time.time()
+        # init_params_ = deepcopy(init_params)
+        # params, state = solver.run(init_params_)
+        # runtime = time.time() - start_time
 
         best_fit = params
         logL_best_fit = self.loss.function(best_fit)
