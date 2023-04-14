@@ -33,9 +33,7 @@ class BaseSparsityWaveletAnalysis(BaseRegulization):
         self._second_gen = None
 
     def initialize(self, lens_image, kwargs_params, **kwargs_weights):
-        if self.model_type == 'source':
-            fn = regul_util.data_noise_to_wavelet_light
-        elif self.model_type == 'lens_light':
+        if self.model_type in ('source', 'lens_light'):
             fn = regul_util.data_noise_to_wavelet_light
         elif self.model_type == 'lens_mass' and self._mass_form == 'potential':
             fn = regul_util.data_noise_to_wavelet_potential

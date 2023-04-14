@@ -22,8 +22,9 @@ from herculens.Util import jax_util, vkl_util
 
 def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
                                 wavelet_type_list=['starlet', 'battle-lemarie-3'],
-                                num_samples=10000, vmap_loop=True, sigma_clipping=True, seed=0,
-                                starlet_second_gen=False, noise_var=None, arc_mask=None):
+                                num_samples=1000, vmap_loop=True, sigma_clipping=True, seed=0,
+                                starlet_num_scales=None, starlet_second_gen=False, 
+                                noise_var=None, arc_mask=None):
     # get the data noise
     nx, ny = lens_image.Grid.num_pixel_axes
     if noise_var is None:
@@ -84,7 +85,11 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
         if 'battle-lemarie' in wavelet_type:
             nscales = 1  # we only care about the first scale for this one
         elif 'starlet' in wavelet_type:
-            nscales = int(np.log2(min(nx_out, ny_out)))  # max number of scales allowed
+            nscales_allowed = int(np.log2(min(nx_out, ny_out)))  # max number of scales allowed
+            if starlet_num_scales is not None:
+                nscales = min(nscales_allowed, starlet_num_scales)
+            else:
+                nscales = nscales_allowed
         wavelet = WaveletTransform(nscales, wavelet_type=wavelet_type, second_gen=starlet_second_gen)
         
         def Phi_T(n): # wavelet transform
