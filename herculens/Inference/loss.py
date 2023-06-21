@@ -34,5 +34,6 @@ class Loss(Differentiable):
         """negative log-probability"""
         loss = - self._prob_model.log_prob(args, constrained=self._constrained)
         loss = jnp.nan_to_num(loss, nan=1e15, posinf=1e15, neginf=1e15)
-        loss = jnp.clip(loss, a_min=self._cap_value)
+        if self._cap_value is not None:
+            loss = jnp.clip(loss, a_min=self._cap_value)
         return loss
