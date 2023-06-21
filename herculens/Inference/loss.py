@@ -18,7 +18,7 @@ __all__ = ['Loss']
 
 class Loss(Differentiable):
 
-    def __init__(self, prob_model, constrained_space=False):
+    def __init__(self, prob_model, constrained_space=False, cap_value=None):
         """
         :param prob_model: probabilistic model (e.g. from numpyro) that has a
         log_prob() method that returns the full log-probability of the model
@@ -28,8 +28,11 @@ class Loss(Differentiable):
         """
         self._prob_model = prob_model
         self._constrained = constrained_space
+        self._cap_value = cap_value
 
     def _func(self, args):
         """negative log-probability"""
         loss = - self._prob_model.log_prob(args, constrained=self._constrained)
-        return jnp.nan_to_num(loss, nan=1e15, posinf=1e15, neginf=1e15)
+        loss = jnp.nan_to_num(loss, nan=1e15, posinf=1e15, neginf=1e15)
+        loss = jnp.clip(loss, a_min=self._cap_value)
+        return loss
