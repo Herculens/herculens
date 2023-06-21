@@ -130,7 +130,7 @@ class LensingOperator(object):
         indices, weights = self._find_source_pixels_bilinear(beta_x, beta_y, 0., 0.)
     
         # Build lensing matrix as a sparse matrix for saving memory
-        dense_shape = (self.ImagePlane.grid_size, self.SourcePlane.grid_size)       
+        dense_shape = (self.ImagePlane.grid_size, self.SourcePlane.grid_size)
         lens_mapping = jsparse.BCOO((weights, np.stack(indices, axis=1)), 
                                     shape=dense_shape, indices_sorted=True)
 
@@ -326,7 +326,7 @@ class MaskedPlaneGrid(PlaneGrid):
         super(MaskedPlaneGrid, self).__init__(grid_class)
         if mask is None:
             self._no_mask = True
-            self._num_pix_eff = self._num_pix
+            self._num_pix_eff = self._num_pix**2
             # self._mask_1d = np.ones(self._num_pix**2).astype(bool)
         else:
             self._no_mask = False

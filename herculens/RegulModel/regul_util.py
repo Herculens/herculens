@@ -16,7 +16,7 @@ import jax.numpy as jnp
 from jax import lax, jit, vmap
 
 from utax.wavelet import WaveletTransform
-from herculens.Util import jax_util, vkl_util
+from herculens.Util import vkl_util
 
 
 
@@ -55,7 +55,7 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
     elif model_type == 'lens_light':
         def F_T(n): # identity operation
             return n
-
+        
     # setup the transposed convolution
     kernel = jnp.copy(lens_image.PSF.kernel_point_source)
     nxk, nyk = kernel.shape
@@ -90,6 +90,7 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
                 nscales = min(nscales_allowed, starlet_num_scales)
             else:
                 nscales = nscales_allowed
+
         wavelet = WaveletTransform(nscales, wavelet_type=wavelet_type, second_gen=starlet_second_gen)
         
         def Phi_T(n): # wavelet transform
