@@ -1,7 +1,7 @@
-__all__ = ['BaseRegulization']
+__all__ = ['BaseRegularization']
 
 
-class BaseRegulization(object):
+class BaseRegularization(object):
     """Base class for all regularization methods."""
 
     param_names = []

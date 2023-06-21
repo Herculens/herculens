@@ -8,7 +8,7 @@ __author__ = 'aymgal'
 
 import jax.numpy as jnp
 
-from herculens.RegulModel.Methods.base import BaseRegulization
+from herculens.RegulModel.Methods.base import BaseRegularization
 from herculens.RegulModel import regul_util
 
 
@@ -18,7 +18,7 @@ __all__ = [
 ]
 
 
-class BaseSparsityWaveletAnalysis(BaseRegulization):
+class BaseSparsityWaveletAnalysis(BaseRegularization):
 
     """
     Base class for regularization strategies imposing a sparsity constraint
@@ -38,7 +38,7 @@ class BaseSparsityWaveletAnalysis(BaseRegulization):
         elif self.model_type == 'lens_mass' and self._mass_form == 'potential':
             fn = regul_util.data_noise_to_wavelet_potential
         else:
-            raise ValueError(f"Combination of {model_type} with "
+            raise ValueError(f"Combination of {self.model_type} with "
                              f"lens mass '{self._mass_form}' is not supported")
         weights_list, transform_list = fn(lens_image, kwargs_params,
                                           model_type=self.model_type,

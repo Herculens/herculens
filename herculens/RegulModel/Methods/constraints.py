@@ -8,7 +8,7 @@ __author__ = 'aymgal'
 
 import jax.numpy as jnp
 
-from herculens.RegulModel.Methods.base import BaseRegulization
+from herculens.RegulModel.Methods.base import BaseRegularization
 
 
 __all__ = [
@@ -17,7 +17,7 @@ __all__ = [
 ]
 
 
-class Positivity(BaseRegulization):
+class Positivity(BaseRegularization):
 
     param_names = ['strength']
     lower_limit_default = {'strength': 0}
@@ -39,7 +39,7 @@ class Positivity(BaseRegulization):
         return log_prob
 
 
-class Negativity(BaseRegulization):
+class Negativity(BaseRegularization):
 
     param_names = ['strength']
     lower_limit_default = {'strength': 0}
