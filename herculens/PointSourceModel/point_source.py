@@ -7,6 +7,7 @@ from herculens.MassModel.lens_equation import LensEquationSolver
 
 __all__ = ['PointSource']
 
+
 class PointSource(object):
     """A point source defined in the image or source plane.
 
@@ -16,6 +17,7 @@ class PointSource(object):
         correspond to a single point in the source plane.
 
     """
+
     def __init__(self, point_source_type, mass_model=None, image_plane=None):
         """Instantiate a point source.
 
@@ -34,7 +36,7 @@ class PointSource(object):
         self.mass_model = mass_model
         self.image_plane = image_plane
 
-    def image_positions(self, kwargs_point_source, kwargs_lens=None):
+    def image_positions(self, kwargs_point_source, kwargs_lens=None, kwargs_solver=None):
         """Compute image plane positions of the point source.
 
         Parameters
@@ -43,6 +45,8 @@ class PointSource(object):
             Keyword arguments corresponding to the point source instances.
         kwargs_lens : list of dict, optional
             Keyword arguments for the lensing mass model. Default is None.
+        kwargs_solver : dict, optional
+            Keyword arguments for the lens equation solver. Default is None.
 
         """
         if self.type == 'IMAGE_POSITIONS':
@@ -58,7 +62,12 @@ class PointSource(object):
             if not hasattr(self, '_solver'):
                 self._solver = LensEquationSolver(self.mass_model)
 
-            theta, beta = self._solver.solve(self.image_plane, beta, kwargs_lens)
+            if kwargs_solver is not None:
+                theta, beta = self._solver.solve(
+                    self.image_plane, beta, kwargs_lens, **kwargs_solver)
+            else:
+                theta, beta = self._solver.solve(
+                    self.image_plane, beta, kwargs_lens)
             return theta.T
 
     def image_amplitudes(self, theta_x, theta_y, kwargs_point_source, kwargs_lens=None):

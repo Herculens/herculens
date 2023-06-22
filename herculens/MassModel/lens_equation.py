@@ -3,7 +3,8 @@
 __author__ = 'austinpeel'
 
 import jax.numpy as jnp
-from jax import jit
+# from jax import jit
+
 
 class LensEquationSolver(object):
     def __init__(self, mass_model):
@@ -50,8 +51,10 @@ class LensEquationSolver(object):
         x_LR, y_LR = xcoords + delta, ycoords - delta
         x_UL, y_UL = xcoords - delta, ycoords + delta
         x_UR, y_UR = xcoords + delta, ycoords + delta
-        t1 = jnp.array([[x_LL, y_LL], [x_LR, y_LR], [x_UL, y_UL]]).transpose(2, 0, 1)
-        t2 = jnp.array([[x_LR, y_LR], [x_UR, y_UR], [x_UL, y_UL]]).transpose(2, 0, 1)
+        t1 = jnp.array([[x_LL, y_LL], [x_LR, y_LR], [
+                       x_UL, y_UL]]).transpose(2, 0, 1)
+        t2 = jnp.array([[x_LR, y_LR], [x_UR, y_UR], [
+                       x_UL, y_UL]]).transpose(2, 0, 1)
 
         # Interleave arrays so that the two triangles corresponding to a pixel are adjacent
         triangles = jnp.column_stack((t1, t2))
@@ -71,7 +74,8 @@ class LensEquationSolver(object):
         """
         # Unpack into (x, y) triangle vertex arrays
         n = len(image_triangles)
-        theta1, theta2 = image_triangles.transpose((2, 0, 1)).reshape((2, 3 * n))
+        theta1, theta2 = image_triangles.transpose(
+            (2, 0, 1)).reshape((2, 3 * n))
 
         # Shoot vertices to the source plane
         beta1, beta2 = self.shoot_rays(theta1, theta2, kwargs_lens)
@@ -151,7 +155,8 @@ class LensEquationSolver(object):
             t2 = [v4, v2, v5]
             t3 = [v6, v4, v5]
             t4 = [v6, v5, v3]
-            subtriangles = jnp.column_stack((t1, t2, t3, t4)).transpose(1, 0, 2)
+            subtriangles = jnp.column_stack(
+                (t1, t2, t3, t4)).transpose(1, 0, 2)
 
         return subtriangles.reshape(4**niter * len(triangles), 3, 2)
 
@@ -179,7 +184,8 @@ class LensEquationSolver(object):
         side2 = triangles[:, 2] - triangles[:, 1]
         return 0.5 * jnp.cross(side1, side2)
 
-    def solve(self, image_plane, beta, kwargs_lens, niter=5, scale_factor=2, nsubdivisions=1):
+    def solve(self, image_plane, beta, kwargs_lens, nsolutions=5, niter=5,
+              scale_factor=2, nsubdivisions=1):
         """Solve the lens equation.
 
         Parameters
@@ -191,11 +197,14 @@ class LensEquationSolver(object):
             Position of a point source in the source plane.
         kwargs_lens : dict
             Parameters defining the mass model.
+        nsolutions: int, optional
+            Number of expected solutions (e.g. 5 for a quad including the
+            central image)
         niter : int
-            Number of
-        scale_factor : float
+            Number of iterations of the solver.
+        scale_factor : float, optional
             Factor by which to scale the selected triangle areas at each iteration.
-        nsubdivisions : int
+        nsubdivisions : int, optional
             Number of times to subdivide (into 4) the selected triangles at
             each iteration.
 
@@ -214,21 +223,23 @@ class LensEquationSolver(object):
 
         # Retain only those image plane triangles whose source image contains the point source
         inds = self.indices_containing_point(src_triangles, beta)
-        img_selection = img_triangles[jnp.where(inds, size=5)]
+        img_selection = img_triangles[jnp.where(inds, size=nsolutions)]
 
         for k in range(niter):
             # Scale up triangles
             img_selection = self.scale_triangles(img_selection, scale_factor)
 
             # Subdivide each triangle into 4
-            img_selection = self.subdivide_triangles(img_selection, nsubdivisions)
+            img_selection = self.subdivide_triangles(
+                img_selection, nsubdivisions)
 
             # Ray-shoot subtriangles to the source plane
-            src_selection = self.source_plane_triangles(img_selection, kwargs_lens)
+            src_selection = self.source_plane_triangles(
+                img_selection, kwargs_lens)
 
             # Select corresponding image plane triangles containing the source point
             inds = self.indices_containing_point(src_selection, beta)
-            img_selection = img_selection[jnp.where(inds, size=5)]
+            img_selection = img_selection[jnp.where(inds, size=nsolutions)]
 
         # Ray-shoot the final image plane triangles to the source plane
         src_selection = self.source_plane_triangles(img_selection, kwargs_lens)

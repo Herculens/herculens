@@ -115,7 +115,7 @@ class PSF(object):
         num_pixels = data_shape[0] * data_shape[1]
         if not hasattr(self, '_blurring_matrix') or self._blurring_matrix.shape != (num_pixels, num_pixels):
             psf_kernel_2d = np.array(self.kernel_point_source)
-            self._blurring_matrix = linear_util.build_convolution_matrix(
+            self._blurring_matrix = build_convolution_matrix(
                 psf_kernel_2d, data_shape)
         return self._blurring_matrix
 

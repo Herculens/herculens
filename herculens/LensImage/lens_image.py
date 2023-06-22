@@ -25,7 +25,8 @@ class LensImage(object):
     def __init__(self, grid_class, psf_class,
                  noise_class=None, lens_mass_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
-                 point_source_model_class=None, kwargs_numerics=None):
+                 point_source_model_class=None, kwargs_numerics=None,
+                 kwargs_lens_equation_solver=None):
         """
         :param grid_class: coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
         :param psf_class: point spread function, instance of PSF() from herculens.Instrument.psf
@@ -35,6 +36,7 @@ class LensImage(object):
         :param lens_light_model_class: lens light model, instance of LightModel() from herculens.MassModel.mass_model
         :param point_source_model_class: point source model, instance of PointSourceModel() from herculens.PointSource.point_source
         :param kwargs_numerics: keyword arguments for various numerical settings (see herculens.Numerics.numerics)
+        :param kwargs_lens_equation_solver: TODO
         """
         self.Grid = grid_class
         self.PSF = psf_class
@@ -93,6 +95,8 @@ class LensImage(object):
         self.ImageNumerics = Numerics(
             pixel_grid=self.Grid, psf=self.PSF, **self.kwargs_numerics)
 
+        self.kwargs_lens_equation_solver = kwargs_lens_equation_solver
+
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, supersampled=False,
                                   de_lensed=False, k=None, k_lens=None):
@@ -144,7 +148,8 @@ class LensImage(object):
                 lens_light, unconvolved=unconvolved)
         return lens_light
 
-    def point_source_image(self, kwargs_point_source, kwargs_lens, k=None):
+    def point_source_image(self, kwargs_point_source, kwargs_lens,
+                           kwargs_solver, k=None):
         """Compute PSF-convolved point sources rendered on the image plane.
 
         :param kwargs_point_source: list of keyword arguments corresponding to the point sources
@@ -157,7 +162,12 @@ class LensImage(object):
             return result
 
         theta_x, theta_y, amplitude = self.PointSourceModel.get_multiple_images(
-            kwargs_point_source, kwargs_lens, k)
+            kwargs_point_source, kwargs_lens, kwargs_solver, k)
+
+        # Extract unique image positions ?
+        # def uniquify(a, tol):
+        #     return a[~(jnp.triu(jnp.abs(a[:, None] - a) <= tol, 1)).any(0)]
+
         for i in range(len(theta_x)):
             result += self.ImageNumerics.render_point_sources(
                 theta_x[i], theta_y[i], amplitude[i])
@@ -208,6 +218,7 @@ class LensImage(object):
 
         if point_source_add:
             model += self.point_source_image(kwargs_point_source, kwargs_lens,
+                                             kwargs_solver=self.kwargs_lens_equation_solver,
                                              k=k_point_source)
 
         return model

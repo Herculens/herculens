@@ -2,12 +2,12 @@
 
 __author__ = 'austinpeel'
 
-import jax.numpy as jnp
 from herculens.PointSourceModel.point_source import PointSource
 
 __all__ = ['PointSourceModel']
 
 SUPPORTED_TYPES = ['IMAGE_POSITIONS', 'SOURCE_POSITION']
+
 
 class PointSourceModel(object):
     """Collection of point sources defined in the source or image plane."""
@@ -41,7 +41,7 @@ class PointSourceModel(object):
                 self.point_sources.append(ps)
             else:
                 err_msg = (f"{ps_type} is not a valid point source type. " +
-                    f"Supported types include {SUPPORTED_TYPES}")
+                           f"Supported types include {SUPPORTED_TYPES}")
                 raise ValueError(err_msg)
 
         self.type_list = point_source_type_list
@@ -69,7 +69,7 @@ class PointSourceModel(object):
         return inds
 
     def get_multiple_images(self, kwargs_point_source, kwargs_lens=None,
-                            k=None, with_amplitude=True):
+                            kwargs_solver=None, k=None, with_amplitude=True):
         """Compute point source positions and amplitudes in the image plane.
 
         For point sources defined in the source plane, solving the lens
@@ -82,6 +82,8 @@ class PointSourceModel(object):
             Keyword arguments corresponding to the point source instances.
         kwargs_lens : list of dict, optional
             Keyword arguments for the lensing mass model. Default is None.
+        kwargs_solver : dict, optional
+            Keyword arguments for the lens equation solver. Default is None.
         k : int, optional
             Index of the single point source for which to compute positions.
             If None, compute positions for all point sources.
@@ -99,8 +101,10 @@ class PointSourceModel(object):
         theta_x, theta_y, amps = [], [], []
         for i in self._indices_from_k(k):
             ps = self.point_sources[i]
-            ra, dec = ps.image_positions(kwargs_point_source[i], kwargs_lens)
-            amp = ps.image_amplitudes(ra, dec, kwargs_point_source[i], kwargs_lens)
+            ra, dec = ps.image_positions(
+                kwargs_point_source[i], kwargs_lens, kwargs_solver)
+            amp = ps.image_amplitudes(
+                ra, dec, kwargs_point_source[i], kwargs_lens)
             theta_x.append(ra)
             theta_y.append(dec)
             amps.append(amp)
