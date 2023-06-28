@@ -176,9 +176,13 @@ class LensImage(object):
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
         noise_var = self.Noise.C_D_model(model)
-        # noise_var = self.Noise.C_D
-        norm_res = (model - data) / np.sqrt(noise_var) * mask
-        return norm_res
+        noise = np.sqrt(noise_var)
+        norm_res_model = (data - model) / noise * mask
+        norm_res_tot = norm_res_model
+        if mask is not None:
+            # outside the mask just add pure data
+            norm_res_tot += (data / noise) * (1. - mask)
+        return norm_res_model, norm_res_tot
 
     def reduced_chi2(self, data, model, mask=None):
         """
@@ -186,7 +190,7 @@ class LensImage(object):
         """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        norm_res = self.normalized_residuals(data, model, mask=mask)
+        norm_res, _ = self.normalized_residuals(data, model, mask=mask)
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
 
