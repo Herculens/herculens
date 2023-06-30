@@ -86,9 +86,9 @@ class PointSource(object):
 
         """
         amp = kwargs_point_source['amp']
-        if self.type is 'IMAGE_POSITIONS':
+        if self.type == 'IMAGE_POSITIONS':
             return jnp.atleast_1d(amp)
-        elif self.type is 'SOURCE_POSITION':
+        elif self.type == 'SOURCE_POSITION':
             mag = self.mass_model.magnification(theta_x, theta_y, kwargs_lens)
             return amp * jnp.abs(mag)
 
