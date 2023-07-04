@@ -11,6 +11,8 @@ import jax.numpy as jnp
 from scipy.ndimage import morphology
 from scipy import ndimage
 
+from herculens.LensImage.lensing_operator import LensingOperator
+
 
 def mask_from_source_area(lens_image, parameters):
     src_idx = lens_image.SourceModel.pixelated_index
@@ -69,7 +71,7 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
     return model_mask, binary_source
 
 
-def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
+def pixelated_region_from_sersic(kwargs_sersic, force_square=False, use_major_axis=False,
                                  min_width=1.0, min_height=1.0, scaling=1.0):
     # imports are here to avoid issues with circular imports
     from herculens.Util import param_util
@@ -92,11 +94,60 @@ def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
     height = diameter * np.abs(np.sin(phi)) * scaling
     width = max(min_width, width)
     height = max(min_height, height)
+    if force_square is True:
+        width = max(width, height)
+        height = width
     # the following dict is consistent with arguments of PixelGrid.create_model_grid()
     kwargs_pixelated_grid = {
-        'grid_center': [float(c_x), float(c_y)],
-        'grid_shape': [float(width), float(height)],
+        'grid_center': (float(c_x), float(c_y)),
+        'grid_shape': (float(width), float(height)),
     }
+    return kwargs_pixelated_grid
+
+
+def pixelated_region_from_arc_mask(arc_mask, image_grid, mass_model, mass_params):
+    # We first design a hypothetical source plane with sufficiently high resolution
+    nx, ny = image_grid.num_pixel_axes
+    nx_src, ny_src = (nx//3, ny//3)
+    high_res_source_grid = image_grid.create_model_grid(pixel_scale_factor=0.5, grid_shape=(nx_src, ny_src))
+    
+    # Then build the lensing operator based on the image/source grids and mass model
+    lensing_op = LensingOperator(mass_model, image_grid, high_res_source_grid)
+    lensing_op.compute_mapping(kwargs_lens=mass_params)
+    
+    # De-lens the arc mask
+    arc_mask_source = np.array(lensing_op.image2source_2d(arc_mask))
+    arc_mask_source = np.where(arc_mask_source < 0.1, 0., 1.)  # only contains 0 and 1 now
+
+    import matplotlib.pyplot as plt
+    plt.imshow(arc_mask_source)
+    plt.show()
+
+    # Find the minimum bounding box that encloses the mask in source plane (square here)
+    # - get the extrema 
+    rows = np.max(arc_mask_source, axis=0)
+    print(rows)
+    row_low, row_high = np.argmax(rows), np.argmax(rows[::-1])
+    print("R", row_low, row_high)
+    cols = np.max(arc_mask_source, axis=1)
+    print(cols)
+    col_low, col_high = np.argmax(cols), np.argmax(cols[::-1])
+    print("C", col_low, col_high)
+    # - get the pixel coordinates corresponding to these extrema
+    x_low, y_low = high_res_source_grid.map_pix2coord(row_low, col_low)
+    x_high, y_high = high_res_source_grid.map_pix2coord(row_high, col_high)
+    print(x_low, y_low)
+    print(x_high, y_high)
+
+    # Get the grid parameters
+    new_grid_shape = (abs(x_high - x_low), abs(y_high - y_low))
+    new_grid_center = (0.5*(x_low+x_high), 0.5*(y_low+y_high))
+    kwargs_pixelated_grid = {
+        'grid_center': new_grid_center,
+        'grid_shape': new_grid_shape,
+    }
+
+    # Create the new, reduced source plane grid
     return kwargs_pixelated_grid
 
 
