@@ -87,7 +87,7 @@ class OptaxOptimizer(BaseOptimizer):
                                 total=max_iterations, 
                                 desc=f"optax.{algorithm}"):
             params, opt_state, loss_val = gd_step(params, opt_state)
-            if stop_at_loss_increase and i > min_iterations and loss > prev_loss:
+            if stop_at_loss_increase and i > min_iterations and loss_val > prev_loss_val:
                 params, loss_val = prev_params, prev_loss_val
                 break
             else:
