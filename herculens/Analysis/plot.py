@@ -156,6 +156,13 @@ class Plotter(object):
                 ref_source = None
                 show_source_diff = False
 
+            if 'kwargs_point_source' in kwargs_result:
+                #TODO: support more than first point sources + lensed/unlensed point sources
+                ps0_params = kwargs_result['kwargs_point_source'][0]
+                ps_src_pos = (ps0_params['ra'], ps0_params['dec'])
+            else:
+                ps_src_pos = None
+
         if show_lens_light:
             kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
             if lens_image.LensLightModel.has_pixels:
@@ -286,6 +293,10 @@ class Plotter(object):
             ax.set_title("source model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+            if ps_src_pos is not None:
+                ax.scatter(*ps_src_pos, s=30, c='black', marker='x', linewidths=0.5, 
+                           label="point source")
+                ax.legend()
             ax = axes[i_row, 2]
             if ref_source is not None and show_source_diff is True:
                 diff = source_model - ref_source
