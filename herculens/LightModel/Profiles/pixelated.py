@@ -72,18 +72,33 @@ class Pixelated(object):
     def pixel_grid(self):
         return self._pixel_grid
 
-    def function(self, x, y, pixels):
+    def function(self, x, y, x_pix, y_pix, pixels):
         if self._interp_type == 'fast_bilinear':
-            return self._function_fast(x, y, pixels)
+            return self._function_fast(x, y, x_pix, y_pix, pixels)
         elif self._interp_type in ['bilinear', 'bicubic']:
             return self._function_std(x, y, pixels)
 
-    def _function_fast(self, x, y, pixels):
+    def _function_fast(self, x, y, x_pix, y_pix, pixels):
         """only works when self._interp_type == 'fast_bilinear'"""
         # ensure the coordinates are cartesian by converting angular to pixel units
         x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
         x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
-        f = self._interp_class(self._limits, pixels, cval=0.)(y_, x_)
+        
+        
+        # f = self._interp_class(self._limits, pixels, cval=0.)(y_, x_)
+
+        
+        x_pix_, y_pix_ = self.pixel_grid.map_coord2pix(x_pix.flatten(), y_pix.flatten())
+        x_pix_, y_pix_ = x_pix_.reshape(*x_pix.shape), y_pix_.reshape(*y_pix.shape)
+        x_pix_coords = x_pix_[0, :]
+        y_pix_coords = y_pix_[:, 0]
+        limits = [
+            ( y_pix_coords.min(), y_pix_coords.max() ), 
+            ( x_pix_coords.min(), x_pix_coords.max() )
+        ]
+
+
+        f = self._interp_class(limits, pixels, cval=0.)(y_, x_)
         return f / self._data_pixel_area
 
     def _function_std(self, x, y, pixels):
