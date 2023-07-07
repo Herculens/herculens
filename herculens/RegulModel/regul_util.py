@@ -24,7 +24,7 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
                                 wavelet_type_list=['starlet', 'battle-lemarie-3'],
                                 num_samples=1000, vmap_loop=True, sigma_clipping=True, seed=0,
                                 starlet_num_scales=None, starlet_second_gen=False, 
-                                noise_var=None, arc_mask=None):
+                                noise_var=None, arc_mask=None, median_per_scale=False):
     # get the data noise
     nx, ny = lens_image.Grid.num_pixel_axes
     if noise_var is None:
@@ -124,6 +124,11 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
         # take the standard deviation
         std_per_scale = jnp.std(noise_samples_prop, axis=0)
 
+        if median_per_scale is True:
+            # single uniform value for each wavelet scale, we take the median value
+            medians = jnp.nanmedian(std_per_scale, axis=(-2, -1))
+            std_per_scale = np.full_like(std_per_scale, medians[:, np.newaxis, np.newaxis])
+            
         wavelet_class_list.append(wavelet)
         std_per_scale_list.append(std_per_scale)
 
