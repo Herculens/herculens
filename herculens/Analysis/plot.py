@@ -137,7 +137,7 @@ class Plotter(object):
             if lens_image.SourceModel.has_pixels:
                 src_idx = lens_image.SourceModel.pixelated_index
                 source_model = kwargs_source[src_idx]['pixels']
-                src_extent = lens_image.SourceModel.pixel_grid.extent
+                _, _, src_extent = lens_image.get_source_coordinates(kwargs_result['kwargs_lens'])
             elif kwargs_grid_source is not None:
                 grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
                 x_grid_src, y_grid_src = grid_src.pixel_coordinates
