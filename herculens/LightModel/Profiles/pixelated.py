@@ -1,6 +1,6 @@
 # Defines a pixelated profile
 # 
-# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2023, herculens developers and contributors
 
 __author__ = 'austinpeel', 'aymgal'
 
@@ -32,7 +32,7 @@ class Pixelated(object):
     _deriv_types = ['interpol', 'autodiff']
 
     def __init__(self, interpolation_type='fast_bilinear', allow_extrapolation=True, 
-                 derivative_type='interpol'):
+                 derivative_type='interpol', adaptive_grid=False):
         if interpolation_type not in self._interp_types:
             raise ValueError(f"Invalid method ('{interpolation_type}'). Must be in {self._interp_types}.")
         if derivative_type not in self._deriv_types:
@@ -57,6 +57,7 @@ class Pixelated(object):
                 from utax.interpolation import BicubicInterpolator
                 self._interp_class = BicubicInterpolator
         self._extrapol_bool = allow_extrapolation
+        self._adaptive_grid = adaptive_grid
 
         self._data_pixel_area = None
         self._pixel_grid = None
@@ -71,37 +72,35 @@ class Pixelated(object):
     @property
     def pixel_grid(self):
         return self._pixel_grid
+    
+    @property
+    def is_adaptive(self):
+        return self._adaptive_grid
 
-    def function(self, x, y, x_pix, y_pix, pixels):
+    def function(self, x, y, pixels_x_coord=None, pixels_y_coord=None, pixels=None):
         if self._interp_type == 'fast_bilinear':
-            return self._function_fast(x, y, x_pix, y_pix, pixels)
+            f = self._function_fast(x, y, pixels_x_coord, pixels_y_coord, pixels)
         elif self._interp_type in ['bilinear', 'bicubic']:
-            return self._function_std(x, y, pixels)
+            f = self._function_std(x, y, pixels_x_coord, pixels_y_coord, pixels)
+        # normalize for correct units when evaluated by LensImage methods
+        return f / self._data_pixel_area
 
-    def _function_fast(self, x, y, x_pix, y_pix, pixels):
-        """only works when self._interp_type == 'fast_bilinear'"""
+    def _function_fast(self, x, y, pixels_x_coord, pixels_y_coord, pixels):
         # ensure the coordinates are cartesian by converting angular to pixel units
         x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
         x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
-        
-        
-        # f = self._interp_class(self._limits, pixels, cval=0.)(y_, x_)
+        if self._adaptive_grid:
+            x_coord_pix, y_coord_pix = self.pixel_grid.map_coord2pix(pixels_x_coord, pixels_y_coord)
+            limits = [
+                ( y_coord_pix.min(), y_coord_pix.max() ), 
+                ( x_coord_pix.min(), x_coord_pix.max() )
+            ]
+        else:
+            limits = self._limits
+        interp = self._interp_class(limits, pixels, cval=0.)
+        return interp(y_, x_)
 
-        
-        x_pix_, y_pix_ = self.pixel_grid.map_coord2pix(x_pix.flatten(), y_pix.flatten())
-        x_pix_, y_pix_ = x_pix_.reshape(*x_pix.shape), y_pix_.reshape(*y_pix.shape)
-        x_pix_coords = x_pix_[0, :]
-        y_pix_coords = y_pix_[:, 0]
-        limits = [
-            ( y_pix_coords.min(), y_pix_coords.max() ), 
-            ( x_pix_coords.min(), x_pix_coords.max() )
-        ]
-
-
-        f = self._interp_class(limits, pixels, cval=0.)(y_, x_)
-        return f / self._data_pixel_area
-
-    def _function_std(self, x, y, pixels):
+    def _function_std(self, x, y, pixels_x_coord, pixels_y_coord, pixels):
         """Interpolated evaluation of a pixelated light profile.
 
         Parameters
@@ -122,12 +121,12 @@ class Pixelated(object):
         x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
         x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
         # setup interpolation, assuming cartesian grid
-        interp = self._interp_class(self._y_coords, self._x_coords, pixels,
+        if not self._adaptive_grid:  # in this case pixels_x_coord and pixels_y_coord should be None
+            pixels_x_coord, pixels_y_coord = self._x_coords, self._y_coords
+        interp = self._interp_class(pixels_y_coord, pixels_x_coord, pixels,
                                     allow_extrapolation=self._extrapol_bool)
         # evaluate the interpolator
-        # and normalize for correct units when evaluated by LensImage methods
-        f = interp(y_, x_)
-        return f / self._data_pixel_area
+        return interp(y_, x_)
 
     def derivatives(self, x, y, pixels):
         if self._deriv_type == 'interpol':

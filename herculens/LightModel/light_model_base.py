@@ -1,6 +1,6 @@
 # Describes a light model, as a list of light profiles
 # 
-# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2023, herculens developers and contributors
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the LightModel module from lenstronomy (version 1.9.3)
 
@@ -18,16 +18,17 @@ __all__ = ['LightModelBase']
 
 SUPPORTED_MODELS = [
     'GAUSSIAN', 'GAUSSIAN_ELLIPSE', 
-    'SERSIC', 'SERSIC_ELLIPSE', 'CORE_SERSIC',
+    'SERSIC', 'SERSIC_ELLIPSE', 
     'SHAPELETS', 'UNIFORM', 'PIXELATED'
 ]
 
 
 class LightModelBase(object):
     """Base class for source and lens light models."""
-    def __init__(self, light_model_list, smoothing=0.001,
-                 pixel_interpol='bilinear', kwargs_pixelated=None, 
-                 shapelets_n_max=4, pixel_allow_extrapolation=False):
+    # TODO: instead of settings for creating PixelGrid objects, pass directly the object to the LightModel
+    def __init__(self, light_model_list, smoothing=0.001, shapelets_n_max=4,
+                 pixel_interpol='bilinear', pixel_adaptive_grid=False, 
+                 pixel_allow_extrapolation=False, kwargs_pixelated=None):
         """Create a LightModelBase object.
 
         Parameters
@@ -56,15 +57,18 @@ class LightModelBase(object):
                 func_list.append(sersic.Sersic(smoothing))
             elif profile_type == 'SERSIC_ELLIPSE':
                 func_list.append(sersic.SersicElliptic(smoothing))
-            elif profile_type == 'CORE_SERSIC':
-                func_list.append(sersic.CoreSersic(smoothing))
             elif profile_type == 'UNIFORM':
                 func_list.append(uniform.Uniform())
             elif profile_type == 'PIXELATED':
                 if pix_idx is not None:
                     raise ValueError("Multiple pixelated profiles is currently not supported.")
-                func_list.append(pixelated.Pixelated(interpolation_type=pixel_interpol, 
-                                                     allow_extrapolation=pixel_allow_extrapolation))
+                func_list.append(
+                    pixelated.Pixelated(
+                        interpolation_type=pixel_interpol, 
+                        allow_extrapolation=pixel_allow_extrapolation,
+                        adaptive_grid=pixel_adaptive_grid,
+                    )
+                )
                 pix_idx = idx
             elif profile_type == 'SHAPELETS':
                 from herculens.LightModel.Profiles import shapelets # prevent importing GigaLens if not used
@@ -122,9 +126,14 @@ class LightModelBase(object):
             return None
         x_coords, _ = self.pixelated_coordinates
         return x_coords.shape
+    
+    @property
+    def pixel_is_adaptive(self):
+        if not self.has_pixels:
+            return False
+        return self.func_list[self.pixelated_index].is_adaptive
 
     @property
     def num_amplitudes_list(self):
         return [func.num_amplitudes for func in self.func_list]
-
 
