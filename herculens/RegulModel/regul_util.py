@@ -8,7 +8,8 @@ __author__ = 'aymgal'
 import copy
 import numpy as np
 import time
-from scipy import signal, stats
+from scipy import signal
+from scipy.interpolate import griddata
 import warnings
 
 import jax
@@ -20,11 +21,21 @@ from herculens.Util import vkl_util
 
 
 
+def interp_unstruct_grid(image, x, y, new_x, new_y):
+    interpolated_image = griddata((x.flatten(), y.flatten()), 
+                                  image.flatten(), 
+                                  (new_x.flatten(), new_y.flatten()), 
+                                  method='linear')
+    return interpolated_image.reshape(*new_x.shape)
+
+
+
 def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
                                 wavelet_type_list=['starlet', 'battle-lemarie-3'],
                                 num_samples=1000, vmap_loop=True, sigma_clipping=True, seed=0,
                                 starlet_num_scales=None, starlet_second_gen=False, 
-                                noise_var=None, arc_mask=None):
+                                noise_var=None, arc_mask=None, 
+                                median_per_scale=False, delensing_type='operator'):
     # get the data noise
     nx, ny = lens_image.Grid.num_pixel_axes
     if noise_var is None:
@@ -45,12 +56,25 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
         raise ValueError("This function only supports (pixelated) 'source' or 'lens_light' profiles")
 
     if model_type == 'source':
-        # construct the lensing operator
-        lensing_op = lens_image.get_lensing_operator(
-            kwargs_lens=kwargs_res['kwargs_lens'], update=False, arc_mask=arc_mask,
-        )
-        def F_T(n): # de-lensing operation
-            return lensing_op.lensing_transpose(n)
+        if delensing_type == 'operator':
+            # construct the lensing operator
+            lensing_op = lens_image.get_lensing_operator(
+                kwargs_lens=kwargs_res['kwargs_lens'], update=False, arc_mask=arc_mask,
+            )
+            def F_T(n): # de-lensing operation
+                return lensing_op.lensing_transpose(n)
+            
+        elif delensing_type == 'interpol':
+            if vmap_loop is True:
+                raise NotImplementedError("Delensing operation via interpolation "
+                                          "is not yet compatible with JAX's vmap")
+            # TODO: update the following once it is possible to perform
+            # interpolation on unstructured grids using JAX
+            theta_x, theta_y = lens_image.Grid.pixel_coordinates 
+            beta_prime_x, beta_prime_y = lens_image.SourceModel.pixel_grid.pixel_coordinates
+            beta_x, beta_y = lens_image.MassModel.ray_shooting(theta_x, theta_y, kwargs_res['kwargs_lens'])
+            def F_T(n):
+                return interp_unstruct_grid(n, beta_x, beta_y, beta_prime_x, beta_prime_y)
 
     elif model_type == 'lens_light':
         def F_T(n): # identity operation
@@ -96,7 +120,6 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
         def Phi_T(n): # wavelet transform
             return wavelet.decompose(n)
         
-        @jit
         def propagate_noise(n):
             # apply linear operators to propagate noise from image plane to source plane
             tmp = F_T(B_T(n))
@@ -114,7 +137,7 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
 
         # propagate the noise to wavelet space for each of them
         if vmap_loop is True:
-            noise_samples_prop = vmap(propagate_noise)(noise_samples)
+            noise_samples_prop = vmap(jit(propagate_noise))(noise_samples)
         else:
             noise_samples_prop = []
             for noise in noise_samples:
@@ -124,6 +147,11 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
         # take the standard deviation
         std_per_scale = jnp.std(noise_samples_prop, axis=0)
 
+        if median_per_scale is True:
+            # single uniform value for each wavelet scale, we take the median value
+            medians = jnp.nanmedian(std_per_scale, axis=(-2, -1))
+            std_per_scale = np.full_like(std_per_scale, medians[:, np.newaxis, np.newaxis])
+            
         wavelet_class_list.append(wavelet)
         std_per_scale_list.append(std_per_scale)
 
