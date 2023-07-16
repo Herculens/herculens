@@ -60,7 +60,7 @@ class Plotter(object):
     cmap_deriv1 = plt.get_cmap('cividis')
     cmap_deriv2 = plt.get_cmap('inferno')
 
-    def __init__(self, data_name=None, base_fontsize=0.28, flux_log_scale=True, 
+    def __init__(self, data_name=None, base_fontsize=14, flux_log_scale=True, 
                  flux_vmin=None, flux_vmax=None, res_vmax=6, cmap_flux=None):
         self.data_name = data_name
         self.base_fontsize = base_fontsize
