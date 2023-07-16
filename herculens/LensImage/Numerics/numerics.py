@@ -23,7 +23,7 @@ class Numerics(object):
     this classes manages the numerical options and computations of an image.
     The class has two main functions, re_size_convolve() and coordinates_evaluate()
     """
-    def __init__(self, pixel_grid, psf, supersampling_factor=1, convolution_type='jax_scipy',
+    def __init__(self, pixel_grid, psf, supersampling_factor=1, convolution_type='jax_scipy_fft',
                  supersampling_convolution=False, iterative_kernel_supersampling=True,
                  supersampling_kernel_size=5, point_source_supersampling_factor=1, 
                  convolution_kernel_size=None, truncation=4):
