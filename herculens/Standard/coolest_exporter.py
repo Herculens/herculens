@@ -12,17 +12,11 @@ import herculens
 from herculens.Standard import coolest_util as util
 
 from coolest.template.json import JSONSerializer
-from coolest.template.classes.coordinates import CoordinatesOrigin
-from coolest.template.classes.lensing_entity_list import LensingEntityList
-from coolest.template.classes.likelihood_list import LikelihoodList
-from coolest.template.classes.regularization_list import RegularizationList
-# from lensmodelapi.api.cosmology import Cosmology
+from coolest.api.util import get_coolest_object
 
 
 class COOLESTexporter(object):
     """Class that handles conversion from a Herculens model to the COOLEST file system"""
-
-    _prefix = 'coolest-herculens'
 
     def __init__(self, output_basename, output_directory, input_coolest_file=None, 
                  empty_output_directory=False, **kwargs_serializer):
@@ -30,7 +24,7 @@ class COOLESTexporter(object):
             raise NotImplementedError("You must provide an input coolest file (for now)")
         if not os.path.isabs(input_coolest_file):
             input_coolest_file = os.path.abspath(input_coolest_file)
-        output_coolest_file = os.path.join(output_directory, self._prefix+'-'+output_basename)
+        output_coolest_file = os.path.join(output_directory, output_basename)
         if not os.path.isabs(output_coolest_file):
             output_coolest_file = os.path.abspath(output_coolest_file)
         self._input_coolest_file = input_coolest_file
@@ -39,10 +33,10 @@ class COOLESTexporter(object):
         self._basename = output_basename
         self._kwargs_serializer = kwargs_serializer
         self._coolest = self._load_coolest_object()
-        check = util.create_output_directory(self._output_dir, empty_output_directory)
-        if check is False:
-            raise ValueError("Output directory already exists and is not empty "
-                             "(use `empty_output_directory=True` keyword argument)")
+        dir_bool = util.create_directory(self._output_dir, empty_output_directory)
+        if dir_bool is False:
+            print("COOLEST-warning: Output directory already exists and has not been emptied. "
+                  "The template file might be directly updated.")
 
     @property
     def coolest_object(self):
@@ -72,12 +66,10 @@ class COOLESTexporter(object):
                                               noise_type=noise_type,
                                               model_noise_map=noise_map, 
                                               json_dir=self._output_dir,
-                                              fits_file_suffix=self._basename,
                                               kwargs_obs=kwargs_obs,
                                               kwargs_noise=kwargs_noise)
         instrument = util.create_instrument(lens_image, observation,
                                             json_dir=self._output_dir,
-                                            fits_file_suffix=self._basename,
                                             psf_type=psf_type,
                                             psf_description=psf_description,
                                             kwargs_psf=kwargs_psf)
@@ -86,13 +78,18 @@ class COOLESTexporter(object):
         self._coolest.instrument = instrument
 
     def update_from_model(self, lens_image, lensing_entity_mapping, 
-                          parameters=None, samples=None):
-        lensing_entities = util.create_lensing_entities(lens_image, lensing_entity_mapping,
+                          parameters=None, samples=None, 
+                          re_create_entities=False):
+        lensing_entities = util.update_lensing_entities(lens_image, lensing_entity_mapping,
                                                         parameters=parameters, samples=samples,
-                                                        json_dir=self._output_dir)
-        # overwites the lensing entities of the COOLEST object
-        self._coolest.lensing_entities = lensing_entities
-        if parameters is not None:
+                                                        re_create_entities=re_create_entities,
+                                                        current_entities=self._coolest.lensing_entities,
+                                                        json_dir=self._output_dir,
+                                                        fits_file_suffix=self._basename)
+        if re_create_entities is True:
+            # overwites the lensing entities of the COOLEST object
+            self._coolest.lensing_entities = lensing_entities
+        if parameters is not None or samples is not None:
             # set the COOLEST mode to MAP (i.e., maximum a-posteriori estimate)
             self._coolest.mode = "MAP"
 
@@ -105,8 +102,5 @@ class COOLESTexporter(object):
         self._coolest.meta.update(meta_kwargs)
 
     def _load_coolest_object(self):
-        serializer = JSONSerializer(self._input_coolest_file, **self._kwargs_serializer)
-        coolest_obj = serializer.load()
-        if coolest_obj.standard.upper() != 'COOLEST':
-            raise ValueError("The JSON file is not a COOLEST template file.")
+        coolest_obj = get_coolest_object(self._input_coolest_file, **self._kwargs_serializer)
         return coolest_obj
