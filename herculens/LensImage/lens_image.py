@@ -65,11 +65,13 @@ class LensImage(object):
             pixel_grid = self.Grid.create_model_grid(**self.LensLightModel.pixel_grid_settings)
             self.LensLightModel.set_pixel_grid(pixel_grid, self.Grid.pixel_area)
 
-        if source_arc_mask is None:
-            source_arc_mask = np.ones(self.Grid.num_pixel_axes)
         self.source_arc_mask = source_arc_mask
-        self._src_arc_mask_bool = source_arc_mask.astype(bool)
         self._src_adaptive_grid = self.SourceModel.pixel_is_adaptive
+        if self._src_adaptive_grid is True and self.source_arc_mask is None:
+            raise ValueError("An arc mask for the lensed source must be "
+                             "provided with adaptive source grid")
+        if self.source_arc_mask is not None:
+            self._src_arc_mask_bool = source_arc_mask.astype(bool)
 
         if kwargs_numerics is None:
             kwargs_numerics = {}
@@ -213,6 +215,7 @@ class LensImage(object):
     
     def adapt_source_coordinates(self, kwargs_lens, k_lens=None):
         """Compute new source coordinates based on ray-traced arc-mask"""
+        # TODO: compute a mask on the adapted source plane
         npix_src, npix_src_y = self.SourceModel.pixel_grid.num_pixel_axes
         if npix_src_y != npix_src:
             raise ValueError("Adaptive source plane grid only works with square grids")

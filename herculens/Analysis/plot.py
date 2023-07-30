@@ -102,7 +102,7 @@ class Plotter(object):
                       shift_pixelated_potential='none',
                       likelihood_mask=None, potential_mask=None,
                       kwargs_grid_source=None,
-                      lock_colorbars=False,
+                      lock_colorbars=False, masked_residuals=True,
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       k_lens=None, # TEMP
                       show_plot=True):
@@ -258,14 +258,18 @@ class Plotter(object):
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
             model_residuals, residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
+            if masked_residuals is True:
+                residuals_plot = model_residuals
+            else:
+                residuals_plot = residuals
             red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
-            im = ax.imshow(residuals, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
+            im = ax.imshow(residuals_plot, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
             im.set_rasterized(True)
-            if mask_bool is True:
+            if mask_bool is True and masked_residuals is False:
                 ax.contour(likelihood_mask, extent=extent, levels=[0], 
                            colors='black', alpha=0.5, linewidths=0.5)
             ax.set_title(r"(f${}_{\rm data}$ - f${}_{\rm model})/\sigma$", fontsize=self.base_fontsize)
-            nice_colorbar_residuals(im, residuals, position='top', pad=0.4, size=0.2, 
+            nice_colorbar_residuals(im, residuals_plot, position='top', pad=0.4, size=0.2, 
                                     vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                     colorbar_kwargs={'orientation': 'horizontal'})
             text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
