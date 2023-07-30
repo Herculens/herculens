@@ -53,6 +53,7 @@ class COOLESTexporter(object):
             serializer.dump_jsonpickle()
         else:
             serializer.dump_simple()
+        print("COOLEST-info: successfully saved / updated the template file.")
 
     def update_from_data(self, data, lens_image,
                          noise_type='NoiseMap', noise_map=None,
