@@ -43,52 +43,57 @@ class JaxoptOptimizer(BaseOptimizer):
             extra_fields['param_history'] = metrics.get_param_history()
         return best_fit, logL_best_fit, extra_fields, runtime
 
-    def run(self, init_params, method='BFGS', progress_bar=True, 
-            return_param_history=False, **solver_kwargs):
+    def run(self, init_params, method='BFGS', progress_bar=False, **solver_kwargs):
         if method == 'BFGS':
             solver = jaxopt.BFGS(self.function_optim, value_and_grad=False, 
                                  **solver_kwargs)
         elif method == 'LBFGS':
             solver = jaxopt.LBFGS(self.function_optim, value_and_grad=False, 
                                   **solver_kwargs)
+        elif method == 'LM':
+            solver = jaxopt.LevenbergMarquardt(self.function_optim_LM_scalar, 
+                                               **solver_kwargs)
         else:
             raise NotImplementedError
 
-        # # Defines and jits a single solver update
-        # @jax.jit
-        # def step(params_state, _):
-        #     params, state = params_state
-        #     params, state = solver.update(params, state)
-        #     loss_val = self.loss.function(params)
-        #     return (params, state), loss_val
-        # # Initialise optimizer state
-        # init_params_ = deepcopy(init_params)
-        # state = solver.init_state(init_params_)
-        # # Gradient descent loop
-        # max_iterations = solver_kwargs.pop('maxiter')
-        # param_history = []
-        # loss_history = []
-        # start_time = time.time()
-        # if progress_bar:
-        #     for i in self._for_loop(range(max_iterations), progress_bar, 
-        #                             total=max_iterations, 
-        #                             desc=f"jaxopt.{method}"):
-        #         (params, state), loss_val = step((params, state), None)
-        #         loss_history.append(loss_val)
-        #         if return_param_history is True:
-        #             param_history.append(params)
-        # else:
-        #     (params, state), loss_history = jax.lax.scan(step, (params, state), None, length=max_iterations)
-        # runtime = time.time() - start_time
+        # Defines and jits a single solver update
+        @jax.jit
+        def step(params_state, _):
+            params, state = params_state
+            params, state = solver.update(params, state)
+            loss_val = self.loss.function(params)
+            return (params, state), loss_val
+
+        # Initialise optimizer state
+        params = deepcopy(init_params)
+        state = solver.init_state(params)
+
+        # Gradient descent loop
+        maxiter = solver_kwargs.pop('maxiter')
 
         start_time = time.time()
-        init_params_ = deepcopy(init_params)
-        params, state = solver.run(init_params_)
+        if progress_bar:
+            # param_history = []
+            loss_history = []
+            for i in self._for_loop(range(maxiter), progress_bar, 
+                                    total=maxiter, 
+                                    desc=f"jaxopt.{method}"):
+                (params, state), loss_val = step((params, state), None)
+                loss_history.append(loss_val)
+                # if return_param_history is True:
+                #     param_history.append(params)
+        else:
+            (params, state), loss_history = jax.lax.scan(step, (params, state), None, length=maxiter)
         runtime = time.time() - start_time
+
+        # start_time = time.time()
+        # init_params_ = deepcopy(init_params)
+        # params, state = solver.run(init_params_)
+        # runtime = time.time() - start_time
 
         best_fit = params
         logL_best_fit = self.loss.function(best_fit)
-        extra_fields = {'loss_history': np.zeros(max_iterations)}
+        extra_fields = {'loss_history': loss_history}
         # if return_param_history is True:
         #     extra_fields['param_history'] = param_history
         return best_fit, logL_best_fit, extra_fields, runtime

@@ -1,6 +1,6 @@
 # High-level interface to a light model
 # 
-# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2023, herculens developers and contributors
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the LightModel module from lenstronomy (version 1.9.3)
 
@@ -31,17 +31,17 @@ class LightModel(LightModelBase):
     for a given set of parameters.
 
     """
-    def __init__(self, light_model_list, smoothing=0.001,
-                 pixel_interpol='bilinear', kwargs_pixelated=None, 
-                 shapelets_n_max=4, **kwargs):
+    def __init__(self, light_model_list, smoothing=0.001, shapelets_n_max=4,
+                 kwargs_pixelated=None, **kwargs):
         """Create a LightModel object."""
         self.profile_type_list = light_model_list
         super(LightModel, self).__init__(self.profile_type_list, smoothing=smoothing,
-                                         pixel_interpol=pixel_interpol, 
+                                         shapelets_n_max=shapelets_n_max,
                                          kwargs_pixelated=kwargs_pixelated,
-                                         shapelets_n_max=shapelets_n_max, **kwargs)
+                                         **kwargs)
 
-    def surface_brightness(self, x, y, kwargs_list, k=None):
+    def surface_brightness(self, x, y, kwargs_list, k=None,
+                           pixels_x_coord=None, pixels_y_coord=None):
         """Total source flux at a given position.
 
         Parameters
@@ -58,7 +58,13 @@ class LightModel(LightModelBase):
         bool_list = self._bool_list(k)
         for i, func in enumerate(self.func_list):
             if bool_list[i]:
-                flux += func.function(x, y, **kwargs_list[i])
+                if i == self.pixelated_index:
+                    flux += func.function(x, y, 
+                                          pixels_x_coord=pixels_x_coord, 
+                                          pixels_y_coord=pixels_y_coord, 
+                                          **kwargs_list[i])
+                else:
+                    flux += func.function(x, y, **kwargs_list[i])
         return flux
 
     def spatial_derivatives(self, x, y, kwargs_list, k=None):

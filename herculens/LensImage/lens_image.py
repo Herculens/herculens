@@ -1,6 +1,6 @@
 # Defines the model of a strong lens
 #
-# Copyright (c) 2021, herculens developers and contributors
+# Copyright (c) 2023, herculens developers and contributors
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the ImSim module from lenstronomy (version 1.9.3)
 
@@ -25,7 +25,9 @@ class LensImage(object):
     def __init__(self, grid_class, psf_class,
                  noise_class=None, lens_mass_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
-                 point_source_model_class=None, kwargs_numerics=None,
+                 point_source_model_class=None, 
+                 source_arc_mask=None,
+                 kwargs_numerics=None,
                  kwargs_lens_equation_solver=None):
         """
         :param grid_class: coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
@@ -35,6 +37,7 @@ class LensImage(object):
         :param source_model_class: extended source light model, instance of LightModel() from herculens.MassModel.mass_model
         :param lens_light_model_class: lens light model, instance of LightModel() from herculens.MassModel.mass_model
         :param point_source_model_class: point source model, instance of PointSourceModel() from herculens.PointSource.point_source
+        :param source_arc_mask: 2D boolean array to define the region over which the (pixelated) lensed source is modeled
         :param kwargs_numerics: keyword arguments for various numerical settings (see herculens.Numerics.numerics)
         :param kwargs_lens_equation_solver: TODO
         """
@@ -89,6 +92,12 @@ class LensImage(object):
         #                                       y_center=y_center, min_distance=self.Data.pixel_width,
         #                                       only_from_unspecified=True)
 
+        if source_arc_mask is None:
+            source_arc_mask = np.ones(self.Grid.num_pixel_axes)
+        self.source_arc_mask = source_arc_mask
+        self._src_arc_mask_bool = source_arc_mask.astype(bool)
+        self._src_adaptive_grid = self.SourceModel.pixel_is_adaptive
+
         if kwargs_numerics is None:
             kwargs_numerics = {}
         self.kwargs_numerics = kwargs_numerics
@@ -114,16 +123,19 @@ class LensImage(object):
         :return: 2d array of surface brightness pixels
         """
         if len(self.SourceModel.profile_type_list) == 0:
-            return jnp.zeros((self.Grid.num_pixel_axes))
-        ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
-        if de_lensed is True:
-            source_light = self.SourceModel.surface_brightness(
-                ra_grid_img, dec_grid_img, kwargs_source, k=k)
+            return jnp.zeros(self.Grid.num_pixel_axes)
+        x_grid_img, y_grid_img = self.ImageNumerics.coordinates_evaluate
+        if self._src_adaptive_grid:
+            pixels_x_coord, pixels_y_coord, _ = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens)
         else:
-            ra_grid_src, dec_grid_src = self.MassModel.ray_shooting(
-                ra_grid_img, dec_grid_img, kwargs_lens, k=k_lens)
-            source_light = self.SourceModel.surface_brightness(
-                ra_grid_src, dec_grid_src, kwargs_source, k=k)
+            pixels_x_coord, pixels_y_coord = None, None  # fall back on fixed, user-defined coordinates
+        if de_lensed is True:
+            source_light = self.SourceModel.surface_brightness(x_grid_img, y_grid_img, kwargs_source, k=k,
+                                                               pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
+        else:
+            x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img, y_grid_img, kwargs_lens, k=k_lens)
+            source_light = self.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source, k=k,
+                                                               pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
         if not supersampled:
             source_light = self.ImageNumerics.re_size_convolve(
                 source_light, unconvolved=unconvolved)
@@ -140,9 +152,8 @@ class LensImage(object):
         :param k: list of bool or list of int to select which model profiles to include
         :return: 2d array of surface brightness pixels
         """
-        ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
-        lens_light = self.LensLightModel.surface_brightness(
-            ra_grid_img, dec_grid_img, kwargs_lens_light, k=k)
+        x_grid_img, y_grid_img = self.ImageNumerics.coordinates_evaluate
+        lens_light = self.LensLightModel.surface_brightness(x_grid_img, y_grid_img, kwargs_lens_light, k=k)
         if not supersampled:
             lens_light = self.ImageNumerics.re_size_convolve(
                 lens_light, unconvolved=unconvolved)
@@ -203,17 +214,16 @@ class LensImage(object):
         model = jnp.zeros((self.Grid.num_pixel_axes))
         if supersampled:
             model = jnp.zeros((self.ImageNumerics.grid_class.num_grid_points,))
-
-        if source_add:
-            model += self.source_surface_brightness(kwargs_source, kwargs_lens,
-                                                    unconvolved=unconvolved,
-                                                    supersampled=supersampled,
-                                                    k=k_source, k_lens=k_lens)
-
-        if lens_light_add:
-            model += self.lens_surface_brightness(kwargs_lens_light,
-                                                  unconvolved=unconvolved,
-                                                  supersampled=supersampled,
+        if source_add is True:
+            source_model = self.source_surface_brightness(kwargs_source, kwargs_lens, 
+                                                          unconvolved=unconvolved, supersampled=supersampled,
+                                                          k=k_source, k_lens=k_lens) 
+            if self.source_arc_mask is not None:
+                source_model *= self.source_arc_mask
+            model += source_model
+        if lens_light_add is True:
+            model += self.lens_surface_brightness(kwargs_lens_light, 
+                                                  unconvolved=unconvolved, supersampled=supersampled,
                                                   k=k_lens_light)
 
         if point_source_add:
@@ -254,9 +264,13 @@ class LensImage(object):
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
         noise_var = self.Noise.C_D_model(model)
-        # noise_var = self.Noise.C_D
-        norm_res = (model - data) / np.sqrt(noise_var) * mask
-        return norm_res
+        noise = np.sqrt(noise_var)
+        norm_res_model = (data - model) / noise * mask
+        norm_res_tot = norm_res_model
+        if mask is not None:
+            # outside the mask just add pure data
+            norm_res_tot += (data / noise) * (1. - mask)
+        return norm_res_model, norm_res_tot
 
     def reduced_chi2(self, data, model, mask=None):
         """
@@ -264,19 +278,68 @@ class LensImage(object):
         """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        norm_res = self.normalized_residuals(data, model, mask=mask)
+        norm_res, _ = self.normalized_residuals(data, model, mask=mask)
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
-
-    def get_lensing_operator(self, kwargs_lens=None, update=False):
+    
+    def adapt_source_coordinates(self, kwargs_lens, k_lens=None):
+        """Compute new source coordinates based on ray-traced arc-mask"""
+        npix_src, npix_src_y = self.SourceModel.pixel_grid.num_pixel_axes
+        if npix_src_y != npix_src:
+            raise ValueError("Adaptive source plane grid only works with square grids")
+        if self.Grid.x_is_inverted or self.Grid.y_is_inverted:
+            # TODO: fix this
+            raise NotImplementedError("invert x and y not yet supported for adaptive source grid")
+        # get data coordinates
+        x_grid_img, y_grid_img = self.Grid.pixel_coordinates
+        # ray-shoot to source plane only coordinates within the source arc mask
+        x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img[self._src_arc_mask_bool], 
+                                                             y_grid_img[self._src_arc_mask_bool], 
+                                                             kwargs_lens, k=k_lens)
+        # create grid encompassed by ray-shooted coordinates
+        x_left, x_right = x_grid_src.min(), x_grid_src.max()
+        y_bottom, y_top = y_grid_src.min(), y_grid_src.max()
+        # center of the region
+        cx = 0.5 * (x_left + x_right)
+        cy = 0.5 * (y_bottom + y_top)
+        # get the width and height
+        width  = jnp.abs(x_left - x_right)
+        height = jnp.abs(y_bottom - y_top)
+        # choose the largest of the two to end up with a square region
+        half_size = jnp.maximum(height, width) / 2.
+        # recompute the new boundaries
+        x_left = cx - half_size
+        x_right = cx + half_size
+        y_bottom = cy - half_size
+        y_top = cy + half_size
+        # print( 0.5*(x_left + x_right), cx )
+        # print( jnp.abs(x_left - x_right), size )
+        # print( 0.5*(y_bottom + y_top), cy )
+        # print( jnp.abs(y_bottom - y_top), size )
+        x_adapt = jnp.linspace(x_left, x_right, npix_src)
+        y_adapt = jnp.linspace(y_bottom, y_top, npix_src)
+        extent_adapt = [x_adapt[0], x_adapt[-1], y_adapt[0], y_adapt[-1]]
+        return x_adapt, y_adapt, extent_adapt
+    
+    def get_source_coordinates(self, kwargs_lens, k_lens=None):
+        if not self._src_adaptive_grid:
+            x_grid, y_grid = self.SourceModel.pixel_grid.pixel_coordinates
+            extent = self.SourceModel.pixel_grid.extent
+        else:
+            x_coord, y_coord, extent = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens)
+            x_grid, y_grid = np.meshgrid(x_coord, y_coord)
+        return x_grid, y_grid, extent
+        
+    def get_lensing_operator(self, kwargs_lens=None, update=False, arc_mask=None):
         if self.SourceModel.pixel_grid is None:
             raise ValueError("The lensing operator is only defined for source "
-                             "models associated to a grid of pixels")
+                            "models associated to a grid of pixels")
         if not hasattr(self, '_lensing_op'):
             self._lensing_op = LensingOperator(self.MassModel,
-                                               # TODO: should be the model (from Numerics) grid at some point
-                                               self.Grid,
-                                               self.SourceModel.pixel_grid)
+                                            self.Grid, # TODO: should be the model grid (from Numerics) at some point
+                                            self.SourceModel.pixel_grid,
+                                            arc_mask=arc_mask)
         if update is True or self._lensing_op.get_lens_mapping() is None:
             self._lensing_op.compute_mapping(kwargs_lens)
         return self._lensing_op
+    

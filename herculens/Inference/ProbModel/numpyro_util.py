@@ -111,8 +111,10 @@ def _transform_fn(model, model_args, model_kwargs, params, invert):
     return params_const
 
 def unconstrain_fn(model, model_args, model_kwargs, params):
+    # TODO: once next numpyro version is out, use newly implemented utilities from the package
     return _transform_fn(model, model_args, model_kwargs, params, True)
 
 def constrain_fn(model, model_args, model_kwargs, params):
+    # TODO: once next numpyro version is out, use newly implemented utilities from the package
     return _transform_fn(model, model_args, model_kwargs, params, False)
 

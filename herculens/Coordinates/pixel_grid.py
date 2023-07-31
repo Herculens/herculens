@@ -103,10 +103,12 @@ class PixelGrid(Coordinates):
         x_coords, y_coords = self.pixel_axes
         return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
 
-    def create_model_grid(self, pixel_scale_factor=None, grid_center=None, grid_shape=None):
+    def create_model_grid(self, num_pixels=None, pixel_scale_factor=None, grid_center=None, grid_shape=None):
         """
+        :param num_pixels: number of pixels on each side. 
+        Currently this only works with square grids, so grid_shape needs to setup a square grid.
         :param pixel_scale_factor: multiplicative factor to go from original pixel width to new pixel width.
-        If None, defaults to the 1.
+        If None, defaults to the 1. If num_pixels is provided, pixel_scale_factor is be ignored.
         :param grid_center: 2-tuple (center_x, center_y) with grid center in angular units
         If None, defaults to the original grid center. 
         :param grid_shape: 2-tuple (width, height) window size in angular units
@@ -123,21 +125,32 @@ class PixelGrid(Coordinates):
             unchanged_count += 1
         else:
             grid_shape_ = grid_shape
-        if pixel_scale_factor is None or pixel_scale_factor == 1:
+        if ((num_pixels is None and (pixel_scale_factor is None or pixel_scale_factor == 1)) or
+            (num_pixels is not None and (num_pixels, num_pixels) == self.num_pixel_axes)):
             pixel_scale_factor_ = 1
+            num_pixels_ = None
             unchanged_count += 1
         else:
             pixel_scale_factor_ = pixel_scale_factor
+            num_pixels_ = num_pixels
 
         # in case it's the same region as the base coordinate grid
         if unchanged_count == 3:
             return copy.deepcopy(self)
 
-        pixel_width = self.pixel_width * float(pixel_scale_factor_)
         center_x, center_y = grid_center_
         width, height = grid_shape_
-        nx = round(width / pixel_width)
-        ny = round(height / pixel_width)
+        if num_pixels_ is None:
+            pixel_width = self.pixel_width * float(pixel_scale_factor_)
+            nx = round(width / pixel_width)
+            ny = round(height / pixel_width)
+        else:
+            nx = ny = num_pixels_  # assuming square grid
+            print("nxny", nx, ny)
+            if height != width:
+                raise ValueError(f"Setting number of side pixels only works with square grids "
+                                 f"(grid shape {grid_shape_} was provided).")
+            pixel_width = width / float(nx)
 
         transform_pix2angle = self.transform_pix2angle / self.pixel_width * pixel_width
 

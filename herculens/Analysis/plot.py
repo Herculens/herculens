@@ -119,7 +119,10 @@ class Plotter(object):
             model = lens_image.model(**kwargs_result, k_lens=k_lens)
             noise_var = lens_image.Noise.C_D_model(model)
             if likelihood_mask is None:
+                mask_bool = False
                 likelihood_mask = np.ones_like(model)
+            else:
+                mask_bool = True
             # create a mask with NaNs such that unmasked areasa appear transparent 
             likelihood_mask_nans = np.nan*np.copy(likelihood_mask)
             likelihood_mask_nans[likelihood_mask == 0] = 0
@@ -134,7 +137,7 @@ class Plotter(object):
             if lens_image.SourceModel.has_pixels:
                 src_idx = lens_image.SourceModel.pixelated_index
                 source_model = kwargs_source[src_idx]['pixels']
-                src_extent = lens_image.SourceModel.pixel_grid.extent
+                _, _, src_extent = lens_image.get_source_coordinates(kwargs_result['kwargs_lens'])
             elif kwargs_grid_source is not None:
                 grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
                 x_grid_src, y_grid_src = grid_src.pixel_coordinates
@@ -245,8 +248,11 @@ class Plotter(object):
 
             ##### IMAGING DATA AND MODEL IMAGE #####
             ax = axes[i_row, 0]
-            im = ax.imshow(data * likelihood_mask, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
+            im = ax.imshow(data, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
             im.set_rasterized(True)
+            if mask_bool is True:
+                ax.contour(likelihood_mask, extent=extent, levels=[0], 
+                           colors='white', alpha=0.5, linewidths=0.5)
             data_title = self.data_name if self.data_name is not None else "data"
             ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -258,15 +264,17 @@ class Plotter(object):
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
+            model_residuals, residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
             red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
-            im = ax.imshow(residuals * likelihood_mask, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
-            # im = ax.imshow((model - data) * likelihood_mask, cmap=self.cmap_res, extent=extent, norm=TwoSlopeNorm(0))
-            ax.set_title(r"(f${}_{\rm model}$ - f${}_{\rm data})/\sigma$", fontsize=self.base_fontsize)
-            nice_colorbar_residuals(im, residuals * likelihood_mask, position='top', pad=0.4, size=0.2, 
+            im = ax.imshow(residuals, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
+            im.set_rasterized(True)
+            if mask_bool is True:
+                ax.contour(likelihood_mask, extent=extent, levels=[0], 
+                           colors='black', alpha=0.5, linewidths=0.5)
+            ax.set_title(r"(f${}_{\rm data}$ - f${}_{\rm model})/\sigma$", fontsize=self.base_fontsize)
+            nice_colorbar_residuals(im, residuals, position='top', pad=0.4, size=0.2, 
                                     vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                     colorbar_kwargs={'orientation': 'horizontal'})
-            im.set_rasterized(True)
             text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
             ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
                     horizontalalignment='left', verticalalignment='bottom',

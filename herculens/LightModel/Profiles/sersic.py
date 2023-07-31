@@ -38,7 +38,7 @@ class Sersic(SersicUtil):
     upper_limit_default = {'amp': 100, 'R_sersic': 100, 'n_sersic': 8, 'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
 
-    def function(self, x, y, amp, R_sersic, n_sersic, center_x=0, center_y=0, max_R_frac=100.0):
+    def function(self, x, y, R_sersic, n_sersic, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
         """
 
         :param x:
@@ -55,7 +55,7 @@ class Sersic(SersicUtil):
         result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
         return amp * result
 
-    def derivatives(self, x, y, amp, R_sersic, n_sersic, center_x=0, center_y=0, max_R_frac=100.0):
+    def derivatives(self, x, y, R_sersic, n_sersic, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
         """
 
         :param x:
@@ -85,7 +85,7 @@ class Sersic(SersicUtil):
         f_x, f_y = jnp.vectorize(_grad_function)(x, y)
         return f_x, f_y
 
-    def derivatives_explicit(self, x, y, amp, R_sersic, n_sersic, center_x=0, center_y=0, max_R_frac=100.0):
+    def derivatives_explicit(self, x, y, R_sersic, n_sersic, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
         """
 
         :param x:
@@ -126,7 +126,7 @@ class SersicElliptic(SersicUtil):
     upper_limit_default = {'amp': 100, 'R_sersic': 100, 'n_sersic': 8, 'e1': 0.5, 'e2': 0.5,'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
 
-    def function(self, x, y, amp, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, max_R_frac=100.0):
+    def function(self, x, y, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
         """
 
         :param x:
@@ -148,7 +148,7 @@ class SersicElliptic(SersicUtil):
         result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
         return amp * result
 
-    def derivatives(self, x, y, amp, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, max_R_frac=100.0):
+    def derivatives(self, x, y, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
         """
 
         :param x:

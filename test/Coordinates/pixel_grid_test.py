@@ -70,3 +70,28 @@ class TestPixelGrid(object):
         pixel_grid = _create_pixel_grid(nx, ny, pix_scl, rot_angle)
         npt.assert_allclose(pixel_grid.pixel_area, pix_scl**2)
 
+
+@pytest.mark.parametrize(
+    "nx, ny, pix_scl_fac, num_pix, grid_shape", 
+    [
+        (10, 10, None, 14, (0.8, 0.8)), 
+        (11, 11, None, 14, (0.8, 0.8)), 
+        (10, 10, 0.4, 15, (0.8, 0.8)), 
+        (11, 11, 0.4, 15, (0.8, 0.8)), 
+        (10, 10, 0.4, None, (0.5, 0.4)),
+        (10, 11, 0.4, None, (0.5, 0.4)),
+    ]
+)
+def test_create_model_grid(nx, ny, pix_scl_fac, num_pix, grid_shape):
+    pix_scl = 0.1
+    rot_angle = 0.
+    pixel_grid = _create_pixel_grid(nx, ny, pix_scl, rot_angle)
+    pixel_grid_new = pixel_grid.create_model_grid(num_pixels=num_pix,
+                                                  pixel_scale_factor=pix_scl_fac,
+                                                  grid_center=(0, 0),
+                                                  grid_shape=grid_shape)
+    nx_new, ny_new = pixel_grid_new.num_pixel_axes
+    if num_pix is not None:
+        assert nx_new == num_pix and ny_new == num_pix
+    elif pix_scl_fac is not None:
+        npt.assert_almost_equal(pixel_grid_new.pixel_width, pix_scl_fac*pixel_grid.pixel_width)

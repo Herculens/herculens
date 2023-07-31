@@ -6,7 +6,8 @@ __author__ = 'aymgal'
 
 
 from functools import partial
-from jax import jit, value_and_grad
+import jax.numpy as jnp
+from jax import jit, grad, value_and_grad
 from tqdm import tqdm
 
 
@@ -32,8 +33,16 @@ class BaseOptimizer(object):
         return self.loss(args) / self.norm_optim
 
     @partial(jit, static_argnums=(0,))
+    def grad_function_optim(self, args):
+        return grad(self.loss)(args)
+
+    @partial(jit, static_argnums=(0,))
     def function_optim_with_grad(self, args):
         return value_and_grad(self.function_optim)(args)
+
+    @partial(jit, static_argnums=(0,))
+    def function_optim_LM_scalar(self, args):
+        return jnp.array([self.function_optim(args)])
     
     @staticmethod
     def _for_loop(iterable, progress_bar_bool, **tqdm_kwargs):

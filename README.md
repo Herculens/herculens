@@ -2,10 +2,10 @@
 
 # Herculens: differentiable gravitational lensing
 
-![License](https://img.shields.io/github/license/austinpeel/herculens)
-![PyPi python support](https://img.shields.io/badge/Python-3.7-blue)
-[![Tests](https://github.com/herculens/herculens/actions/workflows/ci_tests.yml/badge.svg?branch=main)](https://github.com/herculens/herculens/actions/workflows/ci_tests.yml)
+![PyPi python support](https://img.shields.io/badge/Python-3.7%20%7C%203.8%20%7C%203.9-blue)
+[![Tests](https://github.com/austinpeel/herculens/actions/workflows/ci_tests.yml/badge.svg?branch=main)](https://github.com/austinpeel/herculens/actions/workflows/ci_tests.yml)
 [![arXiv](https://img.shields.io/badge/arXiv-2207.05763-b31b1b.svg)](https://arxiv.org/abs/2207.05763)
+![License](https://img.shields.io/github/license/austinpeel/herculens)
 <!-- ![PyPi version](https://img.shields.io/pypi/v/herculens) -->
 <!-- [![Coverage Status](https://coveralls.io/repos/github/herculens/herculens/badge.svg?branch=main)](https://coveralls.io/github/aymgal/utax?branch=main) -->
 
@@ -41,10 +41,13 @@ This highly modular framework offers a way to merge all modeling paradigms explo
 Below you can find a few examples of synthetic problems that can be tackled with `herculens`:
 
 - [**Starting guide**: Lens modeling with gradient descent, Fisher analysis and Hamiltonian sampling](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Starting_guide.ipynb)
+- [Starting guide with a complex source: similar to the starting guide but with a more complex source galaxy](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Starting_guide_complex_source.ipynb)
 - [Reconstruction of a complex lensed galaxy with wavelets (and analytical profiles)](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Complex_source_with_wavelets.ipynb)
 - [Detection of a dark satellite as a localized deviation to the smooth lens potential](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Subhalo_detection_with_wavelets.ipynb)
+- [Bayesian wavelet modeling of a spiral galaxy with (Laplace) sparsifying priors](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Spiral_galaxy_Bayesian_sparsity_Laplace.ipynb)
+- [Simple smooth light profile fitting](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Simple_galaxy_fitting.ipynb)
 
-New notebooks will be added soon in order to showcase other features of the package and apply those in different situations.
+New notebooks will continuously be added in order to showcase other features of the package and apply those in different situations.
 
 
 
