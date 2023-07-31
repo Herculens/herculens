@@ -10,7 +10,6 @@ import shutil
 import math
 import numpy as np
 from astropy.io import fits
-import logging
 
 from herculens.Inference.legacy.parameters import Parameters as HerculensParameters
 from herculens.Util import param_util
@@ -18,21 +17,20 @@ from herculens.Util.jax_util import unjaxify_kwargs
 
 from coolest.template.lazy import *
 
-logging.getLogger().setLevel(logging.INFO)
 
 # NOTE: `h2c` is a shorthand for `herculens2coolest`
 
 
-def create_output_directory(directory, empty_dir_bool):
+def create_directory(directory, empty_dir_bool):
     if not os.path.exists(directory):
         os.makedirs(directory)
-        logging.info(f"Created directory {directory}")
+        print(f"COOLEST-info: Created directory {directory}")
     elif empty_dir_bool:
         shutil.rmtree(directory)
         os.makedirs(directory)
-        logging.info(f"Emptied directory {directory}")
+        print(f"COOLEST-info: Emptied directory {directory}")
     elif not os.listdir(directory):
-        logging.info(f"Directory {directory} already empty; nothing to be done.")
+        print(f"COOLEST-info: Directory {directory} already empty; nothing to be done.")
     else:
         return False
     return True
@@ -40,10 +38,9 @@ def create_output_directory(directory, empty_dir_bool):
 
 def create_observation(data, lens_image, json_dir=None,
                        noise_type='NoiseMap', model_noise_map=None, 
-                       fits_file_suffix="coolest", 
                        kwargs_obs=None, kwargs_noise=None):
     # saves the observed lens image on disk
-    obs_file_name = f"obs-{fits_file_suffix}.fits"
+    obs_file_name = "obs.fits"
     if json_dir is not None:
         obs_fits_path = os.path.join(json_dir, obs_file_name)
     else:
@@ -67,7 +64,7 @@ def create_observation(data, lens_image, json_dir=None,
     if noise_type == 'NoiseMap':
         if model_noise_map is None:
             raise ValueError(f"A noise map must be provided for noise type {noise_type}")
-        noise_map_file_name = f"noise_map-{fits_file_suffix}.fits"
+        noise_map_file_name = "noise_map.fits"
         if json_dir is not None:
             noise_map_fits_path = os.path.join(json_dir, noise_map_file_name)
         else:
@@ -99,7 +96,6 @@ def create_observation(data, lens_image, json_dir=None,
 
 def create_instrument(lens_image, observation, json_dir=None,
                       psf_type='PixelatedPSF',
-                      fits_file_suffix="coolest",
                       psf_description=None,
                       kwargs_psf=None):
     if psf_type == 'PixelatedPSF':
@@ -111,7 +107,7 @@ def create_instrument(lens_image, observation, json_dir=None,
         else:
             raise ValueError(f"PSF supersampling factor of {super_factor} is unknown "
                              f"for `psf_type` {psf_type}")
-        psf_file_name = f"psf-{fits_file_suffix}.fits"
+        psf_file_name = f"psf.fits"
         if json_dir is not None:
             psf_fits_path = os.path.join(json_dir, psf_file_name)
         else:
@@ -147,90 +143,117 @@ def create_instrument(lens_image, observation, json_dir=None,
 def save_image_to_fits(path, image, header_cards=[], overwrite=True):
     header = fits.Header(cards=header_cards)
     fits.writeto(path, image, header, overwrite=overwrite)
-    logging.info(f"Saved image to FITS file {path}")
+    print(f"COOLEST-info: Saved image to FITS file {path}")
 
 
-def create_lensing_entities(lens_image, lensing_entity_mapping, 
+def update_lensing_entities(lens_image, lensing_entity_mapping, 
                             parameters=None, samples=None, 
+                            current_entities=None, re_create_entities=True,
                             json_dir=None, fits_file_suffix="coolest"):
-        """
-        lensing_entity_mapping: list of 2-tuples of the following format:
-            ('name_of_the_entity', kwargs_mapping)
-        where kwargs_mapping is settings for create_extshear_model and create_galaxy_model functions. 
-        """
-        # TODO: check if multi-plane lensing
+    """
+    lensing_entity_mapping: list of 2-tuples of the following format:
+        ('name_of_the_entity', kwargs_mapping)
+    where kwargs_mapping is settings for update_mass_field_model and update_galaxy_model functions. 
+    """
+    # TODO: check if multi-plane lensing
 
-        if parameters is not None and isinstance(parameters, dict):
-            parameters = unjaxify_kwargs(parameters)
-        if samples is not None and isinstance(samples, dict):
-            samples = unjaxify_kwargs(samples)
+    if re_create_entities is False:
+        if current_entities is None or len(current_entities) == 0:
+            print("COOLEST-info: Since no lensing entities have been found nor provided, "
+                         "new ones will be created based on the model.")
+            re_create_entities = True
+        else:
+            print("COOLEST-info: Current lensing entities will be updated.")
+    else:
+        print("COOLEST-info: New lensing entities will be created based on the model.")
 
-        # initialize list of lensing entities
-        entities = []
+    if parameters is not None and isinstance(parameters, dict):
+        parameters = unjaxify_kwargs(parameters)
+    if samples is not None and isinstance(samples, dict):
+        samples = unjaxify_kwargs(samples)
 
-        # iterate over the lensing entities (galaxies or external shears)
-        for entity_name, kwargs_mapping in lensing_entity_mapping:
-            entity_type = kwargs_mapping.pop('type')
-            if entity_type == 'external_shear':
-                entity = create_extshear_model(lens_image, entity_name, 
-                                                    parameters=parameters,
-                                                    samples=samples,
-                                                    **kwargs_mapping)
-            elif entity_type == 'galaxy':
-                entity = create_galaxy_model(lens_image, entity_name, 
-                                                  parameters=parameters,
-                                                  samples=samples,
-                                                  file_dir=json_dir,
-                                                  fits_file_suffix="coolest",
-                                                  **kwargs_mapping)
-            else:
-                raise ValueError(f"Unknown lensing entity type '{entity_type}'.")
+    # initialize list of lensing entities
+    entities = []
 
+    # iterate over the lensing entities (galaxies or external shears)
+    for i, (entity_name, kwargs_mapping) in enumerate(lensing_entity_mapping):
+        if kwargs_mapping is None:
+            continue  # this entity is ignored (neither created nor updated!)
+
+        entity_type = kwargs_mapping.pop('type')
+
+        if re_create_entities is True:
+            current_entity = None
+        else:
+            current_entity = current_entities[i]
+        
+        if entity_type == 'MassField':
+            entity = update_mass_field_model(lens_image, entity_name,
+                                             mass_field=current_entity, 
+                                             parameters=parameters,
+                                             samples=samples,
+                                             **kwargs_mapping)
+        elif entity_type == 'Galaxy':
+            entity = update_galaxy_model(lens_image, entity_name, 
+                                         galaxy=current_entity, 
+                                         parameters=parameters,
+                                         samples=samples,
+                                         file_dir=json_dir,
+                                         fits_file_suffix=fits_file_suffix,
+                                         **kwargs_mapping)
+        else:
+            raise ValueError(f"Unknown lensing entity type '{entity_type}'.")
+
+        if re_create_entities:
             entities.append(entity)
+        else:
+            # in that case the current entity has been updated in place
+            pass
 
-        return LensingEntityList(*entities)
+    return current_entities if not re_create_entities else LensingEntityList(*entities)
 
 
-def create_extshear_model(lens_image, name, parameters=None, samples=None,
-                          mass_profile_indices=None, 
-                          redshift=None):
+def update_mass_field_model(lens_image, name, mass_field=None,
+                            parameters=None, samples=None,
+                            mass_profile_indices=None, 
+                            redshift=None):
     # external shear
     mass_profiles_all = lens_image.MassModel.profile_type_list
     mass_profiles_in  = [mass_profiles_all[i] for i in mass_profile_indices]
+    if mass_profiles_in not in (['SHEAR'], ['SHEAR_GAMMA_PSI']):
+        raise NotImplementedError("Mass fields other than a single external shear are not yet supported.")
     mass_profiles_out = h2c_extshear_profiles(mass_profiles_in)
     
     # instantiate the external shear
-    extshear = ExternalShear(name, mass_model=MassModel(*mass_profiles_out), redshift=redshift)
+    if mass_field is None:
+        mass_field = MassField(name, mass_model=MassModel(*mass_profiles_out), redshift=redshift)
+    else:
+        assert isinstance(mass_field, MassField), "Inconsistent entity type"
 
-    if parameters is not None:
-        if isinstance(parameters, HerculensParameters):
-            logging.info("Using the legacy interface of the Parameters class")
-            kwargs_list = parameters.best_fit_values(as_kwargs=True)['kwargs_lens']
-            if parameters.samples is not None:
-                kwargs_list_samples = parameters.samples(as_kwargs=True, group_by_param=True)['kwargs_lens']
-            else:
-                kwargs_list_samples = None
-        elif isinstance(parameters, dict):
-            kwargs_list = parameters['kwargs_lens']
-            kwargs_list_samples = None if samples is None else samples['kwargs_lens']
-
-        # add point estimate values to the ExternalShear object
+    kwargs_all, kwargs_all_samples = get_parameters_and_samples(parameters, samples)
+        
+    if kwargs_all is not None or kwargs_all_samples is not None:
+        # add point estimate values to the MassField object
         for ic, ih in enumerate(mass_profile_indices):
             profile_name = mass_profiles_in[ic]
             if profile_name == 'SHEAR':
                 g1g2_param = True
             elif profile_name == 'SHEAR_GAMMA_PSI':
                 g1g2_param = False
-            h2c_extshear_values(extshear.mass_model[ic], kwargs_list[ih], 
-                                g1g2_param=g1g2_param)
-            if kwargs_list_samples is not None:
-                h2c_extshear_posteriors(extshear.mass_model[ic], kwargs_list_samples[ih], 
+            if kwargs_all is not None:
+                h2c_extshear_values(mass_field.mass_model[ic], 
+                                    kwargs_all['kwargs_lens'][ih], 
+                                    g1g2_param=g1g2_param)
+            if kwargs_all_samples is not None:
+                h2c_extshear_posteriors(mass_field.mass_model[ic], 
+                                        kwargs_all_samples['kwargs_lens'][ih], 
                                         g1g2_param=g1g2_param)
 
-    return extshear
+    return mass_field
 
 
-def create_galaxy_model(lens_image, name, parameters=None, samples=None,
+def update_galaxy_model(lens_image, name, galaxy=None,
+                        parameters=None, samples=None,
                         mass_profile_indices=None, light_profile_indices=None,
                         lensed=None, redshift=None, 
                         file_dir=None, fits_file_suffix="coolest"):
@@ -253,24 +276,18 @@ def create_galaxy_model(lens_image, name, parameters=None, samples=None,
     else:
         light_profiles_out = []
     
-    # instantiate the galaxy
-    galaxy = Galaxy(name,
-                    mass_model=MassModel(*mass_profiles_out), 
-                    light_model=LightModel(*light_profiles_out),
-                    redshift=redshift)
+    if galaxy is None:
+        # instantiate the galaxy
+        galaxy = Galaxy(name,
+                        mass_model=MassModel(*mass_profiles_out), 
+                        light_model=LightModel(*light_profiles_out),
+                        redshift=redshift)
+    else:
+        assert isinstance(galaxy, Galaxy), "Inconsistent entity type"
 
-    if parameters is not None:
-        if isinstance(parameters, HerculensParameters):
-            logging.info("Using the legacy interface of the Parameters class")
-            kwargs_all = parameters.best_fit_values(as_kwargs=True)
-            if parameters.samples is not None:
-                kwargs_all_samples = parameters.samples(as_kwargs=True, group_by_param=True)
-            else:
-                kwargs_all_samples = None
-        elif isinstance(parameters, dict):
-            kwargs_all = parameters
-            kwargs_all_samples = samples
+    kwargs_all, kwargs_all_samples = get_parameters_and_samples(parameters, samples)
 
+    if kwargs_all is not None or kwargs_all_samples is not None:
         if mass_profile_indices is not None:
             update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                                      mass_profile_indices, mass_profiles_in, 
@@ -286,8 +303,6 @@ def create_galaxy_model(lens_image, name, parameters=None, samples=None,
 def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, 
                              profile_indices, profile_names, 
                              file_dir=None, fits_file_suffix="coolest"):
-    kwargs_list = kwargs_all['kwargs_lens']
-    kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples['kwargs_lens']
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
         profile_name = profile_names[ic]
@@ -300,10 +315,11 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                 isothermal, spherical = False, False
             elif profile_name == 'SPEMD':
                 raise NotImplementedError("SPEMD mass profile is not yet supported")
-            h2c_powerlaw_values(galaxy.mass_model[ic], kwargs_list[ih], 
-                                isothermal=isothermal, spherical=spherical)
-            if kwargs_list_samples is not None:
-                h2c_powerlaw_posteriors(galaxy.mass_model[ic], kwargs_list_samples[ih], 
+            if kwargs_all is not None:
+                h2c_powerlaw_values(galaxy.mass_model[ic], kwargs_all['kwargs_lens'][ih], 
+                                    isothermal=isothermal, spherical=spherical)
+            if kwargs_all_samples is not None:
+                h2c_powerlaw_posteriors(galaxy.mass_model[ic], kwargs_all_samples['kwargs_lens'][ih], 
                                         isothermal=isothermal, spherical=spherical)
         else:
             raise NotImplementedError(f"'{profile_name}' not yet supported.")
@@ -314,26 +330,33 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
                               file_dir=None, fits_file_suffix="coolest"):
     # get current values
     light_comp = 'source' if lensed else 'lens_light'
-    kwargs_list = kwargs_all[f'kwargs_{light_comp}']
-    kwargs_list_samples = None if kwargs_all_samples is None else kwargs_all_samples[f'kwargs_{light_comp}']
+    key = f'kwargs_{light_comp}'
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
         if profile_names[ic] == 'SERSIC_ELLIPSE':
-            h2c_Sersic_values(galaxy.light_model[ic], kwargs_list[ih])
-            if kwargs_list_samples is not None:
-                h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_list_samples[ih])
+            if kwargs_all is not None:
+                h2c_Sersic_values(galaxy.light_model[ic], kwargs_all[key][ih])
+            if kwargs_all_samples is not None:
+                h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih])
         elif profile_names[ic] == 'SERSIC':
-            h2c_Sersic_values(galaxy.light_model[ic], kwargs_list[ih], spherical=True)
-            if kwargs_list_samples is not None:
-                h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_list_samples[ih], spherical=True)
+            if kwargs_all is not None:
+                h2c_Sersic_values(galaxy.light_model[ic], kwargs_all[key][ih], spherical=True)
+            if kwargs_all_samples is not None:
+                h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih], spherical=True)
         elif profile_names[ic] == 'SHAPELETS':
-            h2c_Shapelets_values(galaxy.light_model[ic], kwargs_list[ih],
-                                 lens_image.SourceModel.func_list[ih])  # TODO: improve access to e.g. n_max 
+            if kwargs_all is not None:
+                h2c_Shapelets_values(galaxy.light_model[ic], kwargs_all[key][ih],
+                                    lens_image.SourceModel.func_list[ih])  # TODO: improve access to e.g. n_max 
+            if kwargs_all_samples is not None:
+                raise NotImplementedError(f"Samples for profile '{profile_names[ic]}' not yet support")
         elif profile_names[ic] == 'PIXELATED':
-            h2c_pixelated_values(galaxy.light_model[ic], kwargs_list[ih],
-                                 lens_image.SourceModel.func_list[ih],
-                                 file_dir=file_dir,
-                                 fits_file_suffix=light_comp+'-'+fits_file_suffix)  # TODO: improve access to e.g. pixel_grid 
+            if kwargs_all is not None:
+                h2c_pixelated_values(galaxy.light_model[ic], kwargs_all[key][ih],
+                                    lens_image.SourceModel.func_list[ih],
+                                    file_dir=file_dir,
+                                    fits_file_suffix=light_comp+'-'+fits_file_suffix)  # TODO: improve access to e.g. pixel_grid 
+            if kwargs_all_samples is not None:
+                raise NotImplementedError(f"Samples for profile '{profile_names[ic]}' not yet support")
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
@@ -509,7 +532,7 @@ def h2c_extshear_posteriors(profile, kwargs_samples, g1g2_param=False):
         gamma1, gamma2 = kwargs_samples['gamma1'], kwargs_samples['gamma2']
         phi_ext, gamma_ext = param_util.shear_cartesian2polar_numpy(gamma1, gamma2)
     else:
-        phi_ext, gamma_ext = kwargs_samples['gamma1'], kwargs_samples['gamma2']
+        phi_ext, gamma_ext = kwargs_samples['phi_ext'], kwargs_samples['gamma_ext']
     phi_ext = h2c_position_angle(phi_ext)
     profile.parameters['phi_ext'].set_posterior(prepare_posterior(phi_ext))
     profile.parameters['gamma_ext'].set_posterior(prepare_posterior(gamma_ext))
@@ -570,7 +593,7 @@ def h2c_position_angle(value):
     """
     value_conv = value + np.pi / 2.
     value_conv = value_conv * 180. / np.pi
-    logging.warning(f"ASSUMING X AXIS IS POSTIVE TOWARDS THE RIGHT!")
+    print("COOLEST-warning: Assuming x axis is positive towards the right!")
     #if is_iterable(value):
     #    for i, val in enumerate(value_conv):
     #        if val <= -90.:
@@ -615,3 +638,29 @@ def is_iterable(value):
         return False
     else:
         return True
+
+def get_parameters_and_samples(parameters, samples):
+    kwargs_all = None
+    kwargs_all_samples = None
+
+    if parameters is not None:
+        if isinstance(parameters, HerculensParameters):
+            print("COOLEST-info: Using the legacy interface of the Parameters class")
+            kwargs_all = parameters.best_fit_values(as_kwargs=True)
+            if parameters.samples is not None:
+                kwargs_all_samples = parameters.samples(as_kwargs=True, group_by_param=True)
+            else:
+                kwargs_all_samples = None
+
+        elif isinstance(parameters, dict):
+            kwargs_all = parameters
+            kwargs_all_samples = None if samples is None else samples
+
+    elif parameters is None and samples is not None:
+        kwargs_all = None
+        if isinstance(samples, dict):
+            kwargs_all_samples = None if samples is None else samples
+        else:
+            raise ValueError(f"Unsupported type '{type(samples)}' for `samples`")
+    
+    return kwargs_all, kwargs_all_samples

@@ -25,9 +25,9 @@ class PixelKernelConvolution(object):
     class to compute convolutions for a given pixelized kernel
     """
 
-    _conv_types = ['jax_scipy', 'matrix']
+    _conv_types = ['jax_scipy_fft', 'jax_scipy', 'matrix']
 
-    def __init__(self, kernel, convolution_type='jax_scipy', output_shape=None):
+    def __init__(self, kernel, convolution_type='jax_scipy_fft', output_shape=None):
         """
 
         :param kernel: 2d array, convolution kernel
@@ -63,7 +63,9 @@ class PixelKernelConvolution(object):
         :param image: 2d array (image) to be convolved
         :return: fft convolution
         """
-        if self._conv_type == 'jax_scipy':
+        if self._conv_type == 'jax_scipy_fft':
+            return jsp.signal.fftconvolve(image, self._kernel, mode='same')
+        elif self._conv_type == 'jax_scipy':
             return jsp.signal.convolve2d(image, self._kernel, mode='same')
         elif self._conv_type == 'matrix':
             return self._conv_matrix.dot(image.flatten()).reshape(*self._output_shape)
