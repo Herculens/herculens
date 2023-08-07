@@ -156,10 +156,10 @@ class Noise(object):
         :param exposure_map: exposure time per pixel, e.g. in units of seconds
         :return: len(d) x len(d) matrix that give the error of background and Poisson components; (photons/second)^2
         """
-        sigma = background_rms**2
+        sigma2 = background_rms**2
         if exposure_map is not None:
             d_pos = jnp.maximum(0, data)
-            sigma += d_pos / exposure_map
+            sigma2 += d_pos / exposure_map
         else:
-            sigma = sigma * jnp.ones_like(data)
-        return sigma
+            sigma2 = sigma2 * jnp.ones_like(data)
+        return sigma2

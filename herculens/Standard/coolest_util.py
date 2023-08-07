@@ -329,6 +329,7 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
                               profile_indices, profile_names, lensed, 
                               file_dir=None, fits_file_suffix="coolest"):
     # get current values
+    class_comp = lens_image.SourceModel if lensed else lens_image.LensLightModel
     light_comp = 'source' if lensed else 'lens_light'
     key = f'kwargs_{light_comp}'
     # add point estimate values
@@ -346,17 +347,20 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
         elif profile_names[ic] == 'SHAPELETS':
             if kwargs_all is not None:
                 h2c_Shapelets_values(galaxy.light_model[ic], kwargs_all[key][ih],
-                                    lens_image.SourceModel.func_list[ih])  # TODO: improve access to e.g. n_max 
+                                     class_comp.func_list[ih])  # TODO: improve access to e.g. n_max 
             if kwargs_all_samples is not None:
-                raise NotImplementedError(f"Samples for profile '{profile_names[ic]}' not yet support")
+                print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
+                      f"is not yet supported; samples are ignored.")
         elif profile_names[ic] == 'PIXELATED':
             if kwargs_all is not None:
+                x_grid_model, y_grid_model, _ = lens_image.get_source_coordinates(kwargs_all['kwargs_lens'])
                 h2c_pixelated_values(galaxy.light_model[ic], kwargs_all[key][ih],
-                                    lens_image.SourceModel.func_list[ih],
-                                    file_dir=file_dir,
-                                    fits_file_suffix=light_comp+'-'+fits_file_suffix)  # TODO: improve access to e.g. pixel_grid 
+                                     x_grid_model, y_grid_model,
+                                     file_dir=file_dir,
+                                     fits_file_suffix=light_comp+'-'+fits_file_suffix)  # TODO: improve access to e.g. pixel_grid 
             if kwargs_all_samples is not None:
-                raise NotImplementedError(f"Samples for profile '{profile_names[ic]}' not yet support")
+                print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
+                      f"is not yet supported; samples are ignored.")
         else:
             raise NotImplementedError(f"'{profile_names[ic]}' not yet supported.")
 
@@ -466,28 +470,31 @@ def h2c_Shapelets_values(profile, kwargs, profile_herculens):
     profile.parameters['n_max'].fix()
 
 
-def h2c_pixelated_values(profile, kwargs, profile_herculens, 
+def h2c_pixelated_values(profile, kwargs, x_grid, y_grid, 
                          file_dir=None, fits_file_suffix="coolest"):
     """Profile based on REGULAR grid of pixels"""
     pixel_values = check_type(kwargs['pixels'])
-    h_grid = profile_herculens.pixel_grid
-    if h_grid.x_is_inverted:
+    if x_grid[0, 0] > x_grid[0, 1]:
         raise NotImplementedError("Only increasing x coordinates is supported so far")
-    if h_grid.y_is_inverted:
+    if y_grid[0, 0] > y_grid[1, 0]:
         raise NotImplementedError("Only increasing y coordinates is supported so far")
-    x_grid, y_grid = h_grid.pixel_coordinates
-    pixel_scale = float(h_grid.pixel_width)
+    pixel_scale = abs(x_grid[0, 0] - x_grid[0, 1])
+    pixel_scale_y = abs(y_grid[0, 0] - y_grid[1, 0])
+    print(f"COOLEST-info: assuming SQUARE pixels for the source "
+          f"(pixel size along x = {pixel_scale}, along y = {pixel_scale_y}).")
+
     half_pix = pixel_scale / 2.
-    extent = h_grid.extent
+    extent = [x_grid[0, 0], x_grid[0, -1], y_grid[0, 0], y_grid[-1, 0]]
     fov_x = [float(extent[0])-half_pix, float(extent[1])+half_pix]
     fov_y = [float(extent[2])-half_pix, float(extent[3])+half_pix]
 
-    matrix = h_grid.transform_pix2angle / 3600.  # arcsec -> degree
+    transform_pix2angle = np.array([[pixel_scale, 0.], [0, pixel_scale]])
+    matrix = transform_pix2angle / 3600.  # arcsec -> degree
     CD1_1 = float(matrix[0, 0])
     CD1_2 = float(matrix[0, 1])
     CD2_1 = float(matrix[1, 0])
     CD2_2 = float(matrix[1, 1])
-  
+
     fits_filename = f'model-{fits_file_suffix}.fits'
     if file_dir is None:
         fits_path = fits_filename

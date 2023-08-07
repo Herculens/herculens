@@ -53,7 +53,7 @@ class COOLESTexporter(object):
             serializer.dump_jsonpickle()
         else:
             serializer.dump_simple()
-        print("COOLEST-info: successfully saved / updated the template file.")
+        print("COOLEST-info: successfully saved the updated template file.")
 
     def update_from_data(self, data, lens_image,
                          noise_type='NoiseMap', noise_map=None,
@@ -101,6 +101,13 @@ class COOLESTexporter(object):
     def update_metadata(self, **meta_kwargs):
         self._coolest.meta['modeling_code'] = f"Herculens (v{herculens.__version__})"
         self._coolest.meta.update(meta_kwargs)
+
+    def delete_metadata(self, meta_key):
+        res = self._coolest.meta.pop(meta_key, None)
+        if res is None:
+            print(f"COOLEST-warning: key '{meta_key}' has not been found in the COOLEST metadata.")
+        else:
+            print(f"COOLEST-info: successfully removed key '{meta_key}' from COOLEST metadata.")
 
     def _load_coolest_object(self):
         coolest_obj = get_coolest_object(self._input_coolest_file, **self._kwargs_serializer)
