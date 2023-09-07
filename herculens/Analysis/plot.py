@@ -268,6 +268,20 @@ class Plotter(object):
                 for curve in curves:
                     ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
                 ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
+            if show_shear_field:
+                shear_field = model_util.shear_deflection_field(lens_image, kwargs_lens)
+                if shear_field is not None:
+                    x_field, y_field, g1_field, g2_field, ax_field, ay_field = shear_field
+                    qu = ax.quiver(x_field, y_field,
+                                   g1_field, g2_field,
+                                   #ax_field, ay_field, 
+                                   scale=0.1, scale_units='xy',
+                                   #width=0.001, headwidth=0.3, 
+                                   color='white', alpha=0.3)
+                    ax.set_xlim(extent[0], extent[1])
+                    ax.set_ylim(extent[2], extent[3])
+                else:
+                    print("Warning: no external shear to plot have been found.")
             data_title = self.data_name if self.data_name is not None else "data"
             ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 

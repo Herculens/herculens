@@ -13,7 +13,6 @@ from scipy import ndimage
 from skimage import measure
 
 from herculens.LensImage.lensing_operator import LensingOperator
-from herculens.Util import util
 
 
 def mask_from_source_area(lens_image, parameters):
@@ -121,10 +120,6 @@ def pixelated_region_from_arc_mask(arc_mask, image_grid, mass_model, mass_params
     arc_mask_source = np.array(lensing_op.image2source_2d(arc_mask))
     arc_mask_source = np.where(arc_mask_source < 0.1, 0., 1.)  # only contains 0 and 1 now
 
-    import matplotlib.pyplot as plt
-    plt.imshow(arc_mask_source)
-    plt.show()
-
     # Find the minimum bounding box that encloses the mask in source plane (square here)
     # - get the extrema 
     rows = np.max(arc_mask_source, axis=0)
@@ -221,3 +216,27 @@ def critical_curves(lens_image, kwargs_lens, return_lens_centers=False):
         return curves, (np.array(cxs), np.array(cys))
     
     return curves
+
+def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
+    shear_type = 'SHEAR_GAMMA_PSI'
+    try:
+        shear_idx = lens_image.MassModel.profile_type_list.index(shear_type)
+    except ValueError:
+        shear_type = 'SHEAR'
+        try:
+            shear_idx = lens_image.MassModel.profile_type_list.index(shear_type)
+        except ValueError:
+            return None
+    if shear_type == 'SHEAR_GAMMA_PSI':
+        # imports are here to avoid issues with circular imports
+        from herculens.Util import param_util
+        gamma1, gamma2 = param_util.shear_polar2cartesian(kwargs_lens[shear_idx]['phi_ext'],
+                                                          kwargs_lens[shear_idx]['gamma_ext'])
+    else:
+        gamma1, gamma2 = kwargs_lens[shear_idx]['gamma1'], kwargs_lens[shear_idx]['gamma2']
+    grid = lens_image.Grid.create_model_grid(num_pixels=num_pixels)
+    x_grid_img, y_grid_img = grid.pixel_coordinates
+    alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_img, y_grid_img, kwargs_lens, 
+                                                  k=shear_idx)
+    return (np.array(x_grid_img), np.array(y_grid_img), 
+            gamma1, gamma2, np.array(alpha_x), np.array(alpha_y))

@@ -146,7 +146,6 @@ class PixelGrid(Coordinates):
             ny = round(height / pixel_width)
         else:
             nx = ny = num_pixels_  # assuming square grid
-            print("nxny", nx, ny)
             if height != width:
                 raise ValueError(f"Setting number of side pixels only works with square grids "
                                  f"(grid shape {grid_shape_} was provided).")
