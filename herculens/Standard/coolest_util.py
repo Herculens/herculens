@@ -478,15 +478,15 @@ def h2c_pixelated_values(profile, kwargs, x_grid, y_grid,
         raise NotImplementedError("Only increasing x coordinates is supported so far")
     if y_grid[0, 0] > y_grid[1, 0]:
         raise NotImplementedError("Only increasing y coordinates is supported so far")
-    pixel_scale = abs(x_grid[0, 0] - x_grid[0, 1])
-    pixel_scale_y = abs(y_grid[0, 0] - y_grid[1, 0])
+    pixel_scale = float(abs(x_grid[0, 0] - x_grid[0, 1]))
+    pixel_scale_y = float(abs(y_grid[0, 0] - y_grid[1, 0]))
     print(f"COOLEST-info: assuming SQUARE pixels for the source "
           f"(pixel size along x = {pixel_scale}, along y = {pixel_scale_y}).")
-
+    
     half_pix = pixel_scale / 2.
     extent = [x_grid[0, 0], x_grid[0, -1], y_grid[0, 0], y_grid[-1, 0]]
-    fov_x = [float(extent[0])-half_pix, float(extent[1])+half_pix]
-    fov_y = [float(extent[2])-half_pix, float(extent[3])+half_pix]
+    fov_x = [extent[0]-half_pix, extent[1]+half_pix]
+    fov_y = [extent[2]-half_pix, extent[3]+half_pix]
 
     transform_pix2angle = np.array([[pixel_scale, 0.], [0, pixel_scale]])
     matrix = transform_pix2angle / 3600.  # arcsec -> degree
@@ -515,10 +515,15 @@ def h2c_pixelated_values(profile, kwargs, x_grid, y_grid,
                                   field_of_view_y=fov_y,
                                   check_fits_file=True,
                                   fits_file_dir=file_dir)
+    # set the pixel values
     profile.parameters['pixels'] = pixels
-    assert math.isclose(pixel_scale,
-                        profile.parameters['pixels'].pixel_size, 
-                        rel_tol=0.0, abs_tol=1e-06)
+    # finally, just perform a consistency check
+    recomputed_pixel_scale = profile.parameters['pixels'].pixel_size
+    consistent =  math.isclose(pixel_scale, recomputed_pixel_scale, 
+                               rel_tol=0.0, abs_tol=1e-06)
+    if not consistent:
+        raise ValueError(f"Inconsistent pixel scale values for profile '{profile.type}' "
+                         f"({pixel_scale} vs. {recomputed_pixel_scale})")
 
 
 def h2c_extshear_values(profile, kwargs, g1g2_param=False):
@@ -600,14 +605,19 @@ def h2c_position_angle(value):
     """
     value_conv = value + np.pi / 2.
     value_conv = value_conv * 180. / np.pi
-    print("COOLEST-warning: Assuming x axis is positive towards the right!")
-    #if is_iterable(value):
-    #    for i, val in enumerate(value_conv):
-    #        if val <= -90.:
-    #            value_conv[i] += 180.
-    #else:
-    #    if value_conv <= -90:
-    #        value_conv += 180.
+    print("COOLEST-warning: Assuming x axis is positive towards the right when converting angles!")
+    if is_iterable(value):
+       median = np.median(value)
+       for i, val in enumerate(value_conv):
+            if median <= -90.:
+                value_conv[i] += 180.
+            elif median > 90.:
+               value_conv[i] -= 180.
+    else:
+        if value_conv <= -90:
+            value_conv += 180.
+        elif value_conv > 90:
+            value_conv -= 180.
     return value_conv
 
 

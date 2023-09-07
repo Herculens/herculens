@@ -10,8 +10,10 @@ import numpy as np
 import jax.numpy as jnp
 from scipy.ndimage import morphology
 from scipy import ndimage
+from skimage import measure
 
 from herculens.LensImage.lensing_operator import LensingOperator
+from herculens.Util import util
 
 
 def mask_from_source_area(lens_image, parameters):
@@ -186,3 +188,36 @@ def draw_samples_from_covariance(mean, covariance, num_samples=10000, seed=None)
         np.random.seed(seed)
     samples = np.random.multivariate_normal(mean, covariance, size=num_samples)
     return samples
+
+
+def critical_curves(lens_image, kwargs_lens, return_lens_centers=False):
+    # TODO: for some reason, using the numerics grid does lead to proper pix2coord conversions 
+    # grid = lens_image.ImageNumerics.grid_class
+    # x_grid_img, y_grid_img = grid.coordinates_evaluate
+
+    # evaluate the total magnification
+    grid = lens_image.Grid
+    x_grid_img, y_grid_img = grid.pixel_coordinates
+    mag_tot = lens_image.MassModel.magnification(x_grid_img, y_grid_img, kwargs_lens)
+    # mag_tot = util.array2image(mag_tot)
+
+    # invert and find contours corresponding to infite magnification
+    inv_mag_tot = 1. / np.array(mag_tot)
+    contours = measure.find_contours(inv_mag_tot, 0.)
+
+    # convert to model coordinates
+    curves = []
+    for i, contour in enumerate(contours):
+        curve_x, curve_y = grid.map_pix2coord(contour[:, 1], contour[:, 0])
+        curves.append((np.array(curve_x), np.array(curve_y)))
+
+    # can also returns the lens components centroids for convenience
+    if return_lens_centers:
+        cxs, cys = [], []
+        for kw in kwargs_lens:
+            if 'center_x' in kw:
+                cxs.append(kw['center_x'])
+                cys.append(kw['center_y'])
+        return curves, (np.array(cxs), np.array(cys))
+    
+    return curves

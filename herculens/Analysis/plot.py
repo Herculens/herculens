@@ -14,6 +14,7 @@ from scipy import ndimage
 from matplotlib.colors import Normalize, LogNorm, TwoSlopeNorm
 
 from herculens.Util.plot_util import nice_colorbar, nice_colorbar_residuals
+from herculens.Util import model_util
 
 
 # Some general default for plotting
@@ -99,8 +100,9 @@ class Plotter(object):
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, 
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
-                      shift_pixelated_potential='none',
-                      likelihood_mask=None, potential_mask=None,
+                      only_pixelated_potential=False, shift_pixelated_potential='none',
+                      likelihood_mask=None, potential_mask=None, 
+                      show_critical_curves=False, show_shear_field=False,
                       kwargs_grid_source=None,
                       lock_colorbars=False, masked_residuals=True,
                       vmin_pot=None, vmax_pot=None,  # TEMP
@@ -108,11 +110,15 @@ class Plotter(object):
                       show_plot=True):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_light, 
-                     show_lens_potential, (show_lens_others and show_lens_potential)])
+                      show_lens_potential, show_lens_others])
         
         extent = lens_image.Grid.extent
 
         ##### PREPARE IMAGES #####
+
+        kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
+        kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
+        kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
             
         if show_image:
             # create the resulting model image
@@ -133,7 +139,6 @@ class Plotter(object):
                 data = np.zeros_like(model)
 
         if show_source:
-            kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
             if lens_image.SourceModel.has_pixels:
                 src_idx = lens_image.SourceModel.pixelated_index
                 source_model = kwargs_source[src_idx]['pixels']
@@ -167,7 +172,6 @@ class Plotter(object):
                 ps_src_pos = None
 
         if show_lens_light:
-            kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
             if lens_image.LensLightModel.has_pixels:
                 ll_idx = lens_image.LensLightModel.pixelated_index
                 lens_light_model = kwargs_lens_light[ll_idx]['pixels']
@@ -185,16 +189,21 @@ class Plotter(object):
                 ref_lens_light = None
                 show_lens_light_diff = False
 
-        if show_lens_potential:
-            kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
-            pot_idx = lens_image.MassModel.pixelated_index
-            x_grid_lens, y_grid_lens = lens_image.MassModel.pixel_grid.pixel_coordinates
+        if show_lens_potential or show_lens_others:
+            pot_idx = lens_image.MassModel.pixelated_index if only_pixelated_potential else None
+            if pot_idx is not None and only_pixelated_potential:
+                x_grid_lens, y_grid_lens = lens_image.MassModel.pixel_grid.pixel_coordinates
+                potential_model = kwargs_lens[pot_idx]['pixels']
+            else:
+                x_grid_lens, y_grid_lens = lens_image.Grid.pixel_coordinates
+                potential_model = lens_image.MassModel.potential(x_grid_lens, y_grid_lens, 
+                                                                 kwargs_lens, k=pot_idx)
             alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_lens, y_grid_lens, 
                                                           kwargs_lens, k=pot_idx)
             kappa = lens_image.MassModel.kappa(x_grid_lens, y_grid_lens, 
                                                kwargs_lens, k=pot_idx)
             #kappa = ndimage.gaussian_filter(kappa, 1)
-            potential_model = kwargs_lens[pot_idx]['pixels']
+            magnification = lens_image.MassModel.magnification(x_grid_lens, y_grid_lens, kwargs_lens)
             
             if potential_mask is None:
                 potential_mask = np.ones_like(potential_model)
@@ -252,17 +261,25 @@ class Plotter(object):
             im.set_rasterized(True)
             if mask_bool is True:
                 ax.contour(likelihood_mask, extent=extent, levels=[0], 
-                           colors='white', alpha=0.5, linewidths=0.5)
+                           colors='white', alpha=0.3, linewidths=0.5)
+            if show_critical_curves:
+                curves, centers = model_util.critical_curves(lens_image, kwargs_lens,
+                                                             return_lens_centers=True)
+                for curve in curves:
+                    ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
+                ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
             data_title = self.data_name if self.data_name is not None else "data"
             ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+            
             ax = axes[i_row, 1]
             im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
             im.set_rasterized(True)
             ax.set_title("model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+
             ax = axes[i_row, 2]
             model_residuals, residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
             if masked_residuals is True:
@@ -402,28 +419,32 @@ class Plotter(object):
                 ax.axis('off')
             i_row += 1
 
-        if show_lens_others and show_lens_potential:
+        if show_lens_others:
 
-            ##### DEFLECTION ANGLES AND SURFACE MASS DENSITY #####
+            ##### DEFLECTION ANGLES, SURFACE MASS DENSITY AND MAGNIFICATION #####
             ax = axes[i_row, 0]
             im = ax.imshow(alpha_x * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\alpha_{x,\rm pix}$", fontsize=self.base_fontsize)
+            title = r"$\alpha_{x,\rm pix}$" if only_pixelated_potential else r"deflection field ($x$)"
+            ax.set_title(title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
-            im = ax.imshow(alpha_y * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
+            im = ax.imshow(kappa * potential_mask, cmap=self.cmap_deriv2, norm=LogNorm(),
+                           alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\alpha_{y,\rm pix}$", fontsize=self.base_fontsize)
+            title = r"$\kappa_{\rm pix}$" if only_pixelated_potential else "convergence"
+            ax.set_title(title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            im = ax.imshow(kappa * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent)
+            im = ax.imshow(magnification * potential_mask, cmap=self.cmap_default, norm=Normalize(-10, 10),
+                           alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\kappa_{\rm pix}$", fontsize=self.base_fontsize)
+            title = r"$\mu_{\rm pix}$" if only_pixelated_potential else "magnification"
+            ax.set_title(title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
-            ax.imshow(likelihood_mask_nans, extent=extent, cmap='gray_r', vmin=0, vmax=1)
             i_row += 1
 
         if show_plot:
