@@ -102,7 +102,7 @@ class Plotter(object):
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
                       only_pixelated_potential=False, shift_pixelated_potential='none',
                       likelihood_mask=None, potential_mask=None, 
-                      show_critical_curves=False, show_shear_field=False,
+                      show_critical_lines=False, show_shear_field=False, show_lens_position=False,
                       kwargs_grid_source=None,
                       lock_colorbars=False, masked_residuals=True,
                       vmin_pot=None, vmax_pot=None,  # TEMP
@@ -115,10 +115,6 @@ class Plotter(object):
         extent = lens_image.Grid.extent
 
         ##### PREPARE IMAGES #####
-
-        kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
-        kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
-        kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
             
         if show_image:
             # create the resulting model image
@@ -139,6 +135,7 @@ class Plotter(object):
                 data = np.zeros_like(model)
 
         if show_source:
+            kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
             if lens_image.SourceModel.has_pixels:
                 src_idx = lens_image.SourceModel.pixelated_index
                 source_model = kwargs_source[src_idx]['pixels']
@@ -172,6 +169,7 @@ class Plotter(object):
                 ps_src_pos = None
 
         if show_lens_light:
+            kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
             if lens_image.LensLightModel.has_pixels:
                 ll_idx = lens_image.LensLightModel.pixelated_index
                 lens_light_model = kwargs_lens_light[ll_idx]['pixels']
@@ -190,6 +188,7 @@ class Plotter(object):
                 show_lens_light_diff = False
 
         if show_lens_potential or show_lens_others:
+            kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
             pot_idx = lens_image.MassModel.pixelated_index if only_pixelated_potential else None
             if pot_idx is not None and only_pixelated_potential:
                 x_grid_lens, y_grid_lens = lens_image.MassModel.pixel_grid.pixel_coordinates
@@ -262,9 +261,20 @@ class Plotter(object):
             if mask_bool is True:
                 ax.contour(likelihood_mask, extent=extent, levels=[0], 
                            colors='white', alpha=0.3, linewidths=0.5)
-            if show_critical_curves:
-                curves, centers = model_util.critical_curves(lens_image, kwargs_lens,
-                                                             return_lens_centers=True)
+            if show_lens_position:
+                if 'kwargs_lens' in kwargs_result:
+                    ax.plot(kwargs_result['kwargs_lens'][0]['center_x'], 
+                            kwargs_result['kwargs_lens'][0]['center_y'], 
+                            linestyle='none', markeredgecolor='black', color='black', 
+                            markersize=3, marker='o', fillstyle='full', markeredgewidth=0.5)
+                if 'kwargs_lens_light' in kwargs_result:
+                    ax.plot(kwargs_result['kwargs_lens_light'][0]['center_x'], 
+                            kwargs_result['kwargs_lens_light'][0]['center_y'], 
+                            linestyle='none', markeredgecolor='black', color='black', 
+                            markersize=10, marker='o', fillstyle='none', markeredgewidth=0.5)
+            if show_critical_lines:
+                curves, centers = model_util.critical_lines(lens_image, kwargs_lens,
+                                                            return_lens_centers=True)
                 for curve in curves:
                     ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
                 ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)

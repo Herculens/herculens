@@ -185,7 +185,7 @@ def draw_samples_from_covariance(mean, covariance, num_samples=10000, seed=None)
     return samples
 
 
-def critical_curves(lens_image, kwargs_lens, return_lens_centers=False):
+def critical_lines(lens_image, kwargs_lens, return_lens_centers=False):
     # TODO: for some reason, using the numerics grid does lead to proper pix2coord conversions 
     # grid = lens_image.ImageNumerics.grid_class
     # x_grid_img, y_grid_img = grid.coordinates_evaluate
@@ -201,10 +201,10 @@ def critical_curves(lens_image, kwargs_lens, return_lens_centers=False):
     contours = measure.find_contours(inv_mag_tot, 0.)
 
     # convert to model coordinates
-    curves = []
+    lines = []
     for i, contour in enumerate(contours):
         curve_x, curve_y = grid.map_pix2coord(contour[:, 1], contour[:, 0])
-        curves.append((np.array(curve_x), np.array(curve_y)))
+        lines.append((np.array(curve_x), np.array(curve_y)))
 
     # can also returns the lens components centroids for convenience
     if return_lens_centers:
@@ -213,9 +213,9 @@ def critical_curves(lens_image, kwargs_lens, return_lens_centers=False):
             if 'center_x' in kw:
                 cxs.append(kw['center_x'])
                 cys.append(kw['center_y'])
-        return curves, (np.array(cxs), np.array(cys))
+        return lines, (np.array(cxs), np.array(cys))
     
-    return curves
+    return lines
 
 def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
     shear_type = 'SHEAR_GAMMA_PSI'
