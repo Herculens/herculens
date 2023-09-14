@@ -261,17 +261,16 @@ class Plotter(object):
             if mask_bool is True:
                 ax.contour(likelihood_mask, extent=extent, levels=[0], 
                            colors='white', alpha=0.3, linewidths=0.5)
-            if show_lens_position:
-                if 'kwargs_lens' in kwargs_result:
-                    ax.plot(kwargs_result['kwargs_lens'][0]['center_x'], 
-                            kwargs_result['kwargs_lens'][0]['center_y'], 
-                            linestyle='none', markeredgecolor='black', color='black', 
-                            markersize=3, marker='o', fillstyle='full', markeredgewidth=0.5)
-                if 'kwargs_lens_light' in kwargs_result:
-                    ax.plot(kwargs_result['kwargs_lens_light'][0]['center_x'], 
-                            kwargs_result['kwargs_lens_light'][0]['center_y'], 
-                            linestyle='none', markeredgecolor='black', color='black', 
-                            markersize=10, marker='o', fillstyle='none', markeredgewidth=0.5)
+            if show_lens_position and 'kwargs_lens_light' in kwargs_result:
+                plotted_centers = []
+                for kw in kwargs_result['kwargs_lens_light']:
+                    if 'center_x' in kw:
+                        center = (kw['center_x'], kw['center_y'])
+                        if center not in plotted_centers:
+                            ax.plot(*center, linestyle='none', color='black', 
+                                    markeredgecolor='black', markersize=10, marker='o', 
+                                    fillstyle='none', markeredgewidth=0.5)
+                        plotted_centers.append(center)
             if show_critical_lines:
                 curves, centers = model_util.critical_lines(lens_image, kwargs_lens,
                                                             return_lens_centers=True)
@@ -279,7 +278,7 @@ class Plotter(object):
                     ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
                 ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
             if show_shear_field:
-                shear_field = model_util.shear_deflection_field(lens_image, kwargs_lens)
+                shear_field = model_util.shear_deflection_field(lens_image, kwargs_lens, num_pixels=8)
                 if shear_field is not None:
                     x_field, y_field, g1_field, g2_field, ax_field, ay_field = shear_field
                     qu = ax.quiver(x_field, y_field,
