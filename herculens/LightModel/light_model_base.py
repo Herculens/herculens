@@ -10,7 +10,7 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 import numpy as np
 import jax.numpy as jnp
 
-from herculens.LightModel.Profiles import (sersic, pixelated, uniform, gaussian)
+from herculens.LightModel.Profiles import (sersic, pixelated, uniform, gaussian, multipole)
 from herculens.Util import util
 
 __all__ = ['LightModelBase']
@@ -18,15 +18,17 @@ __all__ = ['LightModelBase']
 
 SUPPORTED_MODELS = [
     'GAUSSIAN', 'GAUSSIAN_ELLIPSE', 
-    'SERSIC', 'SERSIC_ELLIPSE', 
-    'SHAPELETS', 'UNIFORM', 'PIXELATED'
+    'SERSIC', 'SERSIC_ELLIPSE', 'SERSIC_SUPERELLIPSE', 
+    'SHAPELETS', 'UNIFORM', 'PIXELATED',
+    'MULTIPOLE',
 ]
 
 
 class LightModelBase(object):
     """Base class for source and lens light models."""
     # TODO: instead of settings for creating PixelGrid objects, pass directly the object to the LightModel
-    def __init__(self, light_model_list, smoothing=0.001, shapelets_n_max=4,
+    def __init__(self, light_model_list, smoothing=0.001, 
+                 shapelets_n_max=4, superellipse_exponent=2,
                  pixel_interpol='bilinear', pixel_adaptive_grid=False, 
                  pixel_allow_extrapolation=False, kwargs_pixelated=None):
         """Create a LightModelBase object.
@@ -56,9 +58,13 @@ class LightModelBase(object):
             elif profile_type == 'SERSIC':
                 func_list.append(sersic.Sersic(smoothing))
             elif profile_type == 'SERSIC_ELLIPSE':
-                func_list.append(sersic.SersicElliptic(smoothing))
+                func_list.append(sersic.SersicElliptic(smoothing, exponent=2))
+            elif profile_type == 'SERSIC_SUPERELLIPSE':
+                func_list.append(sersic.SersicElliptic(smoothing, exponent=superellipse_exponent))
             elif profile_type == 'UNIFORM':
                 func_list.append(uniform.Uniform())
+            elif profile_type == 'MULTIPOLE':
+                func_list.append(multipole.Multipole())
             elif profile_type == 'PIXELATED':
                 if pix_idx is not None:
                     raise ValueError("Multiple pixelated profiles is currently not supported.")

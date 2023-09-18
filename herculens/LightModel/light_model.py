@@ -31,12 +31,14 @@ class LightModel(LightModelBase):
     for a given set of parameters.
 
     """
-    def __init__(self, light_model_list, smoothing=0.001, shapelets_n_max=4,
+    def __init__(self, light_model_list, smoothing=0.001, 
+                 shapelets_n_max=4, superellipse_exponent=2,
                  kwargs_pixelated=None, **kwargs):
         """Create a LightModel object."""
         self.profile_type_list = light_model_list
         super(LightModel, self).__init__(self.profile_type_list, smoothing=smoothing,
                                          shapelets_n_max=shapelets_n_max,
+                                         superellipse_exponent=superellipse_exponent,
                                          kwargs_pixelated=kwargs_pixelated,
                                          **kwargs)
 
