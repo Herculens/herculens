@@ -153,8 +153,8 @@ class PixelGrid(Coordinates):
 
         transform_pix2angle = self.transform_pix2angle / self.pixel_width * pixel_width
 
-        cx, cy = int(nx / 2), int(ny / 2)
+        cx, cy = nx / 2., ny / 2.
         cra, cdec = transform_pix2angle.dot(np.array([cx, cy]))
-        ra_at_xy_0, dec_at_xy_0 = - cra + center_x, - cdec + center_y
+        ra_at_xy_0, dec_at_xy_0 = - cra + center_x + pixel_width/2., - cdec + center_y + pixel_width/2.
 
         return PixelGrid(nx, ny, transform_pix2angle, ra_at_xy_0, dec_at_xy_0)
