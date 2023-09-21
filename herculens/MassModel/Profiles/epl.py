@@ -183,8 +183,8 @@ class EPLMajorAxis(object):
         alpha = 2. / (1. + q) * (b / R)**t * jax_util.R_omega(z, t, q, nmax=20)
 
         # return real and imaginary part
-        alpha_real = jnp.nan_to_num(alpha.real, posinf=1e8, neginf=-1e8)
-        alpha_imag = jnp.nan_to_num(alpha.imag, posinf=1e8, neginf=-1e8)
+        alpha_real = alpha.real # jnp.nan_to_num(alpha.real, posinf=1e8, neginf=-1e8)
+        alpha_imag = alpha.imag # jnp.nan_to_num(alpha.imag, posinf=1e8, neginf=-1e8)
 
         return alpha_real, alpha_imag
 
@@ -200,7 +200,7 @@ class EPLMajorAxis(object):
 
         # convergence, eq. (2)
         kappa = (2. - t) / 2. * (b / R)**t
-        kappa = jnp.nan_to_num(kappa, posinf=1e8, neginf=-1e8)
+        # kappa = jnp.nan_to_num(kappa, posinf=1e8, neginf=-1e8)
 
         # deflection via method
         alpha_x, alpha_y = self.derivatives(x, y, b, t, q)
