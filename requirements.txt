@@ -5,6 +5,7 @@ jaxlib>=0.3.14
 optax>=0.1.0
 jaxopt>=0.5.5
 chex>=0.1.4
+objax>=1.7.0
 matplotlib>=3.0.0
 findiff==0.8.9
 scikit-image>=0.20.0
