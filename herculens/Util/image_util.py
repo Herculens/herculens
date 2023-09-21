@@ -10,7 +10,10 @@ import numpy as np
 from scipy import interpolate #, ndimage
 from scipy.ndimage import interpolation as interp
 from jax import random
+import jax.numpy as jnp
 
+from objax import functional
+from objax.constants import ConvPadding
 # from herculens.Util.jax_util import BilinearInterpolator
 
 
@@ -138,7 +141,10 @@ def re_size(image, factor=1):
     f = int(factor)
     nx, ny = np.shape(image)
     if int(nx/f) == nx/f and int(ny/f) == ny/f:
-        small = image.reshape([int(nx/f), f, int(ny/f), f]).mean(3).mean(1)
+        # small = image.reshape([int(nx/f), f, int(ny/f), f]).mean(3).mean(1)
+        image_nchw = image[None, None, :, :]
+        small_nchw = functional.average_pool_2d(image_nchw, size=f, padding=ConvPadding.SAME)
+        small = jnp.squeeze(small_nchw)
         return small
     else:
         raise ValueError("scaling with factor %s is not possible with grid size %s, %s" %(f, nx, ny))
