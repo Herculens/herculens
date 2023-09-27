@@ -16,7 +16,7 @@ from herculens.LensImage.Numerics.numerics import Numerics
 from herculens.LensImage.lensing_operator import LensingOperator
 
 
-__all__ = ['LensImage']
+__all__ = ['LensImage', 'LensImage3D']
 
 
 class LensImage(object):
@@ -257,6 +257,9 @@ class LensImage(object):
         if compute_true_noise_map is True:
             self.Noise.compute_noise_map_from_model(model)
         return simu
+    
+    def C_D_model(self, model):
+        return self.Noise.C_D_model(model)
 
     def normalized_residuals(self, data, model, mask=None):
         """
@@ -265,7 +268,7 @@ class LensImage(object):
         """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        noise_var = self.Noise.C_D_model(model)
+        noise_var = self.C_D_model(model)
         noise = np.sqrt(noise_var)
         norm_res_model = (data - model) / noise * mask
         norm_res_tot = norm_res_model
@@ -299,7 +302,7 @@ class LensImage(object):
         x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img[self._src_arc_mask_bool], 
                                                              y_grid_img[self._src_arc_mask_bool], 
                                                              kwargs_lens, k=k_lens)
-        # create grid encompassed by ray-shooted coordinates
+        # create grid encompassed by ray-shot coordinates
         x_left, x_right = x_grid_src.min(), x_grid_src.max()
         y_bottom, y_top = y_grid_src.min(), y_grid_src.max()
         # center of the region
@@ -345,4 +348,171 @@ class LensImage(object):
         if update is True or self._lensing_op.get_lens_mapping() is None:
             self._lensing_op.compute_mapping(kwargs_lens)
         return self._lensing_op
+    
+
+
+class LensImage3D(object):
+    """Generate lensed images from source light, lens mass/light, and point source models."""
+
+    def __init__(self, lens_image_list):
+        """
+        :param lens_image_list: list of LensImage instances
+        """
+        self.num_bands = len(lens_image_list)
+        for i in range(1, self.num_bands):
+            if lens_image_list[i].Grid.num_pixel_axes != lens_image_list[i-1].Grid.num_pixel_axes:
+                raise ValueError("In each band, all models should have the same shape.")
+        self.lens_images = lens_image_list
+        self.nx, self.ny = lens_image_list[0].Grid.num_pixel_axes
+        self.nw = self.num_bands
+
+    def source_surface_brightness(self, kwargs_source_list, k_list=None, **kwargs_single_band):
+        """
+
+        computes the source surface brightness distribution
+
+        :param kwargs_source: list of keyword arguments corresponding to the superposition of different source light profiles
+        :param kwargs_lens: list of keyword arguments corresponding to the superposition of different lens profiles
+        :param kwargs_extinction: list of keyword arguments of extinction model
+        :param unconvolved: if True: returns the unconvolved light distribution (prefect seeing)
+        :param de_lensed: if True: returns the un-lensed source surface brightness profile, otherwise the lensed.
+        :param k: list of bool or list of int to select which source profiles to include
+        :param k_lens: list of bool or list of int to select which lens mass profiles to include
+        :return: 2d array of surface brightness pixels
+        """
+        if k_list is None:
+            k_list = [None]*self.num_bands
+        source_light_list = []
+        for i in range(self.num_bands):
+            source_light = self.lens_images[i].source_surface_brightness(
+                kwargs_source_list[i], k=k_list[i], **kwargs_single_band,
+            )
+            source_light_list.append(source_light)
+        return source_light_list
+
+    def lens_surface_brightness(self, kwargs_lens_light_list, k_list=None, **kwargs_single_band):
+        """
+
+        computes the lens surface brightness distribution
+
+        :param kwargs_lens_light: list of keyword arguments corresponding to different lens light surface brightness profiles
+        :param unconvolved: if True, returns unconvolved surface brightness (perfect seeing), otherwise convolved with PSF kernel
+        :param k: list of bool or list of int to select which model profiles to include
+        :return: 2d array of surface brightness pixels
+        """
+        if k_list is None:
+            k_list = [None]*self.num_bands
+        lens_light_list = []
+        for i in range(self.num_bands):
+            lens_light = self.lens_images[i].lens_surface_brightness(
+                kwargs_lens_light_list[i], k=k_list[i], **kwargs_single_band,
+            )
+            lens_light_list.append(lens_light)
+        return lens_light_list
+
+    def point_source_image(self, kwargs_point_source_list, k_list=None, **kwargs_single_band):
+        """Compute PSF-convolved point sources rendered on the image plane.
+
+        :param kwargs_point_source: list of keyword arguments corresponding to the point sources
+        :param kwargs_lens: list of keyword arguments corresponding to the superposition of different lens profiles
+        :param k: list of bool or list of int to select which point sources to include
+        :return: 2d array at the image plane resolution of all multiple images of the point sources
+        """
+        if k_list is None:
+            k_list = [None]*self.num_bands
+        point_source_list = []
+        for i in range(self.num_bands):
+            point_source = self.lens_images[i].point_source_image(
+                kwargs_point_source_list[i], k=k_list[i], **kwargs_single_band,
+            )
+            point_source_list.append(point_source)
+        return point_source_list
+
+    @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13))
+    def model(self, kwargs_lens=None, kwargs_source_list=None, kwargs_lens_light_list=None,
+            kwargs_point_source_list=None, unconvolved=False, supersampled=False,
+            source_add=True, lens_light_add=True, point_source_add=True,
+            k_lens=None, k_source_list=None, k_lens_light_list=None, k_point_source_list=None):
+        """
+        Create the 2D model image from parameter values.
+        Note: due to JIT compilation, the first call to this method will be slower.
+
+        :param kwargs_lens: list of keyword arguments corresponding to the superposition of different lens profiles
+        :param kwargs_source: list of keyword arguments corresponding to the superposition of different source light profiles
+        :param kwargs_lens_light: list of keyword arguments corresponding to different lens light surface brightness profiles
+        :param kwargs_point_source: keyword arguments corresponding to "other" parameters, such as external shear and
+                                    point source image positions
+        :param unconvolved: if True: returns the unconvolved light distribution (prefect seeing)
+        :param supersampled: if True, returns the model on the higher resolution grid (WARNING: no convolution nor normalization is performed in this case!)
+        :param source_add: if True, compute source, otherwise without
+        :param lens_light_add: if True, compute lens light, otherwise without
+        :param point_source_add: if True, compute point source multiple images, otherwise without
+        :param k_lens: list of bool or list of int to select which lens mass profiles to include
+        :param k_source: list of bool or list of int to select which source profiles to include
+        :param k_lens_light: list of bool or list of int to select which lens light profiles to include
+        :param k_point_source: list of bool or list of int to select which point sources to include
+        :return: 2d array of surface brightness pixels of the simulation
+        """
+        kwargs_source_list = self._none_kwargs(kwargs_source_list)
+        kwargs_lens_light_list = self._none_kwargs(kwargs_lens_light_list)
+        kwargs_point_source_list = self._none_kwargs(kwargs_point_source_list)
+        k_source_list = self._none_kwargs(k_source_list)
+        k_lens_light_list = self._none_kwargs(k_lens_light_list)
+        k_point_source_list = self._none_kwargs(k_point_source_list)
+        model_multi_band = []
+        for i in range(self.num_bands):
+            model_sgl_band = self.lens_images[i].model(
+                kwargs_lens=kwargs_lens,
+                kwargs_source=kwargs_source_list[i],
+                kwargs_lens_light=kwargs_lens_light_list[i],
+                kwargs_point_source=kwargs_point_source_list[i],
+                unconvolved=unconvolved, supersampled=supersampled,
+                source_add=source_add, lens_light_add=lens_light_add, 
+                point_source_add=point_source_add,
+                k_lens=k_lens, k_lens_light=k_lens_light_list[i], k_source=k_source_list[i], 
+                k_point_source=k_point_source_list[i],
+            )
+            model_multi_band.append(model_sgl_band)
+        return jnp.array(model_multi_band)
+
+    def simulation(self, add_poisson=True, add_gaussian=True,
+                compute_true_noise_map=True, noise_seed=18,
+                **model_kwargs):
+        raise NotImplementedError()
+    
+    def C_D_model(self, model):
+        c_d_multi_band = []
+        for i in range(self.num_bands):
+            c_d_slg_band = self.lens_images[i].C_D_model(model[i])
+            c_d_multi_band.append(c_d_slg_band)
+        return jnp.array(c_d_multi_band)
+
+    def normalized_residuals(self, data, model, mask=None):
+        """
+        compute the map of normalized residuals,
+        given the data and the model image
+        """
+        if mask is None:
+            mask = np.ones_like(data)
+        noise_var = self.C_D_model(model)
+        noise = np.sqrt(noise_var)
+        norm_res_model = (data - model) / noise * mask
+        norm_res_tot = norm_res_model
+        if mask is not None:
+            # outside the mask just add pure data
+            norm_res_tot += (data / noise) * (1. - mask)
+        return norm_res_model, norm_res_tot
+
+    def reduced_chi2(self, data, model, mask_list=None):
+        """
+        compute the reduced chi2 of the data given the model
+        """
+        if mask is None:
+            mask = np.ones_like(data)
+        norm_res, _ = self.normalized_residuals(data, model, mask=mask)
+        num_data_points = np.sum(mask)
+        return np.sum(norm_res**2) / num_data_points
+    
+    def _none_kwargs(self, kwargs):
+        return kwargs if kwargs is not None else [None]*self.num_bands
     
