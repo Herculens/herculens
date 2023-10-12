@@ -102,7 +102,7 @@ class Plotter(object):
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
                       only_pixelated_potential=False, shift_pixelated_potential='none',
                       likelihood_mask=None, potential_mask=None, 
-                      show_critical_lines=False, show_shear_field=False, show_lens_position=False,
+                      show_lens_lines=False, show_shear_field=False, show_lens_position=False,
                       kwargs_grid_source=None,
                       lock_colorbars=False, masked_residuals=True,
                       vmin_pot=None, vmax_pot=None,  # TEMP
@@ -112,7 +112,8 @@ class Plotter(object):
         n_rows = sum([show_image, show_source, show_lens_light, 
                       show_lens_potential, show_lens_others])
         
-        extent = lens_image.Grid.extent
+        # extent = lens_image.Grid.extent
+        extent = lens_image.Grid.plt_extent
 
         ##### PREPARE IMAGES #####
             
@@ -139,13 +140,14 @@ class Plotter(object):
             if lens_image.SourceModel.has_pixels:
                 src_idx = lens_image.SourceModel.pixelated_index
                 source_model = kwargs_source[src_idx]['pixels']
-                _, _, src_extent = lens_image.get_source_coordinates(kwargs_result['kwargs_lens'])
+                _, _, src_extent = lens_image.get_source_coordinates(
+                    kwargs_result['kwargs_lens'], return_plt_extent=True)
             elif kwargs_grid_source is not None:
                 grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
                 x_grid_src, y_grid_src = grid_src.pixel_coordinates
                 source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
                 source_model *= lens_image.Grid.pixel_area
-                src_extent = grid_src.extent
+                src_extent = grid_src.plt_extent
             else:
                 source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
                 src_extent = extent
@@ -243,6 +245,10 @@ class Plotter(object):
                 # TODO: compute potential mask based on undersampled likelihood_mask
                 potential_mask = np.ones_like(potential_model)
 
+        if show_lens_lines:
+            clines, caustics, centers = model_util.critical_lines_caustics(
+                lens_image, kwargs_result['kwargs_lens'], return_lens_centers=True)
+
 
         ##### BUILD UP THE PLOTS #####
 
@@ -271,10 +277,8 @@ class Plotter(object):
                                     markeredgecolor='black', markersize=10, marker='o', 
                                     fillstyle='none', markeredgewidth=0.5)
                         plotted_centers.append(center)
-            if show_critical_lines:
-                curves, centers = model_util.critical_lines(lens_image, kwargs_lens,
-                                                            return_lens_centers=True)
-                for curve in curves:
+            if show_lens_lines:
+                for curve in clines:
                     ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
                 ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
             if show_shear_field:
@@ -345,6 +349,12 @@ class Plotter(object):
             ax.set_title("source model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+            if show_lens_lines:
+                for curve in caustics:
+                    ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
+                    # force x, y limits to stay the same as 
+                    ax.set_xlim(src_extent[0], src_extent[1])
+                    ax.set_ylim(src_extent[2], src_extent[3])
             if ps_src_pos is not None:
                 ax.scatter(*ps_src_pos, s=30, c='black', marker='x', linewidths=0.5, 
                            label="point source")

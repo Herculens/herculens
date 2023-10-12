@@ -102,6 +102,27 @@ class PixelGrid(Coordinates):
     def extent(self):
         x_coords, y_coords = self.pixel_axes
         return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
+    
+    @property
+    def plt_extent(self):
+        """set of coordinates of the borders of the grid (useful for matplotlib functions)"""
+        extent = copy.copy(self.extent)
+        # WARNING: the following assumes NO ROTATION (i.e. coordinates axes aligned with x/y axes)
+        pix_scl_x = self._Mpix2a[0, 0]
+        pix_scl_y = self._Mpix2a[1, 1]
+        if self.x_is_inverted:
+            extent[0] += pix_scl_x / 2.
+            extent[1] -= pix_scl_x / 2.
+        else:
+            extent[0] -= pix_scl_x / 2.
+            extent[1] += pix_scl_x / 2.
+        if self.y_is_inverted:
+            extent[2] += pix_scl_y / 2.
+            extent[3] -= pix_scl_y / 2.
+        else:
+            extent[2] -= pix_scl_y / 2.
+            extent[3] += pix_scl_y / 2.
+        return extent
 
     def create_model_grid(self, num_pixels=None, pixel_scale_factor=None, grid_center=None, grid_shape=None):
         """

@@ -11,6 +11,7 @@ import jax.numpy as jnp
 from scipy.ndimage import morphology
 from scipy import ndimage
 from skimage import measure
+from jax import config
 
 from herculens.LensImage.lensing_operator import LensingOperator
 
@@ -185,26 +186,31 @@ def draw_samples_from_covariance(mean, covariance, num_samples=10000, seed=None)
     return samples
 
 
-def critical_lines(lens_image, kwargs_lens, return_lens_centers=False):
-    # TODO: for some reason, using the numerics grid does lead to proper pix2coord conversions 
-    # grid = lens_image.ImageNumerics.grid_class
-    # x_grid_img, y_grid_img = grid.coordinates_evaluate
-
+def critical_lines_caustics(lens_image, kwargs_lens, supersampling=5, 
+                            return_lens_centers=False):
+    if config.read('jax_enable_x64') is not True:
+        print("WARNING: JAX's 'jax_enable_x64' is not enabled; "
+              "computation of critical lines and caustics might be inaccurate.")
     # evaluate the total magnification
-    grid = lens_image.Grid
+    grid = lens_image.Grid.create_model_grid(pixel_scale_factor=1./supersampling)
     x_grid_img, y_grid_img = grid.pixel_coordinates
     mag_tot = lens_image.MassModel.magnification(x_grid_img, y_grid_img, kwargs_lens)
-    # mag_tot = util.array2image(mag_tot)
+    mag_tot = np.array(mag_tot, dtype=np.float64)
 
-    # invert and find contours corresponding to infite magnification
-    inv_mag_tot = 1. / np.array(mag_tot)
+    # invert and find contours corresponding to infinite magnification
+    inv_mag_tot = 1. / mag_tot
     contours = measure.find_contours(inv_mag_tot, 0.)
 
-    # convert to model coordinates
-    lines = []
-    for i, contour in enumerate(contours):
-        curve_x, curve_y = grid.map_pix2coord(contour[:, 1], contour[:, 0])
-        lines.append((np.array(curve_x), np.array(curve_y)))
+    crit_lines, caustics = [], []
+    for contour in contours:
+        # extract the lines
+        cline_x, cline_y = contour[:, 1], contour[:, 0]
+        # convert to model coordinates
+        cline_x, cline_y = grid.map_pix2coord(cline_x, cline_y)
+        crit_lines.append((np.array(cline_x), np.array(cline_y)))
+        # find corresponding caustics through ray shooting
+        caust_x, caust_y = lens_image.MassModel.ray_shooting(cline_x, cline_y, kwargs_lens)
+        caustics.append((np.array(caust_x), np.array(caust_y)))
 
     # can also returns the lens components centroids for convenience
     if return_lens_centers:
@@ -213,9 +219,9 @@ def critical_lines(lens_image, kwargs_lens, return_lens_centers=False):
             if 'center_x' in kw:
                 cxs.append(kw['center_x'])
                 cys.append(kw['center_y'])
-        return lines, (np.array(cxs), np.array(cys))
-    
-    return lines
+        return crit_lines, caustics, (np.array(cxs), np.array(cys))
+    return crit_lines, caustics
+
 
 def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
     shear_type = 'SHEAR_GAMMA_PSI'

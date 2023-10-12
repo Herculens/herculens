@@ -287,14 +287,17 @@ class LensImage(object):
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
     
-    def adapt_source_coordinates(self, kwargs_lens, k_lens=None):
-        """Compute new source coordinates based on ray-traced arc-mask"""
+    def adapt_source_coordinates(self, kwargs_lens, k_lens=None, return_plt_extent=False):
+        """
+        Compute new source coordinates based on ray-traced arc-mask
+        return_plt_extent=True returns the extent of the grid for imshow
+        """
         # TODO: compute a mask on the adapted source plane
         npix_src, npix_src_y = self.SourceModel.pixel_grid.num_pixel_axes
         if npix_src_y != npix_src:
             raise ValueError("Adaptive source plane grid only works with square grids")
         if self.Grid.x_is_inverted or self.Grid.y_is_inverted:
-            # TODO: fix this
+            # TODO: implement this
             raise NotImplementedError("invert x and y not yet supported for adaptive source grid")
         # get data coordinates
         x_grid_img, y_grid_img = self.Grid.pixel_coordinates
@@ -324,15 +327,31 @@ class LensImage(object):
         # print( jnp.abs(y_bottom - y_top), size )
         x_adapt = jnp.linspace(x_left, x_right, npix_src)
         y_adapt = jnp.linspace(y_bottom, y_top, npix_src)
-        extent_adapt = [x_adapt[0], x_adapt[-1], y_adapt[0], y_adapt[-1]]
+        if return_plt_extent is True:
+            pix_scl_x = jnp.abs(x_adapt[0]-x_adapt[1])
+            pix_scl_y = jnp.abs(y_adapt[0]-y_adapt[1])
+            half_pix_scl = jnp.sqrt(pix_scl_x*pix_scl_y) / 2.
+            extent_adapt = [
+                x_adapt[0]-half_pix_scl, x_adapt[-1]+half_pix_scl, 
+                y_adapt[0]-half_pix_scl, y_adapt[-1]+half_pix_scl
+            ]
+        else:
+            extent_adapt = [
+                x_adapt[0], x_adapt[-1], 
+                y_adapt[0], y_adapt[-1]
+            ]
         return x_adapt, y_adapt, extent_adapt
     
-    def get_source_coordinates(self, kwargs_lens, k_lens=None):
+    def get_source_coordinates(self, kwargs_lens, k_lens=None, return_plt_extent=False):
         if not self._src_adaptive_grid:
             x_grid, y_grid = self.SourceModel.pixel_grid.pixel_coordinates
-            extent = self.SourceModel.pixel_grid.extent
+            if return_plt_extent is True:
+                extent = self.SourceModel.pixel_grid.plt_extent
+            else:
+                extent = self.SourceModel.pixel_grid.extent
         else:
-            x_coord, y_coord, extent = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens)
+            x_coord, y_coord, extent = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens,
+                                                                     return_plt_extent=return_plt_extent)
             x_grid, y_grid = np.meshgrid(x_coord, y_coord)
         return x_grid, y_grid, extent
         

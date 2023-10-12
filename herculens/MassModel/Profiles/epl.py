@@ -28,7 +28,6 @@ class EPL(object):
     
     def __init__(self):
         self.epl_major_axis = EPLMajorAxis()
-        super(EPL, self).__init__()
 
     def param_conv(self, theta_E, e1, e2, gamma):
         """
@@ -154,10 +153,6 @@ class EPLMajorAxis(object):
     Tessore & Metcalf (2015), https://arxiv.org/abs/1507.01819
     """
     param_names = ['b', 't', 'q', 'center_x', 'center_y']
-
-    def __init__(self):
-
-        super(EPLMajorAxis, self).__init__()
 
     def function(self, x, y, b, t, q):
         """
