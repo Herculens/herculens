@@ -22,6 +22,7 @@ class SersicUtil(object):
     def __init__(self, smoothing=0.00001, exponent=2.):
         self._s = smoothing
         self._e = exponent
+        self._super = False if self._e == 2. else True
 
     def k_bn(self, n, Re):
         """
@@ -67,9 +68,11 @@ class SersicUtil(object):
         sin_phi = jnp.sin(phi_G)
         xt1 = cos_phi*x_shift+sin_phi*y_shift
         xt2 = -sin_phi*x_shift+cos_phi*y_shift
-        # xt2difq2 = xt2/(q*q)
-        # R = jnp.sqrt(xt1*xt1+xt2*xt2difq2)
-        R = jnp.power(jnp.power(jnp.abs(xt1), self._e) + jnp.power(jnp.abs(xt2/q), self._e), 1/self._e)
+        if not self._super:
+            xt2difq2 = xt2/(q*q)
+            R = jnp.sqrt(xt1*xt1+xt2*xt2difq2)
+        else:
+            R = jnp.power(jnp.power(jnp.abs(xt1), self._e) + jnp.power(jnp.abs(xt2/q), self._e), 1/self._e)
         return R
 
     def _x_reduced(self, x, y, n_sersic, r_eff, center_x, center_y):
