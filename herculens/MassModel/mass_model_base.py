@@ -25,7 +25,8 @@ SUPPORTED_MODELS = [
 
 class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, kwargs_pixelated=None, pixel_derivative_mode='autodiff'):
+    def __init__(self, lens_model_list, kwargs_pixelated=None, 
+                 pixel_interpol='fast_bilinear', pixel_derivative_type='interpol'):
         """Create a MassProfileBase object.
 
         Parameters
@@ -34,14 +35,14 @@ class MassModelBase(object):
             Lens model profile types.
 
         """
-        self.func_list, self._pix_idx = self._load_model_instances(lens_model_list, pixel_derivative_mode)
+        self.func_list, self._pix_idx = self._load_model_instances(lens_model_list, pixel_derivative_type, pixel_interpol)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
         if kwargs_pixelated is None:
             kwargs_pixelated = {}
         self._kwargs_pixelated = kwargs_pixelated
         
-    def _load_model_instances(self, lens_model_list, pixel_derivative_mode):
+    def _load_model_instances(self, lens_model_list, pixel_derivative_type, pixel_interpol):
         func_list = []
         imported_classes = {}
         pix_idx = None
@@ -49,7 +50,7 @@ class MassModelBase(object):
             # These models require a new instance per profile as certain pre-computations
             # are relevant per individual profile
             if lens_type in ['PIXELATED', 'PIXELATED_DIRAC']:
-                mass_model_class = self._import_class(lens_type, pixel_derivative_mode=pixel_derivative_mode)
+                mass_model_class = self._import_class(lens_type, pixel_derivative_type=pixel_derivative_type, pixel_interpol=pixel_interpol)
                 pix_idx = idx
             else:
                 if lens_type not in imported_classes.keys():
@@ -61,7 +62,7 @@ class MassModelBase(object):
         return func_list, pix_idx
 
     @staticmethod
-    def _import_class(lens_type, pixel_derivative_mode=None):
+    def _import_class(lens_type, pixel_derivative_type=None, pixel_interpol=None):
         """Get the lens profile class of the corresponding type."""
         if lens_type == 'GAUSSIAN':
             return gaussian_potential.Gaussian()
@@ -82,7 +83,7 @@ class MassModelBase(object):
         elif lens_type == 'MULTIPOLE':
             return multipole.Multipole()
         elif lens_type == 'PIXELATED':
-            return pixelated.PixelatedPotential(pixel_derivative_mode)
+            return pixelated.PixelatedPotential(derivative_type=pixel_derivative_type, interpolation_type=pixel_interpol)
         elif lens_type == 'PIXELATED_DIRAC':
             return pixelated.PixelatedPotentialDirac()
         else:
