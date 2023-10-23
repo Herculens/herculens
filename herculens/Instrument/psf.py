@@ -98,33 +98,12 @@ class PSF(object):
             return self._kernel_point_source
 
     @property
-    def kernel_pixel(self):
-        """
-        returns the convolution kernel for a uniform surface brightness on a pixel size
-
-        :return: 2d numpy array
-        """
-        # WARNING kernel_util.pixel_kernel() is not implemented
-        # Check where this method is used elsewhere to determine if it can be removed
-        if not hasattr(self, '_kernel_pixel'):
-            self._kernel_pixel = kernel_util.pixel_kernel(
-                self.kernel_point_source, subgrid_res=1)
-        return self._kernel_pixel
-
-    def blurring_matrix(self, data_shape):
-        num_pixels = data_shape[0] * data_shape[1]
-        if not hasattr(self, '_blurring_matrix') or self._blurring_matrix.shape != (num_pixels, num_pixels):
-            psf_kernel_2d = np.array(self.kernel_point_source)
-            self._blurring_matrix = build_convolution_matrix(
-                psf_kernel_2d, data_shape)
-        return self._blurring_matrix
-
-    @property
     def kernel_supersampling_factor(self):
         return self._kernel_supersampling_factor
 
-    def kernel_point_source_supersampled(self, supersampling_factor, update_cache=True,
-                                         iterative_supersampling=True):
+    def kernel_point_source_supersampled(self, supersampling_factor,
+                                         iterative_supersampling=False,
+                                         update_cache=False):
         """Generate a supersampled PSF.
 
         The resulting 2D array has the supersampled PSF at the center of a grid
@@ -134,14 +113,15 @@ class PSF(object):
         ----------
         supersampling_factor : int
             Supersampling factor relative to the pixel size.
-        update_cache : bool
-            If True, update (and overwrite, if present) the cached supersampled PSF.
         iterative_supersampling : bool
             If True, use 5 iterations when supersampling.
+        update_cache : bool
+            If True, update (and overwrite, if present) the cached supersampled PSF.
 
         """
         if (hasattr(self, '_kernel_point_source_supersampled') and
-                self._kernel_supersampling_factor == supersampling_factor):
+                self._kernel_supersampling_factor == supersampling_factor and 
+                not update_cache):
             return self._kernel_point_source_supersampled
 
         if self.psf_type == 'GAUSSIAN':
@@ -171,6 +151,14 @@ class PSF(object):
             self._kernel_supersampling_factor = supersampling_factor
 
         return result
+    
+    def blurring_matrix(self, data_shape):
+        num_pixels = data_shape[0] * data_shape[1]
+        if not hasattr(self, '_blurring_matrix') or self._blurring_matrix.shape != (num_pixels, num_pixels):
+            psf_kernel_2d = np.array(self.kernel_point_source)
+            self._blurring_matrix = build_convolution_matrix(
+                psf_kernel_2d, data_shape)
+        return self._blurring_matrix
 
     def set_pixel_size(self, pixel_size):
         """Update pixel size.
