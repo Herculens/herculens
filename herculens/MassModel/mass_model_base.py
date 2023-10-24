@@ -26,6 +26,7 @@ SUPPORTED_MODELS = [
 class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
     def __init__(self, lens_model_list, kwargs_pixelated=None, 
+                 no_complex_numbers=False,
                  pixel_interpol='fast_bilinear', pixel_derivative_type='interpol'):
         """Create a MassProfileBase object.
 
@@ -35,14 +36,14 @@ class MassModelBase(object):
             Lens model profile types.
 
         """
-        self.func_list, self._pix_idx = self._load_model_instances(lens_model_list, pixel_derivative_type, pixel_interpol)
+        self.func_list, self._pix_idx = self._load_model_instances(lens_model_list, pixel_derivative_type, pixel_interpol, no_complex_numbers)
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
         if kwargs_pixelated is None:
             kwargs_pixelated = {}
         self._kwargs_pixelated = kwargs_pixelated
         
-    def _load_model_instances(self, lens_model_list, pixel_derivative_type, pixel_interpol):
+    def _load_model_instances(self, lens_model_list, pixel_derivative_type, pixel_interpol, no_complex_numbers):
         func_list = []
         imported_classes = {}
         pix_idx = None
@@ -54,7 +55,7 @@ class MassModelBase(object):
                 pix_idx = idx
             else:
                 if lens_type not in imported_classes.keys():
-                    mass_model_class = self._import_class(lens_type)
+                    mass_model_class = self._import_class(lens_type, no_complex_numbers=no_complex_numbers)
                     imported_classes.update({lens_type: mass_model_class})
                 else:
                     mass_model_class = imported_classes[lens_type]
@@ -62,7 +63,7 @@ class MassModelBase(object):
         return func_list, pix_idx
 
     @staticmethod
-    def _import_class(lens_type, pixel_derivative_type=None, pixel_interpol=None):
+    def _import_class(lens_type, pixel_derivative_type=None, pixel_interpol=None, no_complex_numbers=None):
         """Get the lens profile class of the corresponding type."""
         if lens_type == 'GAUSSIAN':
             return gaussian_potential.Gaussian()
@@ -79,7 +80,7 @@ class MassModelBase(object):
         elif lens_type == 'SIS':
             return sis.SIS()
         elif lens_type == 'EPL':
-            return epl.EPL()
+            return epl.EPL(no_complex_numbers=no_complex_numbers)
         elif lens_type == 'MULTIPOLE':
             return multipole.Multipole()
         elif lens_type == 'PIXELATED':

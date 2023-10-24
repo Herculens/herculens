@@ -9,7 +9,7 @@ from functools import partial
 from copy import deepcopy
 import numpy as np
 import jax.numpy as jnp
-from jax import jit, vmap, lax
+from jax import jit, lax
 from jax.scipy.special import gammaln
 from jax.scipy.stats import norm
 from jax.lax import conv_general_dilated, conv_dimension_numbers
@@ -50,9 +50,6 @@ def R_omega(z, t, q, nmax):
     for omega(phi).
 
     """
-    # Set the maximum number of iterations
-    # nmax = 10
-
     # Compute constant factors
     f = (1. - q) / (1. + q)
     ei2phi = z / z.conjugate()
@@ -68,6 +65,38 @@ def R_omega(z, t, q, nmax):
         # Update the partial sum
         partial_sum += omega_i
     return partial_sum
+
+
+def omega_real(x, y, t, q, nmax):
+    """Angular dependency of the deflection angle in the EPL lens profile.
+
+    The computation follows Eqs. (31)-(32) in Tessore & Metcalf (2015), where
+    x, y are coordinates in the lens plane,
+    t = gamma - 1 is the logarithmic slope of the profile, and
+    q is the axis ratio.
+
+    This iterative implementation is necessary, since the usual hypergeometric
+    function `hyp2f1` provided in `scipy.special` has not yet been implemented
+    in an autodiff way in JAX.
+
+    This function is based on the Giga-lens implementation (gigalens.jax.profiles.mass.epl).
+    """
+    # Compute constant factors
+    phi = jnp.arctan2(y, q * x)
+    f = (1. - q) / (1. + q)
+    Cs, Ss = jnp.cos(phi), jnp.sin(phi)
+    Cs2, Ss2 = jnp.cos(2 * phi), jnp.sin(2 * phi)
+    def update(n, val):
+        prefac = -f * (2 * n - (2 - t)) / (2 * n + (2 - t))
+        last_x, last_y, fx, fy = val
+        last_x, last_y = prefac * (Cs2 * last_x - Ss2 * last_y), prefac * (
+                Ss2 * last_x + Cs2 * last_y
+        )
+        fx += last_x
+        fy += last_y
+        return last_x, last_y, fx, fy
+    _, _, fx, fy = lax.fori_loop(1, nmax, update, (Cs, Ss, Cs, Ss))
+    return fx, fy
 
 
 class special(object):
