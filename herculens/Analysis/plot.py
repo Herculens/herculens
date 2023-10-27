@@ -197,8 +197,9 @@ class Plotter(object):
                 potential_model = kwargs_lens[pot_idx]['pixels']
             else:
                 x_grid_lens, y_grid_lens = lens_image.Grid.pixel_coordinates
-                potential_model = lens_image.MassModel.potential(x_grid_lens, y_grid_lens, 
-                                                                 kwargs_lens, k=pot_idx)
+                if show_lens_potential:
+                    potential_model = lens_image.MassModel.potential(x_grid_lens, y_grid_lens, 
+                                                                     kwargs_lens, k=pot_idx)
             alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_lens, y_grid_lens, 
                                                           kwargs_lens, k=pot_idx)
             kappa = lens_image.MassModel.kappa(x_grid_lens, y_grid_lens, 
@@ -207,10 +208,10 @@ class Plotter(object):
             magnification = lens_image.MassModel.magnification(x_grid_lens, y_grid_lens, kwargs_lens)
             
             if potential_mask is None:
-                potential_mask = np.ones_like(potential_model)
+                potential_mask = np.ones_like(x_grid_lens)
 
             # here we know that there are no perturbations in the reference potential
-            if hasattr(self, '_ref_pixel_pot'):
+            if hasattr(self, '_ref_pixel_pot') and show_lens_potential:
                 ref_potential = self._ref_pixel_pot
                 if ref_potential.shape != potential_model.shape:
                     warnings.warn("Reference potential does not have the same shape as model potential.")
@@ -240,10 +241,6 @@ class Plotter(object):
             else:
                 ref_potential = None
                 show_pot_diff = False
-
-            if potential_mask is None:
-                # TODO: compute potential mask based on undersampled likelihood_mask
-                potential_mask = np.ones_like(potential_model)
 
         if show_lens_lines:
             clines, caustics, centers = model_util.critical_lines_caustics(
