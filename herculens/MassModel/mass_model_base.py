@@ -25,9 +25,12 @@ SUPPORTED_MODELS = [
 
 class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, kwargs_pixelated=None, 
+    def __init__(self, lens_model_list, 
+                 kwargs_pixelated=None, 
                  no_complex_numbers=False,
-                 pixel_interpol='fast_bilinear', pixel_derivative_type='interpol'):
+                 pixel_interpol='fast_bilinear', 
+                 pixel_derivative_type='interpol',
+                 kwargs_pixel_grid_fixed=None):
         """Create a MassProfileBase object.
 
         Parameters
@@ -36,14 +39,20 @@ class MassModelBase(object):
             Lens model profile types.
 
         """
-        self.func_list, self._pix_idx = self._load_model_instances(lens_model_list, pixel_derivative_type, pixel_interpol, no_complex_numbers)
+        self.func_list, self._pix_idx = self._load_model_instances(
+            lens_model_list, pixel_derivative_type, pixel_interpol, 
+            no_complex_numbers, kwargs_pixel_grid_fixed
+        )
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
         if kwargs_pixelated is None:
             kwargs_pixelated = {}
         self._kwargs_pixelated = kwargs_pixelated
         
-    def _load_model_instances(self, lens_model_list, pixel_derivative_type, pixel_interpol, no_complex_numbers):
+    def _load_model_instances(self, 
+            lens_model_list, pixel_derivative_type, pixel_interpol, 
+            no_complex_numbers, kwargs_pixel_grid_fixed,
+        ):
         func_list = []
         imported_classes = {}
         pix_idx = None
@@ -51,11 +60,16 @@ class MassModelBase(object):
             # These models require a new instance per profile as certain pre-computations
             # are relevant per individual profile
             if lens_type in ['PIXELATED', 'PIXELATED_DIRAC']:
-                mass_model_class = self._import_class(lens_type, pixel_derivative_type=pixel_derivative_type, pixel_interpol=pixel_interpol)
+                mass_model_class = self._import_class(
+                    lens_type, pixel_derivative_type=pixel_derivative_type, pixel_interpol=pixel_interpol
+                )
                 pix_idx = idx
             else:
                 if lens_type not in imported_classes.keys():
-                    mass_model_class = self._import_class(lens_type, no_complex_numbers=no_complex_numbers)
+                    mass_model_class = self._import_class(
+                        lens_type, no_complex_numbers=no_complex_numbers, 
+                        kwargs_pixel_grid_fixed=kwargs_pixel_grid_fixed,
+                    )
                     imported_classes.update({lens_type: mass_model_class})
                 else:
                     mass_model_class = imported_classes[lens_type]
@@ -63,7 +77,10 @@ class MassModelBase(object):
         return func_list, pix_idx
 
     @staticmethod
-    def _import_class(lens_type, pixel_derivative_type=None, pixel_interpol=None, no_complex_numbers=None):
+    def _import_class(
+            lens_type, pixel_derivative_type=None, pixel_interpol=None, 
+            no_complex_numbers=None, kwargs_pixel_grid_fixed=None
+        ):
         """Get the lens profile class of the corresponding type."""
         if lens_type == 'GAUSSIAN':
             return gaussian_potential.Gaussian()
@@ -87,6 +104,10 @@ class MassModelBase(object):
             return pixelated.PixelatedPotential(derivative_type=pixel_derivative_type, interpolation_type=pixel_interpol)
         elif lens_type == 'PIXELATED_DIRAC':
             return pixelated.PixelatedPotentialDirac()
+        elif lens_type == 'PIXELATED_FIXED':
+            if kwargs_pixel_grid_fixed is None:
+                raise ValueError("At least one pixel grid must be provided to use 'PIXELATED_FIXED' profile")
+            return pixelated.PixelatedFixed(**kwargs_pixel_grid_fixed)
         else:
             err_msg = (f"{lens_type} is not a valid lens model. " +
                        f"Supported types are {SUPPORTED_MODELS}")

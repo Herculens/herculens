@@ -11,12 +11,12 @@ import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev, vmap
 # from functools import partial
 
-from utax.interpolation import BicubicInterpolator
+from utax.interpolation import BilinearInterpolator, BicubicInterpolator
 
 from herculens.Util import util
 
 
-__all__ = ['PixelatedPotential', 'PixelatedPotentialDirac']
+__all__ = ['PixelatedPotential', 'PixelatedPotentialDirac', 'PixelatedFixed']
 
 
 class PixelatedPotential(object):
@@ -280,3 +280,58 @@ class PixelatedPotentialDirac(object):
         self.pp.set_pixel_grid(pixel_grid)
         self.hss_x = np.abs(self.pp._x_coords[0] - self.pp._x_coords[1]) / 2.
         self.hss_y = np.abs(self.pp._y_coords[0] - self.pp._y_coords[1]) / 2.
+
+
+
+class PixelatedFixed(object):
+    # param_names = ['pot_pixels',
+    #                'deriv_pixels',
+    #                'hess_pixels']
+    # lower_limit_default = {'pixels': -1e10}
+    # upper_limit_default = {'pixels': 1e10}
+    # fixed_default = {key: False for key in param_names}
+    def __init__(self, func_pixel_grid=None, deriv_pixel_grid=None, hess_pixel_grid=None):
+        """
+        Potential and its spatial derivatives defined on a pixelated grid (can be different for each of these).
+        IMPORTANT: This profile is NOT designed to be used during optimization!!
+        """
+        self._func_pixel_grid  = func_pixel_grid
+        self._deriv_pixel_grid = deriv_pixel_grid
+        self._hess_pixel_grid  = hess_pixel_grid
+        try:
+            from jaxinterp2d import CartesianGrid
+        except ImportError as e:
+            raise NotImplementedError("`jaxinterp2d` is not installed and "
+                                      "the use of the bilinear interpolator from `utax` is not implemented.")
+            # self._interp_type = 'bilinear'
+            # self._interp_class = BilinearInterpolator
+        else:
+            self._interp_type = 'fast_bilinear'
+            self._interp_class = CartesianGrid
+
+    def function(self, x, y, func_pixels=None, deriv_pixels=None, hess_pixels=None):
+        return self._interpol(x, y, func_pixels, self._func_pixel_grid)
+    
+    def derivatives(self, x, y, func_pixels=None, deriv_pixels=None, hess_pixels=None):
+        deriv_x, deriv_y = deriv_pixels
+        return (self._interpol(x, y, deriv_x, self._deriv_pixel_grid), 
+                self._interpol(x, y, deriv_y, self._deriv_pixel_grid))
+
+    def hessian(self, x, y, func_pixels=None, deriv_pixels=None, hess_pixels=None):
+        hess_xx, hess_yy, hess_xy = hess_pixels
+        return (self._interpol(x, y, hess_xx, self._hess_pixel_grid), 
+                self._interpol(x, y, hess_yy, self._hess_pixel_grid),
+                self._interpol(x, y, hess_xy, self._hess_pixel_grid))
+
+    def _interpol(self, x, y, pixels, pixel_grid):
+        # ensure the coordinates are cartesian by converting angular to pixel units
+        x_, y_ = pixel_grid.map_coord2pix(x.flatten(), y.flatten())
+        x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
+        x_coord, y_coord = pixel_grid.pixel_axes
+        x_coord_pix, y_coord_pix = pixel_grid.map_coord2pix(x_coord, y_coord)
+        limits = [
+            ( y_coord_pix.min(), y_coord_pix.max() ), 
+            ( x_coord_pix.min(), x_coord_pix.max() )
+        ]
+        interp = self._interp_class(limits, pixels, cval=0.)
+        return interp(y_, x_)
