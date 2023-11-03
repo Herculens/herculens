@@ -522,7 +522,7 @@ class LensImage3D(object):
             norm_res_tot += (data / noise) * (1. - mask)
         return norm_res_model, norm_res_tot
 
-    def reduced_chi2(self, data, model, mask_list=None):
+    def reduced_chi2(self, data, model, mask=None):
         """
         compute the reduced chi2 of the data given the model
         """
