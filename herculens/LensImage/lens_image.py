@@ -132,7 +132,11 @@ class LensImage(object):
         else:
             pixels_x_coord, pixels_y_coord = None, None  # fall back on fixed, user-defined coordinates
         if de_lensed is True:
-            source_light = self.SourceModel.surface_brightness(x_grid_img, y_grid_img, kwargs_source, k=k,
+            if self._src_adaptive_grid:
+                offset_x, offset_y = pixels_x_coord.mean(), pixels_y_coord.mean()
+            else:
+                offset_x, offset_y = 0., 0.
+            source_light = self.SourceModel.surface_brightness(x_grid_img+offset_x, y_grid_img+offset_y, kwargs_source, k=k,
                                                                pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
         else:
             x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img, y_grid_img, kwargs_lens, k=k_lens)
