@@ -7,6 +7,7 @@ __author__ =  'aymgal'
 
 
 import os
+from copy import deepcopy
 
 import herculens
 from herculens.Standard import coolest_util as util
@@ -81,7 +82,8 @@ class COOLESTexporter(object):
     def update_from_model(self, lens_image, lensing_entity_mapping, 
                           parameters=None, samples=None, 
                           re_create_entities=False):
-        lensing_entities = util.update_lensing_entities(lens_image, lensing_entity_mapping,
+        lensing_entities = util.update_lensing_entities(lens_image, 
+                                                        deepcopy(lensing_entity_mapping),
                                                         parameters=parameters, samples=samples,
                                                         re_create_entities=re_create_entities,
                                                         current_entities=self._coolest.lensing_entities,

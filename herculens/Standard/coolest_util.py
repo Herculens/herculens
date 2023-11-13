@@ -81,14 +81,22 @@ def create_observation(data, lens_image, json_dir=None,
     else:
         raise NotImplementedError(f"Noise type {noise_type} not yet supported")
     
-    exp_time = lens_image.Noise.exposure_map
-    if exp_time is not None and not isinstance(exp_time, (int, float)):
-        raise NotImplementedError("Only exposure *time* is supported")
+    exp_map = lens_image.Noise.exposure_map
+    if isinstance(exp_map, (int, float)):
+        pass
+    elif isinstance(exp_map, np.ndarray) and exp_map.ndim == 2:
+        exp_map_file_name = "exposure_map"
+        exp_map = PixelatedRegularGrid(exp_map_file_name,
+                                        field_of_view_x=fov_x,
+                                        field_of_view_y=fov_y,
+                                        fits_file_dir=json_dir)
+    else:
+        raise NotImplementedError("Exposure time / map can only be a float or integerer, or a 2D array")
     
     if kwargs_obs is None:
         kwargs_obs = {}
     observation = Observation(pixels=pixels,
-                              exposure_time=exp_time,
+                              exposure_time=exp_map,
                               noise=noise,
                               **kwargs_obs)
     return observation
@@ -107,7 +115,7 @@ def create_instrument(lens_image, observation, json_dir=None,
         else:
             raise ValueError(f"PSF supersampling factor of {super_factor} is unknown "
                              f"for `psf_type` {psf_type}")
-        psf_file_name = f"psf.fits"
+        psf_file_name = "psf.fits"
         if json_dir is not None:
             psf_fits_path = os.path.join(json_dir, psf_file_name)
         else:
@@ -179,7 +187,7 @@ def update_lensing_entities(lens_image, lensing_entity_mapping,
     for i, (entity_name, kwargs_mapping) in enumerate(lensing_entity_mapping):
         if kwargs_mapping is None:
             continue  # this entity is ignored (neither created nor updated!)
-
+        
         entity_type = kwargs_mapping.pop('type')
 
         if re_create_entities is True:
