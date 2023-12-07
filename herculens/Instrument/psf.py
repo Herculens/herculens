@@ -41,8 +41,7 @@ class PSF(object):
             Truncation length (in units of sigma) for Gaussian model. Only
             required for 'GAUSSIAN' type. Default is None.
         pixel_size : float, optional
-            Pixel width (in arcsec). Required for 'GAUSSIAN' type. Not required
-            when used in combination with the LensImage class. Default is None.
+            Pixel width (in arcsec). Required for 'GAUSSIAN' type. Default is None.
         kernel_point_source : array_like, optional
             2D array of odd length representing the centered PSF. Required
             for 'PIXEL' type. Default is None.
@@ -58,10 +57,9 @@ class PSF(object):
         if self.psf_type == 'GAUSSIAN':
             # Validate required inputs
             if fwhm is None:
-                raise ValueError('Must set `fwhm` for GAUSSIAN `psf_type`')
+                raise ValueError("Must set `fwhm` if `psf_type='GAUSSIAN'`")
             if pixel_size is None:
-                raise ValueError(
-                    'Must set `pixel_size` for GAUSSIAN `psf_type`')
+                raise ValueError("Must set `pixel_size` if `psf_type='GAUSSIAN'`")
 
             self._fwhm = fwhm
             self._sigma_gaussian = util.fwhm2sigma(self._fwhm)
