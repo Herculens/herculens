@@ -95,8 +95,8 @@ def add_poisson(image, exp_time, seed):
     """
     adds a poison (or Gaussian) distributed noise with mean given by surface brightness
     """
-    sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
-    poisson = random.normal(seed, shape=np.shape(image)) * sigma
+    sigma = jnp.sqrt(jnp.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
+    poisson = random.normal(seed, shape=jnp.shape(image)) * sigma
     # without JAX:
     # sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
     # poisson = np.random.randn(*image.shape) * sigma
