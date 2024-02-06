@@ -69,9 +69,9 @@ class Noise(object):
         self._reset_cache()
         self._noise_map = noise_map if as_jax_array else np.array(noise_map)
 
-    def realisation(self, model, seed, add_gaussian=True, add_poisson=True):
+    def realisation(self, model, prng_key, add_gaussian=True, add_poisson=True):
         noise_real = 0.
-        key1, key2 = random.split(random.PRNGKey(seed))
+        key1, key2 = random.split(prng_key)
         if add_poisson and self._exp_map is not None:
             noise_real += image_util.add_poisson(model, self._exp_map, key1)
         if add_gaussian:

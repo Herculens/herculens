@@ -11,6 +11,7 @@ import numpy as np
 import jax.numpy as jnp
 from functools import partial
 from jax import jit
+from jax import random
 
 from herculens.LensImage.Numerics.numerics import Numerics
 from herculens.LensImage.lensing_operator import LensingOperator
@@ -240,22 +241,22 @@ class LensImage(object):
         return model
 
     def simulation(self, add_poisson=True, add_gaussian=True,
-                   compute_true_noise_map=True, noise_seed=18,
+                   compute_true_noise_map=True, prng_key=random.PRNGKey(18),
                    **model_kwargs):
         """
         same as model() but with noise added
 
         :param compute_true_noise_map: if True (default), define the noise map (diagonal covariance matrix)
         to be the 'true' one, i.e. based on the noiseless model image.
-        :param noise_seed: the seed that will be used by the PRNG from JAX to fix the noise realization.
-        The default is the arbtrary value 18, so it is the user task to change it for different realizations.
+        :param prng_key: instance of jax.random.PRNGKey to generate the noise realization.
+        The default is an arbitrary value from seed 18, so it is the user task to change it for different realizations.
         """
         if self.Noise is None:
             raise ValueError(
                 "Impossible to generate noise realisation because no noise class has been set")
         model = self.model(**model_kwargs)
         noise = self.Noise.realisation(
-            model, noise_seed, add_poisson=add_poisson, add_gaussian=add_gaussian)
+            model, prng_key, add_poisson=add_poisson, add_gaussian=add_gaussian)
         simu = model + noise
         self.Noise.set_data(simu)
         if compute_true_noise_map is True:
@@ -499,7 +500,7 @@ class LensImage3D(object):
         return jnp.array(model_multi_band)
 
     def simulation(self, add_poisson=True, add_gaussian=True,
-                compute_true_noise_map=True, noise_seed=18,
+                compute_true_noise_map=True, prng_key=18,
                 **model_kwargs):
         raise NotImplementedError()
     
