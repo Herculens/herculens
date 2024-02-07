@@ -87,7 +87,10 @@ def _simulate_data(data_type, supersampling_factor):
     kwargs_input = dict(kwargs_lens=kwargs_lens_mass_input,
                             kwargs_source=kwargs_source_input,
                             kwargs_lens_light=kwargs_lens_light_input)
-    data = lens_image_input.simulation(**kwargs_input, compute_true_noise_map=True, noise_seed=42)
+    data = lens_image_input.simulation(
+        **kwargs_input, compute_true_noise_map=True, 
+        prng_key=jax.random.PRNGKey(42),
+    )
     return data, lens_image_input, kwargs_input
 
 
