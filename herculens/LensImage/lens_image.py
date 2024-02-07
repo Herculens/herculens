@@ -180,7 +180,9 @@ class LensImage(object):
             return result
 
         theta_x, theta_y, amplitude = self.PointSourceModel.get_multiple_images(
-            kwargs_point_source, kwargs_lens, kwargs_solver, k)
+            kwargs_point_source, kwargs_lens, kwargs_solver, 
+            k=k, with_amplitude=True, zero_duplicates=True
+        )
 
         # Extract unique image positions ?
         # def uniquify(a, tol):

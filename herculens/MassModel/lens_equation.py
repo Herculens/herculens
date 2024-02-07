@@ -245,3 +245,8 @@ class LensEquationSolver(object):
         src_selection = self.source_plane_triangles(img_selection, kwargs_lens)
 
         return self.centroids(img_selection), self.centroids(src_selection)
+
+    def estimate_accuracy(self, grid_pixel_width, niter, scale_factor, nsubdivisions):
+        """Gives an estimate of the accuracy of predicted image positions"""
+        return grid_pixel_width * (scale_factor / 4**nsubdivisions)**(niter / 2.)
+    
