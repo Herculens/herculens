@@ -209,8 +209,7 @@ class PointSource(object):
             kwargs_solver['scale_factor'], 
             kwargs_solver['nsubdivisions'], 
         )
-        position_decimals = int(- np.log10(position_accuracy))
-        print("position_decimals", position_decimals)
+        position_decimals = np.floor(- np.log10(position_accuracy)).astype(int) - 1
         unique_theta_x, unique_indices = jnp.unique(
             jnp.round(theta_x_in, decimals=position_decimals), 
             return_index=True, fill_value=False, size=num_images,
