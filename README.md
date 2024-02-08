@@ -46,6 +46,8 @@ Below you can find a few examples of synthetic problems that can be tackled with
 - [Detection of a dark satellite as a localized deviation to the smooth lens potential](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Subhalo_detection_with_wavelets.ipynb)
 - [Bayesian wavelet modeling of a spiral galaxy with (Laplace) sparsifying priors](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Spiral_galaxy_Bayesian_sparsity_Laplace.ipynb)
 - [Simple smooth light profile fitting](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Simple_galaxy_fitting.ipynb)
+- [Reconstruction of a lensed quasar and its complex host with wavelets](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Starting_guide_complex_source_and_point_source_arc.ipynb)
+- [Fast GPU-boosted lensed quasar simulations](https://github.com/aymgal/herculens_workspace/blob/main/notebooks/herculens__Fast_lensed_quasar_simulations.ipynb)
 
 New notebooks will continuously be added in order to showcase other features of the package and apply those in different situations.
 
