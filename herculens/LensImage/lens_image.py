@@ -178,16 +178,10 @@ class LensImage(object):
         result = jnp.zeros((self.Grid.num_pixel_axes))
         if self.PointSourceModel is None:
             return result
-
         theta_x, theta_y, amplitude = self.PointSourceModel.get_multiple_images(
             kwargs_point_source, kwargs_lens, kwargs_solver, 
             k=k, with_amplitude=True, zero_duplicates=True
         )
-
-        # Extract unique image positions ?
-        # def uniquify(a, tol):
-        #     return a[~(jnp.triu(jnp.abs(a[:, None] - a) <= tol, 1)).any(0)]
-
         for i in range(len(theta_x)):
             result += self.ImageNumerics.render_point_sources(
                 theta_x[i], theta_y[i], amplitude[i])

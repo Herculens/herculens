@@ -45,7 +45,7 @@ class PointSource(object):
 
     def image_positions_and_amplitudes(self, kwargs_point_source, 
                                        kwargs_lens=None, kwargs_solver=None,
-                                       zero_duplicates=True):
+                                       zero_duplicates=True, re_compute=False):
         """Compute image plane positions and corresponding amplitudes
         of the point source, optionally "turning-off" (zeroing their amplitude)
         potentially duplicated images predicted by the lens equation solver.
@@ -62,6 +62,10 @@ class PointSource(object):
             If True, amplitude of duplicated images are forced to be zero.
             Note that it may affect point source ordering!.
             Default is True.
+        re_compute : bool, optional
+            If True, re-compute (solving the lens equation) image positions,
+            even for point source models of type 'IMAGE_POSITIONS'.
+            Default is False.
         
         Return
         ------
@@ -70,18 +74,19 @@ class PointSource(object):
 
         """
         theta_x, theta_y = self.image_positions(
-            kwargs_point_source, kwargs_lens=kwargs_lens, kwargs_solver=kwargs_solver,
+            kwargs_point_source, kwargs_lens=kwargs_lens, 
+            kwargs_solver=kwargs_solver, re_compute=re_compute,
         )
         amp = self.image_amplitudes(
             theta_x, theta_y, kwargs_point_source, kwargs_lens=kwargs_lens,
         )
-        if zero_duplicates:
+        if zero_duplicates and self.type == 'SOURCE_POSITION':
             amp, theta_x, theta_y = self._zero_amp_duplicated_images(
                 amp, theta_x, theta_y, kwargs_solver,
             )
         return theta_x, theta_y, amp
 
-    def image_positions(self, kwargs_point_source, kwargs_lens=None, kwargs_solver=None):
+    def image_positions(self, kwargs_point_source, kwargs_lens=None, kwargs_solver=None, re_compute=False):
         """Compute image plane positions of the point source.
 
         Parameters
@@ -94,16 +99,17 @@ class PointSource(object):
             Keyword arguments for the lens equation solver. Default is None.
 
         """
-        if self.type == 'IMAGE_POSITIONS':
+        if self.type == 'IMAGE_POSITIONS' and not re_compute:
             theta_x = jnp.atleast_1d(kwargs_point_source['ra'])
             theta_y = jnp.atleast_1d(kwargs_point_source['dec'])
             return theta_x, theta_y
-        elif self.type == 'SOURCE_POSITION':
+        elif self.type == 'SOURCE_POSITION' or re_compute:
+            if self.type == 'IMAGE_POSITIONS':  # i.e. re_compute = True
+                beta_x, beta_y = self.source_position(kwargs_point_source, kwargs_lens=kwargs_lens)
+            else:
+                beta_x, beta_y = kwargs_point_source['ra'], kwargs_point_source['dec']
             # Solve the lens equation
-            beta_x = kwargs_point_source['ra']
-            beta_y = kwargs_point_source['dec']
             beta = jnp.array([beta_x, beta_y])
-
             if kwargs_solver is not None:
                 theta, beta = self.solver.solve(
                     self.image_plane, beta, kwargs_lens, **kwargs_solver,
@@ -176,6 +182,31 @@ class PointSource(object):
             return jnp.mean(amps)
         elif self.type == 'SOURCE_POSITION':
             return jnp.array(kwargs_point_source['amp'])
+        
+    def log_prob_image_plane(self, kwargs_point_source, kwargs_lens, 
+                             kwargs_solver, sigma_image=1e-3):
+        # find source position via ray-tracing
+        theta_x_in = jnp.array(kwargs_point_source['ra'])
+        theta_y_in = jnp.array(kwargs_point_source['dec'])
+        beta = self.mass_model.ray_shooting(theta_x_in, theta_y_in, kwargs_lens)
+        beta_x, beta_y = jnp.mean(beta[0]), jnp.mean(beta[1])
+        beta = jnp.array([beta_x, beta_y])
+        # solve lens equation to find corresponding image positions
+        theta, beta = self.solver.solve(
+            self.image_plane, beta, kwargs_lens, **kwargs_solver,
+        )
+        theta_x, theta_y = theta.T
+        # penalize departures between original and new positions
+        return - jnp.sum((jnp.hypot(theta_x_in - theta_x, theta_y_in - theta_y) / sigma_image)**2)
+    
+    def log_prob_source_plane(self, kwargs_point_source, kwargs_lens, sigma_source=1e-3):
+        # find source position via ray-tracing
+        theta_x_in = jnp.array(kwargs_point_source['ra'])
+        theta_y_in = jnp.array(kwargs_point_source['dec'])
+        beta_x, beta_y = self.mass_model.ray_shooting(theta_x_in, theta_y_in, kwargs_lens)
+        beta_x_mean, beta_y_mean = jnp.mean(beta_x), jnp.mean(beta_y)
+        # penalize departures between original and new positions
+        return - jnp.sum((jnp.hypot(beta_x - beta_x_mean, beta_y - beta_y_mean) / sigma_source)**2)
 
     def _zero_amp_duplicated_images(self, amp_in, theta_x_in, theta_y_in, kwargs_solver):
         """This function takes as input the list of multiply lensed images 
@@ -210,13 +241,17 @@ class PointSource(object):
             kwargs_solver['nsubdivisions'], 
         )
         position_decimals = np.floor(- np.log10(position_accuracy)).astype(int) - 1
+        print("position_decimals", position_decimals)
         unique_theta_x, unique_indices = jnp.unique(
-            jnp.round(theta_x_in, decimals=position_decimals), 
-            return_index=True, fill_value=False, size=num_images,
+            jnp.round(theta_x_in, decimals=position_decimals),  # TODO: issue when original value close to zero -> rounded to exactly zero!
+            return_index=True, 
+            fill_value=False,   # effectively zero
+            size=num_images,
         )
         condition = jnp.where(unique_theta_x, True, False)
         unique_amp = amp_in[unique_indices]  # order amplitudes as the positions
-        amp_out = jnp.where(condition, unique_amp, jnp.zeros(num_images))
+        zero_amp = 1e-20  # not exactly 0 to avoid problems with autodiff gradients
+        amp_out = jnp.where(condition, unique_amp, jnp.full(num_images, zero_amp))
         theta_x_out = theta_x_in[unique_indices]
         theta_y_out = theta_y_in[unique_indices]
         return amp_out, theta_x_out, theta_y_out

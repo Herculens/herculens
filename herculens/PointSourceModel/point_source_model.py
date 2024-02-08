@@ -46,31 +46,9 @@ class PointSourceModel(object):
 
         self.type_list = point_source_type_list
 
-    def _indices_from_k(self, k):
-        """Validate a proposed point source index.
-
-        Parameters
-        ----------
-        k : int
-            Proposed point source index. If k is None or is outside the range
-            [0, N - 1], where N is the number of point sources, return the
-            list [0, 1, ..., N - 1].
-
-        Returns
-        -------
-        out : list
-            Indices to take from the point source list.
-
-        """
-        inds = list(range(len(self.point_sources)))
-        if k in inds:
-            inds = [k]
-
-        return inds
-
     def get_multiple_images(self, kwargs_point_source, kwargs_lens=None,
                             kwargs_solver=None, k=None, with_amplitude=True,
-                            zero_duplicates=True):
+                            zero_duplicates=True, re_compute=False):
         """Compute point source positions and amplitudes in the image plane.
 
         For point sources defined in the source plane, solving the lens
@@ -95,6 +73,10 @@ class PointSourceModel(object):
             If True, amplitude of duplicated images are forced to be zero.
             Note that it may affect point source ordering!.
             Default is True.
+        re_compute : bool, optional
+            If True, re-compute (solving the lens equation) image positions,
+            even for point source models of type 'IMAGE_POSITIONS'.
+            Default is False.
 
         Returns
         -------
@@ -108,7 +90,7 @@ class PointSourceModel(object):
             ps = self.point_sources[i]
             ra, dec, amp = ps.image_positions_and_amplitudes(
                 kwargs_point_source[i], kwargs_lens, kwargs_solver,
-                zero_duplicates=zero_duplicates,
+                zero_duplicates=zero_duplicates, re_compute=re_compute,
             )
             theta_x.append(ra)
             theta_y.append(dec)
@@ -159,3 +141,63 @@ class PointSourceModel(object):
             return beta_x, beta_y, amps
 
         return beta_x, beta_y
+    
+    def log_prob_image_plane(self, kwargs_params, kwargs_solver, **kwargs_hyperparams):
+        """This function takes as input the current parameters
+        and returns log-probability penalty term that enforces multiply imaged
+        point sources optimized following the 'IMAGE_POSITIONS' model
+        to be consistent with the lens deflection field.
+        """
+        log_prob = 0.
+        kwargs_point_source = kwargs_params['kwargs_point_source']
+        for i, ps_type in enumerate(self.type_list):
+            if ps_type == 'IMAGE_POSITIONS':
+                ps = self.point_sources[i]
+                log_prob += ps.log_prob_image_plane(
+                    kwargs_params['kwargs_point_source'][i], 
+                    kwargs_params['kwargs_lens'], 
+                    kwargs_solver,
+                    **kwargs_hyperparams,
+                )
+        return log_prob
+    
+    def log_prob_source_plane(self, kwargs_params, **kwargs_hyperparams):
+        """This function takes as input the current parameters
+        and returns log-probability penalty term that enforces multiply imaged
+        point sources optimized following the 'IMAGE_POSITIONS' model
+        to be consistent with the lens deflection field.
+        """
+        log_prob = 0.
+        kwargs_point_source = kwargs_params['kwargs_point_source']
+        for i, ps_type in enumerate(self.type_list):
+            if ps_type == 'IMAGE_POSITIONS':
+                ps = self.point_sources[i]
+                log_prob += ps.log_prob_source_plane(
+                    kwargs_params['kwargs_point_source'][i], 
+                    kwargs_params['kwargs_lens'], 
+                    **kwargs_hyperparams,
+                )
+        return log_prob
+
+    def _indices_from_k(self, k):
+        """Validate a proposed point source index.
+
+        Parameters
+        ----------
+        k : int
+            Proposed point source index. If k is None or is outside the range
+            [0, N - 1], where N is the number of point sources, return the
+            list [0, 1, ..., N - 1].
+
+        Returns
+        -------
+        out : list
+            Indices to take from the point source list.
+
+        """
+        inds = list(range(len(self.point_sources)))
+        if k in inds:
+            inds = [k]
+
+        return inds
+    
