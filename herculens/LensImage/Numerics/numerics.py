@@ -10,6 +10,7 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 import numpy as np
 import jax.numpy as jnp
 from jax.scipy.ndimage import map_coordinates
+from scipy.ndimage import map_coordinates as map_coordinates_orig
 from herculens.LensImage.Numerics.grid import RegularGrid
 from herculens.LensImage.Numerics.convolution import (PixelKernelConvolution,
                                                       SubgridKernelConvolution,
@@ -138,7 +139,7 @@ class Numerics(object):
                 "example, if `pixel_size` was not provided for type GAUSSIAN.")
             raise ValueError(err_msg)
 
-        kernel = self._psf.kernel_point_source
+        kernel = self._psf.kernel_point_source.T  # taking the transpose for map_coordinates
         nx, ny = self._pixel_grid.num_pixel_axes
         xrange = jnp.arange(nx) + kernel.shape[0] // 2
         yrange = jnp.arange(ny) + kernel.shape[1] // 2
