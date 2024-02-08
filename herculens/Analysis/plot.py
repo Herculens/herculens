@@ -164,9 +164,14 @@ class Plotter(object):
                 show_source_diff = False
 
             if 'kwargs_point_source' in kwargs_result:
-                #TODO: support more than first point sources + lensed/unlensed point sources
+                #TODO: support several point source models
                 ps0_params = kwargs_result['kwargs_point_source'][0]
-                ps_src_pos = (ps0_params['ra'], ps0_params['dec'])
+                all_ps_src_x, all_ps_src_y = lens_image.PointSourceModel.get_source_plane_points(
+                    kwargs_result['kwargs_point_source'],
+                    kwargs_lens=kwargs_result['kwargs_lens'],
+                    with_amplitude=False,
+                )
+                ps_src_pos = (all_ps_src_x[0], all_ps_src_y[0])
             else:
                 ps_src_pos = None
 
@@ -353,7 +358,7 @@ class Plotter(object):
                     ax.set_xlim(src_extent[0], src_extent[1])
                     ax.set_ylim(src_extent[2], src_extent[3])
             if ps_src_pos is not None:
-                ax.scatter(*ps_src_pos, s=30, c='black', marker='x', linewidths=0.5, 
+                ax.scatter(*ps_src_pos, s=30, c='tab:blue', marker='x', linewidths=0.5, 
                            label="point source")
                 ax.legend()
             ax = axes[i_row, 2]
