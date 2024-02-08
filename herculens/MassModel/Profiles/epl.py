@@ -26,9 +26,8 @@ class EPL(object):
     upper_limit_default = {'gamma': 3, 'theta_E': 10, 'e1': 0.5, 'e2': 0.5, 'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
     
-    def __init__(self):
-        self.epl_major_axis = EPLMajorAxis()
-        super(EPL, self).__init__()
+    def __init__(self, no_complex_numbers=False):
+        self.epl_major_axis = EPLMajorAxis(no_complex_numbers)
 
     def param_conv(self, theta_E, e1, e2, gamma):
         """
@@ -155,9 +154,8 @@ class EPLMajorAxis(object):
     """
     param_names = ['b', 't', 'q', 'center_x', 'center_y']
 
-    def __init__(self):
-
-        super(EPLMajorAxis, self).__init__()
+    def __init__(self, no_complex_numbers):
+        self._no_complex = no_complex_numbers
 
     def function(self, x, y, b, t, q):
         """
@@ -175,16 +173,24 @@ class EPLMajorAxis(object):
         """
         returns the deflection
         """
-        # elliptical radius, eq. (5)
-        z = q * x + y * 1j
-        R = jnp.abs(z)
+        if self._no_complex:  # Using real numbers
+            # elliptical radius, eq. (5) of Tessore et al. 2015
+            R = jnp.hypot(q * x, y)
+            # deflection, eq. (22)
+            f_real, f_imag = jax_util.omega_real(x, y, t, q, nmax=20)
+            prefac = (2 * b) / (1 + q) * ((b / R) ** (t - 1))
+            alpha_real = prefac * f_real
+            alpha_imag = prefac * f_imag
 
-        # deflection, eq. (22)
-        alpha = 2. / (1. + q) * (b / R)**t * jax_util.R_omega(z, t, q, nmax=20)
-
-        # return real and imaginary part
-        alpha_real = jnp.nan_to_num(alpha.real, posinf=1e8, neginf=-1e8)
-        alpha_imag = jnp.nan_to_num(alpha.imag, posinf=1e8, neginf=-1e8)
+        else:  # Using complex numbers
+            # elliptical radius, eq. (5) of Tessore et al. 2015
+            z = q * x + y * 1j
+            R = jnp.abs(z)
+            # deflection, eq. (22)
+            alpha = 2. / (1. + q) * (b / R)**t * jax_util.R_omega(z, t, q, nmax=20)
+            # return real and imaginary part
+            alpha_real = alpha.real # jnp.nan_to_num(alpha.real, posinf=1e8, neginf=-1e8)
+            alpha_imag = alpha.imag # jnp.nan_to_num(alpha.imag, posinf=1e8, neginf=-1e8)
 
         return alpha_real, alpha_imag
 
@@ -200,7 +206,7 @@ class EPLMajorAxis(object):
 
         # convergence, eq. (2)
         kappa = (2. - t) / 2. * (b / R)**t
-        kappa = jnp.nan_to_num(kappa, posinf=1e8, neginf=-1e8)
+        # kappa = jnp.nan_to_num(kappa, posinf=1e8, neginf=-1e8)
 
         # deflection via method
         alpha_x, alpha_y = self.derivatives(x, y, b, t, q)

@@ -1,5 +1,5 @@
 # Handles different convolution methods
-# 
+#
 # Copyright (c) 2021, herculens developers and contributors
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the ImSim.Numerics module from lenstronomy (version 1.9.3)
@@ -25,9 +25,9 @@ class PixelKernelConvolution(object):
     class to compute convolutions for a given pixelized kernel
     """
 
-    _conv_types = ['jax_scipy', 'matrix']
+    _conv_types = ['jax_scipy_fft', 'jax_scipy', 'matrix']
 
-    def __init__(self, kernel, convolution_type='jax_scipy', output_shape=None):
+    def __init__(self, kernel, convolution_type='jax_scipy_fft', output_shape=None):
         """
 
         :param kernel: 2d array, convolution kernel
@@ -63,7 +63,9 @@ class PixelKernelConvolution(object):
         :param image: 2d array (image) to be convolved
         :return: fft convolution
         """
-        if self._conv_type == 'jax_scipy':
+        if self._conv_type == 'jax_scipy_fft':
+            return jsp.signal.fftconvolve(image, self._kernel, mode='same')
+        elif self._conv_type == 'jax_scipy':
             return jsp.signal.convolve2d(image, self._kernel, mode='same')
         elif self._conv_type == 'matrix':
             return self._conv_matrix.dot(image.flatten()).reshape(*self._output_shape)
@@ -139,7 +141,7 @@ class GaussianConvolution(object):
     class to perform a convolution a 2d Gaussian
     """
 
-    def __init__(self, sigma, pixel_scale, supersampling_factor=1, 
+    def __init__(self, sigma, pixel_scale, supersampling_factor=1,
                  supersampling_convolution=False, truncation=2):
         self._sigma = sigma / pixel_scale
         if supersampling_convolution is True:

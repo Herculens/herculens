@@ -69,9 +69,9 @@ class Noise(object):
         self._reset_cache()
         self._noise_map = noise_map if as_jax_array else np.array(noise_map)
 
-    def realisation(self, model, seed, add_gaussian=True, add_poisson=True):
+    def realisation(self, model, prng_key, add_gaussian=True, add_poisson=True):
         noise_real = 0.
-        key1, key2 = random.split(random.PRNGKey(seed))
+        key1, key2 = random.split(prng_key)
         if add_poisson and self._exp_map is not None:
             noise_real += image_util.add_poisson(model, self._exp_map, key1)
         if add_gaussian:
@@ -156,10 +156,10 @@ class Noise(object):
         :param exposure_map: exposure time per pixel, e.g. in units of seconds
         :return: len(d) x len(d) matrix that give the error of background and Poisson components; (photons/second)^2
         """
-        sigma = background_rms**2
+        sigma2 = background_rms**2
         if exposure_map is not None:
             d_pos = jnp.maximum(0, data)
-            sigma += d_pos / exposure_map
+            sigma2 += d_pos / exposure_map
         else:
-            sigma = sigma * jnp.ones_like(data)
-        return sigma
+            sigma2 = sigma2 * jnp.ones_like(data)
+        return sigma2

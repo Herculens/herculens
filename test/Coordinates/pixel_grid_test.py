@@ -80,6 +80,10 @@ class TestPixelGrid(object):
         (11, 11, 0.4, 15, (0.8, 0.8)), 
         (10, 10, 0.4, None, (0.5, 0.4)),
         (10, 11, 0.4, None, (0.5, 0.4)),
+        (68, 68, 1/2., None, (2.1, 2.1)),
+        (68, 68, 1/3., None, (2.1, 2.1)),
+        (69, 69, 1/2., None, (2.1, 2.1)),
+        (69, 69, 1/3., None, (2.1, 2.1)),
     ]
 )
 def test_create_model_grid(nx, ny, pix_scl_fac, num_pix, grid_shape):
@@ -91,6 +95,7 @@ def test_create_model_grid(nx, ny, pix_scl_fac, num_pix, grid_shape):
                                                   grid_center=(0, 0),
                                                   grid_shape=grid_shape)
     nx_new, ny_new = pixel_grid_new.num_pixel_axes
+    npt.assert_almost_equal(pixel_grid_new.center, pixel_grid.center)
     if num_pix is not None:
         assert nx_new == num_pix and ny_new == num_pix
     elif pix_scl_fac is not None:

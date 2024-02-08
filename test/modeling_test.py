@@ -30,7 +30,6 @@ from herculens.LensImage.lens_image import LensImage
 from herculens.Inference.loss import Loss
 from herculens.Inference.ProbModel.numpyro import NumpyroModel
 from herculens.Inference.Optimization.jaxopt import JaxoptOptimizer
-from herculens.Util import image_util, param_util, plot_util
 
 
 def _simulate_data(data_type, supersampling_factor):
@@ -42,7 +41,7 @@ def _simulate_data(data_type, supersampling_factor):
     pixel_grid = PixelGrid(nx=npix, ny=npix, 
                            ra_at_xy_0=ra_at_xy_0, dec_at_xy_0=dec_at_xy_0,
                            transform_pix2angle=transform_pix2angle)
-    psf = PSF(psf_type='GAUSSIAN', fwhm=0.3)
+    psf = PSF(psf_type='GAUSSIAN', fwhm=0.3, pixel_size=pix_scl)
     noise = Noise(npix, npix, background_rms=1e-2, exposure_time=2000.)
 
     # Define simulation parameters
@@ -88,7 +87,10 @@ def _simulate_data(data_type, supersampling_factor):
     kwargs_input = dict(kwargs_lens=kwargs_lens_mass_input,
                             kwargs_source=kwargs_source_input,
                             kwargs_lens_light=kwargs_lens_light_input)
-    data = lens_image_input.simulation(**kwargs_input, compute_true_noise_map=True, noise_seed=42)
+    data = lens_image_input.simulation(
+        **kwargs_input, compute_true_noise_map=True, 
+        prng_key=jax.random.PRNGKey(42),
+    )
     return data, lens_image_input, kwargs_input
 
 

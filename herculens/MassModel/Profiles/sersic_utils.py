@@ -19,10 +19,10 @@ __all__ = ['SersicUtil']
 
 class SersicUtil(object):
 
-    _s = 0.00001
-
-    def __init__(self, smoothing=_s):
-        self._smoothing = smoothing
+    def __init__(self, smoothing=0.00001, exponent=2.):
+        self._s = smoothing
+        self._e = exponent
+        self._super = False if self._e == 2. else True
 
     def k_bn(self, n, Re):
         """
@@ -59,6 +59,8 @@ class SersicUtil(object):
         :param q: axis ratio
         :param center_x: center x of sersic
         :param center_y: center y of sersic
+        :param exponent: exponent for generalization to superelliptical distance.
+        If equal to 2, corresponds to the classical ellipse.
         """
         x_shift = x - center_x
         y_shift = y - center_y
@@ -66,8 +68,11 @@ class SersicUtil(object):
         sin_phi = jnp.sin(phi_G)
         xt1 = cos_phi*x_shift+sin_phi*y_shift
         xt2 = -sin_phi*x_shift+cos_phi*y_shift
-        xt2difq2 = xt2/(q*q)
-        R = jnp.sqrt(xt1*xt1+xt2*xt2difq2)
+        if not self._super:
+            xt2difq2 = xt2/(q*q)
+            R = jnp.sqrt(xt1*xt1+xt2*xt2difq2)
+        else:
+            R = jnp.power(jnp.power(jnp.abs(xt1), self._e) + jnp.power(jnp.abs(xt2/q), self._e), 1/self._e)
         return R
 
     def _x_reduced(self, x, y, n_sersic, r_eff, center_x, center_y):
@@ -186,11 +191,11 @@ class SersicUtil(object):
 
     def _R_stable(self, R):
         """
-        Floor R_ at self._smoothing for numerical stability
+        Floor R_ at self._s for numerical stability
         :param R: radius
         :return: smoothed and stabilized radius
         """
-        return jnp.maximum(self._smoothing, R)
+        return jnp.maximum(self._s, R)
 
     def _r_sersic(self, R, R_sersic, n_sersic, max_R_frac=100.0, alpha=1.0, R_break=0.0):
         """

@@ -10,7 +10,10 @@ import numpy as np
 from scipy import interpolate #, ndimage
 from scipy.ndimage import interpolation as interp
 from jax import random
+import jax.numpy as jnp
 
+from objax import functional
+from objax.constants import ConvPadding
 # from herculens.Util.jax_util import BilinearInterpolator
 
 
@@ -92,8 +95,8 @@ def add_poisson(image, exp_time, seed):
     """
     adds a poison (or Gaussian) distributed noise with mean given by surface brightness
     """
-    sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
-    poisson = random.normal(seed, shape=np.shape(image)) * sigma
+    sigma = jnp.sqrt(jnp.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
+    poisson = random.normal(seed, shape=jnp.shape(image)) * sigma
     # without JAX:
     # sigma = np.sqrt(np.abs(image) / exp_time) # Gaussian approximation for Poisson distribution, normalized to exposure time
     # poisson = np.random.randn(*image.shape) * sigma
@@ -138,7 +141,10 @@ def re_size(image, factor=1):
     f = int(factor)
     nx, ny = np.shape(image)
     if int(nx/f) == nx/f and int(ny/f) == ny/f:
-        small = image.reshape([int(nx/f), f, int(ny/f), f]).mean(3).mean(1)
+        # small = image.reshape([int(nx/f), f, int(ny/f), f]).mean(3).mean(1)
+        image_nchw = image[None, None, :, :]
+        small_nchw = functional.average_pool_2d(image_nchw, size=f, padding=ConvPadding.SAME)
+        small = jnp.squeeze(small_nchw)
         return small
     else:
         raise ValueError("scaling with factor %s is not possible with grid size %s, %s" %(f, nx, ny))

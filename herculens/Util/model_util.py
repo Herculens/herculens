@@ -10,6 +10,10 @@ import numpy as np
 import jax.numpy as jnp
 from scipy.ndimage import morphology
 from scipy import ndimage
+from skimage import measure
+from jax import config
+
+from herculens.LensImage.lensing_operator import LensingOperator
 
 
 def mask_from_source_area(lens_image, parameters):
@@ -69,7 +73,7 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
     return model_mask, binary_source
 
 
-def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
+def pixelated_region_from_sersic(kwargs_sersic, force_square=False, use_major_axis=False,
                                  min_width=1.0, min_height=1.0, scaling=1.0):
     # imports are here to avoid issues with circular imports
     from herculens.Util import param_util
@@ -92,11 +96,56 @@ def pixelated_region_from_sersic(kwargs_sersic, use_major_axis=False,
     height = diameter * np.abs(np.sin(phi)) * scaling
     width = max(min_width, width)
     height = max(min_height, height)
+    if force_square is True:
+        width = max(width, height)
+        height = width
     # the following dict is consistent with arguments of PixelGrid.create_model_grid()
     kwargs_pixelated_grid = {
-        'grid_center': [float(c_x), float(c_y)],
-        'grid_shape': [float(width), float(height)],
+        'grid_center': (float(c_x), float(c_y)),
+        'grid_shape': (float(width), float(height)),
     }
+    return kwargs_pixelated_grid
+
+
+def pixelated_region_from_arc_mask(arc_mask, image_grid, mass_model, mass_params):
+    # We first design a hypothetical source plane with sufficiently high resolution
+    nx, ny = image_grid.num_pixel_axes
+    nx_src, ny_src = (nx//3, ny//3)
+    high_res_source_grid = image_grid.create_model_grid(pixel_scale_factor=0.5, grid_shape=(nx_src, ny_src))
+    
+    # Then build the lensing operator based on the image/source grids and mass model
+    lensing_op = LensingOperator(mass_model, image_grid, high_res_source_grid)
+    lensing_op.compute_mapping(kwargs_lens=mass_params)
+    
+    # De-lens the arc mask
+    arc_mask_source = np.array(lensing_op.image2source_2d(arc_mask))
+    arc_mask_source = np.where(arc_mask_source < 0.1, 0., 1.)  # only contains 0 and 1 now
+
+    # Find the minimum bounding box that encloses the mask in source plane (square here)
+    # - get the extrema 
+    rows = np.max(arc_mask_source, axis=0)
+    print(rows)
+    row_low, row_high = np.argmax(rows), np.argmax(rows[::-1])
+    print("R", row_low, row_high)
+    cols = np.max(arc_mask_source, axis=1)
+    print(cols)
+    col_low, col_high = np.argmax(cols), np.argmax(cols[::-1])
+    print("C", col_low, col_high)
+    # - get the pixel coordinates corresponding to these extrema
+    x_low, y_low = high_res_source_grid.map_pix2coord(row_low, col_low)
+    x_high, y_high = high_res_source_grid.map_pix2coord(row_high, col_high)
+    print(x_low, y_low)
+    print(x_high, y_high)
+
+    # Get the grid parameters
+    new_grid_shape = (abs(x_high - x_low), abs(y_high - y_low))
+    new_grid_center = (0.5*(x_low+x_high), 0.5*(y_low+y_high))
+    kwargs_pixelated_grid = {
+        'grid_center': new_grid_center,
+        'grid_shape': new_grid_shape,
+    }
+
+    # Create the new, reduced source plane grid
     return kwargs_pixelated_grid
 
 
@@ -135,3 +184,65 @@ def draw_samples_from_covariance(mean, covariance, num_samples=10000, seed=None)
         np.random.seed(seed)
     samples = np.random.multivariate_normal(mean, covariance, size=num_samples)
     return samples
+
+
+def critical_lines_caustics(lens_image, kwargs_lens, supersampling=5, 
+                            return_lens_centers=False):
+    if config.read('jax_enable_x64') is not True:
+        print("WARNING: JAX's 'jax_enable_x64' is not enabled; "
+              "computation of critical lines and caustics might be inaccurate.")
+    # evaluate the total magnification
+    grid = lens_image.Grid.create_model_grid(pixel_scale_factor=1./supersampling)
+    x_grid_img, y_grid_img = grid.pixel_coordinates
+    mag_tot = lens_image.MassModel.magnification(x_grid_img, y_grid_img, kwargs_lens)
+    mag_tot = np.array(mag_tot, dtype=np.float64)
+
+    # invert and find contours corresponding to infinite magnification
+    inv_mag_tot = 1. / mag_tot
+    contours = measure.find_contours(inv_mag_tot, 0.)
+
+    crit_lines, caustics = [], []
+    for contour in contours:
+        # extract the lines
+        cline_x, cline_y = contour[:, 1], contour[:, 0]
+        # convert to model coordinates
+        cline_x, cline_y = grid.map_pix2coord(cline_x, cline_y)
+        crit_lines.append((np.array(cline_x), np.array(cline_y)))
+        # find corresponding caustics through ray shooting
+        caust_x, caust_y = lens_image.MassModel.ray_shooting(cline_x, cline_y, kwargs_lens)
+        caustics.append((np.array(caust_x), np.array(caust_y)))
+
+    # can also returns the lens components centroids for convenience
+    if return_lens_centers:
+        cxs, cys = [], []
+        for kw in kwargs_lens:
+            if 'center_x' in kw:
+                cxs.append(kw['center_x'])
+                cys.append(kw['center_y'])
+        return crit_lines, caustics, (np.array(cxs), np.array(cys))
+    return crit_lines, caustics
+
+
+def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
+    shear_type = 'SHEAR_GAMMA_PSI'
+    try:
+        shear_idx = lens_image.MassModel.profile_type_list.index(shear_type)
+    except ValueError:
+        shear_type = 'SHEAR'
+        try:
+            shear_idx = lens_image.MassModel.profile_type_list.index(shear_type)
+        except ValueError:
+            return None
+    if shear_type == 'SHEAR_GAMMA_PSI':
+        # imports are here to avoid issues with circular imports
+        from herculens.Util import param_util
+        gamma1, gamma2 = param_util.shear_polar2cartesian(kwargs_lens[shear_idx]['phi_ext'],
+                                                          kwargs_lens[shear_idx]['gamma_ext'])
+    else:
+        gamma1, gamma2 = kwargs_lens[shear_idx]['gamma1'], kwargs_lens[shear_idx]['gamma2']
+    grid = lens_image.Grid.create_model_grid(num_pixels=num_pixels)
+    x_grid_img, y_grid_img = grid.pixel_coordinates
+    alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_img, y_grid_img, kwargs_lens, 
+                                                  k=shear_idx)
+    return (np.array(x_grid_img), np.array(y_grid_img), 
+            gamma1, gamma2, np.array(alpha_x), np.array(alpha_y))

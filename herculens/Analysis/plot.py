@@ -14,6 +14,7 @@ from scipy import ndimage
 from matplotlib.colors import Normalize, LogNorm, TwoSlopeNorm
 
 from herculens.Util.plot_util import nice_colorbar, nice_colorbar_residuals
+from herculens.Util import model_util
 
 
 # Some general default for plotting
@@ -60,7 +61,7 @@ class Plotter(object):
     cmap_deriv1 = plt.get_cmap('cividis')
     cmap_deriv2 = plt.get_cmap('inferno')
 
-    def __init__(self, data_name=None, base_fontsize=0.28, flux_log_scale=True, 
+    def __init__(self, data_name=None, base_fontsize=14, flux_log_scale=True, 
                  flux_vmin=None, flux_vmax=None, res_vmax=6, cmap_flux=None):
         self.data_name = data_name
         self.base_fontsize = base_fontsize
@@ -99,18 +100,20 @@ class Plotter(object):
     def model_summary(self, lens_image, kwargs_result,
                       show_image=True, show_source=True, 
                       show_lens_light=False, show_lens_potential=False, show_lens_others=False,
-                      shift_pixelated_potential='none',
-                      likelihood_mask=None, potential_mask=None,
+                      only_pixelated_potential=False, shift_pixelated_potential='none',
+                      likelihood_mask=None, potential_mask=None, 
+                      show_lens_lines=False, show_shear_field=False, show_lens_position=False,
                       kwargs_grid_source=None,
-                      lock_colorbars=False,
+                      lock_colorbars=False, masked_residuals=True,
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       k_lens=None, # TEMP
                       show_plot=True):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_light, 
-                     show_lens_potential, (show_lens_others and show_lens_potential)])
+                      show_lens_potential, show_lens_others])
         
-        extent = lens_image.Grid.extent
+        # extent = lens_image.Grid.extent
+        extent = lens_image.Grid.plt_extent
 
         ##### PREPARE IMAGES #####
             
@@ -137,13 +140,14 @@ class Plotter(object):
             if lens_image.SourceModel.has_pixels:
                 src_idx = lens_image.SourceModel.pixelated_index
                 source_model = kwargs_source[src_idx]['pixels']
-                _, _, src_extent = lens_image.get_source_coordinates(kwargs_result['kwargs_lens'])
+                _, _, src_extent = lens_image.get_source_coordinates(
+                    kwargs_result['kwargs_lens'], return_plt_extent=True)
             elif kwargs_grid_source is not None:
                 grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
                 x_grid_src, y_grid_src = grid_src.pixel_coordinates
                 source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
                 source_model *= lens_image.Grid.pixel_area
-                src_extent = grid_src.extent
+                src_extent = grid_src.plt_extent
             else:
                 source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
                 src_extent = extent
@@ -158,6 +162,18 @@ class Plotter(object):
             else:
                 ref_source = None
                 show_source_diff = False
+
+            if 'kwargs_point_source' in kwargs_result:
+                #TODO: support several point source models
+                ps0_params = kwargs_result['kwargs_point_source'][0]
+                all_ps_src_x, all_ps_src_y = lens_image.PointSourceModel.get_source_plane_points(
+                    kwargs_result['kwargs_point_source'],
+                    kwargs_lens=kwargs_result['kwargs_lens'],
+                    with_amplitude=False,
+                )
+                ps_src_pos = (all_ps_src_x[0], all_ps_src_y[0])
+            else:
+                ps_src_pos = None
 
         if show_lens_light:
             kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
@@ -178,22 +194,29 @@ class Plotter(object):
                 ref_lens_light = None
                 show_lens_light_diff = False
 
-        if show_lens_potential:
+        if show_lens_potential or show_lens_others:
             kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
-            pot_idx = lens_image.MassModel.pixelated_index
-            x_grid_lens, y_grid_lens = lens_image.MassModel.pixel_grid.pixel_coordinates
+            pot_idx = lens_image.MassModel.pixelated_index if only_pixelated_potential else None
+            if pot_idx is not None and only_pixelated_potential:
+                x_grid_lens, y_grid_lens = lens_image.MassModel.pixel_grid.pixel_coordinates
+                potential_model = kwargs_lens[pot_idx]['pixels']
+            else:
+                x_grid_lens, y_grid_lens = lens_image.Grid.pixel_coordinates
+                if show_lens_potential:
+                    potential_model = lens_image.MassModel.potential(x_grid_lens, y_grid_lens, 
+                                                                     kwargs_lens, k=pot_idx)
             alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_lens, y_grid_lens, 
                                                           kwargs_lens, k=pot_idx)
             kappa = lens_image.MassModel.kappa(x_grid_lens, y_grid_lens, 
                                                kwargs_lens, k=pot_idx)
             #kappa = ndimage.gaussian_filter(kappa, 1)
-            potential_model = kwargs_lens[pot_idx]['pixels']
+            magnification = lens_image.MassModel.magnification(x_grid_lens, y_grid_lens, kwargs_lens)
             
             if potential_mask is None:
-                potential_mask = np.ones_like(potential_model)
+                potential_mask = np.ones_like(x_grid_lens)
 
             # here we know that there are no perturbations in the reference potential
-            if hasattr(self, '_ref_pixel_pot'):
+            if hasattr(self, '_ref_pixel_pot') and show_lens_potential:
                 ref_potential = self._ref_pixel_pot
                 if ref_potential.shape != potential_model.shape:
                     warnings.warn("Reference potential does not have the same shape as model potential.")
@@ -224,9 +247,9 @@ class Plotter(object):
                 ref_potential = None
                 show_pot_diff = False
 
-            if potential_mask is None:
-                # TODO: compute potential mask based on undersampled likelihood_mask
-                potential_mask = np.ones_like(potential_model)
+        if show_lens_lines:
+            clines, caustics, centers = model_util.critical_lines_caustics(
+                lens_image, kwargs_result['kwargs_lens'], return_lens_centers=True)
 
 
         ##### BUILD UP THE PLOTS #####
@@ -245,27 +268,61 @@ class Plotter(object):
             im.set_rasterized(True)
             if mask_bool is True:
                 ax.contour(likelihood_mask, extent=extent, levels=[0], 
-                           colors='white', alpha=0.5, linewidths=0.5)
+                           colors='white', alpha=0.3, linewidths=0.5)
+            if show_lens_position and 'kwargs_lens_light' in kwargs_result:
+                plotted_centers = []
+                for kw in kwargs_result['kwargs_lens_light']:
+                    if 'center_x' in kw:
+                        center = (kw['center_x'], kw['center_y'])
+                        if center not in plotted_centers:
+                            ax.plot(*center, linestyle='none', color='black', 
+                                    markeredgecolor='black', markersize=10, marker='o', 
+                                    fillstyle='none', markeredgewidth=0.5)
+                        plotted_centers.append(center)
+            if show_lens_lines:
+                for curve in clines:
+                    ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
+                ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
+            if show_shear_field:
+                shear_field = model_util.shear_deflection_field(lens_image, kwargs_lens, num_pixels=8)
+                if shear_field is not None:
+                    x_field, y_field, g1_field, g2_field, ax_field, ay_field = shear_field
+                    qu = ax.quiver(x_field, y_field,
+                                   g1_field, g2_field,
+                                   #ax_field, ay_field, 
+                                   scale=0.1, scale_units='xy',
+                                   #width=0.001, headwidth=0.3, 
+                                   color='white', alpha=0.3)
+                    ax.set_xlim(extent[0], extent[1])
+                    ax.set_ylim(extent[2], extent[3])
+                else:
+                    print("Warning: no external shear to plot have been found.")
             data_title = self.data_name if self.data_name is not None else "data"
             ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+            
             ax = axes[i_row, 1]
             im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
             im.set_rasterized(True)
             ax.set_title("model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+
             ax = axes[i_row, 2]
             model_residuals, residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
+            if masked_residuals is True:
+                residuals_plot = model_residuals
+            else:
+                residuals_plot = residuals
             red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
-            im = ax.imshow(residuals, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
+            im = ax.imshow(residuals_plot, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
             im.set_rasterized(True)
-            if mask_bool is True:
+            if mask_bool is True and masked_residuals is False:
                 ax.contour(likelihood_mask, extent=extent, levels=[0], 
                            colors='black', alpha=0.5, linewidths=0.5)
             ax.set_title(r"(f${}_{\rm data}$ - f${}_{\rm model})/\sigma$", fontsize=self.base_fontsize)
-            nice_colorbar_residuals(im, residuals, position='top', pad=0.4, size=0.2, 
+            nice_colorbar_residuals(im, residuals_plot, position='top', pad=0.4, size=0.2, 
                                     vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                     colorbar_kwargs={'orientation': 'horizontal'})
             text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
@@ -294,6 +351,16 @@ class Plotter(object):
             ax.set_title("source model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+            if show_lens_lines:
+                for curve in caustics:
+                    ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
+                    # force x, y limits to stay the same as 
+                    ax.set_xlim(src_extent[0], src_extent[1])
+                    ax.set_ylim(src_extent[2], src_extent[3])
+            if ps_src_pos is not None:
+                ax.scatter(*ps_src_pos, s=30, c='tab:blue', marker='x', linewidths=0.5, 
+                           label="point source")
+                ax.legend()
             ax = axes[i_row, 2]
             if ref_source is not None and show_source_diff is True:
                 diff = source_model - ref_source
@@ -387,28 +454,32 @@ class Plotter(object):
                 ax.axis('off')
             i_row += 1
 
-        if show_lens_others and show_lens_potential:
+        if show_lens_others:
 
-            ##### DEFLECTION ANGLES AND SURFACE MASS DENSITY #####
+            ##### DEFLECTION ANGLES, SURFACE MASS DENSITY AND MAGNIFICATION #####
             ax = axes[i_row, 0]
             im = ax.imshow(alpha_x * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\alpha_{x,\rm pix}$", fontsize=self.base_fontsize)
+            title = r"$\alpha_{x,\rm pix}$" if only_pixelated_potential else r"deflection field ($x$)"
+            ax.set_title(title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
-            im = ax.imshow(alpha_y * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
+            im = ax.imshow(kappa * potential_mask, cmap=self.cmap_deriv2, norm=LogNorm(),
+                           alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\alpha_{y,\rm pix}$", fontsize=self.base_fontsize)
+            title = r"$\kappa_{\rm pix}$" if only_pixelated_potential else "convergence"
+            ax.set_title(title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
-            im = ax.imshow(kappa * potential_mask, cmap=self.cmap_deriv2, alpha=1, extent=extent)
+            im = ax.imshow(magnification * potential_mask, cmap=self.cmap_default, norm=Normalize(-10, 10),
+                           alpha=1, extent=extent)
             im.set_rasterized(True)
-            ax.set_title(r"$\kappa_{\rm pix}$", fontsize=self.base_fontsize)
+            title = r"$\mu_{\rm pix}$" if only_pixelated_potential else "magnification"
+            ax.set_title(title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
-            ax.imshow(likelihood_mask_nans, extent=extent, cmap='gray_r', vmin=0, vmax=1)
             i_row += 1
 
         if show_plot:

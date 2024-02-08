@@ -102,6 +102,27 @@ class PixelGrid(Coordinates):
     def extent(self):
         x_coords, y_coords = self.pixel_axes
         return [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
+    
+    @property
+    def plt_extent(self):
+        """set of coordinates of the borders of the grid (useful for matplotlib functions)"""
+        extent = copy.copy(self.extent)
+        # WARNING: the following assumes NO ROTATION (i.e. coordinates axes aligned with x/y axes)
+        pix_scl_x = self._Mpix2a[0, 0]
+        pix_scl_y = self._Mpix2a[1, 1]
+        if self.x_is_inverted:
+            extent[0] += pix_scl_x / 2.
+            extent[1] -= pix_scl_x / 2.
+        else:
+            extent[0] -= pix_scl_x / 2.
+            extent[1] += pix_scl_x / 2.
+        if self.y_is_inverted:
+            extent[2] += pix_scl_y / 2.
+            extent[3] -= pix_scl_y / 2.
+        else:
+            extent[2] -= pix_scl_y / 2.
+            extent[3] += pix_scl_y / 2.
+        return extent
 
     def create_model_grid(self, num_pixels=None, pixel_scale_factor=None, grid_center=None, grid_shape=None):
         """
@@ -146,7 +167,6 @@ class PixelGrid(Coordinates):
             ny = round(height / pixel_width)
         else:
             nx = ny = num_pixels_  # assuming square grid
-            print("nxny", nx, ny)
             if height != width:
                 raise ValueError(f"Setting number of side pixels only works with square grids "
                                  f"(grid shape {grid_shape_} was provided).")
@@ -154,8 +174,8 @@ class PixelGrid(Coordinates):
 
         transform_pix2angle = self.transform_pix2angle / self.pixel_width * pixel_width
 
-        cx, cy = int(nx / 2), int(ny / 2)
+        cx, cy = nx / 2., ny / 2.
         cra, cdec = transform_pix2angle.dot(np.array([cx, cy]))
-        ra_at_xy_0, dec_at_xy_0 = - cra + center_x, - cdec + center_y
+        ra_at_xy_0, dec_at_xy_0 = - cra + center_x + pixel_width/2., - cdec + center_y + pixel_width/2.
 
         return PixelGrid(nx, ny, transform_pix2angle, ra_at_xy_0, dec_at_xy_0)

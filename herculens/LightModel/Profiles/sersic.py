@@ -38,6 +38,9 @@ class Sersic(SersicUtil):
     upper_limit_default = {'amp': 100, 'R_sersic': 100, 'n_sersic': 8, 'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
 
+    def __init__(self, smoothing=0.00001, exponent=2.):
+        super().__init__(smoothing=smoothing, exponent=exponent)
+
     def function(self, x, y, R_sersic, n_sersic, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
         """
 
@@ -125,6 +128,9 @@ class SersicElliptic(SersicUtil):
     lower_limit_default = {'amp': 0, 'R_sersic': 0, 'n_sersic': 0.5, 'e1': -0.5, 'e2': -0.5,'center_x': -100, 'center_y': -100}
     upper_limit_default = {'amp': 100, 'R_sersic': 100, 'n_sersic': 8, 'e1': 0.5, 'e2': 0.5,'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
+
+    def __init__(self, smoothing=0.00001, exponent=2.):
+        super().__init__(smoothing=smoothing, exponent=exponent)
 
     def function(self, x, y, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
         """
