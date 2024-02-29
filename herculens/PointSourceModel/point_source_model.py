@@ -48,7 +48,7 @@ class PointSourceModel(object):
 
     def get_multiple_images(self, kwargs_point_source, kwargs_lens=None,
                             kwargs_solver=None, k=None, with_amplitude=True,
-                            zero_duplicates=True, re_compute=False):
+                            zero_amp_duplicates=True, re_compute=False):
         """Compute point source positions and amplitudes in the image plane.
 
         For point sources defined in the source plane, solving the lens
@@ -69,7 +69,7 @@ class PointSourceModel(object):
         with_amplitude : bool, optional
             Whether to return the (magnified) amplitude of each point source.
             Default is True.
-        zero_duplicates : bool, optional
+        zero_amp_duplicates : bool, optional
             If True, amplitude of duplicated images are forced to be zero.
             Note that it may affect point source ordering!.
             Default is True.
@@ -89,8 +89,8 @@ class PointSourceModel(object):
         for i in self._indices_from_k(k):
             ps = self.point_sources[i]
             ra, dec, amp = ps.image_positions_and_amplitudes(
-                kwargs_point_source[i], kwargs_lens, kwargs_solver,
-                zero_duplicates=zero_duplicates, re_compute=re_compute,
+                kwargs_point_source[i], kwargs_lens=kwargs_lens, kwargs_solver=kwargs_solver,
+                zero_amp_duplicates=zero_amp_duplicates, re_compute=re_compute,
             )
             theta_x.append(ra)
             theta_y.append(dec)

@@ -179,8 +179,8 @@ class LensImage(object):
         if self.PointSourceModel is None:
             return result
         theta_x, theta_y, amplitude = self.PointSourceModel.get_multiple_images(
-            kwargs_point_source, kwargs_lens, kwargs_solver, 
-            k=k, with_amplitude=True, zero_duplicates=True
+            kwargs_point_source, kwargs_lens=kwargs_lens, kwargs_solver=kwargs_solver, 
+            k=k, with_amplitude=True, zero_amp_duplicates=True
         )
         for i in range(len(theta_x)):
             result += self.ImageNumerics.render_point_sources(

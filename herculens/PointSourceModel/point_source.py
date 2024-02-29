@@ -2,9 +2,17 @@
 
 __author__ = 'austinpeel'
 
+import functools
 import numpy as np
 import jax.numpy as jnp
-from herculens.MassModel.lens_equation import LensEquationSolver
+
+try:
+    from helens import LensEquationSolver
+except ImportError:
+    _solver_installed = False
+else:
+    _solver_installed = True
+
 
 __all__ = ['PointSource']
 
@@ -19,7 +27,7 @@ class PointSource(object):
 
     """
 
-    def __init__(self, point_source_type, mass_model=None, image_plane=None):
+    def __init__(self, point_source_type, mass_model, image_plane):
         """Instantiate a point source.
 
         Parameters
@@ -36,16 +44,21 @@ class PointSource(object):
         self.type = point_source_type
         self.mass_model = mass_model
         self.image_plane = image_plane
+        if self.type == 'SOURCE_POSITION':
+            self._check_solver_install(f"type = '{self.type}'")
 
     @property
     def solver(self):
         if not hasattr(self, '_solver'):
-            self._solver = LensEquationSolver(self.mass_model)
+            # TODO: support the argument k != None
+            ray_shooting_func = functools.partial(self.mass_model.ray_shooting, k=None)
+            x_grid, y_grid = self.image_plane.pixel_coordinates
+            self._solver = LensEquationSolver(x_grid, y_grid, ray_shooting_func)
         return self._solver
 
     def image_positions_and_amplitudes(self, kwargs_point_source, 
                                        kwargs_lens=None, kwargs_solver=None,
-                                       zero_duplicates=True, re_compute=False):
+                                       zero_amp_duplicates=True, re_compute=False):
         """Compute image plane positions and corresponding amplitudes
         of the point source, optionally "turning-off" (zeroing their amplitude)
         potentially duplicated images predicted by the lens equation solver.
@@ -58,7 +71,7 @@ class PointSource(object):
             Keyword arguments for the lensing mass model. Default is None.
         kwargs_solver : dict, optional
             Keyword arguments for the lens equation solver. Default is None.
-        zero_duplicates : bool, optional
+        zero_amp_duplicates : bool, optional
             If True, amplitude of duplicated images are forced to be zero.
             Note that it may affect point source ordering!.
             Default is True.
@@ -80,7 +93,7 @@ class PointSource(object):
         amp = self.image_amplitudes(
             theta_x, theta_y, kwargs_point_source, kwargs_lens=kwargs_lens,
         )
-        if zero_duplicates and self.type == 'SOURCE_POSITION':
+        if zero_amp_duplicates and self.type == 'SOURCE_POSITION':
             amp, theta_x, theta_y = self._zero_amp_duplicated_images(
                 amp, theta_x, theta_y, kwargs_solver,
             )
@@ -110,14 +123,11 @@ class PointSource(object):
                 beta_x, beta_y = kwargs_point_source['ra'], kwargs_point_source['dec']
             # Solve the lens equation
             beta = jnp.array([beta_x, beta_y])
-            if kwargs_solver is not None:
-                theta, beta = self.solver.solve(
-                    self.image_plane, beta, kwargs_lens, **kwargs_solver,
-                )
-            else:
-                theta, beta = self.solver.solve(
-                    self.image_plane, beta, kwargs_lens,
-                )
+            if kwargs_solver is None:
+                kwargs_solver = {}  # fall back to default lens equation solver settings
+            theta, beta = self.solver.solve(
+                beta, kwargs_lens, **kwargs_solver,
+            )
             return theta.T
 
     def image_amplitudes(self, theta_x, theta_y, kwargs_point_source, kwargs_lens=None):
@@ -185,6 +195,7 @@ class PointSource(object):
         
     def log_prob_image_plane(self, kwargs_point_source, kwargs_lens, 
                              kwargs_solver, sigma_image=1e-3):
+        self._check_solver_install("log_prob_image_plane")
         # find source position via ray-tracing
         theta_x_in = jnp.array(kwargs_point_source['ra'])
         theta_y_in = jnp.array(kwargs_point_source['dec'])
@@ -193,7 +204,7 @@ class PointSource(object):
         beta = jnp.array([beta_x, beta_y])
         # solve lens equation to find corresponding image positions
         theta, beta = self.solver.solve(
-            self.image_plane, beta, kwargs_lens, **kwargs_solver,
+            beta, kwargs_lens, **kwargs_solver,
         )
         theta_x, theta_y = theta.T
         # penalize departures between original and new positions
@@ -235,13 +246,12 @@ class PointSource(object):
         # TODO: find a way not to change the image ordering (might be slower though).
         num_images = kwargs_solver['nsolutions']
         position_accuracy = self.solver.estimate_accuracy(
-            self.image_plane.pixel_width,
             kwargs_solver['niter'], 
             kwargs_solver['scale_factor'], 
             kwargs_solver['nsubdivisions'], 
         )
+        # TODO: the following choice for truncation the digits may not be general enough!
         position_decimals = np.floor(- np.log10(position_accuracy)).astype(int) - 1
-        print("position_decimals", position_decimals)
         unique_theta_x, unique_indices = jnp.unique(
             jnp.round(theta_x_in, decimals=position_decimals),  # TODO: issue when original value close to zero -> rounded to exactly zero!
             return_index=True, 
@@ -255,3 +265,10 @@ class PointSource(object):
         theta_x_out = theta_x_in[unique_indices]
         theta_y_out = theta_y_in[unique_indices]
         return amp_out, theta_x_out, theta_y_out
+
+    def _check_solver_install(self, feature):
+        if not _solver_installed:
+            raise RuntimeError(f"A lens equation solver is required for the "
+                               f"require point source modeling feature ('{feature}'). "
+                               f"Please install `helens` from https://github.com/Herculens/helens.")
+        
