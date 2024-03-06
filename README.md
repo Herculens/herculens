@@ -84,16 +84,7 @@ The [`requirements.txt`](requirements.txt) file lists all required and optional 
 
 ### Citation
 
-If you make use of `herculens`, please cite [Galan et al. 2022](https://arxiv.org/abs/2207.05763). This work presents the global architecture of the tool, and applies it to reconstruct a pixelated lens potential with wavelets.
-```
-@article{Galan:2022:herculens,
-    author        = "Galan, Aymeric and Vernardos, Georgios and Peel, Austin and Courbin, Fr\'ed\'eric and Starck, Jean-Luc",
-    title         = "{Using wavelets to capture deviations from smoothness in galaxy-scale strong lenses}",
-    eprint        = "2207.05763",
-    archivePrefix = "arXiv",
-    primaryClass  = "astro-ph.CO",
-    year          = "2022"
-}
+If you make use of `herculens`, please cite [Galan et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract). This work presents the global architecture of the tool, and applies it to reconstruct a pixelated lens potential with wavelets. See [`CITATION.md`](CITATION.md) for the bibtex entry.
 ```
 
 
