@@ -133,13 +133,13 @@ def test_model_fit(data_type, supersampling_factor):
              'n_sersic': numpyro.sample('source_n', dist.Uniform(1., 3.)), 
              'e1': numpyro.sample('source_e1', dist.TruncatedNormal(0.1, 0.05, low=-0.3, high=0.3)),
              'e2': numpyro.sample('source_e2', dist.TruncatedNormal(-0.05, 0.05, low=-0.3, high=0.3)),
-             'center_x': numpyro.sample('source_center_x', dist.Normal(0.05, 0.05)), 
-            'center_y': numpyro.sample('source_center_y', dist.Normal(0.1, 0.05))}
+             'center_x': numpyro.sample('source_center_x', dist.TruncatedNormal(0., 0.05, low=-0.2, high=0.2)), 
+            'center_y': numpyro.sample('source_center_y', dist.TruncatedNormal(0., 0.05, low=-0.2, high=0.2))}
             ]
 
             # Parameters of the lens
-            cx = numpyro.sample('lens_center_x', dist.Normal(0., 0.05))
-            cy = numpyro.sample('lens_center_y', dist.Normal(0., 0.05))
+            cx = numpyro.sample('lens_center_x', dist.TruncatedNormal(0., 0.05, low=-0.1, high=0.1))
+            cy = numpyro.sample('lens_center_y', dist.TruncatedNormal(0., 0.05, low=-0.1, high=0.1))
             prior_lens = [
                 # power-law
             {
