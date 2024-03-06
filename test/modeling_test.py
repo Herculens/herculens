@@ -6,16 +6,11 @@
 import numpy as np
 import numpy.testing as npt
 import pytest
-import matplotlib.pyplot as plt
-import time
 from copy import deepcopy
-from functools import partial
 
 import jax
 import jax.numpy as jnp
-# uncomment for double precision
-#from jax.config import config
-#config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", True)
 
 import numpyro
 import numpyro.distributions as dist
@@ -89,7 +84,7 @@ def _simulate_data(data_type, supersampling_factor):
                             kwargs_lens_light=kwargs_lens_light_input)
     data = lens_image_input.simulation(
         **kwargs_input, compute_true_noise_map=True, 
-        prng_key=jax.random.PRNGKey(42),
+        prng_key=jax.random.PRNGKey(0),
     )
     return data, lens_image_input, kwargs_input
 
@@ -105,7 +100,11 @@ def _simulate_data(data_type, supersampling_factor):
 )
 @pytest.mark.parametrize(
     "supersampling_factor",
-    [1, 2, 3],
+    [
+        1, 
+        2, 
+        3,
+    ],
 )
 def test_model_fit(data_type, supersampling_factor):
     # Get some fake imaging data
@@ -235,7 +234,7 @@ def test_model_fit(data_type, supersampling_factor):
     loss = Loss(prob_model)
 
     # Draw some initial parameter values (from the prior)
-    init_params = prob_model.unconstrain(prob_model.get_sample(seed=8))
+    init_params = prob_model.unconstrain(prob_model.get_sample(seed=0))
     kwargs_init = prob_model.params2kwargs(prob_model.constrain(init_params))
     print("Initial loss =", loss(init_params))
     print("Initial gradient =", loss.gradient(init_params))
@@ -245,11 +244,12 @@ def test_model_fit(data_type, supersampling_factor):
     assert red_chi2_init > 1.05  # residual should be bad here
 
     # uncomment this to check the initial model compared to the data
+    # import matplotlib.pyplot as plt
     # fig, axes = plt.subplots(1, 2)
     # axes[0].imshow(data)
     # axes[1].imshow(model_init)
     # plt.show()
-    # raise
+    # # raise
 
     # Performs the fit
     optimizer = JaxoptOptimizer(loss, loss_norm_optim=data.size)
@@ -264,7 +264,12 @@ def test_model_fit(data_type, supersampling_factor):
     kwargs_bestfit = prob_model.params2kwargs(prob_model.constrain(bestfit_params))
 
     model_bestfit = lens_image_fit.model(**kwargs_bestfit)
+    residuals, _ = lens_image_fit.normalized_residuals(data, model_bestfit)
     red_chi2_bestfit = lens_image_fit.reduced_chi2(data, model_bestfit)
+
+    # plt.figure()
+    # plt.imshow(residuals, vmin=-3, vmax=3)
+    # plt.show()
 
     # assert that residuals after fitting are effectively down to the noise
     assert red_chi2_bestfit < 1.05
