@@ -85,7 +85,6 @@ The [`requirements.txt`](requirements.txt) file lists all required and optional 
 ### Citation
 
 If you make use of `herculens`, please cite [Galan et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract). This work presents the global architecture of the tool, and applies it to reconstruct a pixelated lens potential with wavelets. See [`CITATION.md`](CITATION.md) for the bibtex entry.
-```
 
 
 ### Special mention regarding Lenstronomy
