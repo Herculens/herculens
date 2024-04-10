@@ -193,31 +193,40 @@ class PointSource(object):
         elif self.type == 'SOURCE_POSITION':
             return jnp.array(kwargs_point_source['amp'])
         
-    def log_prob_image_plane(self, kwargs_point_source, kwargs_lens, 
-                             kwargs_solver, sigma_image=1e-3):
+    def error_image_plane(self, kwargs_point_source, kwargs_lens, kwargs_solver):
         self._check_solver_install("log_prob_image_plane")
+        # get the optimized image positions
+        theta_x_opti = jnp.array(kwargs_point_source['ra'])
+        theta_y_opti = jnp.array(kwargs_point_source['dec'])
         # find source position via ray-tracing
-        theta_x_in = jnp.array(kwargs_point_source['ra'])
-        theta_y_in = jnp.array(kwargs_point_source['dec'])
-        beta = self.mass_model.ray_shooting(theta_x_in, theta_y_in, kwargs_lens)
-        beta_x, beta_y = jnp.mean(beta[0]), jnp.mean(beta[1])
+        beta = self.mass_model.ray_shooting(theta_x_opti, theta_y_opti, kwargs_lens)
+        beta_x, beta_y = beta[0].mean(), beta[1].mean()
         beta = jnp.array([beta_x, beta_y])
-        # solve lens equation to find corresponding image positions
+        # solve lens equation to find the predicted image positions
         theta, beta = self.solver.solve(
             beta, kwargs_lens, **kwargs_solver,
         )
-        theta_x, theta_y = theta.T
+        theta_x_pred, theta_y_pred = theta.T
+        # return departures between original and new positions
+        return jnp.sqrt((theta_x_opti - theta_x_pred)**2 + (theta_y_opti - theta_y_pred)**2)
+        
+    def log_prob_image_plane(self, kwargs_point_source, kwargs_lens, 
+                             kwargs_solver, sigma_image=1e-3):
+        error_image = self.error_image_plane(kwargs_point_source, kwargs_lens, kwargs_solver)
         # penalize departures between original and new positions
-        return - jnp.sum((jnp.hypot(theta_x_in - theta_x, theta_y_in - theta_y) / sigma_image)**2)
+        return - jnp.sum((error_image / sigma_image)**2)
     
-    def log_prob_source_plane(self, kwargs_point_source, kwargs_lens, sigma_source=1e-3):
+    def error_source_plane(self, kwargs_point_source, kwargs_lens):
         # find source position via ray-tracing
         theta_x_in = jnp.array(kwargs_point_source['ra'])
         theta_y_in = jnp.array(kwargs_point_source['dec'])
         beta_x, beta_y = self.mass_model.ray_shooting(theta_x_in, theta_y_in, kwargs_lens)
-        beta_x_mean, beta_y_mean = jnp.mean(beta_x), jnp.mean(beta_y)
-        # penalize departures between original and new positions
-        return - jnp.sum((jnp.hypot(beta_x - beta_x_mean, beta_y - beta_y_mean) / sigma_source)**2)
+        # compute distance between mean position and ray-traced positions
+        return jnp.sqrt((beta_x - beta_x.mean())**2 + (beta_y - beta_y.mean())**2)
+    
+    def log_prob_source_plane(self, kwargs_point_source, kwargs_lens, sigma_source=1e-3):
+        error_source = self.error_source_plane(kwargs_point_source, kwargs_lens)
+        return - jnp.sum((error_source / sigma_source)**2)
 
     def _zero_amp_duplicated_images(self, amp_in, theta_x_in, theta_y_in, kwargs_solver):
         """This function takes as input the list of multiply lensed images 

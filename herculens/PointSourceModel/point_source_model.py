@@ -142,6 +142,23 @@ class PointSourceModel(object):
 
         return beta_x, beta_y
     
+    def error_image_plane(self, kwargs_params, kwargs_solver):
+        """This function takes as input the current parameters
+        and returns distance between the predicted image positions
+        based on the mean ray-traced source position, and the model image positions.
+        """
+        error_image = 0.
+        kwargs_point_source = kwargs_params['kwargs_point_source']
+        for i, ps_type in enumerate(self.type_list):
+            if ps_type == 'IMAGE_POSITIONS':
+                ps = self.point_sources[i]
+                error_image += ps.error_image_plane(
+                    kwargs_params['kwargs_point_source'][i], 
+                    kwargs_params['kwargs_lens'], 
+                    kwargs_solver,
+                )
+        return error_image
+    
     def log_prob_image_plane(self, kwargs_params, kwargs_solver, **kwargs_hyperparams):
         """This function takes as input the current parameters
         and returns log-probability penalty term that enforces multiply imaged
@@ -160,6 +177,23 @@ class PointSourceModel(object):
                     **kwargs_hyperparams,
                 )
         return log_prob
+    
+    def error_source_plane(self, kwargs_params):
+        """This function takes as input the current parameters
+        and returns distance between the predicted source positions
+        based on the mean source position, and the ray-traced source positions
+        from the model image positions.
+        """
+        error_source = 0.
+        kwargs_point_source = kwargs_params['kwargs_point_source']
+        for i, ps_type in enumerate(self.type_list):
+            if ps_type == 'IMAGE_POSITIONS':
+                ps = self.point_sources[i]
+                error_source += ps.error_source_plane(
+                    kwargs_params['kwargs_point_source'][i], 
+                    kwargs_params['kwargs_lens'],
+                )
+        return error_source
     
     def log_prob_source_plane(self, kwargs_params, **kwargs_hyperparams):
         """This function takes as input the current parameters
