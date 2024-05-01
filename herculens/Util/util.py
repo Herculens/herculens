@@ -15,8 +15,10 @@ import re
 
 def rotate(xcoords, ycoords, angle):
     """Rotate points about the origin by an angle."""
-    new_x = xcoords * jnp.cos(angle) + ycoords * jnp.sin(angle)
-    new_y = -xcoords * jnp.sin(angle) + ycoords * jnp.cos(angle)
+    cos = jnp.cos(angle)
+    sin = jnp.sin(angle)
+    new_x =   xcoords * cos + ycoords * sin
+    new_y = - xcoords * sin + ycoords * cos
     return new_x, new_y
 
 def map_coord2pix(ra, dec, x_0, y_0, M):

@@ -184,8 +184,8 @@ class LensImage(object):
         )
         for i in range(len(theta_x)):
             result += self.ImageNumerics.render_point_sources(
-                theta_x[i], theta_y[i], amplitude[i])
-
+                theta_x[i], theta_y[i], amplitude[i]
+            )
         return result
 
     @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13))
