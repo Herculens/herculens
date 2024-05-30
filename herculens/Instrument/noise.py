@@ -21,8 +21,8 @@ class Noise(object):
     class that deals with noise properties of imaging data
     """
 
-    def __init__(self, nx, ny, exposure_time=None, background_rms=None, noise_map=None,
-                 verbose=True):
+    def __init__(self, nx, ny, exposure_time=None, background_rms=None, 
+                 noise_map=None, variance_boost_map=None, verbose=True):
         """
 
         :param image_data: numpy array, pixel data values
@@ -31,6 +31,7 @@ class Noise(object):
         :param background_rms: root-mean-square value of Gaussian background noise
         :param noise_map: int or array of size the data; joint noise sqrt(variance) of each individual pixel.
         Overwrites meaning of background_rms and exposure_time.
+        :param variance_boost_map: fixed (not model-dependent) variance boost map.
         """
         self._background_rms = float(background_rms)
         if exposure_time is not None:
@@ -52,6 +53,9 @@ class Noise(object):
                     UserWarning("sigma_b*f %s < 1 count may introduce unstable error estimates with a Gaussian "
                                 "error function for a Poisson distribution with mean < 1." % (
                         background_rms * np.max(exposure_time)))
+        if variance_boost_map is None:
+            variance_boost_map = np.ones((nx, ny))
+        self._boost_map = variance_boost_map
         self._nx, self._ny = nx, ny
         self._data = None
 
@@ -121,16 +125,19 @@ class Noise(object):
                 self._C_D = self.covariance_matrix(self._data, self.background_rms, self.exposure_map)
         return self._C_D
 
-    def C_D_model(self, model, force_recompute=False):
+    def C_D_model(self, model, boost_map=None, force_recompute=False):
         """
 
         :param model: model (same as data but without noise)
         :return: estimate of the noise per pixel based on the model flux
         """
+        if boost_map is None:
+            boost_map = self._boost_map
         if not force_recompute and self._noise_map is not None:
-            return self._noise_map**2
+            c_d = self._noise_map**2
         else:
-            return self.covariance_matrix(model, self._background_rms, self._exp_map)
+            c_d = self.covariance_matrix(model, self._background_rms, self._exp_map)
+        return boost_map * c_d
 
     def _reset_cache(self):
         if hasattr(self, '_C_D'):

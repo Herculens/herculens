@@ -27,7 +27,8 @@ class PSF(object):
 
     def __init__(self, psf_type='NONE', fwhm=None, truncation=5,
                  pixel_size=None, kernel_point_source=None,
-                 kernel_supersampling_factor=1):
+                 kernel_supersampling_factor=1,
+                 variance_boost_map=None):
         """Create a PSF object.
 
         Parameters
@@ -49,10 +50,15 @@ class PSF(object):
             For a 'PIXEL' type PSF, this parameter specifies the factor by
             which the provided `kernel_point_source` has been supersampled.
             Default is 1.
-
+        variance_boost_map : array_like or float, optional
+            Single floating point value or 2D array of floating point values 
+            that multiply the model noise variance associated to a given pixel value.
+            For the 'GAUSSIAN' model, only the single value option is currently supported.
         """
         self.psf_type = psf_type
         self._pixel_size = pixel_size
+        if variance_boost_map is None:
+            variance_boost_map = 1.
 
         if self.psf_type == 'GAUSSIAN':
             # Validate required inputs
@@ -68,6 +74,7 @@ class PSF(object):
             kernel = self.compute_gaussian_kernel(self._pixel_size, self.fwhm,
                                                   self._truncation)
             self._kernel_point_source = kernel
+            self._var_boost_map = variance_boost_map
 
         elif self.psf_type == 'PIXEL':
             # Validate required inputs
@@ -84,20 +91,38 @@ class PSF(object):
                     self._kernel_point_source_supersampled, self._kernel_supersampling_factor)
             self._kernel_point_source = kernel_point_source / \
                 np.sum(kernel_point_source)
+            if isinstance(variance_boost_map, (float, int)):
+                variance_boost_map = np.full_like(
+                    self._kernel_point_source.shape,
+                    variance_boost_map,
+                )
+            elif variance_boost_map.shape != self._kernel_point_source.shape:
+                raise ValueError("Variance boost map should have the same shape as the PSF kernel.")
+            self._var_boost_map = variance_boost_map
+            
         elif self.psf_type == 'NONE':
             self._kernel_point_source = np.zeros((3, 3))
             self._kernel_point_source[1, 1] = 1
+            self._var_boost_map = variance_boost_map
+    
         else:
             raise ValueError("psf_type %s not supported" % self.psf_type)
 
     @property
     def kernel_point_source(self):
-        if hasattr(self, '_kernel_point_source'):
-            return self._kernel_point_source
+        if not hasattr(self, '_kernel_point_source'):
+            return None
+        return self._kernel_point_source
 
     @property
     def kernel_supersampling_factor(self):
         return self._kernel_supersampling_factor
+
+    @property
+    def variance_boost_map(self):
+        if not hasattr(self, '_var_boost_map'):
+            return None
+        return self._var_boost_map
 
     def kernel_point_source_supersampled(self, supersampling_factor,
                                          iterative_supersampling=False,

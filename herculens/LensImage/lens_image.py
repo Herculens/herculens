@@ -259,8 +259,8 @@ class LensImage(object):
             self.Noise.compute_noise_map_from_model(model)
         return simu
     
-    def C_D_model(self, model):
-        return self.Noise.C_D_model(model)
+    def C_D_model(self, model, boost_map=None):
+        return self.Noise.C_D_model(model, boost_map=boost_map)
 
     def normalized_residuals(self, data, model, mask=None):
         """
