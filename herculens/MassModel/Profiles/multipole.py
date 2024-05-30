@@ -79,4 +79,4 @@ class Multipole(object):
         f_xx = 1./r * jnp.sin(phi)**2 * a_m * jnp.cos(m*(phi-phi_m))
         f_yy = 1./r * jnp.cos(phi)**2 * a_m * jnp.cos(m*(phi-phi_m))
         f_xy = -1./r * a_m * jnp.cos(phi) * jnp.sin(phi) * jnp.cos(m*(phi-phi_m))
-        return f_xx, f_xy, f_yy
+        return f_xx, f_yy, f_xy
