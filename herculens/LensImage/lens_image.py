@@ -128,24 +128,29 @@ class LensImage(object):
         if len(self.SourceModel.profile_type_list) == 0:
             return jnp.zeros(self.Grid.num_pixel_axes)
         x_grid_img, y_grid_img = self.ImageNumerics.coordinates_evaluate
+        source_light = self.eval_source_surface_brightness(
+            x_grid_img, y_grid_img,
+            kwargs_source, kwargs_lens=kwargs_lens,
+            k=k, k_lens=k_lens, de_lensed=de_lensed,
+        )
+        if not supersampled:
+            source_light = self.ImageNumerics.re_size_convolve(
+                source_light, unconvolved=unconvolved)
+        return source_light
+    
+    def eval_source_surface_brightness(self, x, y, kwargs_source, kwargs_lens=None, 
+                                       k=None, k_lens=None, de_lensed=False):
         if self._src_adaptive_grid:
             pixels_x_coord, pixels_y_coord, _ = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens)
         else:
             pixels_x_coord, pixels_y_coord = None, None  # fall back on fixed, user-defined coordinates
         if de_lensed is True:
-            if self._src_adaptive_grid:
-                offset_x, offset_y = pixels_x_coord.mean(), pixels_y_coord.mean()
-            else:
-                offset_x, offset_y = 0., 0.
-            source_light = self.SourceModel.surface_brightness(x_grid_img+offset_x, y_grid_img+offset_y, kwargs_source, k=k,
+            source_light = self.SourceModel.surface_brightness(x, y, kwargs_source, k=k,
                                                                pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
         else:
-            x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img, y_grid_img, kwargs_lens, k=k_lens)
+            x_grid_src, y_grid_src = self.MassModel.ray_shooting(x, y, kwargs_lens, k=k_lens)
             source_light = self.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source, k=k,
                                                                pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
-        if not supersampled:
-            source_light = self.ImageNumerics.re_size_convolve(
-                source_light, unconvolved=unconvolved)
         return source_light
 
     def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False,

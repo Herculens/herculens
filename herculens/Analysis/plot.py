@@ -138,15 +138,14 @@ class Plotter(object):
 
         if show_source:
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
-            if lens_image.SourceModel.has_pixels:
-                src_idx = lens_image.SourceModel.pixelated_index
-                source_model = kwargs_source[src_idx]['pixels']
-                _, _, src_extent = lens_image.get_source_coordinates(
-                    kwargs_result['kwargs_lens'], return_plt_extent=True)
-            elif kwargs_grid_source is not None:
+            if kwargs_grid_source is not None:
                 grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
                 x_grid_src, y_grid_src = grid_src.pixel_coordinates
-                source_model = lens_image.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source)
+                source_model = lens_image.eval_source_surface_brightness(
+                    x_grid_src, y_grid_src, 
+                    kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'],
+                    k=None, k_lens=k_lens, de_lensed=True,
+                )
                 source_model *= lens_image.Grid.pixel_area
                 src_extent = grid_src.plt_extent
             else:
@@ -365,7 +364,7 @@ class Plotter(object):
                     ax.set_xlim(src_extent[0], src_extent[1])
                     ax.set_ylim(src_extent[2], src_extent[3])
             if ps_src_pos is not None:
-                ax.scatter(*ps_src_pos, s=30, c='tab:blue', marker='x', linewidths=0.5, 
+                ax.scatter(*ps_src_pos, s=100, c='tab:green', marker='*', linewidths=0.5, 
                            label="point source")
                 ax.legend()
             ax = axes[i_row, 2]
