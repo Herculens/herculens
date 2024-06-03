@@ -276,6 +276,9 @@ class LensImage(object):
         if mask is not None:
             # outside the mask just add pure data
             norm_res_tot += (data / noise) * (1. - mask)
+        # make sure there is no NaN or infinite values
+        norm_res_model = np.where(np.isfinite(norm_res_model), norm_res_model, 0.)
+        norm_res_tot = np.where(np.isfinite(norm_res_tot), norm_res_tot, 0.)
         return norm_res_model, norm_res_tot
 
     def reduced_chi2(self, data, model, mask=None):
