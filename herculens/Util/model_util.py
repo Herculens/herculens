@@ -234,15 +234,19 @@ def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
         except ValueError:
             return None
     if shear_type == 'SHEAR_GAMMA_PSI':
-        # imports are here to avoid issues with circular imports
-        from herculens.Util import param_util
-        gamma1, gamma2 = param_util.shear_polar2cartesian(kwargs_lens[shear_idx]['phi_ext'],
-                                                          kwargs_lens[shear_idx]['gamma_ext'])
+        phi_ext, gamma_ext = kwargs_lens[shear_idx]['phi_ext'], kwargs_lens[shear_idx]['gamma_ext']
     else:
-        gamma1, gamma2 = kwargs_lens[shear_idx]['gamma1'], kwargs_lens[shear_idx]['gamma2']
+        # imports are here to avoid issues with circular imports
+        from herculens.Util.param_util import shear_cartesian2polar_numpy
+        phi_ext, gamma_ext = shear_cartesian2polar_numpy(
+            kwargs_lens[shear_idx]['gamma1'], 
+            kwargs_lens[shear_idx]['gamma2']
+        )
     grid = lens_image.Grid.create_model_grid(num_pixels=num_pixels)
     x_grid_img, y_grid_img = grid.pixel_coordinates
-    alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_img, y_grid_img, kwargs_lens, 
-                                                  k=shear_idx)
-    return (np.array(x_grid_img), np.array(y_grid_img), 
-            gamma1, gamma2, np.array(alpha_x), np.array(alpha_y))
+    gamma_x = gamma_ext*np.cos(phi_ext)
+    gamma_y = gamma_ext*np.sin(phi_ext)
+    if gamma_x.size == 1:
+        gamma_x = np.full_like(x_grid_img, float(gamma_x))
+        gamma_y = np.full_like(y_grid_img, float(gamma_y))
+    return (np.array(x_grid_img), np.array(y_grid_img), gamma_x, gamma_y)

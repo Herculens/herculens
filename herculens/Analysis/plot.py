@@ -289,13 +289,17 @@ class Plotter(object):
             if show_shear_field:
                 shear_field = model_util.shear_deflection_field(lens_image, kwargs_result['kwargs_lens'], num_pixels=8)
                 if shear_field is not None:
-                    x_field, y_field, g1_field, g2_field, ax_field, ay_field = shear_field
-                    qu = ax.quiver(x_field, y_field,
-                                   g1_field, g2_field,
-                                   #ax_field, ay_field, 
-                                   scale=0.1, scale_units='xy',
-                                   #width=0.001, headwidth=0.3, 
-                                   color='white', alpha=0.3)
+                    x_field, y_field, gx_field, gy_field = shear_field
+                    ax.quiver(
+                        x_field, y_field, # + overall_shift, 
+                        gx_field, gy_field, 
+                        scale=0.2, 
+                        width=0.05,
+                        scale_units='xy', units='xy',
+                        pivot='middle',
+                        headaxislength=0, headlength=0,
+                        color='white', alpha=0.3,
+                    )
                     ax.set_xlim(extent[0], extent[1])
                     ax.set_ylim(extent[2], extent[3])
                 else:
