@@ -59,8 +59,10 @@ def R_omega(z, t, q, nmax):
 
     @jit
     def body_fun(i, val):
+        # Currrent term in the series is proportional to the previous
         ratio = (2. * i + t - 2) / (2. * i - t + 2.)
         val[1] = -f * ei2phi * ratio * val[1]
+        # Adds the current term to the partial sum
         val[0] += val[1]
         return val
 
