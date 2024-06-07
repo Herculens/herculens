@@ -5,14 +5,11 @@
 __author__ = 'austinpeel', 'aymgal', 'duxfrederic'
 
 
-from functools import partial
 from copy import deepcopy
 import numpy as np
 import jax.numpy as jnp
 from jax import jit, lax
 from jax.scipy.special import gammaln
-from jax.scipy.stats import norm
-from jax.lax import conv_general_dilated, conv_dimension_numbers
 
 
 def unjaxify_kwargs(kwargs_params):
@@ -59,7 +56,7 @@ def R_omega(z, t, q, nmax):
 
     @jit
     def body_fun(i, val):
-        # Currrent term in the series is proportional to the previous
+        # Current term in the series is proportional to the previous
         ratio = (2. * i + t - 2.) / (2. * i - t + 2.)
         val[1] = -f * ei2phi * ratio * val[1]
         # Adds the current term to the partial sum
