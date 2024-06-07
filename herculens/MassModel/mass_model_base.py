@@ -8,13 +8,14 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
 from herculens.MassModel.Profiles import (gaussian_potential, point_mass, multipole,
-                                           shear, sie, sis, nie, epl, pixelated)
+                                           shear, sie, sis, nie, epl, dpie, pixelated)
 from herculens.Util import util
 
 __all__ = ['MassModelBase']
 
 SUPPORTED_MODELS = [
-    'EPL', 'NIE', 'SIE', 'SIS', 'GAUSSIAN', 'POINT_MASS', 
+    'EPL', 'NIE', 'SIE', 'SIS', 'DPIE',
+    'GAUSSIAN', 'POINT_MASS', 
     'SHEAR', 'SHEAR_GAMMA_PSI', 'MULTIPOLE',
     'PIXELATED', 'PIXELATED_DIRAC',
 ]
@@ -98,6 +99,8 @@ class MassModelBase(object):
             return sis.SIS()
         elif lens_type == 'EPL':
             return epl.EPL(no_complex_numbers=no_complex_numbers)
+        elif lens_type == 'DPIE':
+            return dpie.DPIE()
         elif lens_type == 'MULTIPOLE':
             return multipole.Multipole()
         elif lens_type == 'PIXELATED':

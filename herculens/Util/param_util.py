@@ -20,8 +20,10 @@ def phi_q2_ellipticity(phi, q):
     :param q: axis ratio minor axis / major axis
     :return: eccentricities e1 and e2 in complex ellipticity moduli
     """
-    e1 = (1. - q) / (1. + q) * jnp.cos(2 * phi)
-    e2 = (1. - q) / (1. + q) * jnp.sin(2 * phi)
+    # e1 = jnp.where(q == 1., 1e-8, (1. - q) / (1. + q) * jnp.cos(2. * phi))
+    # e2 = jnp.where(q == 1., 1e-8, (1. - q) / (1. + q) * jnp.sin(2. * phi))
+    e1 = (1. - q) / (1. + q) * jnp.cos(2. * phi)
+    e2 = (1. - q) / (1. + q) * jnp.sin(2. * phi)
     return e1, e2
 
 def ellipticity2phi_q(e1, e2):
@@ -41,8 +43,8 @@ def ellipticity2phi_q(e1, e2):
     # replace value by low float instead to avoid NaNs
     # e1 = lax.cond(e1 == 0.0, lambda _: 1e-4, lambda _: e1, operand=None)  # does not work with TFP!
     # e2 = lax.cond(e2 == 0.0, lambda _: 1e-4, lambda _: e2, operand=None)  # does not work with TFP!
-    e1 = jnp.where(e1 == 0., 1e-4, e1)
-    e2 = jnp.where(e2 == 0., 1e-4, e2)
+    # e1 = jnp.where(e1 == 0., 1e-8, e1)
+    # e2 = jnp.where(e2 == 0., 1e-8, e2)
     phi = jnp.arctan2(e2, e1) / 2.
     c = jnp.sqrt(e1**2 + e2**2)
     c = jnp.minimum(c, 0.9999)
@@ -184,10 +186,15 @@ def transform_e1e2_square_average(x, y, e1, e2, center_x, center_y):
     y_shift = y - center_y
     cos_phi = jnp.cos(phi_G)
     sin_phi = jnp.sin(phi_G)
-    e = jnp.abs(1 - q)
+    e = q2e(q)
     x_ = (cos_phi * x_shift + sin_phi * y_shift) * jnp.sqrt(1 - e)
     y_ = (-sin_phi * x_shift + cos_phi * y_shift) * jnp.sqrt(1 + e)
     return x_, y_
+
+
+def q2e(q):
+    e = jnp.abs(1 - q**2) / (1 + q**2)
+    return e
 
 
 def statistics_from_samples(samples, losses):
