@@ -27,7 +27,7 @@ class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
     def __init__(self, lens_model_list, 
                  kwargs_pixelated=None, 
-                 no_complex_numbers=False,
+                 no_complex_numbers=True,
                  pixel_interpol='fast_bilinear', 
                  pixel_derivative_type='interpol',
                  kwargs_pixel_grid_fixed=None):
