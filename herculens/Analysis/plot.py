@@ -149,7 +149,10 @@ class Plotter(object):
                 source_model *= lens_image.Grid.pixel_area
                 src_extent = grid_src.plt_extent
             else:
-                source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
+                source_model = lens_image.source_surface_brightness(
+                    kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'], 
+                    de_lensed=True, unconvolved=True
+                )
                 src_extent = extent
 
             if hasattr(self, '_ref_source'):
