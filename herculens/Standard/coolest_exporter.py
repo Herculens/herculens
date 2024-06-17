@@ -24,12 +24,14 @@ class COOLESTexporter(object):
         if input_coolest_file is None:
             raise NotImplementedError("You must provide an input coolest file (for now)")
         if not os.path.isabs(input_coolest_file):
-            input_coolest_file = os.path.abspath(input_coolest_file)
+            self._input_coolest_file = os.path.abspath(input_coolest_file)
+        else:
+            self._input_coolest_file = input_coolest_file
         output_coolest_file = os.path.join(output_directory, output_basename)
         if not os.path.isabs(output_coolest_file):
-            output_coolest_file = os.path.abspath(output_coolest_file)
-        self._input_coolest_file = input_coolest_file
-        self._output_coolest_file = output_coolest_file
+            self._output_coolest_file = os.path.abspath(output_coolest_file)
+        else:
+            self._output_coolest_file = output_coolest_file
         self._output_dir = os.path.dirname(output_coolest_file)
         self._basename = output_basename
         self._kwargs_serializer = kwargs_serializer
@@ -88,7 +90,7 @@ class COOLESTexporter(object):
                                                         re_create_entities=re_create_entities,
                                                         current_entities=self._coolest.lensing_entities,
                                                         json_dir=self._output_dir,
-                                                        fits_file_suffix=self._basename)
+                                                        fits_file_suffix="bestfit")
         if re_create_entities is True:
             # overwites the lensing entities of the COOLEST object
             self._coolest.lensing_entities = lensing_entities

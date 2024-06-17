@@ -311,6 +311,8 @@ def update_galaxy_model(lens_image, name, galaxy=None,
 def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, 
                              profile_indices, profile_names, 
                              file_dir=None, fits_file_suffix="coolest"):
+    comp_name = 'lens_mass'
+    key = 'kwargs_lens'
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
         profile_name = profile_names[ic]
@@ -321,16 +323,58 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                 isothermal, spherical = True, False
             elif profile_name in ['EPL', 'PEMD']:
                 isothermal, spherical = False, False
-            elif profile_name == 'SPEMD':
-                raise NotImplementedError("SPEMD mass profile is not yet supported")
+            else:
+                raise NotImplementedError(f"Parametric mass profile '{profile_name}' is not yet supported")
             if kwargs_all is not None:
-                h2c_powerlaw_values(galaxy.mass_model[ic], kwargs_all['kwargs_lens'][ih], 
+                h2c_powerlaw_values(galaxy.mass_model[ic], kwargs_all[key][ih], 
                                     isothermal=isothermal, spherical=spherical)
             if kwargs_all_samples is not None:
-                h2c_powerlaw_posteriors(galaxy.mass_model[ic], kwargs_all_samples['kwargs_lens'][ih], 
+                h2c_powerlaw_posteriors(galaxy.mass_model[ic], kwargs_all_samples[key][ih], 
                                         isothermal=isothermal, spherical=spherical)
+
+        elif profile_name in ['PIXELATED', 'PIXELATED_DIRAC', 'PIXELATED_FIXED']:
+            if profile_name == 'PIXELATED_FIXED':
+                if kwargs_all is not None:
+                    h2c_fixed_pixelated_lens_mass(
+                        galaxy.mass_model[ic],   # coolest profile
+                        lens_image.MassModel.func_list[ih],  # herculens profile
+                        kwargs_all[key][ih],
+                        file_dir=file_dir,
+                        fits_file_suffix=fits_file_suffix+f'-{comp_name}_{ic}'
+                    )
+                if kwargs_all_samples is not None:
+                    print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
+                        f"is not yet supported; samples are ignored.")
+            else:
+                raise NotImplementedError(f"Pixelated mass profile '{profile_name}' is not yet supported")
+        
         else:
             raise NotImplementedError(f"'{profile_name}' not yet supported.")
+
+
+def h2c_fixed_pixelated_lens_mass(coolest_profile, herculens_profile, 
+                                  kwargs_lens_profile, file_dir=None, 
+                                  fits_file_suffix="coolest"):
+    for herculens_key, coolest_key, stacked in (
+            ('func_pixels' , 'pixels_potential', False), 
+            ('deriv_pixels', 'pixels_derivative', True), 
+            ('hess_pixels' , 'pixels_hessian', True),
+        ):
+        x_grid, y_grid = herculens_profile.get_pixel_grid(component=herculens_key).pixel_coordinates
+        if stacked is True:
+            # 3D array, with x and y axes corresponding to axis 1 and 2
+            pixels = np.stack(kwargs_lens_profile[herculens_key], axis=0)
+        else:
+            # 2D array, with x and y axes corresponding to axis 0 and 1
+            pixels = kwargs_lens_profile[herculens_key]
+        h2c_pixelated_values(coolest_profile, 
+                             pixels, 
+                             x_grid, y_grid,
+                             param_key=coolest_key,
+                             file_dir=file_dir,
+                             fits_file_suffix=fits_file_suffix+f'_{coolest_key}',
+                             description="Pixelated lens potential and derivatives",
+                             )  # TODO: improve access to e.g. pixel_grid 
 
 
 def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples, 
@@ -338,8 +382,8 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
                               file_dir=None, fits_file_suffix="coolest"):
     # get current values
     class_comp = lens_image.SourceModel if lensed else lens_image.LensLightModel
-    light_comp = 'source' if lensed else 'lens_light'
-    key = f'kwargs_{light_comp}'
+    comp_name = 'source' if lensed else 'lens_light'
+    key = 'kwargs_source' if lensed else 'kwargs_lens_light'
     # add point estimate values
     for ic, ih in enumerate(profile_indices):
         if profile_names[ic] == 'SERSIC_ELLIPSE':
@@ -359,13 +403,21 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
             if kwargs_all_samples is not None:
                 print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
                       f"is not yet supported; samples are ignored.")
+        elif profile_names[ic] == 'UNIFORM':
+            if kwargs_all is not None:
+                h2c_Uniform_values(galaxy.light_model[ic], kwargs_all[key][ih])
+            if kwargs_all_samples is not None:
+                h2c_Uniform_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih])
         elif profile_names[ic] == 'PIXELATED':
             if kwargs_all is not None:
                 x_grid_model, y_grid_model, _ = lens_image.get_source_coordinates(kwargs_all['kwargs_lens'])
-                h2c_pixelated_values(galaxy.light_model[ic], kwargs_all[key][ih],
+                h2c_pixelated_values(galaxy.light_model[ic], 
+                                     kwargs_all[key][ih]['pixels'],
                                      x_grid_model, y_grid_model,
                                      file_dir=file_dir,
-                                     fits_file_suffix=light_comp+'-'+fits_file_suffix)  # TODO: improve access to e.g. pixel_grid 
+                                     fits_file_suffix=f'{comp_name}_{ic}-'+fits_file_suffix,
+                                     description="Pixelated surface brightness model",
+                                     )  # TODO: improve access to e.g. pixel_grid 
             if kwargs_all_samples is not None:
                 print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
                       f"is not yet supported; samples are ignored.")
@@ -464,6 +516,15 @@ def h2c_Sersic_posteriors(profile, kwargs_samples, spherical=False):
     profile.parameters['q'].set_posterior(prepare_posterior(q))
 
 
+def h2c_Uniform_values(profile, kwargs):
+    amp = check_type(kwargs['amp'])
+    profile.parameters['A'].set_point_estimate(amp)
+
+
+def h2c_Uniform_posteriors(profile, kwargs_samples):
+    profile.parameters['A'].set_posterior(prepare_posterior(kwargs_samples['amp']))
+
+
 def h2c_Shapelets_values(profile, kwargs, profile_herculens):
     amps = check_type(kwargs['amps'])
     beta = check_type(kwargs['beta'])
@@ -478,17 +539,23 @@ def h2c_Shapelets_values(profile, kwargs, profile_herculens):
     profile.parameters['n_max'].fix()
 
 
-def h2c_pixelated_values(profile, kwargs, x_grid, y_grid, 
-                         file_dir=None, fits_file_suffix="coolest"):
-    """Profile based on REGULAR grid of pixels"""
-    pixel_values = check_type(kwargs['pixels'])
+def h2c_pixelated_values(profile, pixel_values_in, x_grid, y_grid, param_key='pixels',
+                         file_dir=None, fits_file_suffix="coolest", 
+                         description="Profile defined on a pixelated grid"):
+    """
+    Profile based on REGULAR grid of pixels.
+    
+    `pixels` can be either a regular 2D arrays of pixels, or a stack (3D array) of
+    pixel grids defined over the same coordinates grid. 
+    """
+    pixel_values = check_type(pixel_values_in)
     if x_grid[0, 0] > x_grid[0, 1]:
         raise NotImplementedError("Only increasing x coordinates is supported so far")
     if y_grid[0, 0] > y_grid[1, 0]:
         raise NotImplementedError("Only increasing y coordinates is supported so far")
     pixel_scale = float(abs(x_grid[0, 0] - x_grid[0, 1]))
     pixel_scale_y = float(abs(y_grid[0, 0] - y_grid[1, 0]))
-    print(f"COOLEST-info: assuming SQUARE pixels for the source "
+    print(f"COOLEST-info: assuming square pixels for the pixelated grid "
           f"(pixel size along x = {pixel_scale}, along y = {pixel_scale_y}).")
     
     half_pix = pixel_scale / 2.
@@ -510,25 +577,35 @@ def h2c_pixelated_values(profile, kwargs, x_grid, y_grid,
         fits_path = os.path.join(file_dir, fits_filename)
     save_image_to_fits(fits_path, pixel_values, 
                        header_cards=[
-                            ('COOLEST', "Pixelated surface brightness model"),
+                            ('COOLEST', description),
                             ('PIXSCALE', pixel_scale),
                             ('CD1_1', CD1_1),
                             ('CD1_2', CD1_2),
                             ('CD2_1', CD2_1),
                             ('CD2_2', CD2_2),
                        ])
-
-    pixels = PixelatedRegularGrid(fits_filename, # relative path to fits file
-                                  field_of_view_x=fov_x,
-                                  field_of_view_y=fov_y,
-                                  check_fits_file=True,
-                                  fits_file_dir=file_dir)
+    if len(pixel_values.shape) == 3:
+        pixels_parameters = PixelatedRegularGridStack(
+            fits_filename, # relative path to fits file
+            field_of_view_x=fov_x,
+            field_of_view_y=fov_y,
+            check_fits_file=True,
+            fits_file_dir=file_dir,
+        )
+    else: 
+        pixels_parameters = PixelatedRegularGrid(
+            fits_filename, # relative path to fits file
+            field_of_view_x=fov_x,
+            field_of_view_y=fov_y,
+            check_fits_file=True,
+            fits_file_dir=file_dir,
+        )
     # set the pixel values
-    profile.parameters['pixels'] = pixels
-    # finally, just perform a consistency check
-    recomputed_pixel_scale = profile.parameters['pixels'].pixel_size
-    consistent =  math.isclose(pixel_scale, recomputed_pixel_scale, 
-                               rel_tol=0.0, abs_tol=1e-06)
+    profile.parameters[param_key] = pixels_parameters
+    # finally, just perform a consistency check regarding the pixel size
+    recomputed_pixel_scale = profile.parameters[param_key].pixel_size
+    consistent = math.isclose(pixel_scale, recomputed_pixel_scale, 
+                              rel_tol=0.0, abs_tol=1e-06)
     if not consistent:
         raise ValueError(f"Inconsistent pixel scale values for profile '{profile.type}' "
                          f"({pixel_scale} vs. {recomputed_pixel_scale})")
@@ -580,7 +657,9 @@ def h2c_mass_profiles(profiles_herculens):
         elif profile_herculens in ['SPEMD']:
             profiles_coolest.append('SPEMD')
         elif profile_herculens in ['PIXELATED']:
-            profiles_coolest.append('PixelatedPotential')
+            profiles_coolest.append('PixelatedRegularGridPotential')
+        elif profile_herculens in ['PIXELATED_FIXED']:
+            profiles_coolest.append('PixelatedRegularGridFull')
         elif profile_herculens in ['SHEAR', 'SHEAR_GAMMA_PSI']:
             raise ValueError("External shear cannot be a galaxy mass profile.")
         else:
