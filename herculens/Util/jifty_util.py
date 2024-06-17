@@ -51,12 +51,17 @@ def UniformTransform_inverse_func(x, l, h):
     """m: mean, s: std, to go from uniform distribution to standard normal distribution"""
     return jstats.norm.ppf( (x - l) / (h - l) )
 
-def ExpCroppedFieldTransform(key, cf, b):
+def ExpCroppedFieldTransform(key, cf, bxy, bwl):
     print(f"Exponential Cropped correlated field prior for '{key}'")
     def crop(x):
         x_ = cf(x)
-        if b > 0:
-            x_ = x_[b:-b, b:-b]
+        if bwl == 0:
+            if bxy > 0:
+                x_ = x_[bxy:-bxy, bxy:-bxy]
+        else:
+            x_ = x_[bwl:-bwl, :, :]
+            if bxy > 0:
+                x_ = x_[:, bxy:-bxy, bxy:-bxy]
         return x_
     return jft.Model(
         lambda x: {key: jnp.exp(crop(x))},  # here the target key is different from domain keys below
@@ -64,7 +69,8 @@ def ExpCroppedFieldTransform(key, cf, b):
     )
 
 def prepare_light_correlated_field(key, light_model, border_xy, 
-                                   kwargs_amplitude, kwargs_fluctuations):
+                                   kwargs_amplitude, kwargs_fluctuations,
+                                   num_pix_wl=0, border_wl=0, kwargs_fluctuations_wl=None):
     # TODO: implement multi-band correlated field
     
     # retrieve the number of pixels from the LightModel instance
@@ -75,6 +81,17 @@ def prepare_light_correlated_field(key, light_model, border_xy,
     # Correlated field parameters
     cfm = jft.CorrelatedFieldMaker(key + '_field_')
     cfm.set_amplitude_total_offset(**kwargs_amplitude)
+
+    # Setup the power-spectrum in the spectral dimension (if multi-band fitting)
+    if num_pix_wl > 0:
+        num_pix_wl_tot = num_pix_wl + 2 * border_wl
+        cfm.add_fluctuations(
+            [num_pix_wl_tot],
+            distances=1./num_pix_wl_tot,  # only makes a difference to get proper units for wavenumbers and certain types of covariance kernels
+            **kwargs_fluctuations_wl,
+            prefix='wav_dim_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
+            non_parametric_kind='power',
+        )
 
     # Setup the power-spectrum in the spatial dimensions
     num_pix_xy_tot = num_pix_xy + 2 * border_xy
@@ -91,7 +108,7 @@ def prepare_light_correlated_field(key, light_model, border_xy,
     field_transform = cfm.finalize()
 
     # Apply non-linear transformation to get the final light model
-    field_transform = ExpCroppedFieldTransform(key, field_transform, border_xy)
+    field_transform = ExpCroppedFieldTransform(key, field_transform, border_xy, border_wl)
         
     return cfm, field_transform
 
