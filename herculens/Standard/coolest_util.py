@@ -91,7 +91,7 @@ def create_observation(data, lens_image, json_dir=None,
                                         field_of_view_y=fov_y,
                                         fits_file_dir=json_dir)
     else:
-        raise NotImplementedError("Exposure time / map can only be a float or integerer, or a 2D array")
+        raise NotImplementedError("Exposure time / map can only be a float or integer, or a 2D array")
     
     if kwargs_obs is None:
         kwargs_obs = {}
@@ -146,6 +146,37 @@ def create_instrument(lens_image, observation, json_dir=None,
                         rel_tol=1e-09, abs_tol=0.0)
 
     return instrument
+
+
+def create_likelihoods(lens_image, json_dir=None, 
+                       likelihood_type='ImagingDataLikelihood', 
+                       likelihood_mask=None):
+    likelihood_list = []
+    if likelihood_type == 'ImagingDataLikelihood':
+        if likelihood_mask is not None:
+            # saves the observed lens image on disk
+            obs_file_name = "mask-likelihood.fits"
+            if json_dir is not None:
+                obs_fits_path = os.path.join(json_dir, obs_file_name)
+            else:
+                obs_fits_path = obs_file_name
+            save_image_to_fits(obs_fits_path, likelihood_mask, 
+                            header_cards=[('COOLEST', "Likelihood mask (0 are excluded pixels)")])
+            model_grid = lens_image.Grid
+            if model_grid.x_is_inverted or model_grid.y_is_inverted:
+                raise NotImplementedError("Grid orientation not yet supported")
+            extent = model_grid.extent
+            pix_scl = model_grid.pixel_width
+            fov_x = [extent[0] - pix_scl/2., extent[1] + pix_scl/2.]
+            fov_y = [extent[2] - pix_scl/2., extent[3] + pix_scl/2.]
+            mask = PixelatedRegularGrid(obs_file_name,
+                                        field_of_view_x=fov_x,
+                                        field_of_view_y=fov_y,
+                                        fits_file_dir=json_dir)
+            likelihood_list.append(ImagingDataLikelihood(mask=mask))
+    else:
+        raise NotImplementedError(f"Likelihood type {likelihood_type} not yet supported") 
+    return DataLikelihoodList(*likelihood_list)
 
 
 def save_image_to_fits(path, image, header_cards=[], overwrite=True):
@@ -328,7 +359,7 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
             if kwargs_all is not None:
                 h2c_powerlaw_values(galaxy.mass_model[ic], kwargs_all[key][ih], 
                                     isothermal=isothermal, spherical=spherical)
-            if kwargs_all_samples is not None:
+            if kwargs_all_samples.get(key, None) is not None:
                 h2c_powerlaw_posteriors(galaxy.mass_model[ic], kwargs_all_samples[key][ih], 
                                         isothermal=isothermal, spherical=spherical)
 
@@ -342,7 +373,7 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                         file_dir=file_dir,
                         fits_file_suffix=fits_file_suffix+f'-{comp_name}_{ic}'
                     )
-                if kwargs_all_samples is not None:
+                if kwargs_all_samples.get(key, None) is not None:
                     print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
                         f"is not yet supported; samples are ignored.")
             else:
@@ -356,7 +387,7 @@ def h2c_fixed_pixelated_lens_mass(coolest_profile, herculens_profile,
                                   kwargs_lens_profile, file_dir=None, 
                                   fits_file_suffix="coolest"):
     for herculens_key, coolest_key, stacked in (
-            ('func_pixels' , 'pixels_potential', False), 
+            ('func_pixels' , 'pixels', False), 
             ('deriv_pixels', 'pixels_derivative', True), 
             ('hess_pixels' , 'pixels_hessian', True),
         ):
@@ -389,24 +420,24 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
         if profile_names[ic] == 'SERSIC_ELLIPSE':
             if kwargs_all is not None:
                 h2c_Sersic_values(galaxy.light_model[ic], kwargs_all[key][ih])
-            if kwargs_all_samples is not None:
+            if kwargs_all_samples.get(key, None) is not None:
                 h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih])
         elif profile_names[ic] == 'SERSIC':
             if kwargs_all is not None:
                 h2c_Sersic_values(galaxy.light_model[ic], kwargs_all[key][ih], spherical=True)
-            if kwargs_all_samples is not None:
+            if kwargs_all_samples.get(key, None) is not None:
                 h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih], spherical=True)
         elif profile_names[ic] == 'SHAPELETS':
             if kwargs_all is not None:
                 h2c_Shapelets_values(galaxy.light_model[ic], kwargs_all[key][ih],
                                      class_comp.func_list[ih])  # TODO: improve access to e.g. n_max 
-            if kwargs_all_samples is not None:
+            if kwargs_all_samples.get(key, None) is not None:
                 print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
                       f"is not yet supported; samples are ignored.")
         elif profile_names[ic] == 'UNIFORM':
             if kwargs_all is not None:
                 h2c_Uniform_values(galaxy.light_model[ic], kwargs_all[key][ih])
-            if kwargs_all_samples is not None:
+            if kwargs_all_samples.get(key, None) is not None:
                 h2c_Uniform_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih])
         elif profile_names[ic] == 'PIXELATED':
             if kwargs_all is not None:
@@ -415,10 +446,10 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
                                      kwargs_all[key][ih]['pixels'],
                                      x_grid_model, y_grid_model,
                                      file_dir=file_dir,
-                                     fits_file_suffix=f'{comp_name}_{ic}-'+fits_file_suffix,
+                                     fits_file_suffix=fits_file_suffix+f'-{comp_name}_{ic}',
                                      description="Pixelated surface brightness model",
                                      )  # TODO: improve access to e.g. pixel_grid 
-            if kwargs_all_samples is not None:
+            if kwargs_all_samples.get(key, None) is not None:
                 print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
                       f"is not yet supported; samples are ignored.")
         else:
@@ -461,8 +492,11 @@ def h2c_powerlaw_posteriors(profile, kwargs_samples, isothermal=False, spherical
     else:
         e1 = kwargs_samples['e1']
         e2 = kwargs_samples['e2']
-        phi, q = param_util.ellipticity2phi_q_numpy(e1, e2)
-        phi = h2c_position_angle(phi)
+        if e1 is not None and e2 is not None:
+            phi, q = param_util.ellipticity2phi_q_numpy(e1, e2)
+            phi = h2c_position_angle(phi)
+        else:
+            phi, q = None, None
     profile.parameters['phi'].set_posterior(prepare_posterior(phi))
     profile.parameters['q'].set_posterior(prepare_posterior(q))
     if not isothermal:
@@ -507,8 +541,11 @@ def h2c_Sersic_posteriors(profile, kwargs_samples, spherical=False):
     else:
         e1 = kwargs_samples['e1']
         e2 = kwargs_samples['e2']
-        phi, q = param_util.ellipticity2phi_q_numpy(e1, e2)
-        phi = h2c_position_angle(phi)
+        if e1 is not None and e2 is not None:
+            phi, q = param_util.ellipticity2phi_q_numpy(e1, e2)
+            phi = h2c_position_angle(phi)
+        else:
+            phi, q = None, None
     R_sersic = kwargs_samples['R_sersic']
     R_sersic = convert_major_axis_radius(R_sersic, q)
     profile.parameters['theta_eff'].set_posterior(prepare_posterior(kwargs_samples['R_sersic']))
@@ -659,7 +696,7 @@ def h2c_mass_profiles(profiles_herculens):
         elif profile_herculens in ['PIXELATED']:
             profiles_coolest.append('PixelatedRegularGridPotential')
         elif profile_herculens in ['PIXELATED_FIXED']:
-            profiles_coolest.append('PixelatedRegularGridFull')
+            profiles_coolest.append('PixelatedRegularGridFullyDefined')
         elif profile_herculens in ['SHEAR', 'SHEAR_GAMMA_PSI']:
             raise ValueError("External shear cannot be a galaxy mass profile.")
         else:
@@ -709,7 +746,7 @@ def h2c_position_angle(value):
 
 
 def prepare_posterior(samples):
-    if isinstance(samples, (int, float)) or len(samples) == 1:
+    if samples is None or isinstance(samples, (int, float)) or len(samples) == 1:
         mean = samples
         perc = None, None, None
     else:

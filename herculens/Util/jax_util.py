@@ -18,7 +18,7 @@ def unjaxify_kwargs(kwargs_params):
     to standard floating point or numpy arrays.
     """
     def unjaxify_array(p):
-        if isinstance(p, (float, int)):
+        if p is None or isinstance(p, (float, int)):
             return p  # don't do anything
         if p.size == 1:
             return float(p)

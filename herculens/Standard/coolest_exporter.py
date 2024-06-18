@@ -98,6 +98,16 @@ class COOLESTexporter(object):
             # set the COOLEST mode to MAP (i.e., maximum a-posteriori estimate)
             self._coolest.mode = "MAP"
 
+    def update_from_likelihood(self, lens_image,
+                               likelihood_type="ImagingDataLikelihood",
+                               likelihood_mask=None):
+        likelihoods = util.create_likelihoods(
+            lens_image, likelihood_type=likelihood_type,
+            likelihood_mask=likelihood_mask,
+            json_dir=self._output_dir,
+        )
+        self._coolest.likelihoods = likelihoods
+
     def update_from_loss(self, loss):
         # TODO: update LikelihoodList and RegularizationList from Herculens' loss
         raise NotImplementedError("update_from_loss() not yet implemented.")
