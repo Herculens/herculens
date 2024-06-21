@@ -36,6 +36,12 @@ def create_directory(directory, empty_dir_bool):
     return True
 
 
+def skycoord_to_coolest(skycoord):
+    ra  = skycoord.ra.to_string()
+    dec = skycoord.dec.to_string()
+    return CoordinatesOrigin(ra=ra, dec=dec)
+
+
 def create_observation(data, lens_image, json_dir=None,
                        noise_type='NoiseMap', model_noise_map=None, 
                        kwargs_obs=None, kwargs_noise=None):
@@ -105,7 +111,7 @@ def create_observation(data, lens_image, json_dir=None,
 def create_instrument(lens_image, observation, json_dir=None,
                       psf_type='PixelatedPSF',
                       psf_description=None,
-                      kwargs_psf=None):
+                      kwargs=None):
     if psf_type == 'PixelatedPSF':
         super_factor = lens_image.PSF.kernel_supersampling_factor
         if super_factor > 1:
@@ -136,11 +142,11 @@ def create_instrument(lens_image, observation, json_dir=None,
     else:
         raise NotImplementedError(f"Noise type {noise_type} not yet supported")
 
-    if kwargs_psf is None:
-        kwargs_psf = {}
+    if kwargs is None:
+        kwargs = {}
     instrument = Instrument(pixel_size,
                             psf=psf,
-                            **kwargs_psf)
+                            **kwargs)
 
     assert math.isclose(observation.pixels.pixel_size, instrument.pixel_size,
                         rel_tol=1e-09, abs_tol=0.0)
@@ -364,6 +370,7 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                                         isothermal=isothermal, spherical=spherical)
 
         elif profile_name in ['PIXELATED', 'PIXELATED_DIRAC', 'PIXELATED_FIXED']:
+            galaxy_name = galaxy.name.replace(' ', '_')
             if profile_name == 'PIXELATED_FIXED':
                 if kwargs_all is not None:
                     h2c_fixed_pixelated_lens_mass(
@@ -371,7 +378,7 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                         lens_image.MassModel.func_list[ih],  # herculens profile
                         kwargs_all[key][ih],
                         file_dir=file_dir,
-                        fits_file_suffix=fits_file_suffix+f'-{comp_name}_{ic}'
+                        fits_file_suffix=fits_file_suffix+f'-{galaxy_name}_{ic}'
                     )
                 if kwargs_all_samples.get(key, None) is not None:
                     print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "

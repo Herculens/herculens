@@ -61,7 +61,7 @@ class COOLESTexporter(object):
     def update_from_data(self, data, lens_image,
                          noise_type='NoiseMap', noise_map=None,
                          psf_type='PixelatedPSF', psf_description=None,
-                         kwargs_obs=None, kwargs_noise=None, kwargs_psf=None):
+                         kwargs_obs=None, kwargs_noise=None, kwargs_instrument=None):
         if 'mag_zero_point' not in kwargs_obs:
             kwargs_obs['mag_zero_point'] = self._coolest.observation.mag_zero_point
         if 'mag_sky_brightness' not in kwargs_obs:
@@ -76,7 +76,7 @@ class COOLESTexporter(object):
                                             json_dir=self._output_dir,
                                             psf_type=psf_type,
                                             psf_description=psf_description,
-                                            kwargs_psf=kwargs_psf)
+                                            kwargs=kwargs_instrument)
         # overwites the attributes
         self._coolest.observation = observation
         self._coolest.instrument = instrument
@@ -108,9 +108,8 @@ class COOLESTexporter(object):
         )
         self._coolest.likelihoods = likelihoods
 
-    def update_from_loss(self, loss):
-        # TODO: update LikelihoodList and RegularizationList from Herculens' loss
-        raise NotImplementedError("update_from_loss() not yet implemented.")
+    def update_from_wcs_coordinates(self, skycoord):
+        self._coolest.coordinates_origin = util.skycoord_to_coolest(skycoord)
 
     def update_metadata(self, **meta_kwargs):
         self._coolest.meta['modeling_code'] = f"Herculens (v{herculens.__version__})"
