@@ -53,11 +53,11 @@ class Noise(object):
                     UserWarning("sigma_b*f %s < 1 count may introduce unstable error estimates with a Gaussian "
                                 "error function for a Poisson distribution with mean < 1." % (
                         background_rms * np.max(exposure_time)))
-        if variance_boost_map is None:
-            variance_boost_map = np.ones((nx, ny))
-        self._boost_map = variance_boost_map
         self._nx, self._ny = nx, ny
         self._data = None
+        if variance_boost_map is not None:
+            # NOTE: we use a setter for backward compatibility reasons
+            self.variance_boost_map = variance_boost_map
 
     def set_data(self, data):
         assert np.shape(data) == (self._nx, self._ny)
@@ -81,6 +81,16 @@ class Noise(object):
         if add_gaussian:
             noise_real += image_util.add_background(model, self._background_rms, key2)
         return noise_real
+    
+    @property
+    def variance_boost_map(self):
+        if not hasattr(self, '_boost_map'):
+            return np.ones((self._nx, self._ny))
+        return self._boost_map
+    
+    @variance_boost_map.setter
+    def variance_boost_map(self, boost_map):
+        self._boost_map = boost_map
 
     @property
     def background_rms(self):
@@ -132,7 +142,7 @@ class Noise(object):
         :return: estimate of the noise per pixel based on the model flux
         """
         if boost_map is None:
-            boost_map = self._boost_map
+            boost_map = self.variance_boost_map
         if not force_recompute and self._noise_map is not None:
             c_d = self._noise_map**2
         else:

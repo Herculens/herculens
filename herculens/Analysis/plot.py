@@ -107,7 +107,7 @@ class Plotter(object):
                       kwargs_grid_source=None,
                       lock_colorbars=False, masked_residuals=True,
                       vmin_pot=None, vmax_pot=None,  # TEMP
-                      k_lens=None, # TEMP
+                      k_source=None, k_lens=None,
                       show_plot=True):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_light, 
@@ -138,20 +138,30 @@ class Plotter(object):
 
         if show_source:
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
-            if kwargs_grid_source is not None:
-                grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
-                x_grid_src, y_grid_src = grid_src.pixel_coordinates
+            if lens_image.SourceModel.has_pixels or kwargs_grid_source is not None:
+                if kwargs_grid_source is not None:
+                    grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
+                    x_grid_src, y_grid_src = grid_src.pixel_coordinates
+                    src_extent = grid_src.plt_extent
+                else:
+                    x_grid_src, y_grid_src, src_extent = lens_image.get_source_coordinates(
+                        kwargs_result['kwargs_lens'], k_lens=k_lens, return_plt_extent=True
+                    )
                 source_model = lens_image.eval_source_surface_brightness(
                     x_grid_src, y_grid_src, 
                     kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'],
-                    k=None, k_lens=k_lens, de_lensed=True,
+                    k=k_source, k_lens=k_lens, de_lensed=True,
                 )
                 source_model *= lens_image.Grid.pixel_area
-                src_extent = grid_src.plt_extent
+                
             else:
-                source_model = lens_image.source_surface_brightness(kwargs_source, de_lensed=True, unconvolved=True)
+                source_model = lens_image.source_surface_brightness(
+                    kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'], 
+                    de_lensed=True, unconvolved=True, 
+                    k=k_source, k_lens=k_lens,
+                )
                 src_extent = extent
-
+                
             if hasattr(self, '_ref_source'):
                 ref_source = self._ref_source
                 if source_model.shape != ref_source.shape:

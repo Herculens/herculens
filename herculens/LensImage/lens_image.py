@@ -117,7 +117,8 @@ class LensImage(object):
         computes the source surface brightness distribution
 
         :param kwargs_source: list of keyword arguments corresponding to the superposition of different source light profiles
-        :param kwargs_lens: list of keyword arguments corresponding to the superposition of different lens profiles
+        :param kwargs_lens: list of keyword arguments corresponding to the superposition of different lens profiles.
+        When using an adaptive source pixel grid, kwargs_lens is required even if de_lensed=True.
         :param kwargs_extinction: list of keyword arguments of extinction model
         :param unconvolved: if True: returns the unconvolved light distribution (prefect seeing)
         :param de_lensed: if True: returns the un-lensed source surface brightness profile, otherwise the lensed.

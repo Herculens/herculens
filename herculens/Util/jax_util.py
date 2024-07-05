@@ -5,14 +5,11 @@
 __author__ = 'austinpeel', 'aymgal', 'duxfrederic'
 
 
-from functools import partial
 from copy import deepcopy
 import numpy as np
 import jax.numpy as jnp
 from jax import jit, lax
 from jax.scipy.special import gammaln
-from jax.scipy.stats import norm
-from jax.lax import conv_general_dilated, conv_dimension_numbers
 
 
 def unjaxify_kwargs(kwargs_params):
@@ -20,17 +17,24 @@ def unjaxify_kwargs(kwargs_params):
     Utility to convert all JAX's device arrays contained in a model kwargs
     to standard floating point or numpy arrays.
     """
+    def unjaxify_array(p):
+        if p is None or isinstance(p, (float, int)):
+            return p  # don't do anything
+        if p.size == 1:
+            return float(p)
+        return np.array(p)
     kwargs_params_new = deepcopy(kwargs_params)
     for model_key, model_kwargs in kwargs_params.items():
         for profile_idx, profile_kwargs in enumerate(model_kwargs):
-            for param_key, param_value in profile_kwargs.items():
-                if not isinstance(param_value, (float, int)):
-                    if param_value.size == 1:
-                        kwargs_params_new[model_key][profile_idx][param_key] = float(
-                            param_value)
-                    else:
-                        kwargs_params_new[model_key][profile_idx][param_key] = np.array(
-                            param_value)
+            for k, p in profile_kwargs.items():
+                if isinstance(p, (tuple, list)):
+                    # iterate over the list/tuple and unjaxify the items
+                    kwargs_params_new[model_key][profile_idx][k] = []  # NOTE: if it was a tuple before, it's not anymore
+                    for p_sub in p:
+                        kwargs_params_new[model_key][profile_idx][k].append(unjaxify_array(p_sub))
+                else:
+                    # unjaxify the array
+                    kwargs_params_new[model_key][profile_idx][k] = unjaxify_array(p)
     return kwargs_params_new
 
 
@@ -59,7 +63,7 @@ def R_omega(z, t, q, nmax):
 
     @jit
     def body_fun(i, val):
-        # Currrent term in the series is proportional to the previous
+        # Current term in the series is proportional to the previous
         ratio = (2. * i + t - 2.) / (2. * i - t + 2.)
         val[1] = -f * ei2phi * ratio * val[1]
         # Adds the current term to the partial sum

@@ -309,6 +309,16 @@ class PixelatedFixed(object):
             self._interp_type = 'fast_bilinear'
             self._interp_class = CartesianGrid
 
+    def get_pixel_grid(self, component='func_pixels'):
+        if component == 'func_pixels':
+            return self._func_pixel_grid
+        elif component == 'deriv_pixels':
+            return self._deriv_pixel_grid
+        elif component == 'hess_pixels':
+            return self._hess_pixel_grid
+        else:
+            raise ValueError(f"Invalid component '{component}' for pixelated mass profile.")
+
     def function(self, x, y, func_pixels=None, deriv_pixels=None, hess_pixels=None):
         return self._interpol(x, y, func_pixels, self._func_pixel_grid)
     

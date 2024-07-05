@@ -24,12 +24,14 @@ class COOLESTexporter(object):
         if input_coolest_file is None:
             raise NotImplementedError("You must provide an input coolest file (for now)")
         if not os.path.isabs(input_coolest_file):
-            input_coolest_file = os.path.abspath(input_coolest_file)
+            self._input_coolest_file = os.path.abspath(input_coolest_file)
+        else:
+            self._input_coolest_file = input_coolest_file
         output_coolest_file = os.path.join(output_directory, output_basename)
         if not os.path.isabs(output_coolest_file):
-            output_coolest_file = os.path.abspath(output_coolest_file)
-        self._input_coolest_file = input_coolest_file
-        self._output_coolest_file = output_coolest_file
+            self._output_coolest_file = os.path.abspath(output_coolest_file)
+        else:
+            self._output_coolest_file = output_coolest_file
         self._output_dir = os.path.dirname(output_coolest_file)
         self._basename = output_basename
         self._kwargs_serializer = kwargs_serializer
@@ -59,7 +61,7 @@ class COOLESTexporter(object):
     def update_from_data(self, data, lens_image,
                          noise_type='NoiseMap', noise_map=None,
                          psf_type='PixelatedPSF', psf_description=None,
-                         kwargs_obs=None, kwargs_noise=None, kwargs_psf=None):
+                         kwargs_obs=None, kwargs_noise=None, kwargs_instrument=None):
         if 'mag_zero_point' not in kwargs_obs:
             kwargs_obs['mag_zero_point'] = self._coolest.observation.mag_zero_point
         if 'mag_sky_brightness' not in kwargs_obs:
@@ -74,7 +76,7 @@ class COOLESTexporter(object):
                                             json_dir=self._output_dir,
                                             psf_type=psf_type,
                                             psf_description=psf_description,
-                                            kwargs_psf=kwargs_psf)
+                                            kwargs=kwargs_instrument)
         # overwites the attributes
         self._coolest.observation = observation
         self._coolest.instrument = instrument
@@ -88,7 +90,7 @@ class COOLESTexporter(object):
                                                         re_create_entities=re_create_entities,
                                                         current_entities=self._coolest.lensing_entities,
                                                         json_dir=self._output_dir,
-                                                        fits_file_suffix=self._basename)
+                                                        fits_file_suffix="bestfit")
         if re_create_entities is True:
             # overwites the lensing entities of the COOLEST object
             self._coolest.lensing_entities = lensing_entities
@@ -96,9 +98,18 @@ class COOLESTexporter(object):
             # set the COOLEST mode to MAP (i.e., maximum a-posteriori estimate)
             self._coolest.mode = "MAP"
 
-    def update_from_loss(self, loss):
-        # TODO: update LikelihoodList and RegularizationList from Herculens' loss
-        raise NotImplementedError("update_from_loss() not yet implemented.")
+    def update_from_likelihood(self, lens_image,
+                               likelihood_type="ImagingDataLikelihood",
+                               likelihood_mask=None):
+        likelihoods = util.create_likelihoods(
+            lens_image, likelihood_type=likelihood_type,
+            likelihood_mask=likelihood_mask,
+            json_dir=self._output_dir,
+        )
+        self._coolest.likelihoods = likelihoods
+
+    def update_from_wcs_coordinates(self, skycoord):
+        self._coolest.coordinates_origin = util.skycoord_to_coolest(skycoord)
 
     def update_metadata(self, **meta_kwargs):
         self._coolest.meta['modeling_code'] = f"Herculens (v{herculens.__version__})"
