@@ -7,18 +7,136 @@ __author__ = 'aymgal'
 
 import numpy as np
 import jax.numpy as jnp
-from jaxtronomy.LensModel.Profiles.p_jaffe import PJaffe
-from herculens.Util import util, param_util, jax_util
+
+from herculens.Util import util, param_util
 
 
-__all__ = ['DPIE']
+__all__ = ['DPIE_GLEE', 'DPIE_PJAFFE']
 
 
-class DPIE(object):
+class DPIE_GLEE(object):
+    """
+    Dual pseudo isothermal elliptical (dPIE) mass profile, based on the
+    different of two PIEMD profiles as implemented in the JAX version of GLEE.
+
+    TODO: finish docstring.
+
+    """
+    param_names = ['theta_E', 'r_core', 'r_trunc', 'q', 'phi', 'center_x', 'center_y']
+    lower_limit_default = {'theta_E': 0, 'r_core': 0, 'r_trunc': 0, 'q': 0.2, 'phi': -np.pi/2., 'center_x': -100, 'center_y': -100}
+    upper_limit_default = {'theta_E': 10, 'r_core': 1e10, 'r_trunc': 1e10, 'q': 1., 'phi': +np.pi/2., 'center_x': 100, 'center_y': 100}
+    fixed_default = {key: False for key in param_names}
+    
+    def __init__(self, scale_flag=True):
+        self._r_soft = 1e-8
+        if scale_flag is False:
+            print("Warning: the dPIE with scale_flag=False has not been "
+                  "thoroughly tested against the GLEE implemented.")
+        self._dpie_flag = scale_flag # if True, theta_E corresponds to the Einstein radius of the profile
+        self._piemd_flag = False
+        try:
+            from herculens.MassModel.Profiles.glee.piemd_jax import Piemd_GPU
+        except ImportError:
+            raise ImportError("Please contact the author to use the dPIE profile "
+                              "as it depends on non-public libraries.")
+        else:
+            self._piemd_cls = Piemd_GPU
+
+    def function(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
+        """
+
+        :param x: x-coordinate in image plane
+        :param y: y-coordinate in image plane
+        :param theta_E: Einstein radius
+        :param r_core: core radius
+        :param r_trunc: truncation radius
+        :param q: axis ratio
+        :param phi: position angle
+        :param center_x: profile center
+        :param center_y: profile center
+        :return: alpha_x, alpha_y
+        """
+        piemd = self._get_piemd(x, y)
+        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._piemd_flag)
+        f_w = piemd._potential(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
+        f_s = piemd._potential(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        f = f_w - f_s
+        return f.reshape(*x.shape)
+
+    def derivatives(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
+        """
+
+        :param x: x-coordinate in image plane
+        :param y: y-coordinate in image plane
+        :param theta_E: Einstein radius
+        :param r_core: core radius
+        :param r_trunc: truncation radius
+        :param q: axis ratio
+        :param phi: position angle
+        :param center_x: profile center
+        :param center_y: profile center
+        :return: alpha_x, alpha_y
+        """
+        piemd = self._get_piemd(x, y)
+        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc)
+        f_x_w, f_y_w = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
+        f_x_s, f_y_s = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        f_x = f_x_w - f_x_s
+        f_y = f_y_w - f_y_s
+        return f_x.reshape(*x.shape), f_y.reshape(*y.shape)
+    
+    def hessian(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
+        """
+
+        :param x: x-coordinate in image plane
+        :param y: y-coordinate in image plane
+        :param theta_E: Einstein radius
+        :param r_core: core radius
+        :param r_trunc: truncation radius
+        :param q: axis ratio
+        :param phi: position angle
+        :param center_x: profile center
+        :param center_y: profile center
+        :return: alpha_x, alpha_y
+        """
+        piemd = self._get_piemd(x, y)
+        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc)
+        f_xx_w, f_yy_w, f_xy_w = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
+        f_xx_s, f_yy_s, f_xy_s = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        f_xx = f_xx_w - f_xx_s
+        f_yy = f_yy_w - f_yy_s
+        f_xy = f_xy_w - f_xy_s
+        return f_xx.reshape(*x.shape), f_yy.reshape(*y.shape), f_xy.reshape(*y.shape)
+    
+    def _param_conv(self, theta_E, r_core, r_trunc):
+        w, s = self._check_radii(r_core, r_trunc)
+        w2 = w**2
+        s2 = s**2
+        if self._dpie_flag is True:
+            theta_E2 = theta_E**2
+            theta_E_scaled = theta_E2 / ( (jnp.sqrt(w2 + theta_E2) - w) - (jnp.sqrt(s2 + theta_E2) - s) )
+        else:
+            theta_E_scaled = theta_E * s2 / (s2 - w2)
+        return theta_E_scaled, w, s
+    
+    def _check_radii(self, w, s):
+        # make sure the core radius parameters do not go below some small value for numerical stability
+        w = jnp.where(w < self._r_soft, self._r_soft, w)
+        # NOTE: the following swap of values *may* cause issues with JAX autodiff
+        w_ = jnp.where(s < w, s, w)
+        s_ = jnp.where(s < w, w, s)
+        return w_, s_
+    
+    def _get_piemd(self, x, y):
+        # NOTE: first 4 arguments of Piemd_GPU do not matter for our use, so we give zeros
+        return self._piemd_cls(0., 0., 0., 0., xx=x, yy=y)
+    
+
+class DPIE_PJAFFE(object):
     """
     Dual pseudo isothermal elliptical (dPIE) mass profile.
 
-    The implementation follows the GLEE definitions.
+    The implementation tries to follow the GLEE definitions.
 
     The convergence is
     kappa(x,y) = (Elimit / 2) * (s^2/(s^2-w^2)) * (1/sqrt(w^2 + rem^2) - 1/sqrt(s^2 + rem^2)
@@ -42,9 +160,14 @@ class DPIE(object):
     fixed_default = {key: False for key in param_names}
     
     def __init__(self):
-        self._backend = PJaffe()
         self._r_min = self._backend._s
         self._r_max = 1e10
+        try:
+            from jaxtronomy.LensModel.Profiles.p_jaffe import PJaffe
+        except ImportError:
+            raise ImportError("JAXtronomy needs to be installed to use the DPIE profile.")
+        else:
+            self._backend = PJaffe()
 
     def function(self, x, y, theta_E, r_core, r_trunc, e1, e2, center_x=0, center_y=0):
         """

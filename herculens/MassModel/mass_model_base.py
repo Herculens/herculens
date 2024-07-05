@@ -14,7 +14,8 @@ from herculens.Util import util
 __all__ = ['MassModelBase']
 
 SUPPORTED_MODELS = [
-    'EPL', 'NIE', 'SIE', 'SIS', 'DPIE',
+    'EPL', 'NIE', 'SIE', 'SIS', 
+    'DPIE', # 'DPIEA_ALT',
     'GAUSSIAN', 'POINT_MASS', 
     'SHEAR', 'SHEAR_GAMMA_PSI', 'MULTIPOLE',
     'PIXELATED', 'PIXELATED_DIRAC',
@@ -29,6 +30,7 @@ class MassModelBase(object):
     def __init__(self, lens_model_list, 
                  kwargs_pixelated=None, 
                  no_complex_numbers=True,
+                 glee_scale_flag=True,
                  pixel_interpol='fast_bilinear', 
                  pixel_derivative_type='interpol',
                  kwargs_pixel_grid_fixed=None):
@@ -80,7 +82,8 @@ class MassModelBase(object):
     @staticmethod
     def _import_class(
             lens_type, pixel_derivative_type=None, pixel_interpol=None, 
-            no_complex_numbers=None, kwargs_pixel_grid_fixed=None
+            no_complex_numbers=None, kwargs_pixel_grid_fixed=None,
+            glee_scale_flag=True,
         ):
         """Get the lens profile class of the corresponding type."""
         if lens_type == 'GAUSSIAN':
@@ -99,8 +102,10 @@ class MassModelBase(object):
             return sis.SIS()
         elif lens_type == 'EPL':
             return epl.EPL(no_complex_numbers=no_complex_numbers)
-        elif lens_type == 'DPIE':
-            return dpie.DPIE()
+        elif lens_type == 'DPIE_GLEE':
+            return dpie.DPIE_GLEE(scale_flag=glee_scale_flag)
+        # elif lens_type == 'DPIE_PJAFFE':
+        #     return dpie.DPIE_PJAFFE()
         elif lens_type == 'MULTIPOLE':
             return multipole.Multipole()
         elif lens_type == 'PIXELATED':
