@@ -11,15 +11,27 @@ import jax.numpy as jnp
 from herculens.Util import util, param_util
 
 
-__all__ = ['DPIE_GLEE', 'DPIE_PJAFFE']
+__all__ = [
+    'DPIE_GLEE', 
+    # 'DPIE_PJAFFE'
+]
 
 
 class DPIE_GLEE(object):
     """
     Dual pseudo isothermal elliptical (dPIE) mass profile, based on the
-    different of two PIEMD profiles as implemented in the JAX version of GLEE.
+    different of two PIEMD profiles as implemented in GLEE.
 
-    TODO: finish docstring.
+    The convergence is
+    kappa(x,y) = (Elimit / 2) * (s^2/(s^2-w^2)) * (1/sqrt(w^2 + rem^2) - 1/sqrt(s^2 + rem^2)
+    
+    with parameters
+    Elimit = strength, (= Einstein radius of SIS in limiting case of s->inf, w->0)
+    w = core radius
+    s = truncation/scale radius (that must be >w)
+    rem = elliptical mass radius = sqrt(x^2/(1+e)^2 + y^2/(1-e)^2)
+    e = ellipticity = (1-q)/(1+q)
+    q = axis ratio (that is <=1)
 
     """
     param_names = ['theta_E', 'r_core', 'r_trunc', 'q', 'phi', 'center_x', 'center_y']
@@ -29,15 +41,12 @@ class DPIE_GLEE(object):
     
     def __init__(self, scale_flag=True):
         self._r_soft = 1e-8
-        if scale_flag is False:
-            print("Warning: the dPIE with scale_flag=False has not been "
-                  "thoroughly tested against the GLEE implemented.")
         self._dpie_flag = scale_flag # if True, theta_E corresponds to the Einstein radius of the profile
         self._piemd_flag = False
         try:
             from herculens.MassModel.Profiles.glee.piemd_jax import Piemd_GPU
         except ImportError:
-            raise ImportError("Please contact the author to use the dPIE profile "
+            raise ImportError("Please contact the author to use this dPIE profile "
                               "as it depends on non-public libraries.")
         else:
             self._piemd_cls = Piemd_GPU
@@ -78,7 +87,7 @@ class DPIE_GLEE(object):
         :return: alpha_x, alpha_y
         """
         piemd = self._get_piemd(x, y)
-        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc)
+        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
         f_x_w, f_y_w = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
         f_x_s, f_y_s = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
         f_x = f_x_w - f_x_s
@@ -100,7 +109,7 @@ class DPIE_GLEE(object):
         :return: alpha_x, alpha_y
         """
         piemd = self._get_piemd(x, y)
-        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc)
+        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
         f_xx_w, f_yy_w, f_xy_w = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
         f_xx_s, f_yy_s, f_xy_s = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
         f_xx = f_xx_w - f_xx_s
@@ -108,11 +117,11 @@ class DPIE_GLEE(object):
         f_xy = f_xy_w - f_xy_s
         return f_xx.reshape(*x.shape), f_yy.reshape(*y.shape), f_xy.reshape(*y.shape)
     
-    def _param_conv(self, theta_E, r_core, r_trunc):
+    def _param_conv(self, theta_E, r_core, r_trunc, scale_flag):
         w, s = self._check_radii(r_core, r_trunc)
         w2 = w**2
         s2 = s**2
-        if self._dpie_flag is True:
+        if scale_flag is True:
             theta_E2 = theta_E**2
             theta_E_scaled = theta_E2 / ( (jnp.sqrt(w2 + theta_E2) - w) - (jnp.sqrt(s2 + theta_E2) - s) )
         else:

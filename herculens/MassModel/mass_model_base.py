@@ -15,7 +15,7 @@ __all__ = ['MassModelBase']
 
 SUPPORTED_MODELS = [
     'EPL', 'NIE', 'SIE', 'SIS', 
-    'DPIE', # 'DPIEA_ALT',
+    'DPIE_GLEE', # 'DPIE_PJAFFE',
     'GAUSSIAN', 'POINT_MASS', 
     'SHEAR', 'SHEAR_GAMMA_PSI', 'MULTIPOLE',
     'PIXELATED', 'PIXELATED_DIRAC', 'PIXELATED_FIXED',
@@ -44,7 +44,7 @@ class MassModelBase(object):
         """
         self.func_list, self._pix_idx = self._load_model_instances(
             lens_model_list, pixel_derivative_type, pixel_interpol, 
-            no_complex_numbers, kwargs_pixel_grid_fixed
+            no_complex_numbers, glee_scale_flag, kwargs_pixel_grid_fixed,
         )
         self._num_func = len(self.func_list)
         self._model_list = lens_model_list
@@ -54,7 +54,7 @@ class MassModelBase(object):
         
     def _load_model_instances(self, 
             lens_model_list, pixel_derivative_type, pixel_interpol, 
-            no_complex_numbers, kwargs_pixel_grid_fixed,
+            no_complex_numbers, glee_scale_flag, kwargs_pixel_grid_fixed,
         ):
         func_list = []
         imported_classes = {}
@@ -72,6 +72,7 @@ class MassModelBase(object):
                     mass_model_class = self._import_class(
                         lens_type, no_complex_numbers=no_complex_numbers, 
                         kwargs_pixel_grid_fixed=kwargs_pixel_grid_fixed,
+                        glee_scale_flag=glee_scale_flag,
                     )
                     imported_classes.update({lens_type: mass_model_class})
                 else:
