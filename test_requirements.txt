@@ -1,4 +1,8 @@
 tqdm>=4.61.0        # for progress bars with certain optimizers and samplers
 numpyro>=0.10.1     # for SVI and HMC sampling
+optax>=0.1.0        # for optimizers
+jaxopt>=0.5.5       # for optimizers
+matplotlib>=3.7.0   # for plotting
+numpyro==0.10.1     # for SVI and HMC sampling
 git+https://github.com/adam-coogan/jaxinterp2d@9881075#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
 git+https://github.com/Herculens/helens.git@main#egg=helens  # lens equation solver
