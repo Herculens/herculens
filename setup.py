@@ -26,6 +26,7 @@ install_requires = [
     'scipy',
     'jax',
     'jaxlib',
+    'objax',
     'scikit-image',
     # 'https://github.com/aymgal/utax.git',  # use requirements.txt
 ]
