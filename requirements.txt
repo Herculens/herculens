@@ -2,16 +2,15 @@ numpy>=1.20.3
 scipy>=1.6.3
 jax>=0.3.14
 jaxlib>=0.3.14
-optax>=0.1.0
-jaxopt>=0.5.5
-chex>=0.1.4
 objax>=1.7.0
-matplotlib>=3.0.0
-findiff==0.8.9
 scikit-image>=0.20.0
 git+https://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolution, interpolation, etc.)
 
 # the following packages are optional (pay attention to the versions)
+#optax>=0.1.0        # for optimizers
+#jaxopt>=0.5.5       # for optimizers
+#matplotlib>=3.7.0   # for plotting
+#findiff==0.8.9      # for building matrix with finite difference coefficients
 #tqdm>=4.61.0        # for progress bars with certain optimizers and samplers
 #numpyro==0.10.1     # for SVI and HMC sampling
 #blackjax==0.9.6     # for JAX-based HMC sampling

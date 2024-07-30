@@ -1,4 +1,5 @@
-<img src="images/horizontal.png" width="600" alt="Herculens logo" />
+<img src="https://raw.githubusercontent.com/Herculens/herculens/main/images/horizontal.png#gh-light-mode-only" width="600" alt="Herculens logo" />
+<img src="https://raw.githubusercontent.com/Herculens/herculens/main/images/horizontal_dark_bg.png#gh-dark-mode-only" width="600" alt="Herculens logo" />
 
 # Herculens: differentiable gravitational lensing
 
