@@ -152,8 +152,7 @@ class Plotter(object):
                     kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'],
                     k=k_source, k_lens=k_lens, de_lensed=True,
                 )
-                source_model *= lens_image.Grid.pixel_area
-                
+                source_model *= lens_image.Grid.pixel_area                
             else:
                 source_model = lens_image.source_surface_brightness(
                     kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'], 
