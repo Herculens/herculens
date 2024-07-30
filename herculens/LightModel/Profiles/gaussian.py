@@ -13,7 +13,7 @@ import jax.numpy as jnp
 from herculens.Util import param_util
 
 
-__all__ = ['Gaussian']
+__all__ = ['Gaussian', 'GaussianEllipse']
 
 
 class Gaussian(object):

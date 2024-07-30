@@ -20,26 +20,25 @@ STRING_MAPPING = pm.STRING_MAPPING
 
 class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, profile_list, 
-                 kwargs_pixelated=None, 
-                 no_complex_numbers=True,
-                 pixel_interpol='fast_bilinear', 
-                 pixel_derivative_type='interpol',
-                 kwargs_pixel_grid_fixed=None):
+    def __init__(self, profile_list, kwargs_pixelated=None, 
+                 **profile_specific_kwargs):
         """Create a MassProfileBase object.
 
-        NOTE: extra keyword arguments are given to the corresponding profile class
+        NOTE: the extra keyword arguments are given to the corresponding profile class
         only when that profile is given as a string instead of a class instance.
 
         Parameters
         ----------
-        profile_list : list of str or profile class instance
-            Lens model profile types.
-
+        profile_list : list of strings or profile instances
+            List of mass profiles. If not a list, wrap the passed argument in a list. 
+        kwargs_pixelated : dict
+            Settings related to the creation of the pixelated grid.
+            See herculens.PixelGrid.create_model_grid for details.
+        profile_specific_kwargs : dict
+            See docstring for get_class_from_string().
         """
         self.func_list, self._pix_idx = self._load_model_instances(
-            profile_list, pixel_derivative_type, pixel_interpol, 
-            no_complex_numbers, kwargs_pixel_grid_fixed
+            profile_list, **profile_specific_kwargs,
         )
         self._num_func = len(self.func_list)
         self._model_list = profile_list
@@ -48,27 +47,21 @@ class MassModelBase(object):
         self._kwargs_pixelated = kwargs_pixelated
         
     def _load_model_instances(
-            self, profile_list, pixel_derivative_type, pixel_interpol, 
-            no_complex_numbers, kwargs_pixel_grid_fixed,
+            self, profile_list, **profile_specific_kwargs,
         ):
         func_list = []
         pix_idx = None
         for idx, profile_type in enumerate(profile_list):
-            # NOTE: Passing string is supported for backward-compatibility only
             if isinstance(profile_type, str):
-                # These models require a new instance per profile as certain pre-computations
-                # are relevant per individual profile
+                # passing string is supported for backward-compatibility only
                 profile_class = self.get_class_from_string(
                     profile_type, 
-                    kwargs_pixel_grid_fixed=kwargs_pixel_grid_fixed,
-                    pixel_derivative_type=pixel_derivative_type, 
-                    pixel_interpol=pixel_interpol,
-                    no_complex_numbers=no_complex_numbers, 
+                    **profile_specific_kwargs,
                 )
                 if profile_type in ['PIXELATED', 'PIXELATED_DIRAC']:
                     pix_idx = idx
 
-            # NOTE: this is the new preferred way: passing the profile as a class
+            # this is the new preferred way: passing the profile as a class
             elif self.is_mass_profile_class(profile_type):
                 profile_class = profile_type
                 if isinstance(
@@ -78,7 +71,7 @@ class MassModelBase(object):
                     pix_idx = idx
             else:
                 raise ValueError("Each profile can either be a string or "
-                                 "directly the profile class (not instantiated).")
+                                 "directly the profile class.")
             func_list.append(profile_class)
         return func_list, pix_idx
     
@@ -93,10 +86,30 @@ class MassModelBase(object):
 
     @staticmethod
     def get_class_from_string(
-            profile_string, pixel_derivative_type=None, pixel_interpol=None, 
-            no_complex_numbers=None, kwargs_pixel_grid_fixed=None,
+            profile_string, 
+            pixel_derivative_type=None, 
+            pixel_interpol=None, 
+            no_complex_numbers=None, 
+            kwargs_pixel_grid_fixed=None,
         ):
-        """Get the lens profile class of the corresponding type."""
+        """
+        Get the lens profile class of the corresponding type.
+        Keyword arguments are related to specific profile types.
+        
+        Parameters
+        ----------
+        smoothing : float
+            Smoothing factor for some models (deprecated).
+        pixel_interpol : string
+            Type of interpolation for 'PIXELATED' profiles: 'fast_bilinear' or 'bicubic'
+        pixel_derivative_type : str
+            Type of interpolation: 'interpol' or 'autodiff'
+        no_complex_numbers : bool
+            Use or not complex number in the EPL's deflection computation.
+        kwargs_pixel_grid_fixed : dict
+            Settings related to the creation of the pixelated grid for profile type 'PIXELATED_FIXED'.
+            See herculens.PixelGrid.create_model_grid for details.
+        """
         if profile_string not in list(STRING_MAPPING.keys()):
             raise ValueError(f"{profile_string} is not a valid lens model. "
                              f"Supported types are {SUPPORTED_MODELS}")
@@ -110,7 +123,7 @@ class MassModelBase(object):
             if kwargs_pixel_grid_fixed is None:
                 raise ValueError("At least one pixel grid must be provided to use 'PIXELATED_FIXED' profile")
             return profile_class(**kwargs_pixel_grid_fixed)
-        # all remaining profile takes no extra arguments
+        # all remaining profiles take no extra arguments
         return profile_class()
 
     def _bool_list(self, k):

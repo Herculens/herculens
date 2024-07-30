@@ -7,13 +7,9 @@
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
-import numpy as np
 import jax.numpy as jnp
-# from functools import partial
-# from jax import jit
 
 from herculens.LightModel.light_model_base import LightModelBase
-from herculens.Util import util
 
 
 __all__ = ['LightModel']
@@ -31,16 +27,20 @@ class LightModel(LightModelBase):
     for a given set of parameters.
 
     """
-    def __init__(self, light_model_list, smoothing=0.001, 
-                 shapelets_n_max=4, superellipse_exponent=2,
-                 kwargs_pixelated=None, **kwargs):
-        """Create a LightModel object."""
-        self.profile_type_list = light_model_list
-        super(LightModel, self).__init__(self.profile_type_list, smoothing=smoothing,
-                                         shapelets_n_max=shapelets_n_max,
-                                         superellipse_exponent=superellipse_exponent,
-                                         kwargs_pixelated=kwargs_pixelated,
-                                         **kwargs)
+    def __init__(self, profile_list, **kwargs):
+        """Create a LightModel object.
+
+        Parameters
+        ----------
+        profile_list : list of strings or profile instances
+            List of light profiles.
+        kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
+        """
+        if not isinstance(profile_list, (list, tuple)):
+            # useful when using a single profile
+            profile_list = [profile_list]
+        self.profile_type_list = profile_list
+        super(LightModel, self).__init__(self.profile_type_list, **kwargs)
 
     def surface_brightness(self, x, y, kwargs_list, k=None,
                            pixels_x_coord=None, pixels_y_coord=None):

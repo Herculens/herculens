@@ -2,36 +2,34 @@
 # as the preferred way is now to pass the profile class directly 
 # to the MassModel() constructor.
 
-from herculens.MassModel.Profiles import (
-    gaussian_potential, 
-    point_mass, 
-    multipole,
-    shear, 
-    sie, 
-    sis, 
-    nie, 
-    epl, 
-    pixelated
+from herculens.MassModel.Profiles.gaussian_potential import Gaussian
+from herculens.MassModel.Profiles.point_mass import PointMass
+from herculens.MassModel.Profiles.multipole import Multipole
+from herculens.MassModel.Profiles.shear import Shear, ShearGammaPsi
+from herculens.MassModel.Profiles.sis import SIS
+from herculens.MassModel.Profiles.sie import SIE
+from herculens.MassModel.Profiles.nie import NIE
+from herculens.MassModel.Profiles.epl import EPL
+from herculens.MassModel.Profiles.pixelated import (
+    PixelatedPotential,
+    PixelatedFixed,
+    PixelatedPotentialDirac,
 )
-
-SUPPORTED_MODELS = [
-    'EPL', 'NIE', 'SIE', 'SIS', 'GAUSSIAN', 'POINT_MASS', 
-    'SHEAR', 'SHEAR_GAMMA_PSI', 'MULTIPOLE',
-    'PIXELATED', 'PIXELATED_DIRAC', 'PIXELATED_FIXED',
-]
 
 # mapping between the string name to the mass profile class.
 STRING_MAPPING = {
-    'EPL': epl.EPL,
-    'NIE': nie.NIE,
-    'SIE': sie.SIE,
-    'SIS': sis.SIS,
-    'GAUSSIAN': gaussian_potential.Gaussian,
-    'POINT_MASS': point_mass.PointMass,
-    'SHEAR': shear.Shear,
-    'SHEAR_GAMMA_PSI': shear.ShearGammaPsi,
-    'MULTIPOLE': multipole.Multipole,
-    'PIXELATED': pixelated.PixelatedPotential,
-    'PIXELATED_DIRAC': pixelated.PixelatedPotentialDirac,
-    'PIXELATED_FIXED': pixelated.PixelatedFixed,
+    'EPL': EPL,
+    'NIE': NIE,
+    'SIE': SIE,
+    'SIS': SIS,
+    'GAUSSIAN': Gaussian,
+    'POINT_MASS': PointMass,
+    'SHEAR': Shear,
+    'SHEAR_GAMMA_PSI': ShearGammaPsi,
+    'MULTIPOLE': Multipole,
+    'PIXELATED': PixelatedPotential,
+    'PIXELATED_DIRAC': PixelatedPotentialDirac,
+    'PIXELATED_FIXED': PixelatedFixed,
 }
+
+SUPPORTED_MODELS = list(STRING_MAPPING.keys())
