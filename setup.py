@@ -27,7 +27,7 @@ install_requires = [
     'jax',
     'jaxlib',
     'scikit-image',
-    'https://github.com/aymgal/utax.git',
+    # 'https://github.com/aymgal/utax.git',  # use requirements.txt
 ]
 
 # Minimal optional packages (see requirements.txt for versions and complete list)
