@@ -110,19 +110,19 @@ class MassModelBase(object):
             Settings related to the creation of the pixelated grid for profile type 'PIXELATED_FIXED'.
             See herculens.PixelGrid.create_model_grid for details.
         """
-        if profile_string not in list(STRING_MAPPING.keys()):
-            raise ValueError(f"{profile_string} is not a valid lens model. "
-                             f"Supported types are {SUPPORTED_MODELS}")
-        profile_class = STRING_MAPPING[profile_string]
-        # treats the few special cases that require user settings
-        if profile_string == 'EPL':
-            return profile_class(no_complex_numbers=no_complex_numbers)
-        elif profile_string == 'PIXELATED':
-            return profile_class(derivative_type=pixel_derivative_type, interpolation_type=pixel_interpol)
-        elif profile_string == 'PIXELATED_FIXED':
-            if kwargs_pixel_grid_fixed is None:
-                raise ValueError("At least one pixel grid must be provided to use 'PIXELATED_FIXED' profile")
-            return profile_class(**kwargs_pixel_grid_fixed)
+        if profile_string in SUPPORTED_MODELS:
+            profile_class = STRING_MAPPING[profile_string]
+            # treats the few special cases that require user settings
+            if profile_string == 'EPL':
+                return profile_class(no_complex_numbers=no_complex_numbers)
+            elif profile_string == 'PIXELATED':
+                return profile_class(derivative_type=pixel_derivative_type, interpolation_type=pixel_interpol)
+            elif profile_string == 'PIXELATED_FIXED':
+                if kwargs_pixel_grid_fixed is None:
+                    raise ValueError("At least one pixel grid must be provided to use 'PIXELATED_FIXED' profile")
+                return profile_class(**kwargs_pixel_grid_fixed)
+        else:
+            raise ValueError(f"Could not load profile type '{profile_string}'.")
         # all remaining profiles take no extra arguments
         return profile_class()
 

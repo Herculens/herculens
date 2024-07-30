@@ -112,8 +112,6 @@ class LightModelBase(object):
             Wether or not to allow the interpolator to predict values outside 
             the field of view of the pixelated profile
         """
-        print("SUPPORTED_MODELS", SUPPORTED_MODELS)
-        raise
         if profile_string in SUPPORTED_MODELS:
             profile_class = STRING_MAPPING[profile_string]
             # treats the few special cases that require user settings
