@@ -7,120 +7,124 @@
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
-from herculens.MassModel.Profiles import (gaussian_potential, point_mass, multipole,
-                                           shear, sie, sis, nie, epl, dpie, pixelated)
+import herculens.MassModel.profile_mapping as pm
 from herculens.Util import util
+
 
 __all__ = ['MassModelBase']
 
-SUPPORTED_MODELS = [
-    'EPL', 'NIE', 'SIE', 'SIS', 
-    'DPIE_GLEE', # 'DPIE_PJAFFE',
-    'GAUSSIAN', 'POINT_MASS', 
-    'SHEAR', 'SHEAR_GAMMA_PSI', 'MULTIPOLE',
-    'PIXELATED', 'PIXELATED_DIRAC', 'PIXELATED_FIXED',
-]
 
-
-# TODO: create parent for methods shared between MassProfileBase and LightProfileBase
+SUPPORTED_MODELS = pm.SUPPORTED_MODELS
+STRING_MAPPING = pm.STRING_MAPPING
 
 
 class MassModelBase(object):
     """Base class for managing lens models in single- or multi-plane lensing."""
-    def __init__(self, lens_model_list, 
-                 kwargs_pixelated=None, 
-                 no_complex_numbers=True,
-                 glee_scale_flag=True,
-                 pixel_interpol='fast_bilinear', 
-                 pixel_derivative_type='interpol',
-                 kwargs_pixel_grid_fixed=None):
+    def __init__(self, profile_list, kwargs_pixelated=None, 
+                 **profile_specific_kwargs):
         """Create a MassProfileBase object.
+
+        NOTE: the extra keyword arguments are given to the corresponding profile class
+        only when that profile is given as a string instead of a class instance.
 
         Parameters
         ----------
-        lens_model_list : list of str
-            Lens model profile types.
-
+        profile_list : list of strings or profile instances
+            List of mass profiles. If not a list, wrap the passed argument in a list. 
+        kwargs_pixelated : dict
+            Settings related to the creation of the pixelated grid.
+            See herculens.PixelGrid.create_model_grid for details.
+        profile_specific_kwargs : dict
+            See docstring for get_class_from_string().
         """
         self.func_list, self._pix_idx = self._load_model_instances(
-            lens_model_list, pixel_derivative_type, pixel_interpol, 
-            no_complex_numbers, glee_scale_flag, kwargs_pixel_grid_fixed,
+            profile_list, **profile_specific_kwargs,
         )
         self._num_func = len(self.func_list)
-        self._model_list = lens_model_list
+        self._model_list = profile_list
         if kwargs_pixelated is None:
             kwargs_pixelated = {}
         self._kwargs_pixelated = kwargs_pixelated
         
-    def _load_model_instances(self, 
-            lens_model_list, pixel_derivative_type, pixel_interpol, 
-            no_complex_numbers, glee_scale_flag, kwargs_pixel_grid_fixed,
+    def _load_model_instances(
+            self, profile_list, **profile_specific_kwargs,
         ):
         func_list = []
-        imported_classes = {}
         pix_idx = None
-        for idx, lens_type in enumerate(lens_model_list):
-            # These models require a new instance per profile as certain pre-computations
-            # are relevant per individual profile
-            if lens_type in ['PIXELATED', 'PIXELATED_DIRAC']:
-                mass_model_class = self._import_class(
-                    lens_type, pixel_derivative_type=pixel_derivative_type, pixel_interpol=pixel_interpol
+        for idx, profile_type in enumerate(profile_list):
+            if isinstance(profile_type, str):
+                # passing string is supported for backward-compatibility only
+                profile_class = self.get_class_from_string(
+                    profile_type, 
+                    **profile_specific_kwargs,
                 )
-                pix_idx = idx
+                if profile_type in ['PIXELATED', 'PIXELATED_DIRAC']:
+                    pix_idx = idx
+
+            # this is the new preferred way: passing the profile as a class
+            elif self.is_mass_profile_class(profile_type):
+                profile_class = profile_type
+                if isinstance(
+                        profile_class, 
+                        (STRING_MAPPING['PIXELATED'], STRING_MAPPING['PIXELATED_DIRAC'])
+                    ):
+                    pix_idx = idx
             else:
-                if lens_type not in imported_classes.keys():
-                    mass_model_class = self._import_class(
-                        lens_type, no_complex_numbers=no_complex_numbers, 
-                        kwargs_pixel_grid_fixed=kwargs_pixel_grid_fixed,
-                        glee_scale_flag=glee_scale_flag,
-                    )
-                    imported_classes.update({lens_type: mass_model_class})
-                else:
-                    mass_model_class = imported_classes[lens_type]
-            func_list.append(mass_model_class)
+                raise ValueError("Each profile can either be a string or "
+                                 "directly the profile class.")
+            func_list.append(profile_class)
         return func_list, pix_idx
+    
+    @staticmethod
+    def is_mass_profile_class(profile):
+        """Simply checks that the mass profile has the required methods"""
+        return (
+            hasattr(profile, 'function') and
+            hasattr(profile, 'derivatives') and
+            hasattr(profile, 'hessian')
+        )
 
     @staticmethod
-    def _import_class(
-            lens_type, pixel_derivative_type=None, pixel_interpol=None, 
-            no_complex_numbers=None, kwargs_pixel_grid_fixed=None,
-            glee_scale_flag=True,
+    def get_class_from_string(
+            profile_string, 
+            pixel_derivative_type=None, 
+            pixel_interpol=None, 
+            no_complex_numbers=None, 
+            kwargs_pixel_grid_fixed=None,
         ):
-        """Get the lens profile class of the corresponding type."""
-        if lens_type == 'GAUSSIAN':
-            return gaussian_potential.Gaussian()
-        elif lens_type == 'SHEAR':
-            return shear.Shear()
-        elif lens_type == 'SHEAR_GAMMA_PSI':
-            return shear.ShearGammaPsi()
-        elif lens_type == 'POINT_MASS':
-            return point_mass.PointMass()
-        elif lens_type == 'NIE':
-            return nie.NIE()
-        elif lens_type == 'SIE':
-            return sie.SIE()
-        elif lens_type == 'SIS':
-            return sis.SIS()
-        elif lens_type == 'EPL':
-            return epl.EPL(no_complex_numbers=no_complex_numbers)
-        elif lens_type == 'DPIE_GLEE':
-            return dpie.DPIE_GLEE(scale_flag=glee_scale_flag)
-        # elif lens_type == 'DPIE_PJAFFE':
-        #     return dpie.DPIE_PJAFFE()
-        elif lens_type == 'MULTIPOLE':
-            return multipole.Multipole()
-        elif lens_type == 'PIXELATED':
-            return pixelated.PixelatedPotential(derivative_type=pixel_derivative_type, interpolation_type=pixel_interpol)
-        elif lens_type == 'PIXELATED_DIRAC':
-            return pixelated.PixelatedPotentialDirac()
-        elif lens_type == 'PIXELATED_FIXED':
-            if kwargs_pixel_grid_fixed is None:
-                raise ValueError("At least one pixel grid must be provided to use 'PIXELATED_FIXED' profile")
-            return pixelated.PixelatedFixed(**kwargs_pixel_grid_fixed)
+        """
+        Get the lens profile class of the corresponding type.
+        Keyword arguments are related to specific profile types.
+        
+        Parameters
+        ----------
+        smoothing : float
+            Smoothing factor for some models (deprecated).
+        pixel_interpol : string
+            Type of interpolation for 'PIXELATED' profiles: 'fast_bilinear' or 'bicubic'
+        pixel_derivative_type : str
+            Type of interpolation: 'interpol' or 'autodiff'
+        no_complex_numbers : bool
+            Use or not complex number in the EPL's deflection computation.
+        kwargs_pixel_grid_fixed : dict
+            Settings related to the creation of the pixelated grid for profile type 'PIXELATED_FIXED'.
+            See herculens.PixelGrid.create_model_grid for details.
+        """
+        if profile_string in SUPPORTED_MODELS:
+            profile_class = STRING_MAPPING[profile_string]
+            # treats the few special cases that require user settings
+            if profile_string == 'EPL':
+                return profile_class(no_complex_numbers=no_complex_numbers)
+            elif profile_string == 'PIXELATED':
+                return profile_class(derivative_type=pixel_derivative_type, interpolation_type=pixel_interpol)
+            elif profile_string == 'PIXELATED_FIXED':
+                if kwargs_pixel_grid_fixed is None:
+                    raise ValueError("At least one pixel grid must be provided to use 'PIXELATED_FIXED' profile")
+                return profile_class(**kwargs_pixel_grid_fixed)
         else:
-            err_msg = (f"{lens_type} is not a valid lens model. " +
-                       f"Supported types are {SUPPORTED_MODELS}")
-            raise ValueError(err_msg)
+            raise ValueError(f"Could not load profile type '{profile_string}'.")
+        # all remaining profiles take no extra arguments
+        return profile_class()
 
     def _bool_list(self, k):
         return util.convert_bool_list(n=self._num_func, k=k)

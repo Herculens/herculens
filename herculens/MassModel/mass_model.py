@@ -18,18 +18,19 @@ __all__ = ['MassModel']
 
 class MassModel(MassModelBase):
     """An arbitrary list of lens models."""
-    def __init__(self, mass_model_list, kwargs_pixelated=None, **kwargs):
+    def __init__(self, profile_list, **kwargs):
         """Create a MassModel object.
 
         Parameters
         ----------
-        mass_model_list : list of str
-            Lens model profile names.
-        kwargs_pixelated : dictionary for settings related to PIXELATED profiles.
+        profile_list : list of strings or profile instances
+            List of mass profiles.
         """
-        self.profile_type_list = mass_model_list
-        super().__init__(self.profile_type_list, kwargs_pixelated=kwargs_pixelated,
-                         **kwargs)
+        if not isinstance(profile_list, (list, tuple)):
+            # useful when using a single profile
+            profile_list = [profile_list]
+        self.profile_type_list = profile_list
+        super().__init__(self.profile_type_list, **kwargs)
 
     def ray_shooting(self, x, y, kwargs, k=None):
         """
