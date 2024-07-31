@@ -13,7 +13,7 @@ from herculens.Util import util, param_util
 
 __all__ = [
     'DPIE_GLEE', 
-    # 'DPIE_PJAFFE'
+    'DPIE_PJAFFE',  # NOTE: the DPIE_PJAFFE is not well tested
 ]
 
 
@@ -143,6 +143,8 @@ class DPIE_GLEE(object):
 
 class DPIE_PJAFFE(object):
     """
+    TODO: finish implementation.
+
     Dual pseudo isothermal elliptical (dPIE) mass profile.
 
     The implementation tries to follow the GLEE definitions.
