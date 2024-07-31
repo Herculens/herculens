@@ -10,6 +10,7 @@ from herculens.MassModel.Profiles.sis import SIS
 from herculens.MassModel.Profiles.sie import SIE
 from herculens.MassModel.Profiles.nie import NIE
 from herculens.MassModel.Profiles.epl import EPL
+from herculens.MassModel.Profiles.dpie import DPIE_GLEE
 from herculens.MassModel.Profiles.pixelated import (
     PixelatedPotential,
     PixelatedFixed,
@@ -22,6 +23,7 @@ STRING_MAPPING = {
     'NIE': NIE,
     'SIE': SIE,
     'SIS': SIS,
+    'DPIE_GLEE': DPIE_GLEE,
     'GAUSSIAN': Gaussian,
     'POINT_MASS': PointMass,
     'SHEAR': Shear,
