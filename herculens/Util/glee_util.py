@@ -7,8 +7,7 @@ from pprint import pprint
 
 
 class GLEEReader(object):
-    """Classes that load, parse and convert a GLEE config file 
-    to a Herculens model.
+    """Load and parse a GLEE config file.
 
     NOTE: As of now, not all the config file can be parsed.
     Things that are not parsed are, for instance:
@@ -93,17 +92,49 @@ class GLEEReader(object):
             self._raise_parser_run_error()
         return self._ptl_src_errors
 
+    @property
+    def extended_source_redshifts(self):
+        redshifts = [p['z'] for p in self.extended_source_parameters]
+        redshifts_priors = [p['z'] for p in self.extended_source_priors]
+        return redshifts, redshifts_priors
+    
+    @property
+    def extended_source_parameters(self):
+        if not hasattr(self, '_ext_src_params'):
+            self._raise_parser_run_error()
+        return self._ext_src_params
+
+    @property
+    def extended_source_priors(self):
+        if not hasattr(self, '_ext_src_priors'):
+            self._raise_parser_run_error()
+        return self._ext_src_priors
+
+    @property
+    def extended_source_settings(self):
+        if not hasattr(self, '_ext_src_settings'):
+            self._raise_parser_run_error()
+        return self._ext_src_settings
+
+    @property
+    def extended_source_ref_coordinates(self):
+        return [s['refcoord'] for s in self.extended_source_settings]
+
     def parse_config(self):
         lines = self.read_and_separate_lines(self._config_path)
         # next we go through the lines and group them by lens/source/esource blocks
         model_component_blocks = self._extract_blocks(
             lines, ['lenses_vary', 'sources', 'esources'],
         )
+        # parse the lens block
         self._lens_params, self._lens_priors, self._lens_labels \
             = self._parse_lens_model(model_component_blocks['lenses_vary'])
+        # parse the point-like source block
         self._ptl_src_params, self._ptl_src_priors, self._ptl_src_labels, self._ptl_src_errors \
             = self._parse_point_like_source_model(model_component_blocks['sources'])
-        # self._parse_extended_sources_block(ext_source_block)
+        # parse the extended source block
+        self._ext_src_params, self._ext_src_priors, self._ext_src_settings \
+            = self._parse_extended_sources_block(model_component_blocks['esources'])
 
     def _parse_lens_model(self, block):
         header = block[0]
@@ -228,6 +259,53 @@ class GLEEReader(object):
             'y_img': err_img,
         }
         return kwargs_params, kwargs_priors, kwargs_errors
+    
+    def _parse_extended_sources_block(self, block):
+        header = block[0]
+        content = block[1:]
+        component_type = header[0]
+        num_components = int(header[1])
+        model_component_blocks, _ = self._extract_blocks(
+            content, ['z'], with_duplicates=True,  # we extract the block that starts with z
+        )
+        assert num_components == len(model_component_blocks), f"Inconsistent number of extended sources ('{component_type}')"
+        return self._parse_all_extended_sources(model_component_blocks)
+
+    def _parse_all_extended_sources(self, blocks):
+        params_list = []
+        priors_list = []
+        settings_list = []
+        for i, block in enumerate(blocks):
+            kwargs_params, kwargs_priors, kwargs_settings \
+                = self._parse_extended_source(i, block)
+            params_list.append(kwargs_params)
+            priors_list.append(kwargs_priors)
+            settings_list.append(kwargs_settings)
+        return params_list, priors_list, settings_list
+
+    def _parse_extended_source(self, i, lines):
+        redshift, redshift_prior, _ = self._parse_redshift(i, lines[0])
+        kwargs_settings = self._parse_extended_source_settings(i, lines[1:])
+        # add the redshift to the rest of the parameters
+        kwargs_params = {'z': redshift}
+        kwargs_priors = {'z': redshift_prior}
+        return kwargs_params, kwargs_priors, kwargs_settings
+
+    def _parse_extended_source_settings(self, i, lines):
+        kwargs_settings = {}
+        for line in lines:
+            setting_name = self.get_line_item(line, pos=0)
+            if setting_name is None or setting_name == 'esource_end':
+                break
+            elif setting_name == 'esource_refcoord':
+                ref_x = float(self.get_line_item(line, pos=1))
+                ref_y = float(self.get_line_item(line, pos=2))
+                setting_value = (ref_x, ref_y)
+            else:
+                setting_value = self.get_line_item(line, pos=1)
+            setting_name = setting_name.replace('esource_', '')  # remove the 'esource' prefix
+            kwargs_settings[setting_name] = setting_value
+        return kwargs_settings
     
     def _parse_redshift(self, i, line):
         assert self.get_line_item(line) == 'z'
