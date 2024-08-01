@@ -36,12 +36,41 @@ class GLEEReader(object):
     def __init__(self, config_file_path, verbose=False):
         self._config_path = config_file_path
         self._verbose = verbose
+        self._parsed = False
+
+    def print_summary(self):
+        if not self._parsed:
+            self._raise_parser_run_error()
+        print("="*60)
+        print("Parsed GLEE model:")
+        print("-"*18)
+        print("> Number of lenses:", self.num_lenses)
+        print("> Number of point-like sources:", self.num_point_like_sources)
+        print(f"  leading to {self.num_point_like_images} point-like multiple images")
+        print("> Number of extended sources:", self.num_extended_sources)
+        print("="*60)
+
+    @property
+    def num_lenses(self):
+        return len(self.lens_parameters)
+
+    @property
+    def num_point_like_sources(self):
+        return len(self.point_like_source_parameters)
+
+    @property
+    def num_point_like_images(self):
+        params = self.point_like_source_parameters
+        return sum([len(p['x_img']) for p in params])
+
+    @property
+    def num_extended_sources(self):
+        return len(self.extended_source_parameters)
         
     @property
     def lens_redshifts(self):
-        if not hasattr(self, '_lens_redshifts'):
-            params = self.lens_parameters
-            self._lens_redshifts = [p['z'] for p in params]
+        redshifts = [p['z'] for p in self.lens_parameters]
+        redshifts_priors = [p['z'] for p in self.lens_priors]
         return self._lens_redshifts
     
     @property
@@ -135,6 +164,8 @@ class GLEEReader(object):
         # parse the extended source block
         self._ext_src_params, self._ext_src_priors, self._ext_src_settings \
             = self._parse_extended_sources_block(model_component_blocks['esources'])
+        # if successful so far, then we say it's parsed
+        self._parsed = True
 
     def _parse_lens_model(self, block):
         header = block[0]
