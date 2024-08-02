@@ -74,6 +74,12 @@ class GLEEReader(object):
         return self._lens_redshifts
     
     @property
+    def lens_profiles(self):
+        if not hasattr(self, '_lens_profiles'):
+            self._raise_parser_run_error()
+        return self._lens_profiles
+    
+    @property
     def lens_parameters(self):
         if not hasattr(self, '_lens_params'):
             self._raise_parser_run_error()
@@ -156,7 +162,7 @@ class GLEEReader(object):
             lines, ['lenses_vary', 'sources', 'esources'],
         )
         # parse the lens block
-        self._lens_params, self._lens_priors, self._lens_labels \
+        self._lens_profiles, self._lens_params, self._lens_priors, self._lens_labels \
             = self._parse_lens_model(model_component_blocks['lenses_vary'])
         # parse the point-like source block
         self._ptl_src_params, self._ptl_src_priors, self._ptl_src_labels, self._ptl_src_errors \
@@ -190,7 +196,7 @@ class GLEEReader(object):
             params_list.append(kwargs_params)
             priors_list.append(kwargs_priors)
             labels_list.append(kwargs_labels)
-        return params_list, priors_list, labels_list
+        return types, params_list, priors_list, labels_list
     
     def _parse_lens_profile(self, i, lines):
         redshift, redshift_prior, redshift_label = self._parse_redshift(i, lines[0])
