@@ -7,8 +7,11 @@
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
 
+from functools import partial
 import numpy as np
 import jax.numpy as jnp
+import jax
+from jax import jit, lax
 
 from herculens.MassModel.mass_model_base import MassModelBase
 
@@ -16,21 +19,39 @@ from herculens.MassModel.mass_model_base import MassModelBase
 __all__ = ['MassModel']
 
 
+def partial_alpha_static(
+        x, y,
+        alpha_list,
+        carry,
+        j
+    ):
+    f_x, f_y = carry
+    f_x_j, f_y_j = jax.lax.switch(j, alpha_list, x, y)
+    f_x = f_x + f_x_j
+    f_y = f_y + f_y_j
+    return (f_x, f_y), None
+
+
 class MassModel(MassModelBase):
     """An arbitrary list of lens models."""
-    def __init__(self, profile_list, **kwargs):
+    def __init__(self, profile_list, use_jax_scan=False, **kwargs):
         """Create a MassModel object.
 
         Parameters
         ----------
         profile_list : list of strings or profile instances
             List of mass profiles.
+        use_jax_scan : bool
+            If True, uses jax.lax.scan to evaluate deflection angles, which may speed up compilation and run time for a large number of mass profiles.
+        kwargs : dict
+            See docstring for MassModelBase.get_class_from_string()
         """
         if not isinstance(profile_list, (list, tuple)):
             # useful when using a single profile
             profile_list = [profile_list]
         self.profile_type_list = profile_list
         super().__init__(self.profile_type_list, **kwargs)
+        self._use_jax_scan = use_jax_scan
 
     def ray_shooting(self, x, y, kwargs, k=None):
         """
@@ -86,6 +107,7 @@ class MassModel(MassModelBase):
                 potential += func.function(x, y, **kwargs[i])
         return potential
 
+    # @partial(jit, static_argnums=(0, 4))
     def alpha(self, x, y, kwargs, k=None):
 
         """
@@ -102,7 +124,12 @@ class MassModel(MassModelBase):
         # y = np.array(y, dtype=float)
         if isinstance(k, int):
             return self.func_list[k].derivatives(x, y, **kwargs[k])
+        elif self._use_jax_scan:
+            return self._alpha_scan(x, y, kwargs, k=k)
+        else:
+            return self._alpha_loop(x, y, kwargs, k=k)
 
+    def _alpha_loop(self, x, y, kwargs, k=None):
         bool_list = self._bool_list(k)
         f_x, f_y = jnp.zeros_like(x), jnp.zeros_like(x)
         for i, func in enumerate(self.func_list):
@@ -110,6 +137,43 @@ class MassModel(MassModelBase):
                 f_x_i, f_y_i = func.derivatives(x, y, **kwargs[i])
                 f_x += f_x_i
                 f_y += f_y_i
+        return f_x, f_y
+
+    def _alpha_scan(self, x, y, kwargs, k=None):
+        """
+        Deflection angles using jax.lax.scan, which can lead to faster compilation time 
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: deflection angles in units of arcsec
+        """
+        # below is a solution for scanning over the profiles based on (credits to @krawczyk)
+        # list of alpha functions with keywords filled in
+        alpha_list = [
+            partial(
+                self.func_list[i].derivatives,
+                **kwargs[i],
+            ) for i in range(self._num_func)
+        ]
+
+        # recursive function with keywords filled in
+        partial_alpha = partial(
+            partial_alpha_static,
+            x, y,
+            alpha_list
+        )
+
+        # run recursion function
+        f_x, f_y = jnp.zeros_like(x), jnp.zeros_like(y)
+        (f_x, f_y), _ = lax.scan(
+            partial_alpha,
+            (f_x, f_y),
+            jnp.arange(self._num_func),
+        )
         return f_x, f_y
 
     def hessian(self, x, y, kwargs, k=None):
