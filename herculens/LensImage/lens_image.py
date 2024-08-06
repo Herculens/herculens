@@ -56,7 +56,7 @@ class LensImage(object):
 
         if lens_mass_model_class is None:
             from herculens.MassModel.mass_model import MassModel
-            lens_mass_model_class = MassModel(mass_model_list=[])
+            lens_mass_model_class = MassModel(profile_list=[])
         self.MassModel = lens_mass_model_class
         if self.MassModel.has_pixels:
             pixel_grid = self.Grid.create_model_grid(
@@ -65,7 +65,7 @@ class LensImage(object):
 
         if source_model_class is None:
             from herculens.LightModel.light_model import LightModel
-            source_model_class = LightModel(light_model_list=[])
+            source_model_class = LightModel(profile_list=[])
         self.SourceModel = source_model_class
         if self.SourceModel.has_pixels:
             pixel_grid = self.Grid.create_model_grid(
@@ -74,7 +74,7 @@ class LensImage(object):
 
         if lens_light_model_class is None:
             from herculens.LightModel.light_model import LightModel
-            lens_light_model_class = LightModel(light_model_list=[])
+            lens_light_model_class = LightModel(profile_list=[])
         self.LensLightModel = lens_light_model_class
         if self.LensLightModel.has_pixels:
             pixel_grid = self.Grid.create_model_grid(
