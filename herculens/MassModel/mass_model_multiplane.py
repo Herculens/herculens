@@ -98,18 +98,34 @@ class MPMassModel(object):
             self.ray_shooting(jnp.array([x]), jnp.array([y]), eta_flat, kwargs)
         ).T.squeeze()
 
-    def A_stack(self, x, y, eta_flat, kwargs):
+    def A_stack(self, x, y, eta_flat, kwargs, kind='auto'):
         '''Helper function that takes the jacobian of the ray shooting give *scaler*
         inputs for x and y and returns a 2x2 array.'''
-        return jnp.stack(
-            jax.jacfwd(
-                self.ray_shooting_slice,
-                argnums=(0, 1)
-            )(x, y, eta_flat, kwargs)
-        )
+        if kind == 'auto':
+            return jnp.stack(
+                jax.jacfwd(
+                    self.ray_shooting_slice,
+                    argnums=(0, 1)
+                )(x, y, eta_flat, kwargs)
+            )
+        elif kind == 'direct':
+            N = self.number_mass_planes
+            A = jnp.kron(jnp.eye(2), jnp.ones((N + 1, 1))).reshape(2, N + 1, 2)
+            xs, ys = self.ray_shooting(jnp.array([x]), jnp.array([y]), eta_flat, kwargs)
+            etas_t = self.base_eta.at[self.eta_idx].set(eta_flat)[:-1, :(N + 1)].T
+            for j in range(N):
+                hxx, hxy, hyx, hyy = self.mass_models[j].hessian(
+                    xs[j][0],
+                    ys[j][0],
+                    kwargs[j]
+                )
+                etas_j = etas_t[:, j:j + 1]
+                A_H = A[:, j, :] @ jnp.array([[hxx, hxy], [hyx, hyy]])
+                A = A - jnp.kron(A_H, etas_j).reshape(2, N + 1, 2)
+            return A
 
-    @partial(jax.jit, static_argnums=(0,))
-    def A(self, x, y, eta_flat, kwargs):
+    @partial(jax.jit, static_argnums=(0, 5))
+    def A(self, x, y, eta_flat, kwargs, kind='auto'):
         '''
         Area distortion matrix of the lens mapping.
 
@@ -128,6 +144,11 @@ class MPMassModel(object):
             the stack).
         kwargs: list of list 
             keyword arguments of lens model parameters matching the lens model classes
+        kind : str
+            either "auto" or "direct". Determines how the distortion matrix is
+            computed, "auto" will using automatic differentiation using using JAX's
+            `jaxfwd` function. "direct" will using the `hessian` method for each
+            mass plane. "auto" is typically faster and is the recommended method.
 
         Returns
         -------
@@ -139,23 +160,24 @@ class MPMassModel(object):
         A_stack_part = partial(
             self.A_stack,
             eta_flat=eta_flat,
-            kwargs=kwargs
+            kwargs=kwargs,
+            kind=kind
         )
         return jnp.moveaxis(jnp.vectorize(
             A_stack_part,
             signature='(),()->(i,j,i)'
         )(x, y), 3, 0)
 
-    def inverse_magnification(self, x, y, eta_flat, kwargs):
-        A = self.A(x, y, eta_flat, kwargs)
+    def inverse_magnification(self, x, y, eta_flat, kwargs, kind='auto'):
+        A = self.A(x, y, eta_flat, kwargs, kind=kind)
         return A[..., 0, 0] * A[..., 1, 1] - A[..., 0, 1] * A[..., 1, 0]
 
-    def kappa(self, x, y, eta_flat, kwargs):
-        A = self.A(x, y, eta_flat, kwargs)
+    def kappa(self, x, y, eta_flat, kwargs, kind='auto'):
+        A = self.A(x, y, eta_flat, kwargs, kind=kind)
         return 1 - 0.5 * (A[..., 0, 0] + A[..., 1, 1])
 
-    def gamma(self, x, y, eta_flat, kwargs):
-        A = self.A(x, y, eta_flat, kwargs)
+    def gamma(self, x, y, eta_flat, kwargs, kind='auto'):
+        A = self.A(x, y, eta_flat, kwargs, kind=kind)
         gamma1 = 0.5 * (A[..., 1, 1] - A[..., 0, 0])
         gamma2 = -A[..., 0, 1]
         return gamma1, gamma2
