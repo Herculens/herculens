@@ -101,9 +101,17 @@ class MPLightModel(object):
             plane (first index corresponds to light plane).
         kwargs_list : list
             List of lists of parameter dictionaries corresponding to each source model.
-        k : list, optional
-            List of position index of a single source model component for each light
-            plane.
+        pixel_x_coords, pixel_y_coords : array_like
+            Pixel position coordinate(s) for and adaptive grid based on arc masks.
+        k : list of list, optional
+            only evaluate the k-th light model (list of list of index values) for each light
+            plane, by default None
+
+        Returns
+        -------
+        array_like
+            Flux for each image plane in the lens system (first index of each corresponds to
+            light plane).
         '''
         k = self.k_expand(k)
         return jnp.stack([
@@ -117,7 +125,8 @@ class MPLightModel(object):
         ])
 
     def spatial_derivatives(self, x, y, kwargs_list, k=None):
-        '''Spatial derivatives of the source flux at a given position (along x and y directions).
+        '''Spatial derivatives of the source flux at a given position (along x and y directions)
+        for each light plane.
 
         Parameters
         ----------
@@ -126,9 +135,15 @@ class MPLightModel(object):
             plane (first index corresponds to light plane).
         kwargs_list : list
             List of lists of parameter dictionaries corresponding to each source model.
-        k : list, optional
-            List of position index of a single source model component for each light
-            plane.
+        list of list, optional
+            only evaluate the k-th light model (list of list of index values) for each light
+            plane, by default None
+
+        Returns
+        -------
+        array_like
+            Spatial derivatives of the source flux at a given position for each light plane
+            (first index of each corresponds to light plane).
         '''
         k = self.k_expand(k)
         results = []
