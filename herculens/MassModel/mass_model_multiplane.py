@@ -182,7 +182,7 @@ class MPMassModel(object):
         return jnp.moveaxis(jnp.vectorize(
             A_stack_part,
             signature='(),()->(i,j,i)'
-        )(x, y), 3, 0)
+        )(x, y), -2, 0)
 
     def inverse_magnification(self, x, y, eta_flat, kwargs, kind='auto'):
         '''Return the inverse magnification map for each plane of the lens
