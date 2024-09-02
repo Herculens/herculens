@@ -26,14 +26,22 @@ class MPMassModel(object):
         mass_model_kwargs : dictionary for settings related to PIXELATED
             profiles.
         '''
-        self.mp_profile_type_list = mp_mass_model_list
-        self.mass_models = []
-        self.number_mass_planes = len(self.mp_profile_type_list)
-        for mass_plane in self.mp_profile_type_list:
-            self.mass_models.append(MassModel(
-                mass_plane,
-                **mass_model_kwargs
-            ))
+        if all([isinstance(mm, str) for mm in mp_mass_model_list]):
+            self.mp_profile_type_list = mp_mass_model_list
+            self.mass_models = []
+            for mass_plane in self.mp_profile_type_list:
+                self.mass_models.append(MassModel(
+                    mass_plane,
+                    **mass_model_kwargs
+                ))
+        elif all([isinstance(mm, MassModel) for mm in mp_mass_model_list]):
+            self.mass_models = mp_mass_model_list
+            self.mp_profile_type_list = [mm.func_list for mm in self.mass_models]
+        else:
+            raise ValueError(
+                "MPMassModel needs to be initialized either with a list of lists of strings, "
+                "or directly with a list of (single plane) MassModel instances.")
+        self.number_mass_planes = len(self.mass_models)
         
         # Eta will be passed in flattened to `ray_shooting`, use these
         # index values to un-flatten it back into an array
