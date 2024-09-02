@@ -9,17 +9,25 @@ import numpy as np
 import jax.numpy as jnp
 from functools import partial
 from jax import jit
-from jax.tree_util import register_pytree_node_class
+from jax.tree_util import register_pytree_node, register_pytree_node_class
 
 from herculens.Util import util, param_util
+
+try:
+    from herculens.MassModel.Profiles.glee.piemd_jax import Piemd_GPU
+except ImportError:
+    raise ImportError("Please contact the author to use this dPIE profile "
+                        "as it depends on non-public libraries.")
 
 
 __all__ = [
     'DPIE_GLEE', 
+    'DPIE_GLEE_STATIC',
     'DPIE_PJAFFE',  # NOTE: the DPIE_PJAFFE is not well tested
 ]
 
 
+@register_pytree_node_class
 class DPIE_GLEE(object):
     """
     Dual pseudo isothermal elliptical (dPIE) mass profile, based on the
@@ -42,18 +50,26 @@ class DPIE_GLEE(object):
     upper_limit_default = {'theta_E': 10, 'r_core': 1e10, 'r_trunc': 1e10, 'q': 1., 'phi': +np.pi/2., 'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
     
-    def __init__(self, scale_flag=True):
-        self._r_soft = 1e-8
+    def __init__(self, r_soft=1e-8, scale_flag=True):
+        self._r_soft = r_soft
         self._dpie_flag = scale_flag # if True, theta_E corresponds to the Einstein radius of the profile
         self._piemd_flag = False
-        try:
-            from herculens.MassModel.Profiles.glee.piemd_jax import Piemd_GPU
-        except ImportError:
-            raise ImportError("Please contact the author to use this dPIE profile "
-                              "as it depends on non-public libraries.")
-        else:
-            self._piemd_cls = Piemd_GPU
+        self._piemd_cls = None
 
+    def tree_flatten(self):
+        children = (self._piemd_cls,)
+        aux_data = {
+            'r_soft': self._r_soft,
+            'scale_flag': self._dpie_flag,
+        }
+        return (children, aux_data)
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        # return cls(*children, **aux_data)
+        return cls(**aux_data)
+    
+    @jit
     def function(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -69,12 +85,13 @@ class DPIE_GLEE(object):
         :return: alpha_x, alpha_y
         """
         piemd = self._get_piemd(x, y)
-        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._piemd_flag)
-        f_w = piemd._potential(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
-        f_s = piemd._potential(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
+        f_w = piemd._potential(center_x, center_y, q, phi, theta_E_scl, w, False)
+        f_s = piemd._potential(center_x, center_y, q, phi, theta_E_scl, s, False)
         f = f_w - f_s
         return f.reshape(*x.shape)
 
+    @jit
     def derivatives(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -91,12 +108,13 @@ class DPIE_GLEE(object):
         """
         piemd = self._get_piemd(x, y)
         theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
-        f_x_w, f_y_w = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
-        f_x_s, f_y_s = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        f_x_w, f_y_w = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, w, False)
+        f_x_s, f_y_s = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, s, False)
         f_x = f_x_w - f_x_s
         f_y = f_y_w - f_y_s
         return f_x.reshape(*x.shape), f_y.reshape(*y.shape)
     
+    @jit
     def hessian(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -113,15 +131,17 @@ class DPIE_GLEE(object):
         """
         piemd = self._get_piemd(x, y)
         theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
-        f_xx_w, f_yy_w, f_xy_w = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
-        f_xx_s, f_yy_s, f_xy_s = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        f_xx_w, f_yy_w, f_xy_w = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, w, False)
+        f_xx_s, f_yy_s, f_xy_s = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, s, False)
         f_xx = f_xx_w - f_xx_s
         f_yy = f_yy_w - f_yy_s
         f_xy = f_xy_w - f_xy_s
         return f_xx.reshape(*x.shape), f_yy.reshape(*y.shape), f_xy.reshape(*y.shape)
     
+    @jit
     def _param_conv(self, theta_E, r_core, r_trunc, scale_flag):
-        w, s = self._check_radii(r_core, r_trunc)
+        w, s = r_core, r_trunc
+        # w, s = self._check_radii(r_core, r_trunc)
         w2 = w**2
         s2 = s**2
         if scale_flag is True:
@@ -131,20 +151,25 @@ class DPIE_GLEE(object):
             theta_E_scaled = theta_E * s2 / (s2 - w2)
         return theta_E_scaled, w, s
     
-    def _check_radii(self, w, s):
-        # make sure the core radius parameters do not go below some small value for numerical stability
-        w = jnp.where(w < self._r_soft, self._r_soft, w)
-        # NOTE: the following swap of values *may* cause issues with JAX autodiff
-        w_ = jnp.where(s < w, s, w)
-        s_ = jnp.where(s < w, w, s)
-        return w_, s_
+    # @jit
+    # def _check_radii(self, w, s):
+    #     # make sure the core radius parameters do not go below some small value for numerical stability
+    #     w = jnp.where(w < self._r_soft, self._r_soft, w)
+    #     # NOTE: the following swap of values *may* cause issues with JAX autodiff
+    #     w_ = jnp.where(s < w, s, w)
+    #     s_ = jnp.where(s < w, w, s)
+    #     return w_, s_
     
+    @jit
     def _get_piemd(self, x, y):
         # NOTE: first 4 arguments of Piemd_GPU do not matter for our use, so we give zeros
         return self._piemd_cls(0., 0., 0., 0., xx=x, yy=y)
 
+    @staticmethod
+    def _get_piemd(x, y):
+        return Piemd_GPU(0., 0., 0., 0., xx=x, yy=y)
 
-# @register_pytree_node_class
+
 class DPIE_GLEE_STATIC(object):
     """
     Dual pseudo isothermal elliptical (dPIE) mass profile, based on the
@@ -170,28 +195,12 @@ class DPIE_GLEE_STATIC(object):
     def __init__(self, scale_flag=True):
         self._r_soft = 1e-8
         self._dpie_flag = scale_flag # if True, theta_E corresponds to the Einstein radius of the profile
-        self._piemd_flag = False
-        try:
-            from herculens.MassModel.Profiles.glee.piemd_jax import Piemd_GPU
-        except ImportError:
-            raise ImportError("Please contact the author to use this dPIE profile "
-                              "as it depends on non-public libraries.")
-        else:
-            self._piemd_cls = Piemd_GPU
+        self._piemd = None
 
     def set_eval_coord_grid(self, x, y):
-        self._piemd = self._piemd_cls(0., 0., 0., 0., xx=x, yy=y)
+        self._piemd = Piemd_GPU(0., 0., 0., 0., xx=x, yy=y)
 
-    # def tree_flatten(self):
-    #     children = (self._piemd_cls,)
-    #     aux_data = (self._r_soft, self._dpie_flag, self._piemd_flag)
-    #     return (children, aux_data)
-
-    # @classmethod
-    # def tree_unflatten(cls, _, children):
-    #     return cls(*children)
-
-
+    @jit
     def function(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -206,13 +215,14 @@ class DPIE_GLEE_STATIC(object):
         :param center_y: profile center
         :return: alpha_x, alpha_y
         """
-        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._piemd_flag)
-        f_w = self._piemd._potential(center_x, center_y, q, phi, theta_E_scl, w, self._self._piemd_flag)
-        f_s = self._piemd._potential(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
+        f_w = self._piemd._potential(center_x, center_y, q, phi, theta_E_scl, w, flags=False)
+        f_s = self._piemd._potential(center_x, center_y, q, phi, theta_E_scl, s, flags=False)
         f = f_w - f_s
         return f.reshape(*x.shape)
 
     # @partial(jit, static_argnums=(0, 1, 2))
+    @jit
     def derivatives(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -228,12 +238,13 @@ class DPIE_GLEE_STATIC(object):
         :return: alpha_x, alpha_y
         """
         theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
-        f_x_w, f_y_w = self._piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
-        f_x_s, f_y_s = self._piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        f_x_w, f_y_w = self._piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, w, flags=False)
+        f_x_s, f_y_s = self._piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, s, flags=False)
         f_x = f_x_w - f_x_s
         f_y = f_y_w - f_y_s
         return f_x.reshape(*x.shape), f_y.reshape(*y.shape)
     
+    @jit
     def hessian(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -249,8 +260,8 @@ class DPIE_GLEE_STATIC(object):
         :return: alpha_x, alpha_y
         """
         theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
-        f_xx_w, f_yy_w, f_xy_w = self._piemd._hessian(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
-        f_xx_s, f_yy_s, f_xy_s = self._piemd._hessian(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
+        f_xx_w, f_yy_w, f_xy_w = self._piemd._hessian(center_x, center_y, q, phi, theta_E_scl, w, flags=False)
+        f_xx_s, f_yy_s, f_xy_s = self._piemd._hessian(center_x, center_y, q, phi, theta_E_scl, s, flags=False)
         f_xx = f_xx_w - f_xx_s
         f_yy = f_yy_w - f_yy_s
         f_xy = f_xy_w - f_xy_s
@@ -276,7 +287,25 @@ class DPIE_GLEE_STATIC(object):
     #     w_ = jnp.where(s < w, s, w)
     #     s_ = jnp.where(s < w, w, s)
     #     return w_, s_
-    
+
+def flatten_func(self):
+    children = (self._piemd,)
+    aux_data = {
+        'r_soft': self._r_soft,
+        'scale_flag': self._dpie_flag,
+    }
+    return (children, aux_data)
+
+def unflatten_func(aux_data, children):
+    # Here we avoid `__init__` because it has extra logic we don't require:
+    obj = object.__new__(DPIE_GLEE_STATIC)
+    obj._piemd = children[0]
+    obj._r_soft = aux_data['r_soft']
+    obj._dpie_flag = aux_data['scale_flag']
+    return obj
+
+register_pytree_node(DPIE_GLEE_STATIC, flatten_func, unflatten_func)
+
 
 class DPIE_PJAFFE(object):
     """
