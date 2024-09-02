@@ -109,6 +109,18 @@ class LensImage(object):
 
         self.kwargs_lens_equation_solver = kwargs_lens_equation_solver
 
+    # WIP
+    def set_static_model_grid(self):
+        ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
+        for j in range(self.MassModel._num_func):
+            profile = self.MassModel.func_list[j]
+            if hasattr(profile, 'set_eval_coord_grid'):
+                profile.set_eval_coord_grid(
+                    ra_grid_img.reshape(*self.ImageNumerics._grid.num_grid_points_axes),
+                    dec_grid_img.reshape(*self.ImageNumerics._grid.num_grid_points_axes),
+                )
+                print(f"Set static coordinate grid for profile {j}")
+
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, supersampled=False,
                                   de_lensed=False, k=None, k_lens=None):
@@ -312,9 +324,11 @@ class LensImage(object):
         # get data coordinates
         x_grid_img, y_grid_img = self.Grid.pixel_coordinates
         # ray-shoot to source plane only coordinates within the source arc mask
-        x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img[self._src_arc_mask_bool], 
-                                                             y_grid_img[self._src_arc_mask_bool], 
+        x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img, #[self._src_arc_mask_bool], 
+                                                             y_grid_img, #[self._src_arc_mask_bool], 
                                                              kwargs_lens, k=k_lens)
+        x_grid_src = x_grid_src[self._src_arc_mask_bool]
+        y_grid_src = y_grid_src[self._src_arc_mask_bool]
         # create grid encompassed by ray-shot coordinates
         x_left, x_right = x_grid_src.min(), x_grid_src.max()
         y_bottom, y_top = y_grid_src.min(), y_grid_src.max()
