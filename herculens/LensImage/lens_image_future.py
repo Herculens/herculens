@@ -39,8 +39,6 @@ class LensImage(MPLensImage):
         """
         WIP
         """
-        if point_source_model_class is not None:
-            raise NotImplementedError
         mp_mass_model_list = [lens_mass_model_class.func_list]  # single mass plane
         mp_mass_model_class = MPMassModel(mp_mass_model_list)
         mp_light_model_list = []
@@ -72,6 +70,30 @@ class LensImage(MPLensImage):
             kwargs_numerics=kwargs_numerics
         )
         self._eta_flat_fixed = np.array([1.])  # this is fixed in single lens plane mode
+
+        # the following attributes are to mimick the original implementation of LensImage
+        self.MassModel = lens_mass_model_class
+        self.LensLightModel = lens_light_model_class
+        self.SourceModel = source_model_class  # in single plane there is 1 source model
+        if point_source_model_class is not None:
+            raise NotImplementedError("Point source are not implemented in this class yet")
+        else:
+            from herculens.PointSourceModel.point_source_model import PointSourceModel
+            point_source_model_class = PointSourceModel(
+                point_source_type_list=[], mass_model=lens_mass_model_class,
+            )
+        self.PointSourceModel = point_source_model_class
+
+    # WIP
+    def set_static_model_grid(self):
+        ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
+        for i in range(self.MPMassModel.number_mass_planes):
+            for j in range(self.MPMassModel.mass_models[i]._num_func):
+                profile = self.MPMassModel.mass_models[i].func_list[j]
+                if hasattr(profile, 'set_eval_coord_grid'):
+                    profile.set_eval_coord_grid(ra_grid_img, dec_grid_img)
+                    print(f"Set static coordinate grid for profile {j} in mass plane {i}")
+            
 
     @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13))
     def model(self, kwargs_lens=None, kwargs_source=None, kwargs_lens_light=None,
@@ -151,21 +173,6 @@ class LensImage(MPLensImage):
     #         source_light = self.ImageNumerics.re_size_convolve(
     #             source_light, unconvolved=unconvolved)
     #     return source_light
-    
-    # def eval_source_surface_brightness(self, x, y, kwargs_source, kwargs_lens=None, 
-    #                                    k=None, k_lens=None, de_lensed=False):
-    #     if self._src_adaptive_grid:
-    #         pixels_x_coord, pixels_y_coord, _ = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens)
-    #     else:
-    #         pixels_x_coord, pixels_y_coord = None, None  # fall back on fixed, user-defined coordinates
-    #     if de_lensed is True:
-    #         source_light = self.SourceModel.surface_brightness(x, y, kwargs_source, k=k,
-    #                                                            pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
-    #     else:
-    #         x_grid_src, y_grid_src = self.MassModel.ray_shooting(x, y, kwargs_lens, k=k_lens)
-    #         source_light = self.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source, k=k,
-    #                                                            pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
-    #     return source_light
 
     # def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False,
     #                             supersampled=False, k=None):
@@ -207,3 +214,118 @@ class LensImage(MPLensImage):
     #         )
     #     return result
 
+    # def adapt_source_coordinates(self, kwargs_lens, k_lens=None, return_plt_extent=False):
+    #     # NOTE: despite the keyword name, this does *NOT* return the extent
+    #     # as expected from pyplot routines! # TODO: fix this
+    #     if k_lens is not None:
+    #         raise NotImplementedError("k_lens != None not implemented in new LensImage class.")
+    #     ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
+    #     kwargs_mass = [kwargs_lens]  # wraps the single mass model for multiplane conventions
+    #     ra_grid_planes, dec_grid_planes = self.MPMassModel.ray_shooting(
+    #         ra_grid_img,
+    #         dec_grid_img,
+    #         eta_flat,
+    #         kwargs_mass
+    #     )
+    #     x_coord_list, y_coord_list, extent_list = super().adapt_source_coordinates(
+    #         ra_grid_planes, 
+    #         dec_grid_planes,
+    #         force=False,
+    #         npix_src=100,  # not used when force=False
+    #         source_grid_scale=1.0  # TODO: implement this
+    #     )
+    #     # extract the source as the last light model in multiplane conventions
+    #     x_coord, y_coord, extent = x_coord_list[-1], y_coord_list[-1], extent_list[-1]
+    #     return (x_coord, y_coord, extent)
+
+    def get_source_coordinates(self, kwargs_lens, k_lens=None, return_plt_extent=False):
+        """
+        WARNING: this does not return the same array shape as the super() class!
+        This function returns 2D 'mesh-gridded' arrays so they can be used by
+        the plotting routines, and is consistent with the output of the 
+        implementation in the original LensImage class.
+        """
+        if k_lens is not None:
+            raise NotImplementedError("k_lens != None not implemented in new LensImage class.")
+        # NOTE: despite the keyword name, this does *NOT* return the extent
+        # as expected from pyplot routines! # TODO: fix this 
+        kwargs_mass = [kwargs_lens]  # wraps the single mass model for multiplane conventions
+        x_coord_list, y_coord_list, extent_list = super().get_source_coordinates(
+            self._eta_flat_fixed,
+            kwargs_mass,
+            force=False,
+            npix_src=100,  # not used when force=False
+            source_grid_scale=1.0  # TODO: implement this
+        )
+        # extract the source as the last light model in multiplane conventions
+        x_coord, y_coord, extent = x_coord_list[-1], y_coord_list[-1], extent_list[-1]
+        # generate the 2D coordinates grid
+        x_grid, y_grid = np.meshgrid(x_coord, y_coord)
+        return (x_grid, y_grid, extent)
+
+    def eval_source_surface_brightness(self, x, y, kwargs_source, kwargs_lens=None, 
+                                       k=None, k_lens=None, de_lensed=False):
+        # pixels_x_coord, pixels_y_coord, _ = self.adapt_source_coordinates(
+        #     kwargs_lens, k_lens=k_lens,
+        # )
+
+        if k_lens is not None:
+            raise NotImplementedError("k_lens != None not implemented in new LensImage class.")
+
+        ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
+        kwargs_mass = [kwargs_lens]  # wraps the single mass model for multiplane conventions
+        ra_grid_planes, dec_grid_planes = self.MPMassModel.ray_shooting(
+            ra_grid_img,
+            dec_grid_img,
+            self._eta_flat_fixed,
+            kwargs_mass
+        )
+        x_coord_list, y_coord_list, _ = super().adapt_source_coordinates(
+            ra_grid_planes, 
+            dec_grid_planes,
+            force=False,
+            npix_src=100,  # not used when force=False
+            source_grid_scale=1.0  # TODO: implement this
+        )
+        # extract the source as the last light model in multiplane conventions
+        pixels_x_coord, pixels_y_coord = x_coord_list[-1], y_coord_list[-1]
+
+        if de_lensed is True:
+            source_light = self.SourceModel.surface_brightness(x, y, kwargs_source, k=k,
+                                                               pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
+        else:
+            kwargs_mass = [kwargs_lens]
+            x_grid_src, y_grid_src = self.MPMassModel.ray_shooting(x, y, kwargs_mass, k=k_lens)
+            source_light = self.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source, k=k,
+                                                               pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
+        return source_light
+
+    def normalized_residuals(self, data, model, mask=None):
+        """
+        compute the map of normalized residuals,
+        given the data and the model image
+        """
+        if mask is None:
+            mask = np.ones(self.Grid.num_pixel_axes)
+        noise_var = self.Noise.C_D_model(model)
+        noise = np.sqrt(noise_var)
+        norm_res_model = (data - model) / noise * mask
+        norm_res_tot = norm_res_model
+        if mask is not None:
+            # outside the mask just add pure data
+            norm_res_tot += (data / noise) * (1. - mask)
+        # make sure there is no NaN or infinite values
+        norm_res_model = np.where(np.isfinite(norm_res_model), norm_res_model, 0.)
+        norm_res_tot = np.where(np.isfinite(norm_res_tot), norm_res_tot, 0.)
+        return norm_res_model, norm_res_tot
+
+    def reduced_chi2(self, data, model, mask=None):
+        """
+        compute the reduced chi2 of the data given the model
+        """
+        if mask is None:
+            mask = np.ones(self.Grid.num_pixel_axes)
+        norm_res, _ = self.normalized_residuals(data, model, mask=mask)
+        num_data_points = np.sum(mask)
+        return np.sum(norm_res**2) / num_data_points
+        
