@@ -39,8 +39,8 @@ class LensImage(MPLensImage):
         """
         WIP
         """
-        mp_mass_model_list = [lens_mass_model_class.func_list]  # single mass plane
-        mp_mass_model_class = MPMassModel(mp_mass_model_list)
+        # mp_mass_model_list = [lens_mass_model_class.func_list]  # single mass plane
+        mp_mass_model_class = MPMassModel([lens_mass_model_class])  # TODO: do the same with LightModels below (i.e. give directly the class, not the strings)
         mp_light_model_list = []
         light_model_kwargs = []
         if lens_light_model_class is not None:
