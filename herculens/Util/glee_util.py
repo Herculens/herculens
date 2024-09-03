@@ -71,7 +71,7 @@ class GLEEReader(object):
     def lens_redshifts(self):
         redshifts = [p['z'] for p in self.lens_parameters]
         redshifts_priors = [p['z'] for p in self.lens_priors]
-        return self._lens_redshifts
+        return redshifts, redshifts_priors
     
     @property
     def lens_profiles(self):
