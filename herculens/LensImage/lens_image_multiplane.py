@@ -28,24 +28,36 @@ class MPLensImage(object):
         conjugate_points=None,
         kwargs_numerics=None
     ):
-        """
-        :param grid_class: coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
-        :param psf_class: point spread function, instance of PSF() from herculens.Instrument.psf
-        :param noise_class: noise properties, instance of Noise() from herculens.Instrument.noise
-        :param mass_model_class: multi-plane mass model, instance of MPMassModel() from
+        '''Generate a multi-plane lensed images from source light, lens mass/light, and point source models.
+
+        Parameters
+        ----------
+        grid_class : PixelGrid
+            coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
+        psf_class : PSF
+            point spread function, instance of PSF() from herculens.Instrument.psf
+        noise_class : Noise
+            noise properties, instance of Noise() from herculens.Instrument.noise
+        mass_model_class : MPMassModel
+            multi-plane mass model, instance of MPMassModel() from
             herculens.MassModel.mass_model_multiplane
-        :param light_model_class: multi-plane light model, instance of MPLightModel() from
+        light_model_class : MPLightModel
+            multi-plane light model, instance of MPLightModel() from
             herculens.LightModel.light_model_multiplane
-        :param source_arc_masks: list of 2D boolean array to define the region over which the
-            (pixelated) lensed source is modeled, one for each plane
-        :param source_grid_scale: a float between 0 and 1 indicating a global scale factor for
-            pixelated grids (e.g. 0.5 will set the pixel grid to be 50% the extent defined by
-            the arc mask traced back to the source plane)
-        :conjugate_points: a list of list of points that can be traced back to each plane
-            with the `MPLensImage.trace_conjugate_points` method
-        :param kwargs_numerics: keyword arguments for various numerical settings (see
-            herculens.Numerics.numerics)
-        """
+        source_arc_masks : List of array_like, optional
+            list of 2D boolean array to define the region over which the
+            (pixelated) lensed source is modeled, one for each plane, by default None
+        source_grid_scale : float, optional
+            a float between 0 and 1 indicating a global scale factor for pixelated grids
+            (e.g. 0.5 will set the pixel grid to be 50% the extent defined by the arc mask
+            traced back to the source plane), by default None
+        conjugate_points : list of lists, optional
+            a list of lists of arrays that can be traced back to each plane
+            with the `MPLensImage.trace_conjugate_points` method, by default None
+        kwargs_numerics : dict, optional
+            keyword arguments for various numerical settings (see herculens.Numerics.numerics),
+            by default None
+        '''
         self.Grid = grid_class
         self.PSF = psf_class
         self.Noise = noise_class
@@ -132,6 +144,46 @@ class MPLensImage(object):
         k_planes=None,
         return_pixel_scale=False
     ):
+        '''Create the 2D model image from the parameter values.  Note: due to JIT compilation,
+        the first call to this method will be slower.
+
+        Parameters
+        ----------
+        eta_flat : jax.numpy array
+            upper triangular elements of eta matrix, values defined as
+            eta_ij = D_ij D_i+1 / D_j D_ii+1 where D_ij is the angular diameter
+            distance between redshifts i and j. Only include values where
+            j > i+1. This convention implies that all einstein radii are defined
+            with respect to the **next** mass plane back (**not** the last plane in
+            the stack).
+        kwargs_mass : list of list
+            List of lists of parameter dictionaries of lens mass model parameters
+            corresponding to each mass plane.
+        kwargs_light : list of list
+            List of lists of parameter dictionaries corresponding to each light plane.
+        supersampled : bool, optional
+            If True returns the unconvolved model on the higher resolution grid, by default False
+        k_mass : list of list, optional
+            Only evaluate the k-th mass model (list of list of index values) for each mass
+            plane, by default None
+        k_light : list of list, optional
+            Only evaluate the k-th light model (list of list of index values) for each light
+            plane, by default None
+        k_planes : list, optional
+            List of light plane index values to include in the output, by default None
+        return_pixel_scale : bool, optional
+            If True returns the pixel scale (arcsec/pixel) of each source plane, by default False.
+            Note: requites and pixelated adaptive source grid to be used.
+
+        Returns
+        -------
+        model : jax.numpy array
+            The 2D model image for the lens system
+        pixel_scale : list, optional
+            The pixel scale (arcsec/pixel) of each source plane, by default False.
+            Note: requites and pixelated adaptive source grid to be used and have `return_pixel_scale`
+            set to True.
+        '''
         ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
 
         # pixel grid positions on each mass plane (including the lens plane)
@@ -219,6 +271,10 @@ class MPLensImage(object):
 
     @partial(jax.jit, static_argnums=(0, 3, 4))
     def trace_conjugate_points(self, eta, kwargs_mass, N=1, k_mass=None):
+        '''
+        Helper function that can be used to ray-trace the list of conjugate points
+        provided to the class on initialization to their corresponding source planes.
+        '''
         i = N - 1
         if self.conjugate_points[i] is not None:
             x, y = self.conjugate_points[i].T
@@ -234,6 +290,32 @@ class MPLensImage(object):
             return None
 
     def mask_extent(self, x_grid_src, y_grid_src, npix_src, source_grid_scale):
+        '''Calculate the extent of an arc mask in it's source plane.
+
+        Parameters
+        ----------
+        x_grid_src : jax.numpy array
+            x positions of the arc mask in it's source plane
+        y_grid_src : jax.numpy array
+            y positions of the arc mask in it's source plane
+        npix_src : int
+            Number of pixels in the source plane
+        source_grid_scale : float
+            A float between 0 and 1 indicating a global scale factor for the grid extent
+            (e.g. 0.5 will set the pixel grid to be 50% the extent defined by the arc mask
+            traced back to the source plane)
+
+        Returns
+        -------
+        x_adapt : jax.numpy array
+            Positions of each x-pixel in the source plane corresponding to the smallest
+            square grid that contains the arc mask with the result scaled by `source_grid_scale`.
+        y_adapt : jax.numpy array
+            Positions of each y-pixel in the source plane corresponding to the smallest
+            square grid that contains the arc mask with the result scaled by `source_grid_scale`.
+        extent : list
+            The bounds of the adaptive grid
+        '''
         # create grid encompassed by ray-traced coordinates
         x_left, x_right = x_grid_src.min(), x_grid_src.max()
         y_bottom, y_top = y_grid_src.min(), y_grid_src.max()
@@ -264,6 +346,34 @@ class MPLensImage(object):
         npix_src=100,
         source_grid_scale=1
     ):
+        '''Calculate the extent of all arc mask in each of their source planes.
+
+        Parameters
+        ----------
+        ra_grid_planes, dec_grid_planes : jax.numpy array
+            All observed (supersampled) grid traced back to each plane (this will be masked down
+            to each arc mask internally to avoid needing to re-calculate the ray shooting).
+        force : bool, optional
+            If True calculate the adaptive grid position even if no adaptive pixel grids
+            are being used in the current model (useful for plotting), by default False.
+        npix_src : int, optional
+            The size of the adaptive grid to make, by default 100
+        source_grid_scale : float, optional
+            A float between 0 and 1 indicating a global scale factor for the grid extent
+            (e.g. 0.5 will set the pixel grid to be 50% the extent defined by the arc mask
+            traced back to the source plane), by default 1.
+
+        Returns
+        -------
+        x_adapt : jax.numpy array
+            Positions of each x-pixel in the source plane corresponding to the smallest
+            square grid that contains the arc mask with the result scaled by `source_grid_scale`.
+        y_adapt : jax.numpy array
+            Positions of each y-pixel in the source plane corresponding to the smallest
+            square grid that contains the arc mask with the result scaled by `source_grid_scale`.
+        extent : list
+            The bounds of the adaptive grid
+        '''
         x_adapt = []
         y_adapt = []
         extent_adapt = []
@@ -297,6 +407,41 @@ class MPLensImage(object):
         npix_src=100,
         source_grid_scale=1.0
     ):
+        '''Calculate the adaptive source coordinates give `eta_flat` and `kwargs_mass`.
+
+        Parameters
+        ----------
+        eta_flat : jax.numpy array
+            upper triangular elements of eta matrix, values defined as
+            eta_ij = D_ij D_i+1 / D_j D_ii+1 where D_ij is the angular diameter
+            distance between redshifts i and j. Only include values where
+            j > i+1. This convention implies that all einstein radii are defined
+            with respect to the **next** mass plane back (**not** the last plane in
+            the stack).
+        kwargs_mass : list of list
+            List of lists of parameter dictionaries of lens mass model parameters
+            corresponding to each mass plane.
+        force : bool, optional
+            If True calculate the adaptive grid position even if no adaptive pixel grids
+            are being used in the current model (useful for plotting), by default False.
+        npix_src : int, optional
+            The size of the adaptive grid to make, by default 100
+        source_grid_scale : float, optional
+            A float between 0 and 1 indicating a global scale factor for the grid extent
+            (e.g. 0.5 will set the pixel grid to be 50% the extent defined by the arc mask
+            traced back to the source plane), by default 1.
+
+        Returns
+        -------
+        x_adapt : jax.numpy array
+            Positions of each x-pixel in the source plane corresponding to the smallest
+            square grid that contains the arc mask with the result scaled by `source_grid_scale`.
+        y_adapt : jax.numpy array
+            Positions of each y-pixel in the source plane corresponding to the smallest
+            square grid that contains the arc mask with the result scaled by `source_grid_scale`.
+        extent : list
+            The bounds of the adaptive grid
+        '''
         ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
         ra_grid_planes, dec_grid_planes = self.MPMassModel.ray_shooting(
             ra_grid_img,
