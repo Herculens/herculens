@@ -19,7 +19,13 @@ from herculens.MassModel.mass_model_base import MassModelBase
 __all__ = ['MassModel']
 
 
-def partial_alpha_static(
+def alpha_static_single(
+        x, y, alpha_func,
+    ):
+    return partial(alpha_func, x, y)
+
+# @partial(jit, static_argnums=(0, 4))
+def alpha_static_for_scan(
         x, y,
         alpha_list,
         carry,
@@ -52,7 +58,16 @@ class MassModel(MassModelBase):
         self.profile_type_list = profile_list
         super().__init__(self.profile_type_list, **kwargs)
         self._use_jax_scan = use_jax_scan
+        first_profile = self.profile_type_list[0]
+        self._single_profile_mode = (
+            all(p == first_profile for p in self.profile_type_list) and 
+            all(type(p) is type(first_profile) for p in self.profile_type_list)
+        )
+        if self._single_profile_mode:
+            print("Single profile mode in MassModel.")
+        # self._single_profile_mode = False
 
+    @partial(jit, static_argnums=(0, 4))
     def ray_shooting(self, x, y, kwargs, k=None):
         """
         maps image to source position (inverse deflection)
@@ -78,7 +93,6 @@ class MassModel(MassModelBase):
         :param kwargs_lens: list of keyword arguments of lens model parameters matching the lens model classes
         :return: fermat potential in arcsec**2 without geometry term (second part of Eqn 1 in Suyu et al. 2013) as a list
         """
-
         potential = self.potential(x_image, y_image, kwargs_lens, k=k)
         if x_source is None or y_source is None:
             x_source, y_source = self.ray_shooting(x_image, y_image, kwargs_lens, k=k)
@@ -124,10 +138,24 @@ class MassModel(MassModelBase):
         # y = np.array(y, dtype=float)
         if isinstance(k, int):
             return self.func_list[k].derivatives(x, y, **kwargs[k])
+        elif self._single_profile_mode:
+            return self._alpha_single(x, y, kwargs, k=k)
         elif self._use_jax_scan:
             return self._alpha_scan(x, y, kwargs, k=k)
         else:
             return self._alpha_loop(x, y, kwargs, k=k)
+
+    def _alpha_single(self, x, y, kwargs, k=None):
+        # TODO: implement case with k not None
+        if k is not None:
+            raise NotImplementedError
+        alpha_func = alpha_static_single(x, y, self.func_list[0].derivatives)
+        return jnp.sum(
+            jnp.array([
+                alpha_func(**kwargs[i]) for i in range(self._num_func)
+            ]),
+            axis=0,
+        )
 
     def _alpha_loop(self, x, y, kwargs, k=None):
         bool_list = self._bool_list(k)
@@ -162,7 +190,7 @@ class MassModel(MassModelBase):
 
         # recursive function with keywords filled in
         partial_alpha = partial(
-            partial_alpha_static,
+            alpha_static_for_scan,
             x, y,
             alpha_list
         )
