@@ -22,7 +22,7 @@ from herculens.LensImage.lensing_operator import LensingOperator
 
 __all__ = [
     'LensImage', 
-    'LensImage3D',  # TODO: to implement
+    # 'LensImage3D',  # TODO: to implement
 ]
 
 
@@ -33,7 +33,7 @@ class LensImage(MPLensImage):
                  noise_class=None, lens_mass_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
                  point_source_model_class=None, 
-                 source_arc_mask=None,
+                 source_arc_mask=None, source_grid_scale=None,
                  kwargs_numerics=None,
                  kwargs_lens_equation_solver=None):
         """
@@ -65,7 +65,7 @@ class LensImage(MPLensImage):
             mp_mass_model_class,
             mp_light_model_class,
             source_arc_masks=[None, source_arc_mask],  # no mask for lens light plane
-            source_grid_scale=None, # TODO
+            source_grid_scale=[None, source_grid_scale],  # no grid scale for lens light
             conjugate_points=None,  # TODO
             kwargs_numerics=kwargs_numerics
         )
@@ -255,7 +255,7 @@ class LensImage(MPLensImage):
             kwargs_mass,
             force=False,
             npix_src=100,  # not used when force=False
-            source_grid_scale=1.0  # TODO: implement this
+            source_grid_scale=self._source_grid_scale[-1], 
         )
         # extract the source as the last light model in multiplane conventions
         x_coord, y_coord, extent = x_coord_list[-1], y_coord_list[-1], extent_list[-1]
@@ -285,7 +285,7 @@ class LensImage(MPLensImage):
             dec_grid_planes,
             force=False,
             npix_src=100,  # not used when force=False
-            source_grid_scale=1.0  # TODO: implement this
+            source_grid_scale=self._source_grid_scale[-1], 
         )
         # extract the source as the last light model in multiplane conventions
         pixels_x_coord, pixels_y_coord = x_coord_list[-1], y_coord_list[-1]
