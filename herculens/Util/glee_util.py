@@ -2,7 +2,7 @@
 
 __author__ = 'aymgal'
 
-
+import numpy as np
 from pprint import pprint
 
 
@@ -126,7 +126,37 @@ class GLEEReader(object):
         if not hasattr(self, '_ptl_src_errors'):
             self._raise_parser_run_error()
         return self._ptl_src_errors
+    
+    def point_like_source_group_indices(self):
+        """Return a list of lists containing indices of point-like sources
+        which have the redshift, order by increasing redshift.
+        For instance: [
+            [redshift1_index1, redshift1_index2],  # redshift 1
+            [redshift2_index1],  # redshift 2
+            [redshift3_index1, redshift3_index2, redshift3_index3],  # redshift 3
+            ...
+        ]
 
+        Returns
+        -------
+        list
+            List lists of integers
+        """
+        redshifts = np.array(self.point_like_source_redshifts[0])
+        iter_indices = np.argsort(redshifts)
+        group_indices = [
+            [iter_indices[0]]
+        ]
+        unique_redshifts = [redshifts[iter_indices[0]]]
+        for i in iter_indices[1:]:
+            z_current = redshifts[i]
+            z_prev = redshifts[i-1]
+            if z_current != z_prev:
+                group_indices.append([])
+                unique_redshifts.append(z_current)
+            group_indices[-1].append(i)
+        return unique_redshifts, group_indices
+    
     @property
     def extended_source_redshifts(self):
         redshifts = [p['z'] for p in self.extended_source_parameters]
@@ -231,7 +261,8 @@ class GLEEReader(object):
         model_component_blocks, _ = self._extract_blocks(
             content, ['z'], with_duplicates=True,  # we extract the block that starts with z
         )
-        assert num_components == len(model_component_blocks), f"Inconsistent number of point-like sources ('{component_type}')"
+        assert (num_components == len(model_component_blocks), 
+                f"Inconsistent number of point-like sources ('{component_type}')")
         return self._parse_all_point_like_sources(model_component_blocks)
 
     def _parse_all_point_like_sources(self, blocks):
