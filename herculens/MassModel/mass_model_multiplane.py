@@ -306,3 +306,52 @@ class MPMassModel(object):
         gamma1 = 0.5 * (A[..., 1, 1] - A[..., 0, 0])
         gamma2 = -A[..., 0, 1]
         return gamma1, gamma2
+
+    @staticmethod
+    def build_eta_matrix(cosmology, redshift_list, return_also_full=True):
+        """Utility function to build the eta matrix with the right conventions
+        for use in a multi-plane lens model.
+
+        Parameters
+        ----------
+        cosmology : Astropy cosmology
+            Instance of an Astropy cosmology (e.g. `LambdaCDM`).
+        redshift_list : list or ndarray
+            List or 1D array containing the redshift for each plane, starting 
+            from the lowest redshift one.
+        return_also_full : bool
+            If True, returns also the full matrix which includes
+            trivial elements of the matrix (0s and 1s). Default is False.
+        """
+        np.testing.assert_equal(np.sort(redshift_list), redshift_list)
+        num_tot_planes = len(redshift_list)
+        num_mass_planes = num_tot_planes - 1
+        eta_flat = []
+        for i in range(num_tot_planes):
+            for j in range(i+2, num_tot_planes):
+                z_i = redshift_list[i]
+                z_i1 = redshift_list[i+1]
+                z_j  = redshift_list[j]
+
+                D_j  = cosmology.angular_diameter_distance_z1z2(0, z_j).value
+                D_ij = cosmology.angular_diameter_distance_z1z2(z_i, z_j).value
+                D_i1 = cosmology.angular_diameter_distance_z1z2(0, z_i1).value
+                D_ii1 = cosmology.angular_diameter_distance_z1z2(z_i, z_i1).value
+
+                eta_ij = (D_ij * D_i1) / (D_j * D_ii1)
+
+                eta_flat.append(eta_ij)
+                # print(f"eta_{i:03}_{j:03}", eta_ij)
+        eta_flat = np.array(eta_flat)
+
+        if not return_also_full:
+            return eta_flat, None
+            
+        # TODO: below is a duplicate of some code above; this can be avoided.
+        N = num_mass_planes
+        eta_idx = np.triu_indices(N + 1, k=2)
+        eta_full = np.eye(N + 1, k=1)
+        eta_full[eta_idx] = eta_flat
+        eta_full = eta_full[:-1, :(N + 1)]  #.T
+        return eta_flat, eta_full
+    
