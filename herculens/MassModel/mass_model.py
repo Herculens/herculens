@@ -58,14 +58,15 @@ class MassModel(MassModelBase):
         self.profile_type_list = profile_list
         super().__init__(self.profile_type_list, **kwargs)
         self._use_jax_scan = use_jax_scan
-        first_profile = self.profile_type_list[0]
-        self._single_profile_mode = (
-            all(p == first_profile for p in self.profile_type_list) and 
-            all(type(p) is type(first_profile) for p in self.profile_type_list)
-        )
-        if self._single_profile_mode:
-            print("Single profile mode in MassModel.")
-        # self._single_profile_mode = False
+        self._single_profile_mode = False
+        if len(self.profile_type_list) > 0:
+            first_profile = self.profile_type_list[0]
+            self._single_profile_mode = (
+                all(p == first_profile for p in self.profile_type_list) and 
+                all(type(p) is type(first_profile) for p in self.profile_type_list)
+            )
+            if self._single_profile_mode:
+                print("Single profile mode in MassModel.")
 
     @partial(jit, static_argnums=(0, 4))
     def ray_shooting(self, x, y, kwargs, k=None):
