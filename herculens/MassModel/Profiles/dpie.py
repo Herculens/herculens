@@ -13,17 +13,23 @@ from jax.tree_util import register_pytree_node
 
 from herculens.Util import util, param_util
 
-try:
-    from herculens.MassModel.Profiles.glee.piemd_jax import Piemd_GPU
-except ImportError:
-    raise ImportError("Please contact the author to use this dPIE profile "
-                        "as it depends on non-public libraries.")
-
 
 __all__ = [
     'DPIE_GLEE', 
     'DPIE_GLEE_STATIC',
 ]
+
+try:
+    from herculens.MassModel.Profiles.glee.piemd_jax import Piemd_GPU
+except ImportError:
+    print("WARNING: dPIE profile class cannot be loaded. "
+          "If you wish to use this profile, "
+          "please contact the author to use this dPIE profile "
+          "as it depends on non-public libraries.")
+    class DPIE_GLEE(object):
+        pass
+    class DPIE_GLEE_STATIC(object):
+        pass
 
 
 class DPIE_GLEE(object):
