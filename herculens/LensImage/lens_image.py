@@ -56,7 +56,7 @@ class LensImage(object):
 
         if lens_mass_model_class is None:
             from herculens.MassModel.mass_model import MassModel
-            lens_mass_model_class = MassModel(mass_model_list=[])
+            lens_mass_model_class = MassModel(profile_list=[])
         self.MassModel = lens_mass_model_class
         if self.MassModel.has_pixels:
             pixel_grid = self.Grid.create_model_grid(
@@ -65,7 +65,7 @@ class LensImage(object):
 
         if source_model_class is None:
             from herculens.LightModel.light_model import LightModel
-            source_model_class = LightModel(light_model_list=[])
+            source_model_class = LightModel(profile_list=[])
         self.SourceModel = source_model_class
         if self.SourceModel.has_pixels:
             pixel_grid = self.Grid.create_model_grid(
@@ -74,7 +74,7 @@ class LensImage(object):
 
         if lens_light_model_class is None:
             from herculens.LightModel.light_model import LightModel
-            lens_light_model_class = LightModel(light_model_list=[])
+            lens_light_model_class = LightModel(profile_list=[])
         self.LensLightModel = lens_light_model_class
         if self.LensLightModel.has_pixels:
             pixel_grid = self.Grid.create_model_grid(
@@ -108,6 +108,18 @@ class LensImage(object):
             pixel_grid=self.Grid, psf=self.PSF, **self.kwargs_numerics)
 
         self.kwargs_lens_equation_solver = kwargs_lens_equation_solver
+
+    # WIP
+    def set_static_model_grid(self):
+        ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
+        for j in range(self.MassModel._num_func):
+            profile = self.MassModel.func_list[j]
+            if hasattr(profile, 'set_eval_coord_grid'):
+                profile.set_eval_coord_grid(
+                    ra_grid_img.reshape(*self.ImageNumerics._grid.num_grid_points_axes),
+                    dec_grid_img.reshape(*self.ImageNumerics._grid.num_grid_points_axes),
+                )
+                print(f"Set static coordinate grid for profile {j}")
 
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, supersampled=False,
@@ -312,9 +324,11 @@ class LensImage(object):
         # get data coordinates
         x_grid_img, y_grid_img = self.Grid.pixel_coordinates
         # ray-shoot to source plane only coordinates within the source arc mask
-        x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img[self._src_arc_mask_bool], 
-                                                             y_grid_img[self._src_arc_mask_bool], 
+        x_grid_src, y_grid_src = self.MassModel.ray_shooting(x_grid_img, #[self._src_arc_mask_bool], 
+                                                             y_grid_img, #[self._src_arc_mask_bool], 
                                                              kwargs_lens, k=k_lens)
+        x_grid_src = x_grid_src[self._src_arc_mask_bool]
+        y_grid_src = y_grid_src[self._src_arc_mask_bool]
         # create grid encompassed by ray-shot coordinates
         x_left, x_right = x_grid_src.min(), x_grid_src.max()
         y_bottom, y_top = y_grid_src.min(), y_grid_src.max()
