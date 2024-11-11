@@ -108,7 +108,7 @@ class Plotter(object):
                       lock_colorbars=False, masked_residuals=True,
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       k_source=None, k_lens=None,
-                      show_plot=True):
+                      kwargs_noise=None, show_plot=True):
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_light, 
                       show_lens_potential, show_lens_others])
@@ -117,11 +117,14 @@ class Plotter(object):
         extent = lens_image.Grid.plt_extent
 
         ##### PREPARE IMAGES #####
+
+        if kwargs_noise is None:
+            kwargs_noise = {}
             
         if show_image:
             # create the resulting model image
             model = lens_image.model(**kwargs_result, k_lens=k_lens)
-            noise_var = lens_image.Noise.C_D_model(model)
+            noise_var = lens_image.Noise.C_D_model(model, **kwargs_noise)
             if likelihood_mask is None:
                 mask_bool = False
                 likelihood_mask = np.ones_like(model)
@@ -325,12 +328,16 @@ class Plotter(object):
                           colorbar_kwargs={'orientation': 'horizontal'})
 
             ax = axes[i_row, 2]
-            model_residuals, residuals = lens_image.normalized_residuals(data, model, mask=likelihood_mask)
+            model_residuals, residuals = lens_image.normalized_residuals(
+                data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
+            )
             if masked_residuals is True:
                 residuals_plot = model_residuals
             else:
                 residuals_plot = residuals
-            red_chi2 = lens_image.reduced_chi2(data, model, mask=likelihood_mask)
+            red_chi2 = lens_image.reduced_chi2(
+                data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
+            )
             im = ax.imshow(residuals_plot, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
             im.set_rasterized(True)
             if mask_bool is True and masked_residuals is False:
