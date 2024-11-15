@@ -5,7 +5,7 @@ name = 'herculens'
 
 release_info = {}
 infopath = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                           name, '__init__.py'))
+                           name, 'info.py'))
 with open(infopath) as open_file:
     exec(open_file.read(), release_info)
 
