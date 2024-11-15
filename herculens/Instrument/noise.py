@@ -18,30 +18,53 @@ __all__ = ['Noise']
 
 
 class Noise(object):
-    """
-    class that deals with noise properties of imaging data
+    """Class that builds a noise model, to be used in LensImage.
+
+    Three possibilities exist, depending on what the user provides to the constructor:
+    - a fixed noise map, which does not depend on any model-predicted flux.
+    - an exposure time (or map) and a fixed background noise estimate,
+    which will be used to estimate the noise based on an image model (see LensImage.model()).
+    - an exposure time (or map) but no background noise estimate. In this case,
+    the user should provide a (possibly varying) background_rms value when 
+    calling the Noise.C_D_model().
+
+    Parameters
+    ----------
+    nx : int
+        number of data pixels along the x direction.
+    ny : int
+        number of data pixels along the y direction.
+    exposure_time : np.array or float, optional
+        exposure time, either common for all pixels or for each individual 
+        data pixel. By default None
+    background_rms : float, optional
+        Root-mean-square value (standard deviation) of Gaussian background noise. 
+        By default None.
+    noise_map : np.array or int, optional
+        noise standard of each individual pixel.
+        If provide, overwrites any value of background_rms and exposure_time. 
+        By default None.
+    variance_boost_map : np.array, optional
+        fixed (not model-dependent) variance boost map. By default None.
+    verbose : bool, optional
+        If True, outputs warning message at construction. By default True.
+
+    Raises
+    ------
+    ValueError
+        If neither a noise map or exposure time is provided.
     """
 
     def __init__(self, nx, ny, exposure_time=None, background_rms=None, 
                  noise_map=None, variance_boost_map=None, verbose=True):
-        """
-
-        :param image_data: numpy array, pixel data values
-        :param exposure_time: int or array of size the data; exposure time
-        (common for all pixels or individually for each individual pixel)
-        :param background_rms: root-mean-square value of Gaussian background noise
-        :param noise_map: int or array of size the data; joint noise sqrt(variance) of each individual pixel.
-        Overwrites meaning of background_rms and exposure_time.
-        :param variance_boost_map: fixed (not model-dependent) variance boost map.
-        """
         self._data = None  # TODO: is that really useful?
         self._nx, self._ny = nx, ny  # TODO: is that really useful?
         if noise_map is not None:
             assert np.shape(noise_map) == (nx, ny)
             assert np.all(noise_map > 0.)
         if exposure_time is None and noise_map is None:
-            raise ValueError("Either a (fixed) noise map or an exposure time "
-                             "(or map) should be provided.")
+            raise ValueError("Either a fixed noise map or an exposure time "
+                             "(or exposure map) should be provided.")
         self._noise_map = noise_map
         if exposure_time is not None:
             # make sure no negative exposure values are present no dividing by zero
@@ -52,12 +75,11 @@ class Noise(object):
                 exposure_time[exposure_time <= 1e-10] = 1e-10
         self._exp_map = exposure_time
         self._background_rms = background_rms
-        # if background_rms is not None:
-        #     if exposure_time is not None:
-        #         if background_rms * np.max(exposure_time) < 1 and verbose is True:
-        #             UserWarning("sigma_b*f %s < 1 count may introduce unstable error estimates with a Gaussian "
-        #                         "error function for a Poisson distribution with mean < 1." % (
-        #                 background_rms * np.max(exposure_time)))
+        if (self._noise_map is None and self._background_rms is None
+            and verbose is True):
+            print("Warning: both `noise_map` and `background_rms` are None; "
+                  "`background_rms` should then be given as a model parameter "
+                  "to estimate the noise variance via C_D_model().")
         if variance_boost_map is None:
             variance_boost_map = np.ones((self._nx, self._ny))
         self.global_boost_map = variance_boost_map  # NOTE: we use a setter for backward compatibility reasons
@@ -102,8 +124,20 @@ class Noise(object):
     @property
     def background_rms(self):
         """
+        The standard deviation ("RMS") of the background noise.
+        
+        NOTE: "RMS" is a misleading term; it will be changed to sigma 
+        or standard deviation in the future.
 
-        :return: rms value of background noise
+        Returns
+        -------
+        float
+            Standard deviation of the background noise
+
+        Raises
+        ------
+        ValueError
+            If neither a background_rms value nor a noise map is available. 
         """
         if self._background_rms is None:
             if self._noise_map is None:
@@ -119,7 +153,15 @@ class Noise(object):
         Units of data and exposure map should result in:
         number of flux counts = data * exposure_map
 
-        :return: exposure map for each pixel
+        Returns
+        -------
+        _type_
+            exposure map for each pixel
+
+        Raises
+        ------
+        ValueError
+            If neither an exposure time (or map) nor a noise map is available.
         """
         if self._exp_map is None:
             if self._noise_map is None:
@@ -128,12 +170,19 @@ class Noise(object):
 
     @property
     def C_D(self):
-        """
-        Covariance matrix of all pixel values in 2d numpy array (only diagonal component)
-        The covariance matrix is estimated from the data.
+        """Covariance matrix of all pixel values in 2d numpy array (only diagonal component)
+        The covariance matrix is estimated from the data (not from any model).
         WARNING: For low count statistics, the noise in the data may lead to biased estimates of the covariance matrix.
 
-        :return: covariance matrix of all pixel values in 2d numpy array (only diagonal component).
+        Returns
+        -------
+        jax.numpy.array
+            Noise variance per pixel.
+
+        Raises
+        ------
+        ValueError
+            If no data image nor a noise map is available.
         """
         if not hasattr(self, '_C_D'):
             if self._noise_map is not None:
@@ -147,10 +196,28 @@ class Noise(object):
     @partial(jit, static_argnums=(0, 4))
     def C_D_model(self, model, background_rms=None, boost_map=1., 
                   force_recompute=False):
-        """
+        """Returns the estimate of the variance per pixel (i.e. the diagonal
+        of the data covariance matrix) with contributions from background noise
+        and shot noise from the model-predicted flux.
 
-        :param model: model (same as data but without noise)
-        :return: estimate of the noise per pixel based on the model flux
+        Parameters
+        ----------
+        model : jax.numpy.array
+            Image model for shot noise (Poisson noise) estimation.
+        background_rms : float, optional
+            Standard deviation of the background noise. If not given, uses the
+            (fixed) value provided to the constructor, or is ignored if a 
+            (fixed) noise map has been provided.
+        boost_map : jax.numpy.array, optional
+            2D map (same dimensions as the model image), that contains
+            multiplicative factors for the noise variance. By default 1.
+        force_recompute : bool, optional
+            If True, forces the use of the fixed noise map. By default False.
+
+        Returns
+        -------
+        jax.numpy.array
+            Noise variance per pixel corresponding to the input image model.
         """
         if not force_recompute and self._noise_map is not None:
             # variance fixed by the noise map
@@ -180,22 +247,23 @@ class Noise(object):
 
         Parameters
         ----------
-        flux : _type_
-            _description_
-        background_rms : _type_
-            _description_
-        exposure_map : _type_
-            _description_
+        flux : jax.numpy.array
+            Pixels containing the flux from which the shot (Poisson) noise can be estimated.
+        background_rms : float
+            Standard deviation of the background noise.
+        exposure_map : float or jax.numpy.array
+            Global exposure time or exposure time per pixel.
 
         Returns
         -------
-        _type_
-            _description_
+        jax.numpy.array
+            Noise variance (background + flux-dependent shot noise) per pixel.
         """
+        sigma2_bkg = background_rms**2
         if exposure_map is not None:
             flux_pos = jnp.maximum(0, flux)
-            sigma2_bkg = background_rms**2
-            sigma2_tot = sigma2_bkg + flux_pos / exposure_map
+            sigma2_poisson = flux_pos / exposure_map
+            sigma2_tot = sigma2_bkg + sigma2_poisson
         else:
-            sigma2_tot = background_rms**2 * jnp.ones_like(flux)
+            sigma2_tot = sigma2_bkg * jnp.ones_like(flux)
         return sigma2_tot
