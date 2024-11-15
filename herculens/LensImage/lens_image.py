@@ -277,17 +277,19 @@ class LensImage(object):
             self.Noise.compute_noise_map_from_model(model)
         return simu
     
-    def C_D_model(self, model, boost_map=None):
-        return self.Noise.C_D_model(model, boost_map=boost_map)
+    def C_D_model(self, model, **kwargs_noise):
+        return self.Noise.C_D_model(model, **kwargs_noise)
 
-    def normalized_residuals(self, data, model, mask=None):
+    def normalized_residuals(self, data, model, kwargs_noise=None, mask=None):
         """
         compute the map of normalized residuals,
         given the data and the model image
         """
+        if kwargs_noise is None:
+            kwargs_noise = {}
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        noise_var = self.C_D_model(model)
+        noise_var = self.C_D_model(model, **kwargs_noise)
         noise = np.sqrt(noise_var)
         norm_res_model = (data - model) / noise * mask
         norm_res_tot = norm_res_model
@@ -299,13 +301,13 @@ class LensImage(object):
         norm_res_tot = np.where(np.isfinite(norm_res_tot), norm_res_tot, 0.)
         return norm_res_model, norm_res_tot
 
-    def reduced_chi2(self, data, model, mask=None):
+    def reduced_chi2(self, data, model, kwargs_noise=None, mask=None):
         """
         compute the reduced chi2 of the data given the model
         """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        norm_res, _ = self.normalized_residuals(data, model, mask=mask)
+        norm_res, _ = self.normalized_residuals(data, model, kwargs_noise=kwargs_noise, mask=mask)
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
     
