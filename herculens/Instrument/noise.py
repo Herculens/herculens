@@ -82,7 +82,7 @@ class Noise(object):
                   "to estimate the noise variance via C_D_model().")
         if variance_boost_map is None:
             variance_boost_map = np.ones((self._nx, self._ny))
-        self.global_boost_map = variance_boost_map  # NOTE: we use a setter for backward compatibility reasons
+        self.global_boost_map = variance_boost_map
 
     def set_data(self, data):
         assert np.shape(data) == (self._nx, self._ny)
@@ -98,28 +98,27 @@ class Noise(object):
         self._reset_cache()
         self._noise_map = noise_map if as_jax_array else np.array(noise_map)
 
-    def realisation(self, model, prng_key, add_gaussian=True, add_poisson=True):
+    def realisation(self, model, prng_key, add_background=True, add_object=True):
         noise_real = 0.
         key1, key2 = random.split(prng_key)
-        if add_poisson:
+        if add_object:
             if self.exposure_map is None:
-                raise ValueError("An exposure time (or map) is needed to add Poisson noise")
+                raise ValueError("An exposure time (or map) is needed to add Poisson (shot) noise")
             noise_real += image_util.add_poisson(model, self.exposure_map, key1)
-        if add_gaussian:
+        if add_background:
             if self.background_rms is None:
-                raise ValueError("An background RMS value is needed to add Poisson noise")
+                raise ValueError("A background RMS value is needed to add background noise")
             noise_real += image_util.add_background(model, self.background_rms, key2)
         return noise_real
     
     @property
     def variance_boost_map(self):
-        if not hasattr(self, '_boost_map'):
-            return np.ones((self._nx, self._ny))
-        return self._boost_map
+        # NOTE: we use a setter for backward compatibility reasons
+        return self.global_boost_map
     
     @variance_boost_map.setter
     def variance_boost_map(self, boost_map):
-        self._boost_map = boost_map
+        self.global_boost_map = boost_map
 
     @property
     def background_rms(self):
