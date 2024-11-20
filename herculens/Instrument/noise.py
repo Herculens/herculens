@@ -98,18 +98,44 @@ class Noise(object):
         self._reset_cache()
         self._noise_map = noise_map if as_jax_array else np.array(noise_map)
 
-    def realisation(self, model, prng_key, add_background=True, add_object=True):
-        noise_real = 0.
-        key1, key2 = random.split(prng_key)
-        if add_object:
-            if self.exposure_map is None:
-                raise ValueError("An exposure time (or map) is needed to add Poisson (shot) noise")
-            noise_real += image_util.add_poisson(model, self.exposure_map, key1)
-        if add_background:
-            if self.background_rms is None:
-                raise ValueError("A background RMS value is needed to add background noise")
-            noise_real += image_util.add_background(model, self.background_rms, key2)
-        return noise_real
+    def realisation(self, model, prng_key, add_background=True, add_poisson_model=True):
+            """Draws a noise realization consistent with the model,
+            based on the specified parameters.
+
+            Parameters
+            ----------
+            model : object
+                The input model to which noise realizations will be added.
+            prng_key : jax.random.PRNGKey
+                The random key used for generating random numbers.
+            add_background : bool, optional
+                Whether to add background noise to the model. Default is True.
+            add_poisson_model : bool, optional
+                Whether to add Poisson noise (shot noise) to the model. Default is True.
+
+            Returns
+            -------
+            float
+                The total noise realization added to the model.
+
+            Raises
+            ------
+            ValueError
+                If `add_poisson_model` is True but `exposure_map` is None.
+            ValueError
+                If `add_background` is True but `background_rms` is None.
+            """
+            noise_real = 0.
+            key1, key2 = random.split(prng_key)
+            if add_poisson_model:
+                if self.exposure_map is None:
+                    raise ValueError("An exposure time (or map) is needed to add Poisson (shot) noise")
+                noise_real += image_util.add_poisson(model, self.exposure_map, key1)
+            if add_background:
+                if self.background_rms is None:
+                    raise ValueError("A background RMS value is needed to add background noise")
+                noise_real += image_util.add_background(model, self.background_rms, key2)
+            return noise_real
     
     @property
     def variance_boost_map(self):

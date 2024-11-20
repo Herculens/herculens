@@ -254,7 +254,7 @@ class LensImage(object):
 
         return model
 
-    def simulation(self, add_poisson=True, add_gaussian=True,
+    def simulation(self, add_poisson_noise=True, add_background_noise=True,
                    compute_true_noise_map=True, prng_key=random.PRNGKey(18),
                    **model_kwargs):
         """
@@ -270,7 +270,9 @@ class LensImage(object):
                 "Impossible to generate noise realisation because no noise class has been set")
         model = self.model(**model_kwargs)
         noise = self.Noise.realisation(
-            model, prng_key, add_poisson=add_poisson, add_gaussian=add_gaussian)
+            model, prng_key, 
+            add_poisson_model=add_poisson_noise, 
+            add_background=add_background_noise)
         simu = model + noise
         self.Noise.set_data(simu)
         if compute_true_noise_map is True:

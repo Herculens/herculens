@@ -14,7 +14,6 @@ jax.config.update("jax_enable_x64", True)
 
 import numpyro
 import numpyro.distributions as dist
-from numpyro.distributions import constraints
 
 from herculens.Coordinates.pixel_grid import PixelGrid
 from herculens.Instrument.psf import PSF
@@ -27,9 +26,9 @@ from herculens.Inference.ProbModel.numpyro import NumpyroModel
 from herculens.Inference.Optimization.jaxopt import JaxoptOptimizer
 
 
-def _simulate_data(data_type, supersampling_factor):
-    npix = 80  # number of pixel on a side
-    pix_scl = 0.08  # pixel size in arcsec
+def simulate_data(data_type, supersampling_factor):
+    npix = 40  # number of pixel on a side
+    pix_scl = 0.16  # pixel size in arcsec
     half_size = npix * pix_scl / 2.
     ra_at_xy_0 = dec_at_xy_0 = -half_size + pix_scl / 2.
     transform_pix2angle = pix_scl * np.eye(2)
@@ -84,6 +83,7 @@ def _simulate_data(data_type, supersampling_factor):
                             kwargs_lens_light=kwargs_lens_light_input)
     data = lens_image_input.simulation(
         **kwargs_input, compute_true_noise_map=True, 
+        add_poisson_noise=True, add_background_noise=True,
         prng_key=jax.random.PRNGKey(0),
     )
     return data, lens_image_input, kwargs_input
@@ -108,7 +108,7 @@ def _simulate_data(data_type, supersampling_factor):
 )
 def test_model_fit(data_type, supersampling_factor):
     # Get some fake imaging data
-    data, lens_image_input, kwargs_input = _simulate_data(data_type, supersampling_factor)
+    data, lens_image_input, kwargs_input = simulate_data(data_type, supersampling_factor)
 
     # Define model components to fit
     lens_image_fit = LensImage(
