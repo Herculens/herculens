@@ -146,9 +146,8 @@ class MassModel(MassModelBase):
             return self._alpha_loop(x, y, kwargs, k=k)
 
     def _alpha_single(self, x, y, kwargs, k=None):
-        # TODO: implement case with k not None
         if k is not None:
-            raise NotImplementedError
+            raise NotImplementedError   # TODO: implement case with k not None
         alpha_func = alpha_static_single(x, y, self.func_list[0].derivatives)
         return jnp.sum(
             jnp.array([
@@ -229,6 +228,7 @@ class MassModel(MassModelBase):
                 f_xx += f_xx_i
                 f_yy += f_yy_i
                 f_xy += f_xy_i
+                print("INSIDE", f_yy_i)
         f_yx = f_xy
         return f_xx, f_xy, f_yx, f_yy
 
