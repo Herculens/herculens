@@ -40,7 +40,7 @@ def alpha_static_for_scan(
 
 class MassModel(MassModelBase):
     """An arbitrary list of lens models."""
-    def __init__(self, profile_list, use_jax_scan=False, **kwargs):
+    def __init__(self, profile_list, use_jax_scan=False, verbose=False, **kwargs):
         """Create a MassModel object.
 
         Parameters
@@ -62,10 +62,9 @@ class MassModel(MassModelBase):
         if len(self.profile_type_list) > 0:
             first_profile = self.profile_type_list[0]
             self._single_profile_mode = (
-                all(p == first_profile for p in self.profile_type_list) and 
-                all(type(p) is type(first_profile) for p in self.profile_type_list)
+                all(p is first_profile for p in self.profile_type_list)
             )
-            if self._single_profile_mode:
+            if verbose is True and self._single_profile_mode:
                 print("Single profile mode in MassModel.")
 
     @partial(jit, static_argnums=(0, 4))
