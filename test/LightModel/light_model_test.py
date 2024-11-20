@@ -3,10 +3,8 @@
 import pytest
 import numpy as np
 
+import herculens as hcl
 from herculens.LightModel.light_model import LightModel
-from herculens.LightModel.Profiles.sersic import SersicElliptic
-from herculens.LightModel.Profiles.gaussian import GaussianEllipse
-from herculens.LightModel.Profiles.shapelets import Shapelets
 
 from herculens.LightModel.profile_mapping import SUPPORTED_MODELS
 
@@ -14,13 +12,29 @@ from herculens.LightModel.profile_mapping import SUPPORTED_MODELS
 @pytest.fixture
 def base_setup():
     # Some coordinates
-    x, y = np.meshgrid(np.linspace(-0.5, 1.5, 5), np.linspace(-1., 1., 5))
+    grid_class = hcl.PixelGrid(nx=5, ny=5)
+    x, y = grid_class.pixel_coordinates
+    kwargs_pixelated = {'num_pixels': 10}
+    n_max = 4
     # Create an instance of the LightModel class with some initial parameters
     # Replace the arguments with appropriate values for your use case
-    n_max = 4
-    light_model = LightModel([
-        SersicElliptic(), GaussianEllipse(), Shapelets(n_max=n_max),
-    ])
+    light_model = LightModel(
+        [
+            hcl.SersicElliptic(), 
+            hcl.GaussianEllipse(), 
+            hcl.Shapelets(n_max=n_max),
+            hcl.PixelatedLight(
+                interpolation_type='fast_bilinear', allow_extrapolation=True, 
+                derivative_type='interpol', adaptive_grid=False
+            )
+        ], 
+        kwargs_pixelated=kwargs_pixelated,
+        verbose=True,
+    )
+    light_model.set_pixel_grid(
+        grid_class.create_model_grid(**light_model.pixel_grid_settings),
+        data_pixel_area=grid_class.pixel_area,
+    )
 
     # Populate kwargs with parameters associated to the base_light_model
     kwargs_light = [
@@ -46,6 +60,9 @@ def base_setup():
             'beta': 0.2,
             'center_x': -0.02,
             'center_y': 0.1,
+        },
+        {
+            'pixels': np.random.randn(10, 10),
         }
     ]
     return (x, y), light_model, kwargs_light
@@ -54,9 +71,9 @@ def get_light_model_instance(alpha_method):
     # returns a LightModel instance with the different setups that lead
     # to different implementations to compute light profiles
     if alpha_method == 'repeated':
-        light_model = LightModel([SersicElliptic(), SersicElliptic(), SersicElliptic()], verbose=True)
+        light_model = LightModel([hcl.SersicElliptic(), hcl.SersicElliptic(), hcl.SersicElliptic()], verbose=True)
     else:
-        light_model = LightModel(3 * [SersicElliptic()], verbose=True)
+        light_model = LightModel(3 * [hcl.SersicElliptic()], verbose=True)
     kwargs_light = 3 * [
         {
             'amp': 1.0,
@@ -93,19 +110,13 @@ def test_summation_methods(xy):
 
 def test_single_profile():
     # Create an instance of the LightModel class with a single profile
-    light_model1 = LightModel([SersicElliptic()])
-    light_model2 = LightModel(SersicElliptic())
+    light_model1 = LightModel([hcl.SersicElliptic()])
+    light_model2 = LightModel(hcl.SersicElliptic())
     light_model3 = LightModel('SERSIC_ELLIPSE')  # will be deprecated in the future
     assert isinstance(light_model2.func_list[0], type(light_model1.func_list[0]))
     assert isinstance(light_model3.func_list[0], type(light_model1.func_list[0]))
 
 def test_surface_brightness(base_setup):
-    # Test the surface_brightness method
-    (x, y), model, kwargs = base_setup
-    surface_brightness = model.surface_brightness(x, y, kwargs)
-    assert surface_brightness.shape == x.shape
-
-def test_surface_brightness_bis(base_setup):
     # Test the surface brightness method
     (x, y), model, kwargs = base_setup
     sb = model.surface_brightness(x, y, kwargs)

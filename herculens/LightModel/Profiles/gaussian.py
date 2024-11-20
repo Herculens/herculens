@@ -68,6 +68,10 @@ class Gaussian(object):
         amp3d = amp / np.sqrt(2 * sigma**2) / np.sqrt(np.pi)
         sigma3d = sigma
         return self.function(r, 0, amp3d, sigma3d)
+    
+    @property
+    def num_amplitudes(self):
+        return 1
 
 
 class GaussianEllipse(object):
@@ -127,3 +131,8 @@ class GaussianEllipse(object):
         :return: 3D brightness per angular volume element
         """
         return self.gaussian.light_3d(r, amp, sigma=sigma)
+
+    @property
+    def num_amplitudes(self):
+        return 1
+    

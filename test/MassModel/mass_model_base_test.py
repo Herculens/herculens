@@ -40,7 +40,6 @@ class TestMassModelBase(unittest.TestCase):
         with self.assertRaises(TypeError):
             mass_model_base = MassModelBase(
                 'EPL',
-                self.kwargs_pixelated,
             )
         with self.assertRaises(TypeError):
             mass_model_base = MassModelBase(
@@ -110,7 +109,7 @@ class TestMassModelBase(unittest.TestCase):
             self.profile_list_pixelated,
             kwargs_pixelated=self.kwargs_pixelated,
         )
-        mass_model_base.set_pixel_grid(grid_class.create_model_grid(**self.kwargs_pixelated))
+        mass_model_base.set_pixel_grid(grid_class.create_model_grid(**mass_model_base.pixel_grid_settings))
         self.assertIsNotNone(mass_model_base.pixel_grid)
 
         # test we can access the coordinates
@@ -124,7 +123,3 @@ class TestMassModelBase(unittest.TestCase):
         )
         self.assertEqual(mass_model_base._bool_list(0), [True, False])
         self.assertEqual(mass_model_base._bool_list(1), [False, True])
-
-
-if __name__ == '__main__':
-    unittest.main()

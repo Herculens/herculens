@@ -5,12 +5,12 @@ from .Instrument.psf import PSF
 from .Instrument.noise import Noise
 
 from .LightModel.light_model import LightModel
-from .LightModel.Profiles.gaussian import Gaussian
+from .LightModel.Profiles.gaussian import Gaussian, GaussianEllipse
 from .LightModel.Profiles.multipole import Multipole
 from .LightModel.Profiles.sersic import Sersic, SersicElliptic  # NOTE: the Sersic class will be suppressed in the future
 from .LightModel.Profiles.shapelets import Shapelets
 from .LightModel.Profiles.uniform import Uniform
-from .LightModel.Profiles.pixelated import Pixelated
+from .LightModel.Profiles.pixelated import Pixelated as PixelatedLight
 
 from .MassModel.mass_model import MassModel
 from .MassModel.Profiles.sis import SIS  # NOTE: this will be suppressed in the future
