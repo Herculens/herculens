@@ -6,13 +6,19 @@
 
 __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 
-
+from functools import partial
 import jax.numpy as jnp
 
 from herculens.LightModel.light_model_base import LightModelBase
 
 
 __all__ = ['LightModel']
+
+
+def function_static_single(
+        x, y, function,
+    ):
+    return partial(function, x, y)
 
 
 class LightModel(LightModelBase):
@@ -27,7 +33,7 @@ class LightModel(LightModelBase):
     for a given set of parameters.
 
     """
-    def __init__(self, profile_list, **kwargs):
+    def __init__(self, profile_list, verbose=False, **kwargs):
         """Create a LightModel object.
 
         Parameters
@@ -41,9 +47,16 @@ class LightModel(LightModelBase):
             profile_list = [profile_list]
         self.profile_type_list = profile_list
         super(LightModel, self).__init__(self.profile_type_list, **kwargs)
+        self._single_profile_mode = False
+        if len(self.profile_type_list) > 0:
+            first_profile = self.profile_type_list[0]
+            self._single_profile_mode = (
+                all(p is first_profile for p in self.profile_type_list)
+            )
+            if verbose is True and self._single_profile_mode:
+                print("Single profile mode in LightModel.")
 
-    def surface_brightness(self, x, y, kwargs_list, k=None,
-                           pixels_x_coord=None, pixels_y_coord=None):
+    def surface_brightness(self, x, y, kwargs, k=None):
         """Total source flux at a given position.
 
         Parameters
@@ -56,6 +69,28 @@ class LightModel(LightModelBase):
             Position index of a single source model component.
 
         """
+        # x = np.array(x, dtype=float)
+        # y = np.array(y, dtype=float)
+        if isinstance(k, int):
+            return self.func_list[k].function(x, y, **kwargs[k])
+        elif self._single_profile_mode:
+            return self._surf_bright_single(x, y, kwargs, k=k)
+        else:
+            return self._surf_bright_loop(x, y, kwargs, k=k)
+        
+    def _surf_bright_single(self, x, y, kwargs, k=None):
+        if k is not None:
+            raise NotImplementedError   # TODO: implement case with k not None
+        func = function_static_single(x, y, self.func_list[0].function)
+        return jnp.sum(
+            jnp.array([
+                func(**kwargs[i]) for i in range(self._num_func)
+            ]),
+            axis=0,
+        )
+
+    def _surf_bright_loop(self, x, y, kwargs_list, k=None,
+                          pixels_x_coord=None, pixels_y_coord=None):
         flux = jnp.zeros_like(x)
         bool_list = self._bool_list(k)
         for i, func in enumerate(self.func_list):
