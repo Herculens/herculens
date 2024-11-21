@@ -24,7 +24,7 @@ class PixelGrid(Coordinates):
     class that manages a specified pixel grid (rectangular at the moment) and its coordinates
     """
 
-    def __init__(self, nx, ny, transform_pix2angle, ra_at_xy_0, dec_at_xy_0):
+    def __init__(self, nx, ny, transform_pix2angle=None, ra_at_xy_0=None, dec_at_xy_0=None):
         """
 
         :param nx: number of pixels in x-axis
@@ -33,6 +33,15 @@ class PixelGrid(Coordinates):
         :param ra_at_xy_0: ra coordinate at pixel (0,0)
         :param dec_at_xy_0: dec coordinate at pixel (0,0)
         """
+        base_pix_scl = 1.  # some default pixel size
+        if transform_pix2angle is None:
+            transform_pix2angle = base_pix_scl * np.eye(2)  # transformation matrix pixel <-> angle
+        if ra_at_xy_0 is None or dec_at_xy_0 is None:
+            half_size_nx = nx * base_pix_scl / 2
+            ra_at_xy_0 = - half_size_nx + base_pix_scl / 2.  # position of the (0, 0) with respect to bottom left pixel
+            half_size_ny = ny * base_pix_scl / 2
+            dec_at_xy_0 = - half_size_ny + base_pix_scl / 2.  # position of the (0, 0) with respect to bottom left pixel
+            
         super(PixelGrid, self).__init__(transform_pix2angle, ra_at_xy_0, dec_at_xy_0)
         self._nx = nx
         self._ny = ny

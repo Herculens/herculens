@@ -24,28 +24,26 @@ plt.rc('image', interpolation='none', origin='lower')  # for imshow
 __all__ = ['Plotter']
 
 
-# def clip(data, nsigma):
-#     """
-#     Iteratively removes data until all is within nsigma of the median, then returns the median and std
-#     author: Cameron Lemon
-#     """
-#     lennewdata = 0
-#     lenolddata = data.size
-#     while lenolddata>lennewdata:
-#         lenolddata = data.size
-#         data = data[np.where((data<np.nanmedian(data)+nsigma*np.nanstd(data))&(data>np.nanmedian(data)-nsigma*np.nanstd(data)))]
-#         lennewdata = data.size
-#     return np.median(data), np.std(data)
-# 18 h 08
-# bg, sigma = clip(data, 4.)
-# lenspixels = data[data>bg+3*sigma]
-# ax.imshow(data, origin='lower', cmap=cm, norm=LogNorm(vmax=np.nanpercentile(lenspixels, 95.), vmin=bg))
-
-
-
 class Plotter(object):
     """
-    Utility class for easy plotting of optimisation results in summary panels.
+    Helper class to plot the results of a LensImage model.
+
+    Parameters
+    ----------
+    data_name : str, optional
+        The name of the data, by default None.
+    base_fontsize : int, optional
+        The base fontsize for the plot, by default 14.
+    flux_log_scale : bool, optional
+        Whether to use a logarithmic scale for the flux, by default True.
+    flux_vmin : float, optional
+        The minimum value for the flux, by default None.
+    flux_vmax : float, optional
+        The maximum value for the flux, by default None.
+    res_vmax : int, optional
+        The maximum value for the residual, by default 6.
+    cmap_flux : str, optional
+        The colormap for the flux, by default None.
     """
 
     # Define some custom colormaps
@@ -109,6 +107,61 @@ class Plotter(object):
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       k_source=None, k_lens=None,
                       kwargs_noise=None, show_plot=True):
+        """
+        Generate a summary plot of the lens model.
+
+        Parameters
+        ----------
+        lens_image : LensImage
+            A herculens.LensImage instance.
+        kwargs_result : dict
+            Nested dictionary containing all model parameters.
+        show_image : bool, optional
+            Whether to show the lens image, by default True.
+        show_source : bool, optional
+            Whether to show the source model, by default True.
+        show_lens_light : bool, optional
+            Whether to show the lens light model, by default False.
+        show_lens_potential : bool, optional
+            Whether to show the lens potential model, by default False.
+        show_lens_others : bool, optional
+            Whether to show other lens models, by default False.
+        only_pixelated_potential : bool, optional
+            Whether to show only the pixelated potential, by default False.
+        shift_pixelated_potential : str, optional
+            The type of shift to apply to the pixelated potential, by default 'none'.
+        likelihood_mask : ndarray, optional
+            The likelihood mask, by default None.
+        potential_mask : ndarray, optional
+            The potential mask, by default None.
+        show_lens_lines : bool, optional
+            Whether to show lens lines, by default False.
+        show_shear_field : bool, optional
+            Whether to show the shear field, by default False.
+        show_lens_position : bool, optional
+            Whether to show the lens position, by default False.
+        kwargs_grid_source : dict, optional
+            The grid source parameters, by default None.
+        lock_colorbars : bool, optional
+            Whether to lock the colorbars, by default False.
+        masked_residuals : bool, optional
+            Whether to show masked residuals, by default True.
+        vmin_pot : float, optional
+            The minimum potential value, by default None.
+        vmax_pot : float, optional
+            The maximum potential value, by default None.
+        k_lens : float, optional
+            The lens model normalization factor, by default None.
+        kwargs_noise : dict, optional
+            Parameters given to Noise.C_D_model(mode, **kwargs_noise), by default None.
+        show_plot : bool, optional
+            Whether to call plt.show(), by default True.
+
+        Returns
+        -------
+        type
+            The summary plot.
+        """
         n_cols = 3
         n_rows = sum([show_image, show_source, show_lens_light, 
                       show_lens_potential, show_lens_others])
@@ -509,10 +562,10 @@ class Plotter(object):
         return fig
 
 
-    def imshow_flux(ax, image, colorbar=True):
-        im = ax.imshow(psf_kernel_orig, cmap=plotter.cmap_flux, norm=plotter.norm_flux)
+    def imshow_flux(self, ax, image, colorbar=True):
+        im = ax.imshow(image, cmap=self.cmap_flux, norm=self.norm_flux)
         if colorbar is True:
-            plot_util.nice_colorbar(im)
+            nice_colorbar(im)
 
 
     def _get_norm_for_model(self, model, lock_colorbars):

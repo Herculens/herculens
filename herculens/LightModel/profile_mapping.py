@@ -14,6 +14,7 @@ from herculens.LightModel.Profiles.shapelets import Shapelets
 STRING_MAPPING = {
     'SERSIC': Sersic,
     'SERSIC_ELLIPSE': SersicElliptic,
+    'SERSIC_SUPERELLIPSE': SersicElliptic,
     'GAUSSIAN': Gaussian,
     'GAUSSIAN_ELLIPSE': GaussianEllipse,
     'MULTIPOLE': Multipole,

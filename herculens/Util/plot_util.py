@@ -93,3 +93,20 @@ def nice_colorbar_residuals(mappable, res_map, vmin, vmax, position='right', pad
     return nice_colorbar(mappable, position=position, pad=pad, size=size, label=label, fontsize=fontsize,
                   invisible=invisible, colorbar_kwargs=colorbar_kwargs, label_kwargs=label_kwargs,
                   divider_kwargs=divider_kwargs)
+
+# def clip(data, nsigma):
+#     """
+#     Iteratively removes data until all is within nsigma of the median, then returns the median and std
+#     author: Cameron Lemon
+#     """
+#     lennewdata = 0
+#     lenolddata = data.size
+#     while lenolddata>lennewdata:
+#         lenolddata = data.size
+#         data = data[np.where((data<np.nanmedian(data)+nsigma*np.nanstd(data))&(data>np.nanmedian(data)-nsigma*np.nanstd(data)))]
+#         lennewdata = data.size
+#     return np.median(data), np.std(data)
+# 18 h 08
+# bg, sigma = clip(data, 4.)
+# lenspixels = data[data>bg+3*sigma]
+# ax.imshow(data, origin='lower', cmap=cm, norm=LogNorm(vmax=np.nanpercentile(lenspixels, 95.), vmin=bg))
