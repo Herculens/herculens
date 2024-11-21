@@ -66,8 +66,8 @@ class TestLightModelBase(unittest.TestCase):
         self.assertTrue(isinstance(profile_class, hcl.Sersic))
         profile_class = LightModelBase.get_class_from_string('SERSIC_SUPERELLIPSE')
         self.assertTrue(isinstance(profile_class, hcl.SersicElliptic))
-        profile_class = LightModelBase.get_class_from_string('SHAPELETS')
-        self.assertTrue(isinstance(profile_class, hcl.Shapelets))
+        # profile_class = LightModelBase.get_class_from_string('SHAPELETS')  # requires gigalens
+        # self.assertTrue(isinstance(profile_class, hcl.Shapelets))
 
     def test_get_class_from_string_PIXELATED(self):
         profile_class = LightModelBase.get_class_from_string('PIXELATED')

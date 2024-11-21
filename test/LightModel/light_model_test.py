@@ -9,25 +9,31 @@ from herculens.LightModel.light_model import LightModel
 from herculens.LightModel.profile_mapping import SUPPORTED_MODELS
 
 
+# Set to True to include the Shapelets profile in the tests, but this requires gigalens
+TEST_SHAPELETS = False
+
+
 @pytest.fixture
 def base_setup():
     # Some coordinates
     grid_class = hcl.PixelGrid(nx=5, ny=5)
     x, y = grid_class.pixel_coordinates
     kwargs_pixelated = {'num_pixels': 10}
-    n_max = 4
     # Create an instance of the LightModel class with some initial parameters
     # Replace the arguments with appropriate values for your use case
+    profile_list = [
+        hcl.SersicElliptic(), 
+        hcl.GaussianEllipse(), 
+        hcl.PixelatedLight(
+            interpolation_type='fast_bilinear', allow_extrapolation=True, 
+            derivative_type='interpol', adaptive_grid=False
+        )
+    ]
+    if TEST_SHAPELETS:
+        n_max = 4
+        profile_list.append(hcl.Shapelets(n_max=n_max))
     light_model = LightModel(
-        [
-            hcl.SersicElliptic(), 
-            hcl.GaussianEllipse(), 
-            hcl.Shapelets(n_max=n_max),
-            hcl.PixelatedLight(
-                interpolation_type='fast_bilinear', allow_extrapolation=True, 
-                derivative_type='interpol', adaptive_grid=False
-            )
-        ], 
+        profile_list, 
         kwargs_pixelated=kwargs_pixelated,
         verbose=True,
     )
@@ -56,15 +62,16 @@ def base_setup():
             'e2': 0.034,
         },
         {
+            'pixels': np.random.randn(10, 10),
+        }
+    ]
+    if TEST_SHAPELETS:
+        kwargs_light.append({
             'amps': np.random.randn((n_max+1)*(n_max+2)//2),
             'beta': 0.2,
             'center_x': -0.02,
             'center_y': 0.1,
-        },
-        {
-            'pixels': np.random.randn(10, 10),
-        }
-    ]
+        })
     return (x, y), light_model, kwargs_light
 
 def get_light_model_instance(alpha_method):
