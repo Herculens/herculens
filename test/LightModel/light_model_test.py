@@ -45,7 +45,7 @@ def base_setup():
     # Populate kwargs with parameters associated to the base_light_model
     kwargs_light = [
         {
-            'amp': 1.0,
+            'amp': 1354.0,
             'R_sersic': 0.5,
             'n_sersic': 4.0,
             'center_x': 0.04,
@@ -54,7 +54,7 @@ def base_setup():
             'e2': 0.07,
         },
         {
-            'amp': 0.8,
+            'amp': 194.,
             'sigma': 0.1,
             'center_x': 0.0,
             'center_y': 0.0,
@@ -67,7 +67,7 @@ def base_setup():
     ]
     if TEST_SHAPELETS:
         kwargs_light.append({
-            'amps': np.random.randn((n_max+1)*(n_max+2)//2),
+            'amps': 1e2*np.random.randn((n_max+1)*(n_max+2)//2),
             'beta': 0.2,
             'center_x': -0.02,
             'center_y': 0.1,
@@ -81,15 +81,33 @@ def get_light_model_instance(alpha_method):
         light_model = LightModel([hcl.SersicElliptic(), hcl.SersicElliptic(), hcl.SersicElliptic()], verbose=True)
     else:
         light_model = LightModel(3 * [hcl.SersicElliptic()], verbose=True)
-    kwargs_light = 3 * [
+    kwargs_light = [
         {
-            'amp': 1.0,
+            'amp': 123.,
             'R_sersic': 0.5,
             'n_sersic': 4.0,
             'center_x': 0.0,
             'center_y': 0.0,
             'e1': 0.0,
             'e2': 0.0,
+        },
+        {
+            'amp': 21.,
+            'R_sersic': 0.6,
+            'n_sersic': 3.2,
+            'center_x': 0.01,
+            'center_y': 0.1,
+            'e1': 0.04,
+            'e2': 0.1,
+        },
+        {
+            'amp': 1335.,
+            'R_sersic': 2.1,
+            'n_sersic': 1.8,
+            'center_x': -0.01,
+            'center_y': -0.2,
+            'e1': -0.04,
+            'e2': 0.1,
         }
     ]
     return light_model, kwargs_light
@@ -102,16 +120,17 @@ def test_summation_methods(xy):
     # unpack the coordinates
     x, y = xy
     # get the instance corresponding to the alpha_method
-    light_model1, kwargs_light2 = get_light_model_instance('repeated')
+    light_model1, kwargs_light1 = get_light_model_instance('repeated')
     light_model2, kwargs_light2 = get_light_model_instance('unique')
     # test the resulting values of the light profiles
+    print("AAAA", light_model1.surface_brightness(x, y, kwargs_light1, k=0), light_model2.surface_brightness(x, y, kwargs_light2, k=0))
     assert np.allclose(
-        light_model1.surface_brightness(x, y, kwargs_light2), 
+        light_model1.surface_brightness(x, y, kwargs_light1), 
         light_model2.surface_brightness(x, y, kwargs_light2), rtol=1e-8
     )
     # here we test the slightly different call when only one profile is evaluated
     assert np.allclose(
-        light_model1.surface_brightness(x, y, kwargs_light2, k=0), 
+        light_model1.surface_brightness(x, y, kwargs_light1, k=0), 
         light_model2.surface_brightness(x, y, kwargs_light2, k=0), rtol=1e-8
     )
 

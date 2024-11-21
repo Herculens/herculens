@@ -47,40 +47,76 @@ class LightModel(LightModelBase):
             profile_list = [profile_list]
         self.profile_type_list = profile_list
         super(LightModel, self).__init__(self.profile_type_list, **kwargs)
-        self._single_profile_mode = False
+        self._repeated_profile_mode = False
+        self._single_profile_mode = len(self.profile_type_list) == 1
         if len(self.profile_type_list) > 0:
             first_profile = self.profile_type_list[0]
-            self._single_profile_mode = (
+            self._repeated_profile_mode = (
                 all(p is first_profile for p in self.profile_type_list)
             )
-            if verbose is True and self._single_profile_mode:
-                print("Single profile mode in LightModel.")
+            if verbose is True and self._repeated_profile_mode:
+                print("All LightModel profiles are identical.")
 
-    def surface_brightness(self, x, y, kwargs, k=None):
-        """Total source flux at a given position.
+    def surface_brightness(self, x, y, kwargs, k=None,
+                           pixels_x_coord=None, pixels_y_coord=None):
+            """Total source flux at a given position.
 
-        Parameters
-        ----------
-        x, y : float or array_like
-            Position coordinate(s) in arcsec relative to the image center.
-        kwargs_list : list
-            List of parameter dictionaries corresponding to each source model.
-        k : int, optional
-            Position index of a single source model component.
+            Parameters
+            ----------
+            x : float or array_like
+                Position coordinate(s) in arcsec relative to the image center.
+            y : float or array_like
+                Position coordinate(s) in arcsec relative to the image center.
+            kwargs : list
+                List of parameter dictionaries corresponding to each source model.
+            k : int, optional
+                Position index of a single source model component.
+            pixels_x_coord : array_like, optional
+                x-coordinates of the pixelated light profile (if any).
+            pixels_y_coord : array_like, optional
+                y-coordinates of the pixelated light profile (if any).
 
-        """
-        # x = np.array(x, dtype=float)
-        # y = np.array(y, dtype=float)
-        if isinstance(k, int):
-            return self.func_list[k].function(x, y, **kwargs[k])
-        elif self._single_profile_mode:
-            return self._surf_bright_single(x, y, kwargs, k=k)
+            Returns
+            -------
+            float or array_like
+                Total source flux at the given position(s).
+
+            """
+            # x = np.array(x, dtype=float)
+            # y = np.array(y, dtype=float)
+            if isinstance(k, int):
+                return self._surf_bright_single(x, y, kwargs, k=k,
+                                                pixels_x_coord=pixels_x_coord,
+                                                pixels_y_coord=pixels_y_coord)
+            elif self._single_profile_mode:
+                return self._surf_bright_single(x, y, kwargs, k=0,
+                                                pixels_x_coord=pixels_x_coord,
+                                                pixels_y_coord=pixels_y_coord)
+            elif self._repeated_profile_mode:
+                return self._surf_bright_repeated(x, y, kwargs, k=k,
+                                                  pixels_x_coord=pixels_x_coord,
+                                                  pixels_y_coord=pixels_y_coord)
+            else:
+                return self._surf_bright_loop(x, y, kwargs, k=k,
+                                              pixels_x_coord=pixels_x_coord,
+                                              pixels_y_coord=pixels_y_coord)
+            
+    def _surf_bright_single(self, x, y, kwargs, k=None,
+                            pixels_x_coord=None, pixels_y_coord=None):
+        if k == self.pixelated_index:
+            return self.func_list[k].function(
+                x, y, **kwargs[k],
+                pixels_x_coord=pixels_x_coord, 
+                pixels_y_coord=pixels_y_coord,
+            )
         else:
-            return self._surf_bright_loop(x, y, kwargs, k=k)
+            return self.func_list[k].function(x, y, **kwargs[k])
         
-    def _surf_bright_single(self, x, y, kwargs, k=None):
+    def _surf_bright_repeated(self, x, y, kwargs, k=None,
+                              pixels_x_coord=None, pixels_y_coord=None):
         if k is not None:
-            raise NotImplementedError   # TODO: implement case with k not None
+            raise NotImplementedError("Repeated profile mode not implemented "
+                                      "specific profile k.")
         func = function_static_single(x, y, self.func_list[0].function)
         return jnp.sum(
             jnp.array([

@@ -66,7 +66,7 @@ def simulate_data(data_type, supersampling_factor):
     elif data_type == 'lensed_source_only':
         lens_mass_input = MassModel(['EPL', 'SHEAR'])
         lens_light_input = LightModel([])
-        source_input = LightModel(['SERSIC_ELLIPSE'])
+        source_input = LightModel(['SERSIC_ELLIPSE'], verbose=True)
     elif data_type == 'source_only':
         lens_mass_input = MassModel([])
         lens_light_input = LightModel([])

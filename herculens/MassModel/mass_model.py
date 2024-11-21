@@ -58,14 +58,14 @@ class MassModel(MassModelBase):
         self.profile_type_list = profile_list
         super().__init__(self.profile_type_list, **kwargs)
         self._use_jax_scan = use_jax_scan
-        self._single_profile_mode = False
+        self._repeated_profile_mode = False
         if len(self.profile_type_list) > 0:
             first_profile = self.profile_type_list[0]
-            self._single_profile_mode = (
+            self._repeated_profile_mode = (
                 all(p is first_profile for p in self.profile_type_list)
             )
-            if verbose is True and self._single_profile_mode:
-                print("Single profile mode in MassModel.")
+            if verbose is True and self._repeated_profile_mode:
+                print("All MassModel profiles are identical.")
 
     @partial(jit, static_argnums=(0, 4))
     def ray_shooting(self, x, y, kwargs, k=None):
@@ -138,14 +138,14 @@ class MassModel(MassModelBase):
         # y = np.array(y, dtype=float)
         if isinstance(k, int):
             return self.func_list[k].derivatives(x, y, **kwargs[k])
-        elif self._single_profile_mode:
-            return self._alpha_single(x, y, kwargs, k=k)
+        elif self._repeated_profile_mode:
+            return self._alpha_repeated(x, y, kwargs, k=k)
         elif self._use_jax_scan:
             return self._alpha_scan(x, y, kwargs, k=k)
         else:
             return self._alpha_loop(x, y, kwargs, k=k)
 
-    def _alpha_single(self, x, y, kwargs, k=None):
+    def _alpha_repeated(self, x, y, kwargs, k=None):
         if k is not None:
             raise NotImplementedError   # TODO: implement case with k not None
         alpha_func = alpha_static_single(x, y, self.func_list[0].derivatives)
