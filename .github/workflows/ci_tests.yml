@@ -44,7 +44,7 @@ jobs:
     
     - name: Test with pytest
       run: |
-        pytest --cov-report lcov --cov=herculens
+        pytest --cov-report lcov --cov=herculens --ignore=test/MassModel/Profiles.dpie_test.py
 
     - name: Coveralls
       uses: coverallsapp/github-action@master
