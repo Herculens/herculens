@@ -16,9 +16,96 @@ from jax import config
 from herculens.LensImage.lensing_operator import LensingOperator
 
 
+def critical_lines_caustics(lens_image, kwargs_lens, supersampling=5, 
+                            return_lens_centers=False):
+    if config.read('jax_enable_x64') is not True:
+        print("WARNING: JAX's 'jax_enable_x64' is not enabled; "
+              "computation of critical lines and caustics might be inaccurate.")
+    # evaluate the total magnification
+    grid = lens_image.Grid.create_model_grid(pixel_scale_factor=1./supersampling)
+    x_grid_img, y_grid_img = grid.pixel_coordinates
+    mag_tot = lens_image.MassModel.magnification(x_grid_img, y_grid_img, kwargs_lens)
+    mag_tot = np.array(mag_tot, dtype=np.float64)
+
+    # invert and find contours corresponding to infinite magnification
+    inv_mag_tot = 1. / mag_tot
+    contours = measure.find_contours(inv_mag_tot, 0.)
+
+    crit_lines, caustics = [], []
+    for contour in contours:
+        # extract the lines
+        cline_x, cline_y = contour[:, 1], contour[:, 0]
+        # convert to model coordinates
+        cline_x, cline_y = grid.map_pix2coord(cline_x, cline_y)
+        crit_lines.append((np.array(cline_x), np.array(cline_y)))
+        # find corresponding caustics through ray shooting
+        caust_x, caust_y = lens_image.MassModel.ray_shooting(cline_x, cline_y, kwargs_lens)
+        caustics.append((np.array(caust_x), np.array(caust_y)))
+
+    # can also returns the lens components centroids for convenience
+    if return_lens_centers:
+        cxs, cys = [], []
+        for kw in kwargs_lens:
+            if 'center_x' in kw:
+                cxs.append(kw['center_x'])
+                cys.append(kw['center_y'])
+        return crit_lines, caustics, (np.array(cxs), np.array(cys))
+    return crit_lines, caustics
+
+
+def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
+    from herculens.MassModel.Profiles.shear import Shear, ShearGammaPsi
+    shear_idx, shear_type = None, None
+    num_profiles = len(lens_image.MassModel.profile_type_list)
+    assert num_profiles == len(kwargs_lens)
+    for i in range(num_profiles):
+        if (lens_image.MassModel.profile_type_list[i] == 'SHEAR' or
+            isinstance(lens_image.MassModel.profile_type_list[i], Shear)):
+            shear_idx = i
+            shear_type = 'SHEAR'
+            break
+        elif (lens_image.MassModel.profile_type_list[i] == 'SHEAR_GAMMA_PSI' or
+              isinstance(lens_image.MassModel.profile_type_list[i], ShearGammaPsi)):
+            shear_idx = i
+            shear_type = 'SHEAR_GAMMA_PSI'
+            break
+    if shear_idx is None:
+        return None
+    if shear_type == 'SHEAR_GAMMA_PSI':
+        phi_ext, gamma_ext = kwargs_lens[shear_idx]['phi_ext'], kwargs_lens[shear_idx]['gamma_ext']
+    else:
+        # imports are here to avoid issues with circular imports
+        from herculens.Util.param_util import shear_cartesian2polar_numpy
+        phi_ext, gamma_ext = shear_cartesian2polar_numpy(
+            kwargs_lens[shear_idx]['gamma1'], 
+            kwargs_lens[shear_idx]['gamma2'],
+        )
+    grid = lens_image.Grid.create_model_grid(num_pixels=num_pixels)
+    x_grid_img, y_grid_img = grid.pixel_coordinates
+    gamma_x = gamma_ext*np.cos(phi_ext)
+    gamma_y = gamma_ext*np.sin(phi_ext)
+    if gamma_x.size == 1:
+        gamma_x = np.full_like(x_grid_img, float(gamma_x))
+        gamma_y = np.full_like(y_grid_img, float(gamma_y))
+    return (np.array(x_grid_img), np.array(y_grid_img), gamma_x, gamma_y)
+
+
+def _get_parameters(parameters):
+    # For backward compatibility, we need to handle both the old (legacy) Parameters class
+    # and the simpler way to provide parameters (which is a simple dictionary)
+    if isinstance(parameters, dict):
+        kwargs_params = parameters
+    else:
+        from herculens.Inference.legacy.parameters import Parameters as LegacyParameters
+        if not isinstance(parameters, LegacyParameters):
+            raise TypeError("The 'parameters' argument must be either a dictionary or a Parameters instance.")
+        kwargs_params = copy.deepcopy(parameters.current_values(as_kwargs=True))
+    return kwargs_params
+
+
 def mask_from_source_area(lens_image, parameters):
     src_idx = lens_image.SourceModel.pixelated_index
-    kwargs_param_mask = copy.deepcopy(parameters.current_values(as_kwargs=True))
+    kwargs_param_mask = _get_parameters(parameters)
     pixels = kwargs_param_mask['kwargs_source'][src_idx]['pixels']
     pixels = np.zeros_like(pixels)
     pixels[3:-3, 3:-3] = 1.  # so the source plane is ones except in a small margin all around
@@ -41,10 +128,10 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
     from herculens.LightModel.light_model import LightModel
 
     if parameters is None and source_model is None:
-        raise ValueError("You must provide an the source model "
+        raise ValueError("You must provide a source model "
                          "if no parameters are provided.")
     if parameters is not None:
-        kwargs_param = parameters.current_values(as_kwargs=True)
+        kwargs_param = _get_parameters(parameters)
         source_model = lens_image.source_surface_brightness(kwargs_param['kwargs_source'], 
                                                             de_lensed=True, unconvolved=True)
     source_model = np.array(source_model)
@@ -185,68 +272,3 @@ def draw_samples_from_covariance(mean, covariance, num_samples=10000, seed=None)
     samples = np.random.multivariate_normal(mean, covariance, size=num_samples)
     return samples
 
-
-def critical_lines_caustics(lens_image, kwargs_lens, supersampling=5, 
-                            return_lens_centers=False):
-    if config.read('jax_enable_x64') is not True:
-        print("WARNING: JAX's 'jax_enable_x64' is not enabled; "
-              "computation of critical lines and caustics might be inaccurate.")
-    # evaluate the total magnification
-    grid = lens_image.Grid.create_model_grid(pixel_scale_factor=1./supersampling)
-    x_grid_img, y_grid_img = grid.pixel_coordinates
-    mag_tot = lens_image.MassModel.magnification(x_grid_img, y_grid_img, kwargs_lens)
-    mag_tot = np.array(mag_tot, dtype=np.float64)
-
-    # invert and find contours corresponding to infinite magnification
-    inv_mag_tot = 1. / mag_tot
-    contours = measure.find_contours(inv_mag_tot, 0.)
-
-    crit_lines, caustics = [], []
-    for contour in contours:
-        # extract the lines
-        cline_x, cline_y = contour[:, 1], contour[:, 0]
-        # convert to model coordinates
-        cline_x, cline_y = grid.map_pix2coord(cline_x, cline_y)
-        crit_lines.append((np.array(cline_x), np.array(cline_y)))
-        # find corresponding caustics through ray shooting
-        caust_x, caust_y = lens_image.MassModel.ray_shooting(cline_x, cline_y, kwargs_lens)
-        caustics.append((np.array(caust_x), np.array(caust_y)))
-
-    # can also returns the lens components centroids for convenience
-    if return_lens_centers:
-        cxs, cys = [], []
-        for kw in kwargs_lens:
-            if 'center_x' in kw:
-                cxs.append(kw['center_x'])
-                cys.append(kw['center_y'])
-        return crit_lines, caustics, (np.array(cxs), np.array(cys))
-    return crit_lines, caustics
-
-
-def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
-    shear_type = 'SHEAR_GAMMA_PSI'
-    try:
-        shear_idx = lens_image.MassModel.profile_type_list.index(shear_type)
-    except ValueError:
-        shear_type = 'SHEAR'
-        try:
-            shear_idx = lens_image.MassModel.profile_type_list.index(shear_type)
-        except ValueError:
-            return None
-    if shear_type == 'SHEAR_GAMMA_PSI':
-        phi_ext, gamma_ext = kwargs_lens[shear_idx]['phi_ext'], kwargs_lens[shear_idx]['gamma_ext']
-    else:
-        # imports are here to avoid issues with circular imports
-        from herculens.Util.param_util import shear_cartesian2polar_numpy
-        phi_ext, gamma_ext = shear_cartesian2polar_numpy(
-            kwargs_lens[shear_idx]['gamma1'], 
-            kwargs_lens[shear_idx]['gamma2']
-        )
-    grid = lens_image.Grid.create_model_grid(num_pixels=num_pixels)
-    x_grid_img, y_grid_img = grid.pixel_coordinates
-    gamma_x = gamma_ext*np.cos(phi_ext)
-    gamma_y = gamma_ext*np.sin(phi_ext)
-    if gamma_x.size == 1:
-        gamma_x = np.full_like(x_grid_img, float(gamma_x))
-        gamma_y = np.full_like(y_grid_img, float(gamma_y))
-    return (np.array(x_grid_img), np.array(y_grid_img), gamma_x, gamma_y)
