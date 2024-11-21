@@ -123,7 +123,6 @@ def test_summation_methods(xy):
     light_model1, kwargs_light1 = get_light_model_instance('repeated')
     light_model2, kwargs_light2 = get_light_model_instance('unique')
     # test the resulting values of the light profiles
-    print("AAAA", light_model1.surface_brightness(x, y, kwargs_light1, k=0), light_model2.surface_brightness(x, y, kwargs_light2, k=0))
     assert np.allclose(
         light_model1.surface_brightness(x, y, kwargs_light1), 
         light_model2.surface_brightness(x, y, kwargs_light2), rtol=1e-8

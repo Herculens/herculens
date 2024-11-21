@@ -228,7 +228,6 @@ class MassModel(MassModelBase):
                 f_xx += f_xx_i
                 f_yy += f_yy_i
                 f_xy += f_xy_i
-                print("INSIDE", f_yy_i)
         f_yx = f_xy
         return f_xx, f_xy, f_yx, f_yy
 
