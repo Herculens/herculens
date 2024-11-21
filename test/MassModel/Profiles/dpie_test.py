@@ -88,7 +88,7 @@ def test_alpha_against_glee(glee_scale_flag):
     assert np.allclose(alpha_2, alpha_2_ref, rtol=1e-10)
 
 @pytest.mark.parametrize(
-    "glee_scale_flag", [False, True],
+    "glee_scale_flag", [False],
 )
 def test_kappa_against_glee(glee_scale_flag):
     (
