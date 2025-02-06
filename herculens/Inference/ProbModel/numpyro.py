@@ -26,7 +26,8 @@ class NumpyroModel(BaseProbModel):
     def num_parameters(self):
         if not hasattr(self, '_num_param'):
             num_param = 0
-            for site in self.get_trace().values():
+            prng_key = jax.random.PRNGKey(0)  # seed not relevant
+            for site in self.get_trace(prng_key).values():
                 if (site['type'] == 'sample' and not site['is_observed']
                     or site['type'] == 'param'):
                     num_param += site['value'].size
@@ -47,22 +48,26 @@ class NumpyroModel(BaseProbModel):
         # returns the logarithm of the data likelihood
         return util.log_likelihood(self.model, params, batch_ndims=0)['obs']
 
-    def seeded_model(self, seed=0):
-        return handlers.seed(self.model, jax.random.PRNGKey(seed))
+    def seeded_model(self, prng_key):
+        return handlers.seed(self.model, prng_key)
     
-    def get_trace(self, seed=0):
-        return handlers.trace(self.seeded_model(seed=seed)).get_trace()
+    def get_trace(self, prng_key):
+        return handlers.trace(self.seeded_model(prng_key)).get_trace()
 
-    def get_sample(self, seed=0):
-        trace = self.get_trace(seed=seed)
+    def get_sample(self, prng_key=None):
+        if prng_key is None:
+            prng_key = jax.random.PRNGKey(0)
+        trace = self.get_trace(prng_key)
         return {site['name']: site['value'] for site in trace.values() if not site.get('is_observed', False)}
 
-    def sample_prior(self, num_samples, seed=0):
+    def sample_prior(self, num_samples, prng_key=None):
+        if prng_key is None:
+            prng_key = jax.random.PRNGKey(0)
         batch_ndims = 0 if num_samples else 1
         predictive = util.Predictive(self.model, 
                                      num_samples=num_samples, 
                                      batch_ndims=batch_ndims)
-        samples = predictive(jax.random.PRNGKey(seed))
+        samples = predictive(prng_key)
         del samples['obs']
         return samples
 
