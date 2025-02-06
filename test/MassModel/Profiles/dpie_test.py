@@ -103,17 +103,20 @@ def test_kappa_against_glee(glee_scale_flag):
     kappa = (f_xx + f_yy) / 2.
     assert np.allclose(kappa, kappa_ref, rtol=1e-6)
 
-# def test_gamma_against_glee():
-#     (
-#         x, y,
-#         _, _, _, gamma_1_ref, gamma_2_ref, 
-#         kwargs_lens_ref,
-#     ) = get_grid_and_target_maps(glee_scale_flag=False)
-#     profile = DPIE_GLEE(scale_flag=False)
-#     f_xx, f_yy, f_xy = profile.hessian(
-#         x, y, **kwargs_lens_ref,
-#     )
-#     # gamma_1 = (f_xx - f_yy) / 2.
-#     gamma_2 = f_xy
-#     # assert np.allclose(gamma_1, gamma_1_ref, rtol=1e-6)
-#     assert np.allclose(gamma_2, gamma_2_ref, rtol=1e-6)
+@pytest.mark.parametrize(
+    "glee_scale_flag", [False],
+)
+def test_gamma_against_glee(glee_scale_flag):
+    (
+        x, y,
+        _, _, _, gamma_1_ref, gamma_2_ref, 
+        kwargs_lens_ref,
+    ) = get_grid_and_target_maps(glee_scale_flag=glee_scale_flag)
+    profile = DPIE_GLEE(scale_flag=glee_scale_flag)
+    f_xx, f_yy, f_xy = profile.hessian(
+        x, y, **kwargs_lens_ref,
+    )
+    gamma_1 = (f_xx - f_yy) / 2.
+    gamma_2 = f_xy
+    assert np.allclose(gamma_1, gamma_1_ref, rtol=1e-6)
+    assert np.allclose(gamma_2, gamma_2_ref, rtol=1e-6)
