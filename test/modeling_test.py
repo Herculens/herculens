@@ -234,7 +234,7 @@ def test_model_fit(data_type, supersampling_factor):
     loss = Loss(prob_model)
 
     # Draw some initial parameter values (from the prior)
-    init_params = prob_model.unconstrain(prob_model.get_sample(seed=0))
+    init_params = prob_model.unconstrain(prob_model.get_sample(prng_key=jax.random.PRNGKey(0)))
     kwargs_init = prob_model.params2kwargs(prob_model.constrain(init_params))
     print("Initial loss =", loss(init_params))
     print("Initial gradient =", loss.gradient(init_params))
