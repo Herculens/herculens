@@ -12,7 +12,7 @@ git+https://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolut
 #matplotlib>=3.7.0   # for plotting
 #findiff==0.8.9      # for building matrix with finite difference coefficients
 #tqdm>=4.61.0        # for progress bars with certain optimizers and samplers
-#numpyro==0.10.1     # for SVI and HMC sampling
+#numpyro>=0.16.0     # for SVI and HMC sampling
 #blackjax==0.9.6     # for JAX-based HMC sampling
 #emcee==3.0.2        # for Ensemble MCMC sampling
 #gigalens==0.1.8     # for a JAX implementation of Shapelets
