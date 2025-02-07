@@ -98,7 +98,7 @@ class CorrelatedField(object):
 
         # Setup the correlated field model
         self._param_suffix = param_suffix
-        self._cfm, self._model, self._num_pix_tot, _ = jifty_util.prepare_light_correlated_field(
+        self._cfm, self._model, self._num_pix_tot, _ = jifty_util.prepare_correlated_field(
             self._param_suffix,
             self._num_pix,
             cropped_border_size,
