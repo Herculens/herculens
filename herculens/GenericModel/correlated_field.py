@@ -113,19 +113,19 @@ class CorrelatedField(object):
         )
 
     def __call__(self, params):
-        """Evaluate the model at the given set of parameters.
+        """Evaluate the model at the given parameters.
         The parameters keys are:
         - '{param_suffix}_field_xi': the field fluctuations
         - '{param_suffix}_field_zeromode': the zero mode of the field
         - '{param_suffix}_field_xy_dim_fluctuations': the field fluctuations (along the spatial dimensions)
         - '{param_suffix}_field_xy_dim_loglogavgslope': the log-log average slope of the power-spectrum (along the spatial dimensions)
         - '{param_suffix}_field_xy_dim_flexibility': the flexibility (along the spatial dimensions)
-        - '{param_suffix}_field_xy_dim_asperity': the asperity in the xy dimension
+        - '{param_suffix}_field_xy_dim_asperity': the asperity (along the spatial dimensions)
 
         Parameters
         ----------
-        params : dict
-            Dictionary / Pytree of parameters values.
+        params : Pytree
+            Parameters values as a Pytree (e.g. dict).
 
         Returns
         -------
