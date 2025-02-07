@@ -37,6 +37,8 @@ class MassModelBase(object):
         profile_specific_kwargs : dict
             See docstring for get_class_from_string().
         """
+        if not isinstance(profile_list, (list, tuple)):
+            raise TypeError("The profile list should be a list or a tuple.")
         self.func_list, self._pix_idx = self._load_model_instances(
             profile_list, **profile_specific_kwargs,
         )
@@ -70,8 +72,8 @@ class MassModelBase(object):
                     ):
                     pix_idx = idx
             else:
-                raise ValueError("Each profile can either be a string or "
-                                 "directly the profile class.")
+                raise TypeError(f"Each profile can either be a string or "
+                                 f"directly a profile instance (supported profiles are {SUPPORTED_MODELS}).")
             func_list.append(profile_class)
         return func_list, pix_idx
     
@@ -112,11 +114,18 @@ class MassModelBase(object):
         """
         if profile_string in SUPPORTED_MODELS:
             profile_class = STRING_MAPPING[profile_string]
+            kwargs = {}
             # treats the few special cases that require user settings
             if profile_string == 'EPL':
-                return profile_class(no_complex_numbers=no_complex_numbers)
+                if no_complex_numbers is not None:
+                    kwargs['no_complex_numbers'] = no_complex_numbers
+                return profile_class(**kwargs)
             elif profile_string == 'PIXELATED':
-                return profile_class(derivative_type=pixel_derivative_type, interpolation_type=pixel_interpol)
+                if pixel_interpol is None:
+                    kwargs['interpolation_type'] = pixel_interpol
+                if pixel_derivative_type is None:
+                    kwargs['derivative_type'] = pixel_derivative_type
+                return profile_class(**kwargs)
             elif profile_string == 'PIXELATED_FIXED':
                 if kwargs_pixel_grid_fixed is None:
                     raise ValueError("At least one pixel grid must be provided to use 'PIXELATED_FIXED' profile")

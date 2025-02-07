@@ -58,8 +58,9 @@ class DPIE_GLEE(object):
         self._r_soft = r_soft
         self._dpie_flag = scale_flag # if True, theta_E corresponds to the Einstein radius of the profile
         self._piemd = None
+        self._piemd_flag = False
     
-    @jit
+    @partial(jit, static_argnums=(0,))
     def function(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -76,12 +77,12 @@ class DPIE_GLEE(object):
         """
         piemd = self.piemd(x, y)
         theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
-        f_w = piemd._potential(center_x, center_y, q, phi, theta_E_scl, w, False)
-        f_s = piemd._potential(center_x, center_y, q, phi, theta_E_scl, s, False)
+        f_w = piemd._potential(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
+        f_s = piemd._potential(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
         f = f_w - f_s
         return f.reshape(*x.shape)
 
-    @jit
+    @partial(jit, static_argnums=(0,))
     def derivatives(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -98,13 +99,13 @@ class DPIE_GLEE(object):
         """
         piemd = self.piemd(x, y)
         theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
-        f_x_w, f_y_w = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, w, False)
-        f_x_s, f_y_s = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, s, False)
+        f_x_w, f_y_w = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
+        f_x_s, f_y_s = piemd._deflection_angle(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
         f_x = f_x_w - f_x_s
         f_y = f_y_w - f_y_s
         return f_x.reshape(*x.shape), f_y.reshape(*y.shape)
     
-    @jit
+    @partial(jit, static_argnums=(0,))
     def hessian(self, x, y, theta_E, r_core, r_trunc, q, phi, center_x=0, center_y=0):
         """
 
@@ -121,14 +122,14 @@ class DPIE_GLEE(object):
         """
         piemd = self.piemd(x, y)
         theta_E_scl, w, s = self._param_conv(theta_E, r_core, r_trunc, self._dpie_flag)
-        f_xx_w, f_yy_w, f_xy_w = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, w, False)
-        f_xx_s, f_yy_s, f_xy_s = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, s, False)
+        f_xx_w, f_yy_w, f_xy_w = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, w, self._piemd_flag)
+        f_xx_s, f_yy_s, f_xy_s = piemd._hessian(center_x, center_y, q, phi, theta_E_scl, s, self._piemd_flag)
         f_xx = f_xx_w - f_xx_s
         f_yy = f_yy_w - f_yy_s
         f_xy = f_xy_w - f_xy_s
         return f_xx.reshape(*x.shape), f_yy.reshape(*y.shape), f_xy.reshape(*y.shape)
     
-    @jit
+    @partial(jit, static_argnums=(0,))
     def _param_conv(self, theta_E, r_core, r_trunc, scale_flag):
         w, s = r_core, r_trunc
         # w, s = self._check_radii(r_core, r_trunc)
@@ -150,7 +151,7 @@ class DPIE_GLEE(object):
     #     s_ = jnp.where(s < w, w, s)
     #     return w_, s_
     
-    @jit
+    @partial(jit, static_argnums=(0,))
     def piemd(self, x, y):
         if self._piemd is None:
             # NOTE: first 4 arguments of Piemd_GPU do not matter for our use, so we give zeros

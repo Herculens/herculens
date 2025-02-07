@@ -41,6 +41,8 @@ class LightModelBase(object):
             See docstring for get_class_from_string().
 
         """
+        if not isinstance(profile_list, (list, tuple)):
+            raise TypeError("The profile list should be a list or a tuple.")
         self.func_list, self._pix_idx = self._load_model_instances(
             profile_list, **profile_specific_kwargs
         )

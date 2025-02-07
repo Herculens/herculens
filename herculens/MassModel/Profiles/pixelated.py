@@ -30,8 +30,9 @@ class PixelatedPotential(object):
 
     def __init__(self, interpolation_type='fast_bilinear', derivative_type='autodiff'):
         """Lensing potential on a fixed coordinate grid."""
+        print("CHECK", interpolation_type, derivative_type)
         if interpolation_type not in self._interp_types:
-            raise ValueError(f"Invalid method ('{interpolation_type}'). Must be in {self._interp_types}.")
+            raise ValueError(f"Invalid interpolated mode ('{interpolation_type}'). Must be in {self._interp_types}.")
         if derivative_type not in self._deriv_types:
             raise ValueError(f"Unknown derivatives mode '{derivative_type}' "
                              f"(supported types are {self._deriv_types}).")

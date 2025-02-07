@@ -58,7 +58,7 @@ class Sersic(SersicUtil):
         result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
         return amp * result
 
-    def derivatives(self, x, y, R_sersic, n_sersic, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
+    def derivatives(self, x, y, R_sersic, n_sersic, center_x, center_y, amp, max_R_frac=100.0):
         """
 
         :param x:
@@ -75,8 +75,8 @@ class Sersic(SersicUtil):
         """
         def _function(p):
             return self.function(p[0], p[1], 
-                                 amp, R_sersic, n_sersic,
-                                 center_x=center_x, center_y=center_y,
+                                 R_sersic, n_sersic,
+                                 center_x, center_y, amp,
                                  max_R_frac=max_R_frac)
         
         grad_function = grad(_function)
@@ -132,7 +132,7 @@ class SersicElliptic(SersicUtil):
     def __init__(self, smoothing=0.00001, exponent=2.):
         super().__init__(smoothing=smoothing, exponent=exponent)
 
-    def function(self, x, y, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
+    def function(self, x, y, R_sersic, n_sersic, e1, e2, center_x, center_y, amp, max_R_frac=1000.0):
         """
 
         :param x:
@@ -154,7 +154,7 @@ class SersicElliptic(SersicUtil):
         result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
         return amp * result
 
-    def derivatives(self, x, y, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
+    def derivatives(self, x, y, R_sersic, n_sersic, e1, e2, center_x, center_y, amp, max_R_frac=1000.0):
         """
 
         :param x:
@@ -171,8 +171,8 @@ class SersicElliptic(SersicUtil):
         """
         def _function(p):
             return self.function(p[0], p[1], 
-                                 amp, R_sersic, n_sersic, e1, e2,
-                                 center_x=center_x, center_y=center_y,
+                                 R_sersic, n_sersic, e1, e2,
+                                 center_x, center_y, amp,
                                  max_R_frac=max_R_frac)
         
         grad_function = grad(_function)
