@@ -19,3 +19,4 @@ git+https://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolut
 #lenstronomy>=1.9.0  # for interpolated Shapelets (via `gigalens`), or for Particle Swarm Optimization
 #git://github.com/adam-coogan/jaxinterp2d@master#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
 #git+https://github.com/Herculens/helens.git@main#egg=helens   # JAX lens equation solver for some point source features
+#nifty8==8.5.6       # for NIFTy8 (for CorrelatedField model)
