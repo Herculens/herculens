@@ -6,10 +6,10 @@ __author__ = 'aymgal', 'austinpeel'
 
 
 import time
-import numpy as np
 from copy import deepcopy
 from functools import partial
 from jax import jit
+import jax.numpy as jnp
 import optax
 
 from herculens.Inference.Optimization.base_optim import BaseOptimizer
@@ -97,8 +97,8 @@ class OptaxOptimizer(BaseOptimizer):
                 param_history.append(params)
         runtime = time.time() - start_time
         best_fit = params
-        logL_best_fit = self.loss.function(best_fit)
-        extra_fields = {'loss_history': np.array(loss_history)}  # TODO: use optax.second_order module to compute diagonal of Hessian?
+        logL_best_fit = - self.loss.function(best_fit)
+        extra_fields = {'loss_history': jnp.array(loss_history)}  # TODO: use optax.second_order module to compute diagonal of Hessian?
         if return_param_history is True:
             extra_fields['param_history'] = param_history
         return best_fit, logL_best_fit, extra_fields, runtime
