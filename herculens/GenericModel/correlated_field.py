@@ -5,6 +5,7 @@
 __author__ = 'aymgal'
 
 import numpy as np
+import jax
 import jax.numpy as jnp
 from herculens.Util import jifty_util
 
@@ -28,12 +29,12 @@ class CorrelatedField(object):
         The mass or light model instance.
     offset_mean : float, optional
         The global additive offset applied to the field realizations, by default np.log(1e-2).
-        IMPORTANT: if `exponentiate` is True, this value should be the log-space of the chosen offset value.
+        NOTE: if `exponentiate` is True, this value should be the log-space of the chosen offset value.
     prior_offset_std : tuple, optional
         The The mean and scatter of the log-normal of the offset, by default (0.5, 1e-6).
     prior_loglogavgslope : tuple, optional
-        The mean and scatter of the log-normal distribution for the log-log average slope
-         of the power-spectrum, by default (-4., 0.5).
+        The mean and scatter of the log-normal distribution for the average slope
+         of the power-spectrum in log-log space, by default (-4., 0.5).
     prior_fluctuations : tuple, optional
         The mean and scatter of the log-normal distribution for the fluctuations, by default (1.5, 0.8).
     prior_flexibility : object, optional
@@ -45,7 +46,8 @@ class CorrelatedField(object):
         and then cropped to return the model in direct space, by default 0.
         This is the number of pixels added on each size of the pixelated grid.
     exponentiate : bool, optional
-        Whether to exponentiate the field, by default True. An exponential non-linearity ensures non–negative values.
+        Whether to return the exponential of the field, by default True. 
+        For example, taking the exponential is useful to ensures non–negative values.
 
     Raises
     ------
@@ -67,9 +69,11 @@ class CorrelatedField(object):
             cropped_border_size=0,
             exponentiate=True,
         ):
-        # Check the model is pixelated
+        # Check that the model is pixelated
         if not mass_or_light_model.has_pixels:
-            raise ValueError("The model must have at least one Pixelated profile to use the CorrelatedField class.")
+            raise ValueError("The provided LightModel or MassModel must contain "
+                             "at least one Pixelated profile for proper use "
+                             "with the CorrelatedField model.")
         
         # retrieve the number of pixels from the LightModel instance
         self._num_pix = mass_or_light_model.pixel_grid_settings.get('num_pixels', None)
@@ -98,7 +102,7 @@ class CorrelatedField(object):
 
         # Setup the correlated field model
         self._param_suffix = param_suffix
-        self._cfm, self._model, self._num_pix_tot, _ = jifty_util.prepare_correlated_field(
+        self._cfm, self._jft_model, self._num_pix_tot, _ = jifty_util.prepare_correlated_field(
             self._param_suffix,
             self._num_pix,
             cropped_border_size,
@@ -132,7 +136,7 @@ class CorrelatedField(object):
         jnp.Array
             Field model (in direct space), as 2d array.
         """
-        return self._model(params)[self._param_suffix]
+        return self._jft_model(params)[self._param_suffix]
     
     def model(self, params):
         """Just a handy alias"""
@@ -187,6 +191,25 @@ class CorrelatedField(object):
                 Normal(0., 1.),
             )
         return self(params)
+    
+    def draw_realizations_from_prior(self, prng_key, num_samples=10):
+        """Draw a random field realization from the prior distribution.
+
+        Returns
+        -------
+        jnp.Array
+            Field model (in direct space), as 2d array.
+        """
+        # imports here to prevent the need for numpyro to be installed
+        # if the CorrelatedField class is used in a non-numpyro context.
+        from numpyro.infer import Predictive
+        def model():
+            """This just to define a callable the 'numpyro way'"""
+            self.numpyro_sample_pixels()
+        # draw sample from the latent space (i.e. standard normal samples)
+        prior_samples = Predictive(model, num_samples=num_samples)(prng_key)
+        # apply the transforms to get the 
+        return jax.vmap(self)(prior_samples)
     
     @property
     def correlated_field_maker(self):
