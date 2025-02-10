@@ -76,10 +76,16 @@ class CorrelatedField(object):
                              "with the CorrelatedField model.")
         
         # retrieve the number of pixels from the LightModel instance
-        self._num_pix = mass_or_light_model.pixel_grid_settings.get('num_pixels', None)
-        if self._num_pix is None:
-            raise ValueError("The number of pixels have not been set at creation of the LightModel or MassModel instance.")
-        
+        # NOTE: the following is to support both when the CorrelatedField is instantiated
+        # before or after the LightModel or a MassModel is passed a LensImage instance.
+        # TODO: simplify this when pixelated profiles treatment is improved in LensImage.
+        try:
+            self._num_pix, self._num_pix_y = mass_or_light_model.pixel_grid.num_pixel_axes
+        except AttributeError:
+            self._num_pix = mass_or_light_model.pixel_grid_settings.get('num_pixels', None)
+        else:
+            if self._num_pix != self._num_pix_y:
+                raise NotImplementedError("Only square pixel grids are supported for now.")
         # Pack the prior choices
         if any([p is None for p in [offset_mean, prior_offset_std, prior_loglogavgslope, prior_fluctuations]]):
             raise ValueError("Field parameters and priors `offset_mean`, `prior_offset_std`, `prior_loglogavgslope`, `prior_fluctuations` are mandatory.")
