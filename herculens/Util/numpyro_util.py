@@ -49,7 +49,7 @@ def unconstrain_reparam(params, site):
 
         value = transform(p)
 
-        # NB: we add the determinant term only for sampled sites
+        # NOTE: we add the determinant term only for sampled sites
         # and only transformed parameter site values above 
         if site["type"] == "sample":
             log_det = transform.log_abs_det_jacobian(p, value)
@@ -62,6 +62,10 @@ def unconstrain_reparam(params, site):
 
 def potential_energy(model, model_args, model_kwargs, params):
     """
+    This is essentially the same as numpyro.infer.util.potential_energy, but with
+    the added support for numpyro.param sites, through a modification 
+    of the unconstrain_reparam function.
+
     (EXPERIMENTAL INTERFACE) Computes potential energy of a model given unconstrained params.
     Under the hood, we will transform these unconstrained parameters to the values
     belong to the supports of the corresponding priors in `model`.
@@ -80,41 +84,3 @@ def potential_energy(model, model_args, model_kwargs, params):
         substituted_model, model_args, model_kwargs, {}
     )
     return -log_joint
-
-def _transform_fn(model, model_args, model_kwargs, params, invert):
-    """
-    Transforms parameter values between constrained <-> unconstrained spaces.
-    It supports numpyro.param sites
-    """
-    substituted_model = handlers.substitute(model, params)
-    model_trace = handlers.trace(substituted_model).get_trace(*model_args, **model_kwargs)
-    values, inv_transforms = {}, {}
-    for k, v in model_trace.items():
-        if v["type"] == "param":
-            values[k] = v["value"]
-            constraint = v["kwargs"].pop("constraint", constraints.real)
-            with util.helpful_support_errors(v):
-                inv_transforms[k] = transforms.biject_to(constraint)
-        elif (
-            v["type"] == "sample"
-            and not v["is_observed"]
-            and not v["fn"].support.is_discrete
-        ):
-            values[k] = v["value"]
-            with util.helpful_support_errors(v):
-                inv_transforms[k] = transforms.biject_to(v["fn"].support)
-    params_const = util.transform_fn(
-        inv_transforms,
-        {k: v for k, v in values.items()},
-        invert=invert,
-    )
-    return params_const
-
-def unconstrain_fn(model, model_args, model_kwargs, params):
-    # TODO: once next numpyro version is out, use newly implemented utilities from the package
-    return _transform_fn(model, model_args, model_kwargs, params, True)
-
-def constrain_fn(model, model_args, model_kwargs, params):
-    # TODO: once next numpyro version is out, use newly implemented utilities from the package
-    return _transform_fn(model, model_args, model_kwargs, params, False)
-

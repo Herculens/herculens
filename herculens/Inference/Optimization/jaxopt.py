@@ -6,8 +6,6 @@ __author__ = 'aymgal', 'austinpeel'
 
 
 import time
-import warnings
-import numpy as np
 from copy import deepcopy
 import jax
 import jaxopt
@@ -92,7 +90,7 @@ class JaxoptOptimizer(BaseOptimizer):
         # runtime = time.time() - start_time
 
         best_fit = params
-        logL_best_fit = self.loss.function(best_fit)
+        logL_best_fit = - self.loss.function(best_fit)
         extra_fields = {'loss_history': loss_history}
         # if return_param_history is True:
         #     extra_fields['param_history'] = param_history

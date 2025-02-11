@@ -31,10 +31,13 @@ from .MassModel.Profiles.dpie import (
 
 from .PointSourceModel.point_source_model import PointSourceModel
 
+from .GenericModel.correlated_field import CorrelatedField
+
 from .LensImage.lens_image import LensImage, LensImage3D
 from .Inference.loss import Loss
 from .Inference.ProbModel.numpyro import NumpyroModel
 from .Inference.Optimization.jaxopt import JaxoptOptimizer
+from .Inference.Optimization.optax import OptaxOptimizer
 from .Analysis.plot import Plotter
 
 from .Util import param_util as prmu

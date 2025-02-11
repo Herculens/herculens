@@ -22,7 +22,7 @@ class Loss(Differentiable):
         """
         :param prob_model: probabilistic model (e.g. from numpyro) that has a
         log_prob() method that returns the full log-probability of the model
-        :param constrained_space: whether or not considering that parameters
+        :param constrained_space: whether or not to consider that the parameters
         (input values of log_prob()) are assumed to be in constrained or 
         unconstrained space
         """

@@ -68,22 +68,54 @@ def ExpCroppedFieldTransform(key, cf, bxy, bwl):
         domain=cf.domain,
     )
 
-def prepare_light_correlated_field(key, light_model, border_xy, 
-                                   kwargs_amplitude, kwargs_fluctuations,
-                                   num_pix_wl=0, border_wl=0, kwargs_fluctuations_wl=None):
-    # TODO: implement multi-band correlated field
-    
-    # retrieve the number of pixels from the LightModel instance
-    num_pix_xy = light_model.pixel_grid_settings.get('num_pixels', None)
-    if num_pix_xy is None:
-        raise ValueError("Number of pixels should be set in the provided LightModel.")
-    
+def prepare_correlated_field(key, num_pix_xy, border_xy, 
+                             kwargs_amplitude, 
+                             kwargs_fluctuations,
+                             num_pix_wl=1, border_wl=0, 
+                             kwargs_fluctuations_wl=None,
+                             non_linearity='exp'):
+    """Utility that sets up a nifty.re correlated field forward model.
+
+    Parameters
+    ----------
+    key : str
+        Suffix (like a parameter name) added to the internal field parameter names
+    num_pix_xy : int
+        Number of pixels along each spatial dimensions (i.e. we assume a square grid).
+    border_xy : int
+        Number of pixels to crop on each sides of the field before it's returned by the model.
+    kwargs_amplitude : dict
+        Parameters of the field (see nifty.re documentation)
+    kwargs_fluctuations : _type_
+        Parameters of the field (see nifty.re documentation)
+    num_pix_wl : int, optional
+        Same as num_pix_xy but for the spectral (i.e. along wavelengths) dimensions, by default 1.
+    border_wl : int, optional
+        Same as border_xy but for the spectral (i.e. along wavelengths) dimension, by default 1.
+    kwargs_fluctuations_wl : _type_, optional
+        Same as kwargs_fluctuations for the spectral (i.e. along wavelengths) dimension
+    non_linearity : str, optional
+        Whether or not to apply a non-linearity to get specific behaviors, by default 'exp'.
+        For instance, exponential non-linearity is useful to ensure non-negative values.
+
+    Returns
+    -------
+    tuple of (jft.CorrelatedFieldMaker, jft.Model, int, int)
+        Instance of the correlated field maker, the forward field model, 
+        the total number of pixels in the spatial dimensions, 
+        and the total number of pixels in the spectral dimensions.
+
+    Raises
+    ------
+    ValueError
+        If the non-linearity is not implemented.
+    """
     # Correlated field parameters
     cfm = jft.CorrelatedFieldMaker(key + '_field_')
     cfm.set_amplitude_total_offset(**kwargs_amplitude)
 
     # Setup the power-spectrum in the spectral dimension (if multi-band fitting)
-    if num_pix_wl > 0:
+    if num_pix_wl > 1:
         num_pix_wl_tot = num_pix_wl + 2 * border_wl
         cfm.add_fluctuations(
             [num_pix_wl_tot],
@@ -92,6 +124,8 @@ def prepare_light_correlated_field(key, light_model, border_xy,
             prefix='wav_dim_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
             non_parametric_kind='power',
         )
+    else:
+        num_pix_wl_tot = 1
 
     # Setup the power-spectrum in the spatial dimensions
     num_pix_xy_tot = num_pix_xy + 2 * border_xy
@@ -108,9 +142,18 @@ def prepare_light_correlated_field(key, light_model, border_xy,
     field_transform = cfm.finalize()
 
     # Apply non-linear transformation to get the final light model
-    field_transform = ExpCroppedFieldTransform(key, field_transform, border_xy, border_wl)
+    if non_linearity not in ['exp', 'none']:
+        raise ValueError(f"Non-linearity '{non_linearity}' not implemented.")
+    if non_linearity == 'exp':
+        field_transform = ExpCroppedFieldTransform(key, field_transform, border_xy, border_wl)
         
-    return cfm, field_transform
+    return cfm, field_transform, num_pix_xy_tot, num_pix_wl_tot
+
+
+def prepare_light_correlated_field(*args, **kwargs):
+    # just for backwards compatibility
+    return prepare_correlated_field(*args, **kwargs)
+
 
 def concatenate_fields(*fields):
     def operator(x):

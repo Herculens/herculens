@@ -22,7 +22,7 @@ archivePrefix = {arXiv},
 }
 ```
 
-In addition, if you combine `herculens` with `nifty`, please cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation).
+In addition, if you combine `herculens` with `nifty`, for example using the `CorrelatedField` model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation).
 
 ```
 @ARTICLE{Galan2024_herculens_nifty,

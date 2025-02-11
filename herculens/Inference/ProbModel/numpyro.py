@@ -13,7 +13,7 @@ from numpyro import handlers
 from numpyro.infer import util
 
 from herculens.Inference.ProbModel.base_model import BaseProbModel
-from herculens.Inference.ProbModel import numpyro_util
+from herculens.Util import numpyro_util as my_util
 
 
 __all__ = ['NumpyroModel']
@@ -41,7 +41,7 @@ class NumpyroModel(BaseProbModel):
             log_prob, model_trace = util.log_density(self.model, (), {}, params)
         else:
             # do this for optimisation in unconstrained space
-            log_prob = - numpyro_util.potential_energy(self.model, (), {}, params)
+            log_prob = - my_util.potential_energy(self.model, (), {}, params)
         return log_prob
     
     def log_likelihood(self, params):
@@ -75,7 +75,7 @@ class NumpyroModel(BaseProbModel):
         return numpyro.render_model(self.model)
 
     def constrain(self, params):
-        return numpyro_util.constrain_fn(self.model, (), {}, params)
+        return util.constrain_fn(self.model, (), {}, params)
 
     def unconstrain(self, params):
-        return numpyro_util.unconstrain_fn(self.model, (), {}, params)
+        return util.unconstrain_fn(self.model, (), {}, params)

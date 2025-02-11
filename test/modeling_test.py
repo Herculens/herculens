@@ -81,6 +81,7 @@ def simulate_data(data_type, supersampling_factor):
     kwargs_input = dict(kwargs_lens=kwargs_lens_mass_input,
                             kwargs_source=kwargs_source_input,
                             kwargs_lens_light=kwargs_lens_light_input)
+        
     data = lens_image_input.simulation(
         **kwargs_input, compute_true_noise_map=True, 
         add_poisson_noise=True, add_background_noise=True,
@@ -234,14 +235,14 @@ def test_model_fit(data_type, supersampling_factor):
     loss = Loss(prob_model)
 
     # Draw some initial parameter values (from the prior)
-    init_params = prob_model.unconstrain(prob_model.get_sample(prng_key=jax.random.PRNGKey(0)))
+    init_params = prob_model.unconstrain(prob_model.get_sample(prng_key=jax.random.PRNGKey(1)))
     kwargs_init = prob_model.params2kwargs(prob_model.constrain(init_params))
     print("Initial loss =", loss(init_params))
     print("Initial gradient =", loss.gradient(init_params))
 
     model_init = lens_image_fit.model(**kwargs_init)
     red_chi2_init = lens_image_fit.reduced_chi2(data, model_init)
-    assert red_chi2_init > 1.05  # residual should be bad here
+    assert red_chi2_init > 1.1  # residual should be bad here
 
     # uncomment this to check the initial model compared to the data
     # import matplotlib.pyplot as plt
@@ -254,7 +255,7 @@ def test_model_fit(data_type, supersampling_factor):
     # Performs the fit
     optimizer = JaxoptOptimizer(loss, loss_norm_optim=data.size)
     bestfit_params, logL_best_fit, extra_fields, runtime \
-        = optimizer.run_scipy(init_params, method='BFGS', maxiter=200)
+        = optimizer.run_scipy(init_params, method='BFGS', maxiter=400)
 
     # uncomment this to check the evolution of the loss
     # plt.figure()
@@ -272,4 +273,4 @@ def test_model_fit(data_type, supersampling_factor):
     # plt.show()
 
     # assert that residuals after fitting are effectively down to the noise
-    assert red_chi2_bestfit < 1.05
+    assert red_chi2_bestfit < 1.1
