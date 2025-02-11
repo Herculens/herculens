@@ -81,10 +81,11 @@ def simulate_data(data_type, supersampling_factor):
     kwargs_input = dict(kwargs_lens=kwargs_lens_mass_input,
                             kwargs_source=kwargs_source_input,
                             kwargs_lens_light=kwargs_lens_light_input)
+        
     data = lens_image_input.simulation(
         **kwargs_input, compute_true_noise_map=True, 
         add_poisson_noise=True, add_background_noise=True,
-        prng_key=jax.random.PRNGKey(0),
+        prng_key=jax.random.PRNGKey(23459),
     )
     return data, lens_image_input, kwargs_input
 
@@ -234,7 +235,7 @@ def test_model_fit(data_type, supersampling_factor):
     loss = Loss(prob_model)
 
     # Draw some initial parameter values (from the prior)
-    init_params = prob_model.unconstrain(prob_model.get_sample(prng_key=jax.random.PRNGKey(0)))
+    init_params = prob_model.unconstrain(prob_model.get_sample(prng_key=jax.random.PRNGKey(290)))
     kwargs_init = prob_model.params2kwargs(prob_model.constrain(init_params))
     print("Initial loss =", loss(init_params))
     print("Initial gradient =", loss.gradient(init_params))
