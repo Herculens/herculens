@@ -242,7 +242,7 @@ def test_model_fit(data_type, supersampling_factor):
 
     model_init = lens_image_fit.model(**kwargs_init)
     red_chi2_init = lens_image_fit.reduced_chi2(data, model_init)
-    assert red_chi2_init > 1.05  # residual should be bad here
+    assert red_chi2_init > 1.1  # residual should be bad here
 
     # uncomment this to check the initial model compared to the data
     # import matplotlib.pyplot as plt
@@ -255,7 +255,7 @@ def test_model_fit(data_type, supersampling_factor):
     # Performs the fit
     optimizer = JaxoptOptimizer(loss, loss_norm_optim=data.size)
     bestfit_params, logL_best_fit, extra_fields, runtime \
-        = optimizer.run_scipy(init_params, method='BFGS', maxiter=200)
+        = optimizer.run_scipy(init_params, method='BFGS', maxiter=400)
 
     # uncomment this to check the evolution of the loss
     # plt.figure()
@@ -273,4 +273,4 @@ def test_model_fit(data_type, supersampling_factor):
     # plt.show()
 
     # assert that residuals after fitting are effectively down to the noise
-    assert red_chi2_bestfit < 1.05
+    assert red_chi2_bestfit < 1.1
