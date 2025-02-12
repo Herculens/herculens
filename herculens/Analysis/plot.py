@@ -96,17 +96,24 @@ class Plotter(object):
                       colorbar_kwargs={'orientation': 'horizontal'})
         return fig
 
-    def model_summary(self, lens_image, kwargs_result,
-                      show_image=True, show_source=True, 
-                      show_lens_light=False, show_lens_potential=False, show_lens_others=False,
-                      only_pixelated_potential=False, shift_pixelated_potential='none',
-                      likelihood_mask=None, potential_mask=None, 
-                      show_lens_lines=False, show_shear_field=False, show_lens_position=False,
-                      kwargs_grid_source=None,
-                      lock_colorbars=False, masked_residuals=True,
-                      vmin_pot=None, vmax_pot=None,  # TEMP
-                      k_source=None, k_lens=None,
-                      kwargs_noise=None, figsize=None, show_plot=True):
+    def model_summary(
+            self, lens_image, kwargs_result,
+            show_image=True, show_source=True, 
+            show_lens_light=False, show_lens_potential=False, show_lens_others=False,
+            only_pixelated_potential=False, shift_pixelated_potential='none',
+            likelihood_mask=None, potential_mask=None, 
+            show_lens_lines=False, show_shear_field=False, show_lens_position=False,
+            kwargs_grid_source=None,
+            lock_colorbars=False, masked_residuals=True,
+            vmin_pot=None, vmax_pot=None,
+            k_source=None, k_lens=None,
+            kwargs_noise=None, 
+            figsize=None, show_plot=True,
+
+            # TODO: this is a dirty quick fix to correctly read multi-band heterogenous LensImage models
+            # This will not be necessary once the LensImage3D class is properly supported.
+            adapted_source_pixels_coords=None,
+        ):
         """
         Generate a summary plot of the lens model.
 
@@ -176,7 +183,11 @@ class Plotter(object):
             
         if show_image:
             # create the resulting model image
-            model = lens_image.model(**kwargs_result, k_lens=k_lens)
+            model = lens_image.model(
+                **kwargs_result, 
+                k_lens=k_lens,
+                adapted_source_pixels_coords=adapted_source_pixels_coords,
+            )
             noise_var = lens_image.Noise.C_D_model(model, **kwargs_noise)
             if likelihood_mask is None:
                 mask_bool = False
@@ -207,6 +218,7 @@ class Plotter(object):
                     x_grid_src, y_grid_src, 
                     kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'],
                     k=k_source, k_lens=k_lens, de_lensed=True,
+                    adapted_pixels_coords=adapted_source_pixels_coords,
                 )
                 source_model *= lens_image.Grid.pixel_area                
             else:
