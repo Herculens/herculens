@@ -5,7 +5,7 @@ from .Instrument.psf import PSF
 from .Instrument.noise import Noise
 
 from .LightModel.light_model import LightModel
-from .LightModel.Profiles.gaussian import Gaussian, GaussianEllipse
+from .LightModel.Profiles.gaussian import Gaussian as GaussianLight, GaussianEllipse as GaussianEllipseLight
 from .LightModel.Profiles.multipole import Multipole
 from .LightModel.Profiles.sersic import Sersic, SersicElliptic  # NOTE: the Sersic class will be suppressed in the future
 from .LightModel.Profiles.shapelets import Shapelets
