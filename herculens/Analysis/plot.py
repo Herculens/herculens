@@ -106,7 +106,7 @@ class Plotter(object):
                       lock_colorbars=False, masked_residuals=True,
                       vmin_pot=None, vmax_pot=None,  # TEMP
                       k_source=None, k_lens=None,
-                      kwargs_noise=None, show_plot=True):
+                      kwargs_noise=None, figsize=None, show_plot=True):
         """
         Generate a summary plot of the lens model.
 
@@ -320,8 +320,9 @@ class Plotter(object):
 
 
         ##### BUILD UP THE PLOTS #####
-
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows*5))
+        if figsize is None:
+            figsize = (15, n_rows*5)
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
         if len(axes.shape) == 1:
             axes = axes[None, :] # add first axis so axes is always 2d array
         i_row = 0
