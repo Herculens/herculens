@@ -215,8 +215,16 @@ class CorrelatedField(object):
                 self._cfm_list.append(cfm)
                 self._jft_model_list.append(jft_model)
             self._cfm, self._jft_model = None, None  # irrelevant variables for this case
+        # Save the expected shapes of the field
+        if self._field_type == '2d':
+            self._shape_latent = (self._num_pix_tot, self._num_pix_tot)
+            self._shape_direct = (self._num_pix, self._num_pix)
+        elif self._field_type in ('3d', '2d_stack'):
+            self._shape_latent = (self._num_pix_wl_tot, self._num_pix_tot, self._num_pix_tot)
+            self._shape_direct = (self._num_pix_wl, self._num_pix, self._num_pix)
         # Nice message to say everything went smoothly
-        print(f"New CorrelatedField model of type '{self._field_type}' successfully created.")
+        print(f"New '{self._field_type}' CorrelatedField model successfully created "
+              f"(final shape is {str(tuple(self._shape_direct))}.")
 
     def __call__(self, params):
         return self.model(params)
@@ -470,3 +478,12 @@ class CorrelatedField(object):
     @property
     def num_wl(self):
         return self._num_pix_wl
+
+    @property
+    def final_shape(self):
+        return self._shape_direct
+    
+    @property
+    def field_latent(self):
+        return self._shape_latent
+    
