@@ -23,7 +23,7 @@ class CorrelatedField(object):
 
     Parameters
     ----------
-    param_suffix : str
+    param_prefix : str
         The suffix to be added to the field parameters name.
     mass_or_light_model : object
         The mass or light model instance.
@@ -45,6 +45,21 @@ class CorrelatedField(object):
         The field can optionally be evaluated on a larger grid size,
         and then cropped to return the model in direct space, by default 0.
         This is the number of pixels added on each size of the pixelated grid.
+    prior_loglogavgslope_wl : tuple, optional
+        The mean and scatter of the log-normal distribution for the average slope
+         of the power-spectrum in log-log space along the spectral dimensions, by default (-2., 0.5).
+    prior_fluctuations_wl : tuple, optional
+        The mean and scatter of the log-normal distribution for the fluctuations along the spectral dimensions, by default (0.3, 0.8).
+    prior_flexibility_wl : object, optional
+        The mean and scatter of the log-normal distribution for the flexibility along the spectral dimensions, by default None.
+    prior_asperity_wl : object, optional
+        The mean and scatter of the log-normal distribution for the asperity along the spectral dimensions, by default None.
+    num_bands : int, optional
+        The number of spectral bands, by default 1.
+    cropped_border_size_wl : int, optional
+        The field can optionally be evaluated on more than the targeted spectral dimensions,
+        and then cropped to return the model in direct space, by default 0.
+        This is the number of pixels added on each size of the pixelated grid along the spectral dimensions.
     exponentiate : bool, optional
         Whether to return the exponential of the field, by default True. 
         For example, taking the exponential is useful to ensures non–negative values.
@@ -58,15 +73,29 @@ class CorrelatedField(object):
     """
     def __init__(
             self, 
-            param_suffix, 
+            param_prefix, 
             mass_or_light_model, 
+
+            # General parameters
             offset_mean=np.log(1e-2),
             prior_offset_std=(0.5, 1e-6),
+
+            # Parameters along the spatial dimensions (`xy_dim`)
             prior_loglogavgslope=(-4., 0.5), 
             prior_fluctuations=(1.5, 0.8),
             prior_flexibility=None,
             prior_asperity=None,
             cropped_border_size=0,
+
+            # Parameters along the spectral, or wavelength dimensions (`wl_dim`)
+            num_bands=1,
+            prior_loglogavgslope_wl=(-2., 0.5), 
+            prior_fluctuations_wl=(0.3, 0.8),
+            prior_flexibility_wl=None,
+            prior_asperity_wl=None,
+            cropped_border_size_wl=0,
+
+            # Non-linearity
             exponentiate=True,
         ):
         # Check that the model is pixelated
@@ -105,32 +134,42 @@ class CorrelatedField(object):
             'flexibility': prior_flexibility, 
             'asperity': prior_asperity,
         }
+        if num_bands > 1:
+            self._kw_fluctuations_wl = {
+                'fluctuations': prior_fluctuations_wl,
+                'loglogavgslope': prior_loglogavgslope_wl,
+                'flexibility': prior_flexibility_wl,
+                'asperity': prior_asperity_wl,
+            }
+        else:
+            self._kw_fluctuations_wl = None
 
         # Setup the correlated field model
-        self._param_suffix = param_suffix
-        self._cfm, self._jft_model, self._num_pix_tot, _ = jifty_util.prepare_correlated_field(
-            self._param_suffix,
+        self._param_prefix = param_prefix
+        self._cfm, self._jft_model, self._num_pix_tot, self._num_wl_tot = jifty_util.prepare_correlated_field(
+            self._param_prefix,
             self._num_pix,
             cropped_border_size,
             kwargs_amplitude=self._kw_amplitude_offset,
             kwargs_fluctuations=self._kw_fluctuations,
-
-            # here we assume no multi-band model
-            # (i.e. nothing along the wavelength dimension)
-            num_pix_wl=1, border_wl=0,
-            kwargs_fluctuations_wl=None,
+            num_pix_wl=num_bands, 
+            border_wl=cropped_border_size_wl if num_bands > 1 else 0,
+            kwargs_fluctuations_wl=self._kw_fluctuations_wl,
             non_linearity='exp' if exponentiate else 'none',
         )
+        self._key_xy = 'xy_dim'
+        self._key_wl = 'wl_dim'
 
     def __call__(self, params):
         """Evaluate the model at the given parameters.
         The parameters keys are:
-        - '{param_suffix}_field_xi': the field fluctuations
-        - '{param_suffix}_field_zeromode': the zero mode of the field
-        - '{param_suffix}_field_xy_dim_fluctuations': the field fluctuations (along the spatial dimensions)
-        - '{param_suffix}_field_xy_dim_loglogavgslope': the log-log average slope of the power-spectrum (along the spatial dimensions)
-        - '{param_suffix}_field_xy_dim_flexibility': the flexibility (along the spatial dimensions)
-        - '{param_suffix}_field_xy_dim_asperity': the asperity (along the spatial dimensions)
+        - '{param_prefix}_field_xi': the field fluctuations
+        - '{param_prefix}_field_zeromode': the zero mode of the field
+        - '{param_prefix}_field_{dim_type}_dim_fluctuations': the field fluctuations (along the spatial dimensions)
+        - '{param_prefix}_field_{dim_type}_dim_loglogavgslope': the log-log average slope of the power-spectrum (along the spatial dimensions)
+        - '{param_prefix}_field_{dim_type}_dim_flexibility': the flexibility (along the spatial dimensions)
+        - '{param_prefix}_field_{dim_type}_dim_asperity': the asperity (along the spatial dimensions)
+        where `dim_type` is either 'xy' (spatial dimensions) or 'wl' (wavelength dimension).
 
         Parameters
         ----------
@@ -142,7 +181,7 @@ class CorrelatedField(object):
         jnp.Array
             Field model (in direct space), as 2d array.
         """
-        return self._jft_model(params)[self._param_suffix]
+        return self._jft_model(params)[self._param_prefix]
     
     def model(self, params):
         """Just a handy alias"""
@@ -159,46 +198,112 @@ class CorrelatedField(object):
         jnp.Array
             Field model (in direct space), as 2d array.
         """
+        if self._num_wl_tot == 1:
+            return self._numpyro_sample_pixels_2d()
+        else:
+            return self._numpyro_sample_pixels_3d()
+        
+    def _numpyro_sample_pixels_2d(self):
+        # TODO: reduce code duplication
         # imports here to prevent the need for numpyro to be installed
         # if the CorrelatedField class is used in a non-numpyro context.
         import numpyro
         from numpyro.distributions import Normal, Independent
         # Base field parameters
         params = {
-            f'{self._param_suffix}_field_xi': numpyro.sample(
-                f'{self._param_suffix}_field_xi', 
+            f'{self._param_prefix}_field_xi': numpyro.sample(
+                f'{self._param_prefix}_field_xi', 
                 Independent(Normal(
                     jnp.zeros((self._num_pix_tot, self._num_pix_tot)), 
                     jnp.ones((self._num_pix_tot, self._num_pix_tot))
                 ), reinterpreted_batch_ndims=2)
             ),
-            f'{self._param_suffix}_field_xy_dim_fluctuations': numpyro.sample(
-                f'{self._param_suffix}_field_xy_dim_fluctuations', 
+            f'{self._param_prefix}_field_zeromode': numpyro.sample(
+                f'{self._param_prefix}_field_zeromode', 
                 Normal(0., 1.),
             ),
-            f'{self._param_suffix}_field_xy_dim_loglogavgslope': numpyro.sample(
-                f'{self._param_suffix}_field_xy_dim_loglogavgslope', 
+            f'{self._param_prefix}_field_{self._key_xy}_fluctuations': numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_xy}_fluctuations', 
                 Normal(0., 1.),
             ),
-            f'{self._param_suffix}_field_zeromode': numpyro.sample(
-                f'{self._param_suffix}_field_zeromode', 
+            f'{self._param_prefix}_field_{self._key_xy}_loglogavgslope': numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_xy}_loglogavgslope', 
                 Normal(0., 1.),
             ),
         }
         # Additional optional field parameters
         if self._kw_fluctuations['flexibility'] is not None:
-            params[f'{self._param_suffix}_field_xy_dim_flexibility'] = numpyro.sample(
-                f'{self._param_suffix}_field_xy_dim_flexibility', 
+            params[f'{self._param_prefix}_field_{self._key_xy}_flexibility'] = numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_xy}_flexibility', 
                 Normal(0., 1.),
             )
         if self._kw_fluctuations['asperity'] is not None:
-            params[f'{self._param_suffix}_field_xy_dim_asperity'] = numpyro.sample(
-                f'{self._param_suffix}_field_xy_dim_asperity', 
+            params[f'{self._param_prefix}_field_{self._key_xy}_asperity'] = numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_xy}_asperity', 
                 Normal(0., 1.),
             )
         return self(params)
     
-    def draw_realizations_from_prior(self, prng_key, num_samples=10):
+    def _numpyro_sample_pixels_3d(self):
+        # TODO: reduce code duplication
+        # imports here to prevent the need for numpyro to be installed
+        # if the CorrelatedField class is used in a non-numpyro context.
+        import numpyro
+        from numpyro.distributions import Normal, Independent
+        # Base field parameters
+        params = {
+            f'{self._param_prefix}_field_zeromode': numpyro.sample(
+                f'{self._param_prefix}_field_zeromode', 
+                Normal(0., 1.),
+            ),
+            f'{self._param_prefix}_field_xi': numpyro.sample(
+                f'{self._param_prefix}_field_xi', 
+                Independent(Normal(
+                    jnp.zeros((self._num_wl_tot, self._num_pix_tot, self._num_pix_tot)), 
+                    jnp.ones((self._num_wl_tot, self._num_pix_tot, self._num_pix_tot))
+                ), reinterpreted_batch_ndims=3)
+            ),
+            f'{self._param_prefix}_field_{self._key_xy}_fluctuations': numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_xy}_fluctuations', 
+                Normal(0., 1.),
+            ),
+            f'{self._param_prefix}_field_{self._key_xy}_loglogavgslope': numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_xy}_loglogavgslope', 
+                Normal(0., 1.),
+            ),
+            f'{self._param_prefix}_field_{self._key_wl}_fluctuations': numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_wl}_fluctuations', 
+                Normal(0., 1.),
+            ),
+            f'{self._param_prefix}_field_{self._key_wl}_loglogavgslope': numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_wl}_loglogavgslope', 
+                Normal(0., 1.),
+            ),
+        }
+        # Additional optional field parameters
+        if self._kw_fluctuations['flexibility'] is not None:
+            params[f'{self._param_prefix}_field_{self._key_xy}_flexibility'] = numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_xy}_flexibility', 
+                Normal(0., 1.),
+            )
+        if self._kw_fluctuations['asperity'] is not None:
+            params[f'{self._param_prefix}_field_{self._key_xy}_asperity'] = numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_xy}_asperity', 
+                Normal(0., 1.),
+            )
+        if self._kw_fluctuations_wl['flexibility'] is not None:
+            params[f'{self._param_prefix}_field_{self._key_wl}_flexibility'] = numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_wl}_flexibility', 
+                Normal(0., 1.),
+            )
+        if self._kw_fluctuations_wl['asperity'] is not None:
+            params[f'{self._param_prefix}_field_{self._key_wl}_asperity'] = numpyro.sample(
+                f'{self._param_prefix}_field_{self._key_wl}_asperity', 
+                Normal(0., 1.),
+            )
+        return self(params)
+    
+    def draw_realizations_from_prior(self, prng_key, num_samples=10, return_parameters=False):
         """Draw a random field realization from the prior distribution.
 
         Returns
@@ -214,8 +319,14 @@ class CorrelatedField(object):
             self.numpyro_sample_pixels()
         # draw sample from the latent space (i.e. standard normal samples)
         prior_samples = Predictive(model, num_samples=num_samples)(prng_key)
-        # apply the transforms to get the 
-        return jax.vmap(self)(prior_samples)
+        # evaluate the model at the prior samples
+        model_samples = jax.vmap(self)(prior_samples)
+        # if there is only one sample, remove the first dimension
+        if num_samples == 1:
+            model_samples = jnp.squeeze(model_samples, axis=0)
+        if return_parameters:
+            return model_samples, prior_samples
+        return model_samples
     
     @property
     def correlated_field_maker(self):
@@ -229,3 +340,10 @@ class CorrelatedField(object):
     def num_pix(self):
         return self._num_pix
     
+    @property
+    def num_wl_field(self):
+        return self._num_wl_tot
+    
+    @property
+    def num_wl(self):
+        return self._num_pix_wl
