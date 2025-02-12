@@ -146,6 +146,8 @@ class CorrelatedField(object):
 
         # Setup the correlated field model
         self._param_prefix = param_prefix
+        self._key_xy = 'xy_dim'
+        self._key_wl = 'wl_dim'
         self._cfm, self._jft_model, self._num_pix_tot, self._num_wl_tot = jifty_util.prepare_correlated_field(
             self._param_prefix,
             self._num_pix,
@@ -156,9 +158,9 @@ class CorrelatedField(object):
             border_wl=cropped_border_size_wl if num_bands > 1 else 0,
             kwargs_fluctuations_wl=self._kw_fluctuations_wl,
             non_linearity='exp' if exponentiate else 'none',
+            param_key_xy=self._key_xy,
+            param_key_wl=self._key_wl,
         )
-        self._key_xy = 'xy_dim'
-        self._key_wl = 'wl_dim'
 
     def __call__(self, params):
         """Evaluate the model at the given parameters.

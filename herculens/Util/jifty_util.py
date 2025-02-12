@@ -73,6 +73,8 @@ def prepare_correlated_field(key, num_pix_xy, border_xy,
                              kwargs_fluctuations,
                              num_pix_wl=1, border_wl=0, 
                              kwargs_fluctuations_wl=None,
+                             param_key_xy='xy_dim', 
+                             param_key_wl='wl_dim',
                              non_linearity='exp'):
     """Utility that sets up a nifty.re correlated field forward model.
 
@@ -121,7 +123,7 @@ def prepare_correlated_field(key, num_pix_xy, border_xy,
             [num_pix_wl_tot],
             distances=1./num_pix_wl_tot,  # only makes a difference to get proper units for wavenumbers and certain types of covariance kernels
             **kwargs_fluctuations_wl,
-            prefix='wav_dim_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
+            prefix=param_key_wl+'_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
             non_parametric_kind='power',
         )
     else:
@@ -133,7 +135,7 @@ def prepare_correlated_field(key, num_pix_xy, border_xy,
         [num_pix_xy_tot, num_pix_xy_tot],
         distances=1./num_pix_xy_tot,  # only makes a difference to get proper units for wavenumbers and certain types of covariance kernels
         **kwargs_fluctuations,
-        prefix='xy_dim_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
+        prefix=param_key_xy+'_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
         non_parametric_kind='power',
     )
     # NOTE: in the pure nifty version, the distances are also 1/num_pix in the SimpleCorrelatedField model
