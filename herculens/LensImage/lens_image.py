@@ -123,7 +123,9 @@ class LensImage(object):
 
     def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
                                   unconvolved=False, supersampled=False,
-                                  de_lensed=False, k=None, k_lens=None):
+                                  de_lensed=False, k=None, k_lens=None,
+                                  adapted_pixels_coords=None, 
+                                  return_pixels_coords=False):
         """
 
         computes the source surface brightness distribution
@@ -141,22 +143,31 @@ class LensImage(object):
         if len(self.SourceModel.profile_type_list) == 0:
             return jnp.zeros(self.Grid.num_pixel_axes)
         x_grid_img, y_grid_img = self.ImageNumerics.coordinates_evaluate
-        source_light = self.eval_source_surface_brightness(
+        source_light, adapted_pixels_coords = self.eval_source_surface_brightness(
             x_grid_img, y_grid_img,
             kwargs_source, kwargs_lens=kwargs_lens,
             k=k, k_lens=k_lens, de_lensed=de_lensed,
+            adapted_pixels_coords=adapted_pixels_coords,
+            return_pixels_coords=True,
         )
         if not supersampled:
             source_light = self.ImageNumerics.re_size_convolve(
                 source_light, unconvolved=unconvolved)
+        if return_pixels_coords:
+            return source_light, adapted_pixels_coords
         return source_light
     
     def eval_source_surface_brightness(self, x, y, kwargs_source, kwargs_lens=None, 
-                                       k=None, k_lens=None, de_lensed=False):
+                                       k=None, k_lens=None, de_lensed=False,
+                                       adapted_pixels_coords=None, 
+                                       return_pixels_coords=False):
         if self._src_adaptive_grid:
-            pixels_x_coord, pixels_y_coord, _ = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens)
+            if adapted_pixels_coords is None:
+                pixels_x_coord, pixels_y_coord, _ = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens)
+            else:
+                pixels_x_coord, pixels_y_coord = adapted_pixels_coords
         else:
-            pixels_x_coord, pixels_y_coord = None, None  # fall back on fixed, user-defined coordinates
+            pixels_x_coord, pixels_y_coord = None, None
         if de_lensed is True:
             source_light = self.SourceModel.surface_brightness(x, y, kwargs_source, k=k,
                                                                pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
@@ -164,6 +175,8 @@ class LensImage(object):
             x_grid_src, y_grid_src = self.MassModel.ray_shooting(x, y, kwargs_lens, k=k_lens)
             source_light = self.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source, k=k,
                                                                pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
+        if return_pixels_coords:
+            return source_light, (pixels_x_coord, pixels_y_coord)
         return source_light
 
     def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False,
@@ -206,11 +219,12 @@ class LensImage(object):
             )
         return result
 
-    @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13))
+    @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15))
     def model(self, kwargs_lens=None, kwargs_source=None, kwargs_lens_light=None,
               kwargs_point_source=None, unconvolved=False, supersampled=False,
               source_add=True, lens_light_add=True, point_source_add=True,
-              k_lens=None, k_source=None, k_lens_light=None, k_point_source=None):
+              k_lens=None, k_source=None, k_lens_light=None, k_point_source=None,
+              adapted_source_pixels_coords=None, return_source_pixels_coords=False):
         """
         Create the 2D model image from parameter values.
         Note: due to JIT compilation, the first call to this method will be slower.
@@ -236,9 +250,11 @@ class LensImage(object):
         if supersampled:
             model = jnp.zeros((self.ImageNumerics.grid_class.num_grid_points,))
         if source_add is True:
-            source_model = self.source_surface_brightness(kwargs_source, kwargs_lens, 
-                                                          unconvolved=unconvolved, supersampled=supersampled,
-                                                          k=k_source, k_lens=k_lens) 
+            source_model, adapted_source_pixels_coords = self.source_surface_brightness(
+                kwargs_source, kwargs_lens, unconvolved=unconvolved, 
+                supersampled=supersampled, k=k_source, k_lens=k_lens,
+                adapted_pixels_coords=adapted_source_pixels_coords, 
+                return_pixels_coords=True) 
             if self.source_arc_mask is not None:
                 source_model *= self.source_arc_mask
             model += source_model
@@ -246,12 +262,12 @@ class LensImage(object):
             model += self.lens_surface_brightness(kwargs_lens_light, 
                                                   unconvolved=unconvolved, supersampled=supersampled,
                                                   k=k_lens_light)
-
         if point_source_add:
             model += self.point_source_image(kwargs_point_source, kwargs_lens,
                                              kwargs_solver=self.kwargs_lens_equation_solver,
                                              k=k_point_source)
-
+        if return_source_pixels_coords:
+            return model, adapted_source_pixels_coords
         return model
 
     def simulation(self, add_poisson_noise=True, add_background_noise=True,
