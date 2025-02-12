@@ -68,14 +68,20 @@ def ExpCroppedFieldTransform(key, cf, bxy, bwl):
         domain=cf.domain,
     )
 
-def prepare_correlated_field(key, num_pix_xy, border_xy, 
-                             kwargs_amplitude, 
-                             kwargs_fluctuations,
-                             num_pix_wl=1, border_wl=0, 
-                             kwargs_fluctuations_wl=None,
-                             param_key_xy='xy_dim', 
-                             param_key_wl='wl_dim',
-                             non_linearity='exp'):
+def prepare_correlated_field(
+        key, num_pix_xy, border_xy, 
+        kwargs_amplitude, 
+        kwargs_fluctuations,
+        correlation_type='power',
+        num_pix_wl=1, 
+        border_wl=0, 
+        kwargs_fluctuations_wl=None,
+        field_key='field',
+        param_key_xy='xy_dim', 
+        param_key_wl='wl_dim',
+        correlation_type_wl='none',
+        non_linearity='exp'
+    ):
     """Utility that sets up a nifty.re correlated field forward model.
 
     Parameters
@@ -113,7 +119,7 @@ def prepare_correlated_field(key, num_pix_xy, border_xy,
         If the non-linearity is not implemented.
     """
     # Correlated field parameters
-    cfm = jft.CorrelatedFieldMaker(key + '_field_')
+    cfm = jft.CorrelatedFieldMaker(key + f'_{field_key}_')
     cfm.set_amplitude_total_offset(**kwargs_amplitude)
 
     # Setup the power-spectrum in the spectral dimension (if multi-band fitting)
@@ -124,7 +130,8 @@ def prepare_correlated_field(key, num_pix_xy, border_xy,
             distances=1./num_pix_wl_tot,  # only makes a difference to get proper units for wavenumbers and certain types of covariance kernels
             **kwargs_fluctuations_wl,
             prefix=param_key_wl+'_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
-            non_parametric_kind='power',
+            non_parametric_kind=correlation_type_wl,
+            harmonic_type='fourier',
         )
     else:
         num_pix_wl_tot = 1
@@ -136,7 +143,8 @@ def prepare_correlated_field(key, num_pix_xy, border_xy,
         distances=1./num_pix_xy_tot,  # only makes a difference to get proper units for wavenumbers and certain types of covariance kernels
         **kwargs_fluctuations,
         prefix=param_key_xy+'_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
-        non_parametric_kind='power',
+        non_parametric_kind=correlation_type,
+        harmonic_type='fourier',
     )
     # NOTE: in the pure nifty version, the distances are also 1/num_pix in the SimpleCorrelatedField model
 

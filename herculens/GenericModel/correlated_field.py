@@ -54,7 +54,7 @@ class CorrelatedField(object):
         The mean and scatter of the log-normal distribution for the flexibility along the spectral dimensions, by default None.
     prior_asperity_wl : object, optional
         The mean and scatter of the log-normal distribution for the asperity along the spectral dimensions, by default None.
-    num_bands : int, optional
+    num_wl : int, optional
         The number of spectral bands, by default 1.
     cropped_border_size_wl : int, optional
         The field can optionally be evaluated on more than the targeted spectral dimensions,
@@ -81,6 +81,7 @@ class CorrelatedField(object):
             prior_offset_std=(0.5, 1e-6),
 
             # Parameters along the spatial dimensions (`xy_dim`)
+            correlation_type='power',
             prior_loglogavgslope=(-4., 0.5), 
             prior_fluctuations=(1.5, 0.8),
             prior_flexibility=None,
@@ -88,8 +89,9 @@ class CorrelatedField(object):
             cropped_border_size=0,
 
             # Parameters along the spectral, or wavelength dimensions (`wl_dim`)
-            num_bands=1,
-            prior_loglogavgslope_wl=(-2., 0.5), 
+            num_pix_wl=1,
+            correlation_type_wl='none',
+            prior_loglogavgslope_wl=(-4., 0.5), 
             prior_fluctuations_wl=(0.3, 0.8),
             prior_flexibility_wl=None,
             prior_asperity_wl=None,
@@ -115,6 +117,19 @@ class CorrelatedField(object):
         else:
             if self._num_pix != self._num_pix_y:
                 raise NotImplementedError("Only square pixel grids are supported for now.")
+            
+        # Define the 'type' of correlated field
+        self._num_pix_wl = num_pix_wl
+        if self._num_pix_wl == 1:
+            # correlated field along the spatial dimensions only
+            self._field_type = '2d'
+        elif correlation_type_wl != 'none':
+            # correlated field along both spatial and spectral dimensions
+            self._field_type = '3d'
+        else:
+            # stack of 2D correlated fields (i.e. uncorrelated along the spectral dimension)
+            self._field_type = '2d_stack'
+        
         # Pack the prior choices
         if any([p is None for p in [offset_mean, prior_offset_std, prior_loglogavgslope, prior_fluctuations]]):
             raise ValueError("Field parameters and priors `offset_mean`, `prior_offset_std`, `prior_loglogavgslope`, `prior_fluctuations` are mandatory.")
@@ -134,7 +149,7 @@ class CorrelatedField(object):
             'flexibility': prior_flexibility, 
             'asperity': prior_asperity,
         }
-        if num_bands > 1:
+        if self._field_type == '3d':
             self._kw_fluctuations_wl = {
                 'fluctuations': prior_fluctuations_wl,
                 'loglogavgslope': prior_loglogavgslope_wl,
@@ -146,23 +161,67 @@ class CorrelatedField(object):
 
         # Setup the correlated field model
         self._param_prefix = param_prefix
+        self._field_key = 'field'
         self._key_xy = 'xy_dim'
         self._key_wl = 'wl_dim'
-        self._cfm, self._jft_model, self._num_pix_tot, self._num_wl_tot = jifty_util.prepare_correlated_field(
-            self._param_prefix,
-            self._num_pix,
-            cropped_border_size,
-            kwargs_amplitude=self._kw_amplitude_offset,
-            kwargs_fluctuations=self._kw_fluctuations,
-            num_pix_wl=num_bands, 
-            border_wl=cropped_border_size_wl if num_bands > 1 else 0,
-            kwargs_fluctuations_wl=self._kw_fluctuations_wl,
-            non_linearity='exp' if exponentiate else 'none',
-            param_key_xy=self._key_xy,
-            param_key_wl=self._key_wl,
-        )
+
+        # There are three possibilities:
+        # - either it's a 2D correlated field (only along spatial dimensions)
+        # - either it's a 3D field, correlated along both spatial and spectral dimensions
+        # - either it's a stack of 2D correlated fields (i.e. uncorrelated along the spectral dimension)
+        if self._field_type in ('2d', '3d'):
+            (
+                self._cfm, self._jft_model, 
+                self._num_pix_tot, self._num_pix_wl_tot
+            ) = jifty_util.prepare_correlated_field(
+                self._param_prefix,
+                self._num_pix,
+                cropped_border_size,
+                kwargs_amplitude=self._kw_amplitude_offset,
+                kwargs_fluctuations=self._kw_fluctuations,
+                num_pix_wl=self._num_pix_wl, 
+                border_wl=cropped_border_size_wl if self._num_pix_wl > 1 else 0,
+                kwargs_fluctuations_wl=self._kw_fluctuations_wl,
+                non_linearity='exp' if exponentiate else 'none',
+                field_key=self._field_key,
+                param_key_xy=self._key_xy,
+                param_key_wl=self._key_wl,
+                correlation_type=correlation_type,
+                correlation_type_wl=correlation_type_wl,
+            )
+            self._cfm_list, self._jft_model_list = None, None  # irrelevant variables for this case
+        else:
+            # iterate over the bands and build a list of independent correlated fields
+            self._cfm_list = []
+            self._jft_model_list = []
+            self._num_pix_wl_tot = self._num_pix_wl  # no cropped border in this case
+            for i_wl in range(self._num_pix_wl):
+                cfm, jft_model, self._num_pix_tot, _ = jifty_util.prepare_correlated_field(
+                    self._param_prefix,
+                    self._num_pix,
+                    cropped_border_size,
+                    kwargs_amplitude=self._kw_amplitude_offset,
+                    kwargs_fluctuations=self._kw_fluctuations,
+                    num_pix_wl=1, 
+                    border_wl=0,
+                    kwargs_fluctuations_wl=None,
+                    non_linearity='exp' if exponentiate else 'none',
+                    field_key=f'{self._field_key}_stack{i_wl}',
+                    param_key_xy=self._key_xy,
+                    param_key_wl=self._key_wl,
+                    correlation_type=correlation_type,
+                    correlation_type_wl='none',
+                )
+                self._cfm_list.append(cfm)
+                self._jft_model_list.append(jft_model)
+            self._cfm, self._jft_model = None, None  # irrelevant variables for this case
+        # Nice message to say everything went smoothly
+        print(f"New CorrelatedField model of type '{self._field_type}' successfully created.")
 
     def __call__(self, params):
+        return self.model(params)
+
+    def model(self, params):
         """Evaluate the model at the given parameters.
         The parameters keys are:
         - '{param_prefix}_field_xi': the field fluctuations
@@ -181,13 +240,22 @@ class CorrelatedField(object):
         Returns
         -------
         jnp.Array
-            Field model (in direct space), as 2d array.
+            Field model (in direct space), as 2d or 3d array.
         """
-        return self._jft_model(params)[self._param_prefix]
+        if self._field_type in ('2d', '3d'):
+            return self._call_model_std(self._jft_model, params)
+        else:
+            return self._call_model_stack(params)
     
-    def model(self, params):
-        """Just a handy alias"""
-        return self(params)
+    def _call_model_std(self, jft_model, params):
+        return jft_model(params)[self._param_prefix]
+    
+    def _call_model_stack(self, params):
+        model_per_band = []
+        for i_wl in range(self._num_pix_wl):
+            model = self._call_model_std(self._jft_model_list[i_wl], params)
+            model_per_band.append(model)
+        return jnp.stack(model_per_band, axis=0)
 
     def numpyro_sample_pixels(self):
         """Defines the numpyro model to be used in a Pixelated (light or mass) profile.
@@ -200,10 +268,8 @@ class CorrelatedField(object):
         jnp.Array
             Field model (in direct space), as 2d array.
         """
-        if self._num_wl_tot == 1:
-            return self._numpyro_sample_pixels_2d()
-        else:
-            return self._numpyro_sample_pixels_3d()
+        sample_method = getattr(self, f'_numpyro_sample_pixels_{self._field_type}')
+        return sample_method()
         
     def _numpyro_sample_pixels_2d(self):
         # TODO: reduce code duplication
@@ -213,30 +279,30 @@ class CorrelatedField(object):
         from numpyro.distributions import Normal, Independent
         # Base field parameters
         params = {
-            f'{self._param_prefix}_field_xi': numpyro.sample(
-                f'{self._param_prefix}_field_xi', 
+            f'{self._param_prefix}_{self._field_key}_xi': numpyro.sample(
+                f'{self._param_prefix}_{self._field_key}_xi', 
                 Independent(Normal(
                     jnp.zeros((self._num_pix_tot, self._num_pix_tot)), 
                     jnp.ones((self._num_pix_tot, self._num_pix_tot))
                 ), reinterpreted_batch_ndims=2)
             ),
-            f'{self._param_prefix}_field_zeromode': numpyro.sample(
-                f'{self._param_prefix}_field_zeromode', 
+            f'{self._param_prefix}_{self._field_key}_zeromode': numpyro.sample(
+                f'{self._param_prefix}_{self._field_key}_zeromode', 
                 Normal(0., 1.),
             ),
-            f'{self._param_prefix}_field_{self._key_xy}_fluctuations': numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_xy}_fluctuations', 
+            f'{self._param_prefix}_{self._field_key}_{self._key_xy}_fluctuations': numpyro.sample(
+                f'{self._param_prefix}_{self._field_key}_{self._key_xy}_fluctuations', 
                 Normal(0., 1.),
             ),
-            f'{self._param_prefix}_field_{self._key_xy}_loglogavgslope': numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_xy}_loglogavgslope', 
+            f'{self._param_prefix}_{self._field_key}_{self._key_xy}_loglogavgslope': numpyro.sample(
+                f'{self._param_prefix}_{self._field_key}_{self._key_xy}_loglogavgslope', 
                 Normal(0., 1.),
             ),
         }
         # Additional optional field parameters
         if self._kw_fluctuations['flexibility'] is not None:
-            params[f'{self._param_prefix}_field_{self._key_xy}_flexibility'] = numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_xy}_flexibility', 
+            params[f'{self._param_prefix}_{self._field_key}_{self._key_xy}_flexibility'] = numpyro.sample(
+                f'{self._param_prefix}_{self._field_key}_{self._key_xy}_flexibility', 
                 Normal(0., 1.),
             )
         if self._kw_fluctuations['asperity'] is not None:
@@ -244,7 +310,7 @@ class CorrelatedField(object):
                 f'{self._param_prefix}_field_{self._key_xy}_asperity', 
                 Normal(0., 1.),
             )
-        return self(params)
+        return self.model(params)
     
     def _numpyro_sample_pixels_3d(self):
         # TODO: reduce code duplication
@@ -261,8 +327,8 @@ class CorrelatedField(object):
             f'{self._param_prefix}_field_xi': numpyro.sample(
                 f'{self._param_prefix}_field_xi', 
                 Independent(Normal(
-                    jnp.zeros((self._num_wl_tot, self._num_pix_tot, self._num_pix_tot)), 
-                    jnp.ones((self._num_wl_tot, self._num_pix_tot, self._num_pix_tot))
+                    jnp.zeros((self._num_pix_wl_tot, self._num_pix_tot, self._num_pix_tot)), 
+                    jnp.ones((self._num_pix_wl_tot, self._num_pix_tot, self._num_pix_tot))
                 ), reinterpreted_batch_ndims=3)
             ),
             f'{self._param_prefix}_field_{self._key_xy}_fluctuations': numpyro.sample(
@@ -303,7 +369,62 @@ class CorrelatedField(object):
                 f'{self._param_prefix}_field_{self._key_wl}_asperity', 
                 Normal(0., 1.),
             )
-        return self(params)
+        return self.model(params)
+    
+    def _numpyro_sample_pixels_2d_stack(self):
+        # TODO: reduce code duplication
+        # imports here to prevent the need for numpyro to be installed
+        # if the CorrelatedField class is used in a non-numpyro context.
+        import numpyro
+        from numpyro.distributions import Normal, Independent
+        # Iterate over the bands
+        params = {}
+        base_key = f'{self._param_prefix}_{self._field_key}'
+        for i_wl in range(self._num_pix_wl):
+            # Base field parameters
+            params.update({
+                f'{base_key}_stack{i_wl}_xi': numpyro.sample(
+                    f'{base_key}_stack{i_wl}_xi', 
+                    Independent(Normal(
+                        jnp.zeros((self._num_pix_tot, self._num_pix_tot)), 
+                        jnp.ones((self._num_pix_tot, self._num_pix_tot))
+                    ), reinterpreted_batch_ndims=2)
+                ),
+                f'{base_key}_stack{i_wl}_zeromode': numpyro.sample(
+                    f'{base_key}_stack{i_wl}_zeromode', 
+                    Normal(0., 1.),
+                ),
+                f'{base_key}_stack{i_wl}_{self._key_xy}_fluctuations': numpyro.sample(
+                    f'{base_key}_stack{i_wl}_{self._key_xy}_fluctuations', 
+                    Normal(0., 1.),
+                ),
+                f'{base_key}_stack{i_wl}_{self._key_xy}_loglogavgslope': numpyro.sample(
+                    f'{base_key}_stack{i_wl}_{self._key_xy}_loglogavgslope', 
+                    Normal(0., 1.),
+                ),
+            })
+            # Additional optional field_key parameters
+            if self._kw_fluctuations['flexibility'] is not None:
+                params.update(
+                    {
+                        f'{base_key}_stack{i_wl}_{self._key_xy}_flexibility': numpyro.sample(
+                            f'{base_key}_stack{i_wl}_{self._key_xy}_flexibility', 
+                            Normal(0., 1.),
+                        )
+                    }
+                )
+            if self._kw_fluctuations['asperity'] is not None:
+                params.update(
+                    {
+                        f'{base_key}_stack{i_wl}_{self._key_xy}_asperity': numpyro.sample(
+                            f'{base_key}_stack{i_wl}_{self._key_xy}_asperity', 
+                            Normal(0., 1.),
+                        )
+                    }
+                )
+            # model = self._jft_model_list[i_wl](params)[self._param_prefix]
+            # models_per_band.append(model)
+        return self.model(params)
     
     def draw_realizations_from_prior(self, prng_key, num_samples=10, return_parameters=False):
         """Draw a random field realization from the prior distribution.
@@ -344,7 +465,7 @@ class CorrelatedField(object):
     
     @property
     def num_wl_field(self):
-        return self._num_wl_tot
+        return self._num_pix_wl_tot
     
     @property
     def num_wl(self):
