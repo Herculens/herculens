@@ -6,6 +6,7 @@
 __author__ = 'aymgal'
 
 
+import copy
 import jax
 import jax.numpy as jnp
 import numpyro
@@ -44,9 +45,9 @@ class NumpyroModel(BaseProbModel):
             log_prob = - my_util.potential_energy(self.model, (), {}, params)
         return log_prob
     
-    def log_likelihood(self, params):
+    def log_likelihood(self, params, obs_site_key='obs'):
         # returns the logarithm of the data likelihood
-        return util.log_likelihood(self.model, params, batch_ndims=0)['obs']
+        return util.log_likelihood(self.model, params, batch_ndims=0)[obs_site_key]
 
     def seeded_model(self, prng_key):
         return handlers.seed(self.model, prng_key)
@@ -68,7 +69,11 @@ class NumpyroModel(BaseProbModel):
                                      num_samples=num_samples, 
                                      batch_ndims=batch_ndims)
         samples = predictive(prng_key)
-        del samples['obs']
+        # delete all sites whose key contain 'obs'
+        sites_keys = copy.deepcopy(list(samples.keys()))
+        for key in sites_keys:
+            if 'obs' in key:
+                del samples[key]
         return samples
 
     def render_model(self):
