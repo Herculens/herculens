@@ -254,7 +254,7 @@ class LensImage(object):
                 kwargs_source, kwargs_lens, unconvolved=unconvolved, 
                 supersampled=supersampled, k=k_source, k_lens=k_lens,
                 adapted_pixels_coords=adapted_source_pixels_coords, 
-                return_pixels_coords=True) 
+                return_pixels_coords=True)
             if self.source_arc_mask is not None:
                 source_model *= self.source_arc_mask
             model += source_model
@@ -417,17 +417,28 @@ class LensImage(object):
 class LensImage3D(object):
     """Generate lensed images from source light, lens mass/light, and point source models."""
 
-    def __init__(self, lens_image_list):
+    def __init__(self, lens_image_list, mode='stack'):
         """
         :param lens_image_list: list of LensImage instances
         """
+        if len(lens_image_list) == 1:
+            raise ValueError("LensImage3D should be used with more than one band.")
+        if mode not in ('stack', 'list'):
+            raise ValueError("mode should be either 'stack' or 'list'.")
+        self.mode = mode
         self.num_bands = len(lens_image_list)
-        for i in range(1, self.num_bands):
-            if lens_image_list[i].Grid.num_pixel_axes != lens_image_list[i-1].Grid.num_pixel_axes:
-                raise ValueError("In each band, all models should have the same shape.")
+        # check that if the 'stack' mode is required, then all LensImage instances
+        # should have the same number of pixels on both axis (otherwise stacking is not possible)
+        if self.mode == 'stack':
+            for i in range(1, self.num_bands):
+                if lens_image_list[i].Grid.num_pixel_axes != lens_image_list[i-1].Grid.num_pixel_axes:
+                    raise ValueError("In each band, all models should have the same shape.")
+            self.nx, self.ny = lens_image_list[0].Grid.num_pixel_axes
+            self.nw = self.num_bands
+        else:
+            # TODO: improve this
+            self.nx, self.ny, self.nw = None, None, None
         self.lens_images = lens_image_list
-        self.nx, self.ny = lens_image_list[0].Grid.num_pixel_axes
-        self.nw = self.num_bands
 
     def source_surface_brightness(self, kwargs_source_list, k_list=None, **kwargs_single_band):
         """
@@ -493,9 +504,9 @@ class LensImage3D(object):
 
     @partial(jit, static_argnums=(0, 5, 6, 7, 8, 9, 10, 11, 12, 13))
     def model(self, kwargs_lens=None, kwargs_source_list=None, kwargs_lens_light_list=None,
-            kwargs_point_source_list=None, unconvolved=False, supersampled=False,
-            source_add=True, lens_light_add=True, point_source_add=True,
-            k_lens=None, k_source_list=None, k_lens_light_list=None, k_point_source_list=None):
+              kwargs_point_source_list=None, unconvolved=False, supersampled=False,
+              source_add=True, lens_light_add=True, point_source_add=True,
+              k_lens=None, k_source_list=None, k_lens_light_list=None, k_point_source_list=None):
         """
         Create the 2D model image from parameter values.
         Note: due to JIT compilation, the first call to this method will be slower.
@@ -524,7 +535,7 @@ class LensImage3D(object):
         k_point_source_list = self._none_kwargs(k_point_source_list)
         model_multi_band = []
         for i in range(self.num_bands):
-            model_sgl_band = self.lens_images[i].model(
+            model_sgl_band, source_coords = self.lens_images[i].model(
                 kwargs_lens=kwargs_lens,
                 kwargs_source=kwargs_source_list[i],
                 kwargs_lens_light=kwargs_lens_light_list[i],
@@ -534,14 +545,20 @@ class LensImage3D(object):
                 point_source_add=point_source_add,
                 k_lens=k_lens, k_lens_light=k_lens_light_list[i], k_source=k_source_list[i], 
                 k_point_source=k_point_source_list[i],
+
+                # the following is to ensure all pixelated source grids (if any) are consistent
+                return_source_pixels_coords=True if i == 0 else False,
+                adapted_source_pixels_coords=source_coords if i > 0 else None,
             )
             model_multi_band.append(model_sgl_band)
-        return jnp.array(model_multi_band)
+        if self.mode == 'stack':
+            return jnp.stack(model_multi_band, axis=0)
+        elif self.mode == 'list':
+            return model_multi_band
 
-    def simulation(self, add_poisson=True, add_gaussian=True,
-                compute_true_noise_map=True, prng_key=18,
-                **model_kwargs):
-        raise NotImplementedError()
+    def simulation(self, *args, **kwargs):
+        raise NotImplementedError("The .simulation() method is not supported for 3D models. "
+                                  "Please use the standard LensImage class.")
     
     def C_D_model(self, model):
         c_d_multi_band = []
