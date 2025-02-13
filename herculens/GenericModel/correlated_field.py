@@ -100,6 +100,9 @@ class CorrelatedField(object):
             # Non-linearity
             exponentiate=True,
         ):
+        # Sanity checks
+        if num_pix_wl < 1:
+            raise ValueError("The number of spectral dimensions must be at least 1.")
         # Check that the model is pixelated
         if not mass_or_light_model.has_pixels:
             raise ValueError("The provided LightModel or MassModel must contain "
@@ -227,6 +230,7 @@ class CorrelatedField(object):
               f"(final shape is {str(tuple(self._shape_direct))}.")
 
     def __call__(self, params):
+        """Handy alias to make the class callable."""
         return self.model(params)
 
     def model(self, params):
@@ -251,17 +255,17 @@ class CorrelatedField(object):
             Field model (in direct space), as 2d or 3d array.
         """
         if self._field_type in ('2d', '3d'):
-            return self._call_model_std(self._jft_model, params)
+            return self._model_std(self._jft_model, params)
         else:
-            return self._call_model_stack(params)
+            return self._model_stack(params)
     
-    def _call_model_std(self, jft_model, params):
+    def _model_std(self, jft_model, params):
         return jft_model(params)[self._param_prefix]
     
-    def _call_model_stack(self, params):
+    def _model_stack(self, params):
         model_per_band = []
         for i_wl in range(self._num_pix_wl):
-            model = self._call_model_std(self._jft_model_list[i_wl], params)
+            model = self._model_std(self._jft_model_list[i_wl], params)
             model_per_band.append(model)
         return jnp.stack(model_per_band, axis=0)
 
@@ -286,36 +290,37 @@ class CorrelatedField(object):
         import numpyro
         from numpyro.distributions import Normal, Independent
         # Base field parameters
+        key_base = f'{self._param_prefix}_{self._field_key}'
         params = {
-            f'{self._param_prefix}_{self._field_key}_xi': numpyro.sample(
-                f'{self._param_prefix}_{self._field_key}_xi', 
+            f'{key_base}_xi': numpyro.sample(
+                f'{key_base}_xi', 
                 Independent(Normal(
                     jnp.zeros((self._num_pix_tot, self._num_pix_tot)), 
                     jnp.ones((self._num_pix_tot, self._num_pix_tot))
                 ), reinterpreted_batch_ndims=2)
             ),
-            f'{self._param_prefix}_{self._field_key}_zeromode': numpyro.sample(
-                f'{self._param_prefix}_{self._field_key}_zeromode', 
+            f'{key_base}_zeromode': numpyro.sample(
+                f'{key_base}_zeromode', 
                 Normal(0., 1.),
             ),
-            f'{self._param_prefix}_{self._field_key}_{self._key_xy}_fluctuations': numpyro.sample(
-                f'{self._param_prefix}_{self._field_key}_{self._key_xy}_fluctuations', 
+            f'{key_base}_{self._key_xy}_fluctuations': numpyro.sample(
+                f'{key_base}_{self._key_xy}_fluctuations', 
                 Normal(0., 1.),
             ),
-            f'{self._param_prefix}_{self._field_key}_{self._key_xy}_loglogavgslope': numpyro.sample(
-                f'{self._param_prefix}_{self._field_key}_{self._key_xy}_loglogavgslope', 
+            f'{key_base}_{self._key_xy}_loglogavgslope': numpyro.sample(
+                f'{key_base}_{self._key_xy}_loglogavgslope', 
                 Normal(0., 1.),
             ),
         }
         # Additional optional field parameters
         if self._kw_fluctuations['flexibility'] is not None:
-            params[f'{self._param_prefix}_{self._field_key}_{self._key_xy}_flexibility'] = numpyro.sample(
-                f'{self._param_prefix}_{self._field_key}_{self._key_xy}_flexibility', 
+            params[f'{key_base}_{self._key_xy}_flexibility'] = numpyro.sample(
+                f'{key_base}_{self._key_xy}_flexibility', 
                 Normal(0., 1.),
             )
         if self._kw_fluctuations['asperity'] is not None:
-            params[f'{self._param_prefix}_field_{self._key_xy}_asperity'] = numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_xy}_asperity', 
+            params[f'{key_base}_{self._key_xy}_asperity'] = numpyro.sample(
+                f'{key_base}_{self._key_xy}_asperity', 
                 Normal(0., 1.),
             )
         return self.model(params)
@@ -327,54 +332,55 @@ class CorrelatedField(object):
         import numpyro
         from numpyro.distributions import Normal, Independent
         # Base field parameters
+        key_base = f'{self._param_prefix}_{self._field_key}'
         params = {
-            f'{self._param_prefix}_field_zeromode': numpyro.sample(
-                f'{self._param_prefix}_field_zeromode', 
+            f'{key_base}_zeromode': numpyro.sample(
+                f'{key_base}_zeromode', 
                 Normal(0., 1.),
             ),
-            f'{self._param_prefix}_field_xi': numpyro.sample(
-                f'{self._param_prefix}_field_xi', 
+            f'{key_base}_xi': numpyro.sample(
+                f'{key_base}_xi', 
                 Independent(Normal(
                     jnp.zeros((self._num_pix_wl_tot, self._num_pix_tot, self._num_pix_tot)), 
                     jnp.ones((self._num_pix_wl_tot, self._num_pix_tot, self._num_pix_tot))
                 ), reinterpreted_batch_ndims=3)
             ),
-            f'{self._param_prefix}_field_{self._key_xy}_fluctuations': numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_xy}_fluctuations', 
+            f'{key_base}_{self._key_xy}_fluctuations': numpyro.sample(
+                f'{key_base}_{self._key_xy}_fluctuations', 
                 Normal(0., 1.),
             ),
-            f'{self._param_prefix}_field_{self._key_xy}_loglogavgslope': numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_xy}_loglogavgslope', 
+            f'{key_base}_{self._key_xy}_loglogavgslope': numpyro.sample(
+                f'{key_base}_{self._key_xy}_loglogavgslope', 
                 Normal(0., 1.),
             ),
-            f'{self._param_prefix}_field_{self._key_wl}_fluctuations': numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_wl}_fluctuations', 
+            f'{key_base}_{self._key_wl}_fluctuations': numpyro.sample(
+                f'{key_base}_{self._key_wl}_fluctuations', 
                 Normal(0., 1.),
             ),
-            f'{self._param_prefix}_field_{self._key_wl}_loglogavgslope': numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_wl}_loglogavgslope', 
+            f'{key_base}_{self._key_wl}_loglogavgslope': numpyro.sample(
+                f'{key_base}_{self._key_wl}_loglogavgslope', 
                 Normal(0., 1.),
             ),
         }
         # Additional optional field parameters
         if self._kw_fluctuations['flexibility'] is not None:
-            params[f'{self._param_prefix}_field_{self._key_xy}_flexibility'] = numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_xy}_flexibility', 
+            params[f'{key_base}_{self._key_xy}_flexibility'] = numpyro.sample(
+                f'{key_base}_{self._key_xy}_flexibility', 
                 Normal(0., 1.),
             )
         if self._kw_fluctuations['asperity'] is not None:
-            params[f'{self._param_prefix}_field_{self._key_xy}_asperity'] = numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_xy}_asperity', 
+            params[f'{key_base}_{self._key_xy}_asperity'] = numpyro.sample(
+                f'{key_base}_{self._key_xy}_asperity', 
                 Normal(0., 1.),
             )
         if self._kw_fluctuations_wl['flexibility'] is not None:
-            params[f'{self._param_prefix}_field_{self._key_wl}_flexibility'] = numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_wl}_flexibility', 
+            params[f'{key_base}_{self._key_wl}_flexibility'] = numpyro.sample(
+                f'{key_base}_{self._key_wl}_flexibility', 
                 Normal(0., 1.),
             )
         if self._kw_fluctuations_wl['asperity'] is not None:
-            params[f'{self._param_prefix}_field_{self._key_wl}_asperity'] = numpyro.sample(
-                f'{self._param_prefix}_field_{self._key_wl}_asperity', 
+            params[f'{key_base}_{self._key_wl}_asperity'] = numpyro.sample(
+                f'{key_base}_{self._key_wl}_asperity', 
                 Normal(0., 1.),
             )
         return self.model(params)
@@ -387,27 +393,27 @@ class CorrelatedField(object):
         from numpyro.distributions import Normal, Independent
         # Iterate over the bands
         params = {}
-        base_key = f'{self._param_prefix}_{self._field_key}'
+        key_base = f'{self._param_prefix}_{self._field_key}'
         for i_wl in range(self._num_pix_wl):
             # Base field parameters
             params.update({
-                f'{base_key}_stack{i_wl}_xi': numpyro.sample(
-                    f'{base_key}_stack{i_wl}_xi', 
+                f'{key_base}_stack{i_wl}_xi': numpyro.sample(
+                    f'{key_base}_stack{i_wl}_xi', 
                     Independent(Normal(
                         jnp.zeros((self._num_pix_tot, self._num_pix_tot)), 
                         jnp.ones((self._num_pix_tot, self._num_pix_tot))
                     ), reinterpreted_batch_ndims=2)
                 ),
-                f'{base_key}_stack{i_wl}_zeromode': numpyro.sample(
-                    f'{base_key}_stack{i_wl}_zeromode', 
+                f'{key_base}_stack{i_wl}_zeromode': numpyro.sample(
+                    f'{key_base}_stack{i_wl}_zeromode', 
                     Normal(0., 1.),
                 ),
-                f'{base_key}_stack{i_wl}_{self._key_xy}_fluctuations': numpyro.sample(
-                    f'{base_key}_stack{i_wl}_{self._key_xy}_fluctuations', 
+                f'{key_base}_stack{i_wl}_{self._key_xy}_fluctuations': numpyro.sample(
+                    f'{key_base}_stack{i_wl}_{self._key_xy}_fluctuations', 
                     Normal(0., 1.),
                 ),
-                f'{base_key}_stack{i_wl}_{self._key_xy}_loglogavgslope': numpyro.sample(
-                    f'{base_key}_stack{i_wl}_{self._key_xy}_loglogavgslope', 
+                f'{key_base}_stack{i_wl}_{self._key_xy}_loglogavgslope': numpyro.sample(
+                    f'{key_base}_stack{i_wl}_{self._key_xy}_loglogavgslope', 
                     Normal(0., 1.),
                 ),
             })
@@ -415,8 +421,8 @@ class CorrelatedField(object):
             if self._kw_fluctuations['flexibility'] is not None:
                 params.update(
                     {
-                        f'{base_key}_stack{i_wl}_{self._key_xy}_flexibility': numpyro.sample(
-                            f'{base_key}_stack{i_wl}_{self._key_xy}_flexibility', 
+                        f'{key_base}_stack{i_wl}_{self._key_xy}_flexibility': numpyro.sample(
+                            f'{key_base}_stack{i_wl}_{self._key_xy}_flexibility', 
                             Normal(0., 1.),
                         )
                     }
@@ -424,8 +430,8 @@ class CorrelatedField(object):
             if self._kw_fluctuations['asperity'] is not None:
                 params.update(
                     {
-                        f'{base_key}_stack{i_wl}_{self._key_xy}_asperity': numpyro.sample(
-                            f'{base_key}_stack{i_wl}_{self._key_xy}_asperity', 
+                        f'{key_base}_stack{i_wl}_{self._key_xy}_asperity': numpyro.sample(
+                            f'{key_base}_stack{i_wl}_{self._key_xy}_asperity', 
                             Normal(0., 1.),
                         )
                     }
