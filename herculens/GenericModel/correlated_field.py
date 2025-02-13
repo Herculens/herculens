@@ -32,6 +32,10 @@ class CorrelatedField(object):
         NOTE: if `exponentiate` is True, this value should be the log-space of the chosen offset value.
     prior_offset_std : tuple, optional
         The The mean and scatter of the log-normal of the offset, by default (0.5, 1e-6).
+    correlation_type : str, optional
+        Either the amplitude spectrum ('amplitude') or the power spectrum ('power') of 
+        the field are parameterized by the parameters below. By default 'amplitude'.
+        The power spectrum is just the amplitude spectrum squared.
     prior_loglogavgslope : tuple, optional
         The mean and scatter of the log-normal distribution for the average slope
          of the power-spectrum in log-log space, by default (-4., 0.5).
@@ -45,6 +49,12 @@ class CorrelatedField(object):
         The field can optionally be evaluated on a larger grid size,
         and then cropped to return the model in direct space, by default 0.
         This is the number of pixels added on each size of the pixelated grid.
+    num_pix_wl : int, optional
+        The number of spectral bands, by default 1.
+    correlation_type_wl : str, optional
+        Similar to correlation_type. Either the amplitude spectrum ('amplitude') 
+        or the power spectrum ('power') of the field are parameterized by the 
+        parameters below, or no correlation at all ('none'). By default 'none'.
     prior_loglogavgslope_wl : tuple, optional
         The mean and scatter of the log-normal distribution for the average slope
          of the power-spectrum in log-log space along the spectral dimensions, by default (-2., 0.5).
@@ -81,7 +91,7 @@ class CorrelatedField(object):
             prior_offset_std=(0.5, 1e-6),
 
             # Parameters along the spatial dimensions (`xy_dim`)
-            correlation_type='power',
+            correlation_type='amplitude',
             prior_loglogavgslope=(-4., 0.5), 
             prior_fluctuations=(1.5, 0.8),
             prior_flexibility=None,
