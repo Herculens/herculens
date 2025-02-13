@@ -415,11 +415,52 @@ class LensImage(object):
 
 
 class LensImage3D(object):
-    """Generate lensed images from source light, lens mass/light, and point source models."""
+    """
+    Handy class to jointly handle a set of multiple LensImage models.
+    Typical use-cases are the joint modelling of multiple bands or multiple exposures.
 
-    def __init__(self, lens_image_list, mode='stack'):
+    NOTE: Special care must be taken when using LensImage instances that represent models at 
+    different resolutions (pixel sizes, cutout size, etc.) in conjunction with
+    pixelated source models. In case you use a 3D pixelated source model 
+    (such as CorrelatedField model) on an adaptive grid, you may want to set 
+    `join_source_coords=True` to ensure that the source model gets evaluated on the same grid.
+    """
+
+    def __init__(self, lens_image_list, mode='stack', reference_lens_image=0, join_source_coords=True):
         """
-        :param lens_image_list: list of LensImage instances
+        Initialize a LensImage object.
+
+        Parameters
+        ----------
+        lens_image_list : list
+            List of LensImages instances to combine.
+        mode : str, optional
+            Either 'list' or 'stack', defining the output format of the main methods, such as .model(). By default 'stack'.
+        reference_lens_image : int, optional
+            Index of the reference lens image. By default 0.
+        join_source_coords : bool, optional
+            If set to True, the adaptive source pixelated grid of the 
+            reference LensImage instance (if any) will be used to define 
+            all source pixelated grids. By default True.
+
+        Raises
+        ------
+        ValueError
+            If `lens_image_list` contains only one LensImage instance.
+        ValueError
+            If `mode` is not 'stack' or 'list'.
+        ValueError
+            If the reference LensImage instance does not have an adaptive source grid
+            and joint_source_coords was set to True.
+
+        Notes
+        -----
+        The `__init__` method initializes a LensImage object with the given parameters. It sets the `mode` attribute to the specified mode, the `num_bands` attribute to the number of lens images in the list, and the `lens_images` attribute to the provided list of lens images. It also checks if the `mode` is 'stack' and verifies that all lens images have the same shape.
+
+        Examples
+        --------
+        >>> lens_image_list = [lens_image1, lens_image2, lens_image3]
+        >>> lens = LensImage3D(lens_image_list, mode='stack', join_source_coords=True, reference_lens_image=0)
         """
         if len(lens_image_list) == 1:
             raise ValueError("LensImage3D should be used with more than one band.")
@@ -427,8 +468,6 @@ class LensImage3D(object):
             raise ValueError("mode should be either 'stack' or 'list'.")
         self.mode = mode
         self.num_bands = len(lens_image_list)
-        # check that if the 'stack' mode is required, then all LensImage instances
-        # should have the same number of pixels on both axis (otherwise stacking is not possible)
         if self.mode == 'stack':
             for i in range(1, self.num_bands):
                 if lens_image_list[i].Grid.num_pixel_axes != lens_image_list[i-1].Grid.num_pixel_axes:
@@ -436,9 +475,21 @@ class LensImage3D(object):
             self.nx, self.ny = lens_image_list[0].Grid.num_pixel_axes
             self.nw = self.num_bands
         else:
-            # TODO: improve this
             self.nx, self.ny, self.nw = None, None, None
         self.lens_images = lens_image_list
+        self._idx_ref = reference_lens_image
+        if any([lens_image.SourceModel.pixel_is_adaptive for lens_image in lens_image_list]):
+            self._join_source_coords = join_source_coords
+        else:
+            self._join_source_coords = False
+        if self._join_source_coords and not self.ref_lens_image.SourceModel.pixel_is_adaptive:
+            raise ValueError("The reference LensImage instance must have an "
+                             "adaptive source grid to join source coordinates.")
+
+    @property
+    def ref_lens_image(self):
+        """Reference LensImage instance (used e.g. for joining source pixelated grids)."""
+        return self.lens_images[self._idx_ref]
 
     def source_surface_brightness(self, kwargs_source_list, k_list=None, **kwargs_single_band):
         """
@@ -454,6 +505,7 @@ class LensImage3D(object):
         :param k_lens: list of bool or list of int to select which lens mass profiles to include
         :return: 2d array of surface brightness pixels
         """
+        # TODO: add support for join_source_coords
         if k_list is None:
             k_list = [None]*self.num_bands
         source_light_list = []
@@ -533,9 +585,19 @@ class LensImage3D(object):
         k_source_list = self._none_kwargs(k_source_list)
         k_lens_light_list = self._none_kwargs(k_lens_light_list)
         k_point_source_list = self._none_kwargs(k_point_source_list)
+        # if we join the source coordinates, we first need to get them from the reference band
+        if self._join_source_coords:
+            src_x_coord, src_y_coord, _ = self.ref_lens_image.adapt_source_coordinates(
+                kwargs_lens, 
+                k_lens=None,  # we consider all mass profiles for this
+                return_plt_extent=False,
+            )
+            source_coords = (src_x_coord, src_y_coord)
+        else:
+            source_coords = None
         model_multi_band = []
         for i in range(self.num_bands):
-            model_sgl_band, source_coords = self.lens_images[i].model(
+            model_sgl_band = self.lens_images[i].model(
                 kwargs_lens=kwargs_lens,
                 kwargs_source=kwargs_source_list[i],
                 kwargs_lens_light=kwargs_lens_light_list[i],
@@ -545,16 +607,12 @@ class LensImage3D(object):
                 point_source_add=point_source_add,
                 k_lens=k_lens, k_lens_light=k_lens_light_list[i], k_source=k_source_list[i], 
                 k_point_source=k_point_source_list[i],
-
-                # the following is to ensure all pixelated source grids (if any) are consistent
-                return_source_pixels_coords=True if i == 0 else False,
-                adapted_source_pixels_coords=source_coords if i > 0 else None,
+                adapted_source_pixels_coords=source_coords,
             )
             model_multi_band.append(model_sgl_band)
         if self.mode == 'stack':
             return jnp.stack(model_multi_band, axis=0)
-        elif self.mode == 'list':
-            return model_multi_band
+        return model_multi_band
 
     def simulation(self, *args, **kwargs):
         raise NotImplementedError("The .simulation() method is not supported for 3D models. "
@@ -565,13 +623,21 @@ class LensImage3D(object):
         for i in range(self.num_bands):
             c_d_slg_band = self.lens_images[i].C_D_model(model[i])
             c_d_multi_band.append(c_d_slg_band)
-        return jnp.array(c_d_multi_band)
+        if self.mode == 'stack':
+            return jnp.array(c_d_multi_band)
+        return c_d_multi_band
 
     def normalized_residuals(self, data, model, mask=None):
         """
         compute the map of normalized residuals,
         given the data and the model image
         """
+        # TODO: add support for mode='list'
+        if self.mode == 'list':
+            raise NotImplementedError(
+                "The normalized_residuals() method is not supported for 3D models returned as lists. "
+                "Please use the individual LensImage instances."
+            )
         if mask is None:
             mask = np.ones_like(data)
         noise_var = self.C_D_model(model)
@@ -587,6 +653,12 @@ class LensImage3D(object):
         """
         compute the reduced chi2 of the data given the model
         """
+        # TODO: add support for mode='list'
+        if self.mode == 'list':
+            raise NotImplementedError(
+                "The reduced_chi2() method is not supported for 3D models returned as lists. "
+                "Please use the individual LensImage instances."
+            )
         if mask is None:
             mask = np.ones_like(data)
         norm_res, _ = self.normalized_residuals(data, model, mask=mask)
