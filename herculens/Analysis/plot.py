@@ -60,7 +60,8 @@ class Plotter(object):
     cmap_deriv2 = plt.get_cmap('inferno')
 
     def __init__(self, data_name=None, base_fontsize=14, flux_log_scale=True, 
-                 flux_vmin=None, flux_vmax=None, res_vmax=6, cmap_flux=None):
+                 flux_vmin=None, flux_vmax=None, res_vmax=6, cmap_flux=None,
+                 ref_lens_image=None, ref_kwargs_result=None):
         self.data_name = data_name
         self.base_fontsize = base_fontsize
         self.flux_log_scale = flux_log_scale
@@ -73,11 +74,18 @@ class Plotter(object):
         if cmap_flux is not None:
             self.cmap_flux = cmap_flux
             self.cmap_flux_alt = cmap_flux
+        if ref_lens_image is not None and ref_kwargs_result is None:
+            raise ValueError("If a reference lens image is provided, "
+                             "the reference kwargs_result must also be provided.")
+        self.ref_lens_image = ref_lens_image
+        self.ref_kwargs_result = ref_kwargs_result
 
     def set_data(self, data):
         self._data = data
 
     def set_ref_source(self, ref_source, plt_extent=None):
+        if self.ref_lens_image is not None:
+            raise ValueError("Reference source already set from a LensImage instance.")
         self._ref_source = ref_source
         self._ref_source_extent = plt_extent
 
@@ -188,7 +196,6 @@ class Plotter(object):
                 k_lens=k_lens,
                 adapted_source_pixels_coords=adapted_source_pixels_coords,
             )
-            noise_var = lens_image.Noise.C_D_model(model, **kwargs_noise)
             if likelihood_mask is None:
                 mask_bool = False
                 likelihood_mask = np.ones_like(model)
@@ -219,17 +226,26 @@ class Plotter(object):
                     kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'],
                     k=k_source, k_lens=k_lens, de_lensed=True,
                     adapted_pixels_coords=adapted_source_pixels_coords,
-                )
-                source_model *= lens_image.Grid.pixel_area                
+                ) * lens_image.Grid.pixel_area
             else:
                 source_model = lens_image.source_surface_brightness(
                     kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'], 
                     de_lensed=True, unconvolved=True, 
                     k=k_source, k_lens=k_lens,
                 )
+                x_grid_src, y_grid_src = lens_image.ImageNumerics.coordinates_evaluate
                 src_extent = extent
-                
-            if hasattr(self, '_ref_source'):
+
+            if self.ref_lens_image is not None:
+                ref_source = self.ref_lens_image.eval_source_surface_brightness(
+                    x_grid_src, y_grid_src, 
+                    self.ref_kwargs_result['kwargs_source'], 
+                    de_lensed=True, 
+                    adapted_pixels_coords=adapted_source_pixels_coords,
+                ) * lens_image.Grid.pixel_area
+                ref_src_extent = src_extent
+                show_source_diff = True
+            elif hasattr(self, '_ref_source'):
                 ref_source = self._ref_source
                 if source_model.shape != ref_source.shape:
                     warnings.warn("Reference source does not have the same shape as model source.")
