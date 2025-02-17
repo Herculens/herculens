@@ -23,7 +23,7 @@ def base_setup():
     # Replace the arguments with appropriate values for your use case
     profile_list = [
         hcl.SersicElliptic(), 
-        hcl.GaussianEllipse(), 
+        hcl.GaussianEllipseLight(), 
         hcl.PixelatedLight(
             interpolation_type='fast_bilinear', allow_extrapolation=True, 
             derivative_type='interpol', adaptive_grid=False
