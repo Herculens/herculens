@@ -4,10 +4,11 @@ from .Coordinates.pixel_grid import PixelGrid
 from .Instrument.psf import PSF
 from .Instrument.noise import Noise
 
+# NOTE: non-elliptical profiles will be suppressed in the future
 from .LightModel.light_model import LightModel
-from .LightModel.Profiles.gaussian import Gaussian, GaussianEllipse
+from .LightModel.Profiles.gaussian import Gaussian as GaussianLight, GaussianEllipse as GaussianEllipseLight
 from .LightModel.Profiles.multipole import Multipole
-from .LightModel.Profiles.sersic import Sersic, SersicElliptic  # NOTE: the Sersic class will be suppressed in the future
+from .LightModel.Profiles.sersic import Sersic, SersicElliptic
 from .LightModel.Profiles.shapelets import Shapelets
 from .LightModel.Profiles.uniform import Uniform
 from .LightModel.Profiles.pixelated import Pixelated as PixelatedLight
@@ -18,7 +19,7 @@ from .MassModel.Profiles.sie import SIE
 from .MassModel.Profiles.nie import NIE
 from .MassModel.Profiles.epl import EPL
 from .MassModel.Profiles.shear import Shear, ShearGammaPsi
-from .MassModel.Profiles.gaussian_potential import Gaussian
+from .MassModel.Profiles.gaussian_potential import Gaussian as GaussianPotential
 from .MassModel.Profiles.point_mass import PointMass
 from .MassModel.Profiles.multipole import Multipole
 from .MassModel.Profiles.pixelated import (

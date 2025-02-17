@@ -10,7 +10,7 @@ class TestLightModelBase(unittest.TestCase):
         self.grid_class = hcl.PixelGrid(nx=10, ny=10)
         # Create a sample profile list
         self.profile_list_base_strings = ['SERSIC_ELLIPSE', 'GAUSSIAN_ELLIPSE']
-        self.profile_list_base_instances = [hcl.SersicElliptic(), hcl.GaussianEllipse()]
+        self.profile_list_base_instances = [hcl.SersicElliptic(), hcl.GaussianEllipseLight()]
         self.profile_list_pixelated = [hcl.PixelatedLight()]
         self.profile_list_pixelated_adapt = [hcl.PixelatedLight(adaptive_grid=True)]
         self.kwargs_pixelated = {'num_pixels': 10}

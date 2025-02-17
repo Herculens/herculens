@@ -60,7 +60,8 @@ class Plotter(object):
     cmap_deriv2 = plt.get_cmap('inferno')
 
     def __init__(self, data_name=None, base_fontsize=14, flux_log_scale=True, 
-                 flux_vmin=None, flux_vmax=None, res_vmax=6, cmap_flux=None):
+                 flux_vmin=None, flux_vmax=None, res_vmax=6, cmap_flux=None,
+                 ref_lens_image=None, ref_kwargs_result=None):
         self.data_name = data_name
         self.base_fontsize = base_fontsize
         self.flux_log_scale = flux_log_scale
@@ -73,11 +74,18 @@ class Plotter(object):
         if cmap_flux is not None:
             self.cmap_flux = cmap_flux
             self.cmap_flux_alt = cmap_flux
+        if ref_lens_image is not None and ref_kwargs_result is None:
+            raise ValueError("If a reference lens image is provided, "
+                             "the reference kwargs_result must also be provided.")
+        self.ref_lens_image = ref_lens_image
+        self.ref_kwargs_result = ref_kwargs_result
 
     def set_data(self, data):
         self._data = data
 
     def set_ref_source(self, ref_source, plt_extent=None):
+        if self.ref_lens_image is not None:
+            raise ValueError("Reference source already set from a LensImage instance.")
         self._ref_source = ref_source
         self._ref_source_extent = plt_extent
 
@@ -96,17 +104,24 @@ class Plotter(object):
                       colorbar_kwargs={'orientation': 'horizontal'})
         return fig
 
-    def model_summary(self, lens_image, kwargs_result,
-                      show_image=True, show_source=True, 
-                      show_lens_light=False, show_lens_potential=False, show_lens_others=False,
-                      only_pixelated_potential=False, shift_pixelated_potential='none',
-                      likelihood_mask=None, potential_mask=None, 
-                      show_lens_lines=False, show_shear_field=False, show_lens_position=False,
-                      kwargs_grid_source=None,
-                      lock_colorbars=False, masked_residuals=True,
-                      vmin_pot=None, vmax_pot=None,  # TEMP
-                      k_source=None, k_lens=None,
-                      kwargs_noise=None, show_plot=True):
+    def model_summary(
+            self, lens_image, kwargs_result,
+            show_image=True, show_source=True, 
+            show_lens_light=False, show_lens_potential=False, show_lens_others=False,
+            only_pixelated_potential=False, shift_pixelated_potential='none',
+            likelihood_mask=None, potential_mask=None, 
+            show_lens_lines=False, show_shear_field=False, show_lens_position=False,
+            kwargs_grid_source=None,
+            lock_colorbars=False, masked_residuals=True,
+            vmin_pot=None, vmax_pot=None,
+            k_source=None, k_lens=None,
+            kwargs_noise=None, 
+            figsize=None, show_plot=True,
+
+            # TODO: this is a dirty quick fix to correctly read multi-band heterogenous LensImage models
+            # This will not be necessary once the LensImage3D class is properly supported.
+            adapted_source_pixels_coords=None,
+        ):
         """
         Generate a summary plot of the lens model.
 
@@ -176,8 +191,11 @@ class Plotter(object):
             
         if show_image:
             # create the resulting model image
-            model = lens_image.model(**kwargs_result, k_lens=k_lens)
-            noise_var = lens_image.Noise.C_D_model(model, **kwargs_noise)
+            model = lens_image.model(
+                **kwargs_result, 
+                k_lens=k_lens,
+                adapted_source_pixels_coords=adapted_source_pixels_coords,
+            )
             if likelihood_mask is None:
                 mask_bool = False
                 likelihood_mask = np.ones_like(model)
@@ -207,17 +225,27 @@ class Plotter(object):
                     x_grid_src, y_grid_src, 
                     kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'],
                     k=k_source, k_lens=k_lens, de_lensed=True,
-                )
-                source_model *= lens_image.Grid.pixel_area                
+                    adapted_pixels_coords=adapted_source_pixels_coords,
+                ) * lens_image.Grid.pixel_area
             else:
                 source_model = lens_image.source_surface_brightness(
                     kwargs_source, kwargs_lens=kwargs_result['kwargs_lens'], 
                     de_lensed=True, unconvolved=True, 
                     k=k_source, k_lens=k_lens,
                 )
+                x_grid_src, y_grid_src = lens_image.ImageNumerics.coordinates_evaluate
                 src_extent = extent
-                
-            if hasattr(self, '_ref_source'):
+
+            if self.ref_lens_image is not None:
+                ref_source = self.ref_lens_image.eval_source_surface_brightness(
+                    x_grid_src, y_grid_src, 
+                    self.ref_kwargs_result['kwargs_source'], 
+                    de_lensed=True, 
+                    adapted_pixels_coords=adapted_source_pixels_coords,
+                ) * lens_image.Grid.pixel_area
+                ref_src_extent = src_extent
+                show_source_diff = True
+            elif hasattr(self, '_ref_source'):
                 ref_source = self._ref_source
                 if source_model.shape != ref_source.shape:
                     warnings.warn("Reference source does not have the same shape as model source.")
@@ -320,8 +348,9 @@ class Plotter(object):
 
 
         ##### BUILD UP THE PLOTS #####
-
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows*5))
+        if figsize is None:
+            figsize = (15, n_rows*5)
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
         if len(axes.shape) == 1:
             axes = axes[None, :] # add first axis so axes is always 2d array
         i_row = 0
