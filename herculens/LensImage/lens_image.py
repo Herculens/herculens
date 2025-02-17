@@ -141,7 +141,10 @@ class LensImage(object):
         :return: 2d array of surface brightness pixels
         """
         if len(self.SourceModel.profile_type_list) == 0:
-            return jnp.zeros(self.Grid.num_pixel_axes)
+            source_light = jnp.zeros(self.Grid.num_pixel_axes)
+            if return_pixels_coords:
+                return source_light, None
+            return source_light
         x_grid_img, y_grid_img = self.ImageNumerics.coordinates_evaluate
         source_light, adapted_pixels_coords = self.eval_source_surface_brightness(
             x_grid_img, y_grid_img,
@@ -152,7 +155,8 @@ class LensImage(object):
         )
         if not supersampled:
             source_light = self.ImageNumerics.re_size_convolve(
-                source_light, unconvolved=unconvolved)
+                source_light, unconvolved=unconvolved
+            )
         if return_pixels_coords:
             return source_light, adapted_pixels_coords
         return source_light

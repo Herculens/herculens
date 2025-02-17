@@ -2,6 +2,9 @@
 # 
 # Copyright (c) 2023, herculens developers and contributors
 
+import os
+os.environ["JAX_TRACEBACK_FILTERING"] = "off"  # be more verbose about errors
+
 
 import numpy as np
 import numpy.testing as npt
@@ -15,15 +18,7 @@ jax.config.update("jax_enable_x64", True)
 import numpyro
 import numpyro.distributions as dist
 
-from herculens.Coordinates.pixel_grid import PixelGrid
-from herculens.Instrument.psf import PSF
-from herculens.Instrument.noise import Noise
-from herculens.LightModel.light_model import LightModel
-from herculens.MassModel.mass_model import MassModel
-from herculens.LensImage.lens_image import LensImage
-from herculens.Inference.loss import Loss
-from herculens.Inference.ProbModel.numpyro import NumpyroModel
-from herculens.Inference.Optimization.jaxopt import JaxoptOptimizer
+import herculens as hcl
 
 
 def simulate_data(data_type, supersampling_factor):
@@ -32,11 +27,13 @@ def simulate_data(data_type, supersampling_factor):
     half_size = npix * pix_scl / 2.
     ra_at_xy_0 = dec_at_xy_0 = -half_size + pix_scl / 2.
     transform_pix2angle = pix_scl * np.eye(2)
-    pixel_grid = PixelGrid(nx=npix, ny=npix, 
-                           ra_at_xy_0=ra_at_xy_0, dec_at_xy_0=dec_at_xy_0,
-                           transform_pix2angle=transform_pix2angle)
-    psf = PSF(psf_type='GAUSSIAN', fwhm=0.3, pixel_size=pix_scl)
-    noise = Noise(npix, npix, background_rms=1e-2, exposure_time=2000.)
+    pixel_grid = hcl.PixelGrid(
+        nx=npix, ny=npix, 
+        ra_at_xy_0=ra_at_xy_0, dec_at_xy_0=dec_at_xy_0,
+        transform_pix2angle=transform_pix2angle
+    )
+    psf = hcl.PSF(psf_type='GAUSSIAN', fwhm=0.3, pixel_size=pix_scl)
+    noise = hcl.Noise(npix, npix, background_rms=1e-2, exposure_time=2000.)
 
     # Define simulation parameters
     kwargs_lens_mass_input = [
@@ -56,23 +53,23 @@ def simulate_data(data_type, supersampling_factor):
 
     # Define input model components
     if data_type == 'full':
-        lens_mass_input = MassModel(['EPL', 'SHEAR'])
-        lens_light_input = LightModel(['SERSIC_ELLIPSE'])
-        source_input = LightModel(['SERSIC_ELLIPSE'])
+        lens_mass_input = hcl.MassModel([hcl.EPL(), hcl.Shear()])
+        lens_light_input = hcl.LightModel([hcl.SersicElliptic()])
+        source_input = hcl.LightModel([hcl.SersicElliptic()])
     elif data_type == 'lens_light_only':
-        lens_mass_input = MassModel([])
-        lens_light_input = LightModel(['SERSIC_ELLIPSE'])
-        source_input = LightModel([])
+        lens_mass_input = hcl.MassModel([])
+        lens_light_input = hcl.LightModel([hcl.SersicElliptic()])
+        source_input = hcl.LightModel([])
     elif data_type == 'lensed_source_only':
-        lens_mass_input = MassModel(['EPL', 'SHEAR'])
-        lens_light_input = LightModel([])
-        source_input = LightModel(['SERSIC_ELLIPSE'], verbose=True)
+        lens_mass_input = hcl.MassModel([hcl.EPL(), hcl.Shear()])
+        lens_light_input = hcl.LightModel([])
+        source_input = hcl.LightModel([hcl.SersicElliptic()], verbose=True)
     elif data_type == 'source_only':
-        lens_mass_input = MassModel([])
-        lens_light_input = LightModel([])
-        source_input = LightModel(['SERSIC_ELLIPSE'])
+        lens_mass_input = hcl.MassModel([])
+        lens_light_input = hcl.LightModel([])
+        source_input = hcl.LightModel([hcl.SersicElliptic()])
 
-    lens_image_input = LensImage(pixel_grid, psf, noise_class=noise,
+    lens_image_input = hcl.LensImage(pixel_grid, psf, noise_class=noise,
                                  lens_mass_model_class=lens_mass_input,
                                  source_model_class=source_input,
                                  lens_light_model_class=lens_light_input,
@@ -112,7 +109,7 @@ def test_model_fit(data_type, supersampling_factor):
     data, lens_image_input, kwargs_input = simulate_data(data_type, supersampling_factor)
 
     # Define model components to fit
-    lens_image_fit = LensImage(
+    lens_image_fit = hcl.LensImage(
         deepcopy(lens_image_input.Grid), 
         deepcopy(lens_image_input.PSF), 
         noise_class=deepcopy(lens_image_input.Noise),
@@ -123,7 +120,7 @@ def test_model_fit(data_type, supersampling_factor):
     )
 
     # Define the probabilistic model
-    class ProbModel(NumpyroModel):
+    class ProbModel(hcl.NumpyroModel):
     
         def model(self):
             # Parameters of the source
@@ -232,7 +229,7 @@ def test_model_fit(data_type, supersampling_factor):
     # print("Number of parameters:", n_param)
 
     # Defines the loss function
-    loss = Loss(prob_model)
+    loss = hcl.Loss(prob_model)
 
     # Draw some initial parameter values (from the prior)
     init_params = prob_model.unconstrain(prob_model.get_sample(prng_key=jax.random.PRNGKey(1)))
@@ -253,7 +250,7 @@ def test_model_fit(data_type, supersampling_factor):
     # # raise
 
     # Performs the fit
-    optimizer = JaxoptOptimizer(loss, loss_norm_optim=data.size)
+    optimizer = hcl.JaxoptOptimizer(loss, loss_norm_optim=data.size)
     bestfit_params, logL_best_fit, extra_fields, runtime \
         = optimizer.run_scipy(init_params, method='BFGS', maxiter=400)
 
