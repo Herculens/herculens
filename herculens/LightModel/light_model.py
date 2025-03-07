@@ -58,7 +58,8 @@ class LightModel(LightModelBase):
                 print("All LightModel profiles are identical.")
 
     def surface_brightness(self, x, y, kwargs, k=None,
-                           pixels_x_coord=None, pixels_y_coord=None):
+                           pixels_x_coord=None, pixels_y_coord=None,
+                           return_as_list=False):
             """Total source flux at a given position.
 
             Parameters
@@ -75,6 +76,8 @@ class LightModel(LightModelBase):
                 x-coordinates of the pixelated light profile (if any).
             pixels_y_coord : array_like, optional
                 y-coordinates of the pixelated light profile (if any).
+            return_as_list : bool, optional
+                If True, return the flux of each profile separately.
 
             Returns
             -------
@@ -87,7 +90,8 @@ class LightModel(LightModelBase):
             if isinstance(k, int):
                 return self._surf_bright_single(x, y, kwargs, k=k,
                                                 pixels_x_coord=pixels_x_coord,
-                                                pixels_y_coord=pixels_y_coord)
+                                                pixels_y_coord=pixels_y_coord,
+                                                return_as_list=return_as_list)
             elif self._single_profile_mode:
                 return self._surf_bright_single(x, y, kwargs, k=0,
                                                 pixels_x_coord=pixels_x_coord,
@@ -99,45 +103,59 @@ class LightModel(LightModelBase):
             else:
                 return self._surf_bright_loop(x, y, kwargs, k=k,
                                               pixels_x_coord=pixels_x_coord,
-                                              pixels_y_coord=pixels_y_coord)
+                                              pixels_y_coord=pixels_y_coord,
+                                              return_as_list=return_as_list)
             
     def _surf_bright_single(self, x, y, kwargs, k=None,
-                            pixels_x_coord=None, pixels_y_coord=None):
+                            pixels_x_coord=None, pixels_y_coord=None,
+                            return_as_list=False):
         if k == self.pixelated_index:
-            return self.func_list[k].function(
+            flux = self.func_list[k].function(
                 x, y, **kwargs[k],
                 pixels_x_coord=pixels_x_coord, 
                 pixels_y_coord=pixels_y_coord,
             )
         else:
-            return self.func_list[k].function(x, y, **kwargs[k])
+            flux = self.func_list[k].function(x, y, **kwargs[k])
+        if return_as_list:
+            return [flux]
+        return flux
         
     def _surf_bright_repeated(self, x, y, kwargs, k=None,
-                              pixels_x_coord=None, pixels_y_coord=None):
+                              pixels_x_coord=None, pixels_y_coord=None,
+                              return_as_list=False):
         if k is not None:
             raise NotImplementedError("Repeated profile mode not implemented "
                                       "specific profile k.")
         func = function_static_single(x, y, self.func_list[0].function)
-        return jnp.sum(
-            jnp.array([
-                func(**kwargs[i]) for i in range(self._num_func)
-            ]),
-            axis=0,
-        )
+        flux_list = [
+            func(**kwargs[i]) for i in range(self._num_func)
+        ]
+        if return_as_list:
+            return flux_list
+        return jnp.sum(jnp.array(flux_list),axis=0)
 
     def _surf_bright_loop(self, x, y, kwargs_list, k=None,
-                          pixels_x_coord=None, pixels_y_coord=None):
-        flux = jnp.zeros_like(x)
+                          pixels_x_coord=None, pixels_y_coord=None,
+                          return_as_list=False):
+        if return_as_list:
+            flux = []
+        else:
+            flux = jnp.zeros_like(x)
         bool_list = self._bool_list(k)
         for i, func in enumerate(self.func_list):
             if bool_list[i]:
                 if i == self.pixelated_index:
-                    flux += func.function(x, y, 
-                                          pixels_x_coord=pixels_x_coord, 
-                                          pixels_y_coord=pixels_y_coord, 
-                                          **kwargs_list[i])
+                    flux_i = func.function(x, y, 
+                                           pixels_x_coord=pixels_x_coord, 
+                                           pixels_y_coord=pixels_y_coord, 
+                                           **kwargs_list[i])
                 else:
-                    flux += func.function(x, y, **kwargs_list[i])
+                    flux_i = func.function(x, y, **kwargs_list[i])
+                if return_as_list:
+                    flux.append(flux_i)
+                else:
+                    flux += flux_i
         return flux
 
     def spatial_derivatives(self, x, y, kwargs_list, k=None):

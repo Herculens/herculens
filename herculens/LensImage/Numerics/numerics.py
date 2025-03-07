@@ -87,7 +87,32 @@ class Numerics(object):
 
         self._point_source_supersampling_factor = point_source_supersampling_factor
 
-    def re_size_convolve(self, flux_array, unconvolved=False):
+    def re_size_convolve(self, flux_array, unconvolved=False, input_as_list=False):
+        """
+        Resize and convolve the flux array.
+
+        Parameters
+        ----------
+        flux_array : 1D array
+            Flux values corresponding to the coordinates being evaluated.
+        unconvolved : bool, optional
+            If True, returns the unconvolved image. Default is False.
+        input_as_list : bool, optional
+            If True, treats the input is a list of flux arrays, and returns
+            the resized and convolved flux as a list as well. Default is False.
+
+        Returns
+        -------
+        image_conv : 2D array
+            Convolved image on the regular pixel grid.
+        """
+        if input_as_list is False:
+            return self._re_size_convolve_sgl(flux_array, unconvolved=unconvolved)
+        return [
+            self._re_size_convolve_sgl(flux_array[i], unconvolved=unconvolved) for i in range(len(flux_array))
+        ]
+    
+    def _re_size_convolve_sgl(self, flux_array, unconvolved=False):
         """
 
         :param flux_array: 1d array, flux values corresponding to coordinates_evaluate
@@ -101,7 +126,7 @@ class Numerics(object):
         else:
             # convolve low res grid and high res grid
             image_conv = self._conv.re_size_convolve(image_low_res, image_high_res_partial)
-        return image_conv * self._pixel_width ** 2
+        return image_conv * self._pixel_width**2
 
     def render_point_sources(self, theta_x, theta_y, amplitude):
         """Put the PSF at the locations of multiply imaged point sources.
