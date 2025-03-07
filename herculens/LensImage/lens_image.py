@@ -125,7 +125,8 @@ class LensImage(object):
                                   unconvolved=False, supersampled=False,
                                   de_lensed=False, k=None, k_lens=None,
                                   adapted_pixels_coords=None, 
-                                  return_pixels_coords=False):
+                                  return_pixels_coords=False,
+                                  return_as_list=False):
         """
 
         computes the source surface brightness distribution
@@ -138,6 +139,9 @@ class LensImage(object):
         :param de_lensed: if True: returns the un-lensed source surface brightness profile, otherwise the lensed.
         :param k: list of bool or list of int to select which source profiles to include
         :param k_lens: list of bool or list of int to select which lens mass profiles to include
+        :param adapted_pixels_coords: tuple of 1d arrays, x and y coordinates of the pixelated light profile
+        :param return_pixels_coords: if True, returns the adapted pixel coordinates
+        :param return_as_list: if True, returns the source surface brightness as a list of arrays
         :return: 2d array of surface brightness pixels
         """
         if len(self.SourceModel.profile_type_list) == 0:
@@ -152,10 +156,11 @@ class LensImage(object):
             k=k, k_lens=k_lens, de_lensed=de_lensed,
             adapted_pixels_coords=adapted_pixels_coords,
             return_pixels_coords=True,
+            return_as_list=return_as_list
         )
         if not supersampled:
             source_light = self.ImageNumerics.re_size_convolve(
-                source_light, unconvolved=unconvolved
+                source_light, unconvolved=unconvolved, input_as_list=return_as_list,
             )
         if return_pixels_coords:
             return source_light, adapted_pixels_coords
@@ -164,7 +169,8 @@ class LensImage(object):
     def eval_source_surface_brightness(self, x, y, kwargs_source, kwargs_lens=None, 
                                        k=None, k_lens=None, de_lensed=False,
                                        adapted_pixels_coords=None, 
-                                       return_pixels_coords=False):
+                                       return_pixels_coords=False,
+                                       return_as_list=False):
         if self._src_adaptive_grid:
             if adapted_pixels_coords is None:
                 pixels_x_coord, pixels_y_coord, _ = self.adapt_source_coordinates(kwargs_lens, k_lens=k_lens)
@@ -174,11 +180,13 @@ class LensImage(object):
             pixels_x_coord, pixels_y_coord = None, None
         if de_lensed is True:
             source_light = self.SourceModel.surface_brightness(x, y, kwargs_source, k=k,
-                                                               pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
+                                                               pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord,
+                                                               return_as_list=return_as_list)
         else:
             x_grid_src, y_grid_src = self.MassModel.ray_shooting(x, y, kwargs_lens, k=k_lens)
             source_light = self.SourceModel.surface_brightness(x_grid_src, y_grid_src, kwargs_source, k=k,
-                                                               pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
+                                                               pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord,
+                                                               return_as_list=return_as_list)
         if return_pixels_coords:
             return source_light, (pixels_x_coord, pixels_y_coord)
         return source_light
@@ -254,13 +262,19 @@ class LensImage(object):
         if supersampled:
             model = jnp.zeros((self.ImageNumerics.grid_class.num_grid_points,))
         if source_add is True:
+            if self.source_arc_mask is not None:
+                return_as_list = True  # this is to apply the arc mask only to the pixelated source profile
+            else:
+                return_as_list = False
             source_model, adapted_source_pixels_coords = self.source_surface_brightness(
                 kwargs_source, kwargs_lens, unconvolved=unconvolved, 
                 supersampled=supersampled, k=k_source, k_lens=k_lens,
                 adapted_pixels_coords=adapted_source_pixels_coords, 
-                return_pixels_coords=True)
-            if self.source_arc_mask is not None:
-                source_model *= self.source_arc_mask
+                return_pixels_coords=True,
+                return_as_list=return_as_list)
+            if return_as_list:  # i.e. if self.source_arc_mask is not None
+                source_model[self.SourceModel.pixelated_index] *= self.source_arc_mask
+                source_model = jnp.sum(jnp.array(source_model), axis=0)
             model += source_model
         if lens_light_add is True:
             model += self.lens_surface_brightness(kwargs_lens_light, 
