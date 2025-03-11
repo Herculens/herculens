@@ -32,7 +32,11 @@ from .MassModel.Profiles.dpie import (
 
 from .PointSourceModel.point_source_model import PointSourceModel
 
-from .GenericModel.correlated_field import CorrelatedField
+try:
+    from .GenericModel.correlated_field import CorrelatedField
+except ImportError:
+    print(f"NIFTy8 should be installed to import the CorrelatedField model.")
+    pass
 
 from .LensImage.lens_image import LensImage, LensImage3D
 from .Inference.loss import Loss
