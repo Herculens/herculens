@@ -95,11 +95,13 @@ class LightModel(LightModelBase):
             elif self._single_profile_mode:
                 return self._surf_bright_single(x, y, kwargs, k=0,
                                                 pixels_x_coord=pixels_x_coord,
-                                                pixels_y_coord=pixels_y_coord)
+                                                pixels_y_coord=pixels_y_coord,
+                                                return_as_list=return_as_list)
             elif self._repeated_profile_mode:
                 return self._surf_bright_repeated(x, y, kwargs, k=k,
                                                   pixels_x_coord=pixels_x_coord,
-                                                  pixels_y_coord=pixels_y_coord)
+                                                  pixels_y_coord=pixels_y_coord,
+                                                  return_as_list=return_as_list)
             else:
                 return self._surf_bright_loop(x, y, kwargs, k=k,
                                               pixels_x_coord=pixels_x_coord,
