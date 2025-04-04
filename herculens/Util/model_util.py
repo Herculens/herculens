@@ -12,23 +12,42 @@ from scipy.ndimage import morphology
 from scipy import ndimage
 from skimage import measure
 from jax import config
+from functools import partial
 
+from herculens.LensImage.lens_image import LensImage, LensImage3D
+from herculens.LensImage.lens_image_multiplane import MPLensImage
 from herculens.LensImage.lensing_operator import LensingOperator
 
 
-def critical_lines_caustics(lens_image, kwargs_lens, supersampling=5, 
-                            return_lens_centers=False):
+def critical_lines_caustics(lens_image, kwargs_mass, eta_flat=None, supersampling=5, 
+                            return_lens_centers=False, k_plane=-1):
     if config.read('jax_enable_x64') is not True:
         print("WARNING: JAX's 'jax_enable_x64' is not enabled; "
               "computation of critical lines and caustics might be inaccurate.")
-    # evaluate the total magnification
+    if isinstance(lens_image, (LensImage, LensImage3D)):
+        mass_model = lens_image.MassModel
+        inv_mag_fn = lambda x, y: 1. / partial(mass_model.magnification, kwargs_lens=kwargs_mass)(x, y)
+        ray_shooting_fn = partial(mass_model.ray_shooting, kwargs_lens=kwargs_mass)
+        multiplane_mode = False
+    elif isinstance(lens_image, MPLensImage):
+        mass_model = lens_image.MPMassModel
+        if eta_flat is None:
+            raise ValueError("The `eta_flat` parameter must be provided when using MPLensImage.")
+        inv_mag_fn = partial(mass_model.inverse_magnification, eta_flat=eta_flat, kwargs=kwargs_mass)
+        ray_shooting_fn = partial(mass_model.ray_shooting, eta_flat=eta_flat, kwargs=kwargs_mass)
+        multiplane_mode = True
+    else:
+        raise TypeError("lens_image must be an instance of LensImage, LensImage3D or MPLensImage.")
+    
+    # evaluate the inverse magnification
     grid = lens_image.Grid.create_model_grid(pixel_scale_factor=1./supersampling)
     x_grid_img, y_grid_img = grid.pixel_coordinates
-    mag_tot = lens_image.MassModel.magnification(x_grid_img, y_grid_img, kwargs_lens)
-    mag_tot = np.array(mag_tot, dtype=np.float64)
+    inv_mag_tot = inv_mag_fn(x_grid_img, y_grid_img)
+    inv_mag_tot = np.array(inv_mag_tot, dtype=np.float64)
+    if multiplane_mode is True:
+        inv_mag_tot = inv_mag_tot[k_plane]
 
-    # invert and find contours corresponding to infinite magnification
-    inv_mag_tot = 1. / mag_tot
+    # find contours corresponding to infinite magnification
     contours = measure.find_contours(inv_mag_tot, 0.)
 
     crit_lines, caustics = [], []
@@ -39,16 +58,23 @@ def critical_lines_caustics(lens_image, kwargs_lens, supersampling=5,
         cline_x, cline_y = grid.map_pix2coord(cline_x, cline_y)
         crit_lines.append((np.array(cline_x), np.array(cline_y)))
         # find corresponding caustics through ray shooting
-        caust_x, caust_y = lens_image.MassModel.ray_shooting(cline_x, cline_y, kwargs_lens)
+        caust_x, caust_y = ray_shooting_fn(cline_x, cline_y)
         caustics.append((np.array(caust_x), np.array(caust_y)))
 
     # can also returns the lens components centroids for convenience
     if return_lens_centers:
         cxs, cys = [], []
-        for kw in kwargs_lens:
-            if 'center_x' in kw:
-                cxs.append(kw['center_x'])
-                cys.append(kw['center_y'])
+        if multiplane_mode is True:
+            k_main_lens = 0
+            for kw in kwargs_mass[k_main_lens]:
+                if 'center_x' in kw:
+                    cxs.append(kw['center_x'])
+                    cys.append(kw['center_y'])
+        else:
+            for kw in kwargs_mass:
+                if 'center_x' in kw:
+                    cxs.append(kw['center_x'])
+                    cys.append(kw['center_y'])
         return crit_lines, caustics, (np.array(cxs), np.array(cys))
     return crit_lines, caustics
 
@@ -84,6 +110,31 @@ def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
     x_grid_img, y_grid_img = grid.pixel_coordinates
     gamma_x = gamma_ext*np.cos(phi_ext)
     gamma_y = gamma_ext*np.sin(phi_ext)
+    if gamma_x.size == 1:
+        gamma_x = np.full_like(x_grid_img, float(gamma_x))
+        gamma_y = np.full_like(y_grid_img, float(gamma_y))
+    return (np.array(x_grid_img), np.array(y_grid_img), gamma_x, gamma_y)
+
+
+def total_shear_deflection_field(lens_image, kwargs_mass, eta_flat=None, num_pixels=20, k_plane=-1):
+    if isinstance(lens_image, (LensImage, LensImage3D)):
+        mass_model = lens_image.MassModel
+        gamma_fn = partial(mass_model.gamma, kwargs_lens=kwargs_mass)
+        multiplane_mode = False
+    elif isinstance(lens_image, MPLensImage):
+        mass_model = lens_image.MPMassModel
+        if eta_flat is None:
+            raise ValueError("The `eta_flat` parameter must be provided when using MPLensImage.")
+        gamma_fn = partial(mass_model.gamma, eta_flat=eta_flat, kwargs=kwargs_mass)
+        multiplane_mode = True
+    else:
+        raise TypeError("lens_image must be an instance of LensImage, LensImage3D or MPLensImage.")
+    grid = lens_image.Grid.create_model_grid(num_pixels=num_pixels)
+    x_grid_img, y_grid_img = grid.pixel_coordinates
+    gamma_x, gamma_y = gamma_fn(x_grid_img, y_grid_img)
+    if multiplane_mode is True:
+        gamma_x = gamma_x[k_plane]
+        gamma_y = gamma_y[k_plane]
     if gamma_x.size == 1:
         gamma_x = np.full_like(x_grid_img, float(gamma_x))
         gamma_y = np.full_like(y_grid_img, float(gamma_y))
