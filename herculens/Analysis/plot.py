@@ -786,9 +786,12 @@ class Plotter(object):
         clines_linestyles = ['-', '--', ':', '-.']*2
         clines_colors = ['tab:blue', 'tab:red', 'tab:green', 'tab:purple']
         for i, clines in enumerate(clines_per_plane):
-            for curve in clines:
-                ax.plot(curve[0], curve[1], linewidth=2, color=clines_colors[i], linestyle=clines_linestyles[i])
+            src_plane_idx = num_planes - i - 1
+            for j, curve in enumerate(clines):
+                ax.plot(curve[0], curve[1], linewidth=2, color=clines_colors[i], linestyle=clines_linestyles[i], 
+                        label=f"Source {src_plane_idx}" if j == 0 else None)
         ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
+        ax.legend()
         # tighten the layout and show the figure
         fig.tight_layout()
 
@@ -802,13 +805,13 @@ class Plotter(object):
                 if conj_points_per_plane[idx_plane] is None:
                     continue
                 color = conj_points_colors[idx_plane]
-                ax.scatter(*conj_points_per_plane[idx_plane].T, s=80, edgecolors=color, marker='o', linewidths=0.5, 
+                ax.scatter(*conj_points_per_plane[idx_plane].T, s=100, edgecolors=color, marker='o', linewidths=1, 
                            facecolors='none', label="conjugate points")
-                ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=80, c=color, marker='*', linewidths=0.5,
+                ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=100, c=color, marker='*', linewidths=0.5,
                             label="traced conjugate points")
                 for conj_point, traced_conj_point in zip(conj_points_per_plane[idx_plane], traced_conj_points_per_plane[idx_plane]):
                     ax.arrow(conj_point[0], conj_point[1], traced_conj_point[0] - conj_point[0], traced_conj_point[1] - conj_point[1], 
-                             color=color, width=0.005, head_width=0.05, alpha=0.2, length_includes_head=True)
+                             color=color, width=0.01, head_width=0.08, alpha=0.2, length_includes_head=True)
             # ax.legend()
             ax.set_title("data + conjugate points", fontsize=self.base_fontsize)
             ax.set_aspect('equal')
@@ -825,8 +828,8 @@ class Plotter(object):
             ax.quiver(
                 x_field, y_field,
                 gx_field, gy_field, 
-                scale=10, 
-                width=0.05,
+                scale=3, 
+                width=0.1,
                 scale_units='xy', 
                 units='xy',
                 pivot='middle',
@@ -845,15 +848,15 @@ class Plotter(object):
         ax = axes[1, 2]
         im = ax.imshow(kappa, extent=extent, cmap=self.cmap_default, norm=LogNorm())
         im.set_rasterized(True)
-        ax.set_title("convergence", fontsize=self.base_fontsize)
+        ax.set_title("convergence (image plane)", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
 
         # Magnification map
         ax = axes[1, 3]
-        im = ax.imshow(magnification, extent=extent, cmap=self.cmap_default, norm=Normalize(-10, 10))
+        im = ax.imshow(magnification, extent=extent, cmap=self.cmap_default, norm=Normalize(-20, 20))
         im.set_rasterized(True)
-        ax.set_title("magnification", fontsize=self.base_fontsize)
+        ax.set_title(f"magnification (for source {num_planes-1})", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
         
