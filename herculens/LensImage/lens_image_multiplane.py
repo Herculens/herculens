@@ -142,7 +142,7 @@ class MPLensImage(object):
         k_mass=None,
         k_light=None,
         k_planes=None,
-        return_pixel_scale=False
+        return_pixel_scale=False,
     ):
         '''Create the 2D model image from the parameter values.  Note: due to JIT compilation,
         the first call to this method will be slower.
@@ -156,6 +156,8 @@ class MPLensImage(object):
             j > i+1. This convention implies that all einstein radii are defined
             with respect to the **next** mass plane back (**not** the last plane in
             the stack).
+            For more details, see comments in the Pull Request #37:
+            https://github.com/Herculens/herculens/pull/37#issuecomment-2343179184
         kwargs_mass : list of list
             List of lists of parameter dictionaries of lens mass model parameters
             corresponding to each mass plane.
@@ -247,25 +249,40 @@ class MPLensImage(object):
         if compute_true_noise_map is True:
             self.Noise.compute_noise_map_from_model(model)
         return simu
+    
+    def C_D_model(self, model, **kwargs_noise):
+        return self.Noise.C_D_model(model, **kwargs_noise)
 
-    def normalized_residuals(self, data, model, mask=None):
+    def normalized_residuals(self, data, model, kwargs_noise=None, mask=None):
         """
         compute the map of normalized residuals,
         given the data and the model image
         """
+        if kwargs_noise is None:
+            kwargs_noise = {}
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        noise_var = self.Noise.C_D_model(model)
-        norm_res = (model - data) / np.sqrt(noise_var) * mask
-        return norm_res
+        noise_var = self.C_D_model(model, **kwargs_noise)
+        noise = np.sqrt(noise_var)
+        norm_res_model = (data - model) / noise * mask
+        norm_res_tot = norm_res_model
+        if mask is not None:
+            # outside the mask just add pure data
+            norm_res_tot += (data / noise) * (1. - mask)
+        # make sure there is no NaN or infinite values
+        norm_res_model = np.where(np.isfinite(norm_res_model), norm_res_model, 0.)
+        norm_res_tot = np.where(np.isfinite(norm_res_tot), norm_res_tot, 0.)
+        return norm_res_model, norm_res_tot
 
-    def reduced_chi2(self, data, model, mask=None):
+    def reduced_chi2(self, data, model, kwargs_noise=None, mask=None):
         """
         compute the reduced chi2 of the data given the model
         """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        norm_res = self.normalized_residuals(data, model, mask=mask)
+        norm_res, _ = self.normalized_residuals(
+            data, model, kwargs_noise=kwargs_noise, mask=mask
+        )
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
 

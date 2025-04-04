@@ -20,7 +20,7 @@ class MPLightModel(object):
     def partial_spatial_derivative(light_model, x, y, kwargs, k):
         return light_model.spatial_derivatives(x, y, kwargs, k)
 
-    def __init__(self, mp_light_model_list, light_model_kwargs):
+    def __init__(self, mp_light_model_list, **light_model_kwargs):
         '''
         Create a MPLightModel object.
 
@@ -33,14 +33,23 @@ class MPLightModel(object):
         light_model_kwargs : dictionary for settings related to PIXELATED
             profiles.
         '''
-        self.mp_profile_type_list = mp_light_model_list
-        self.light_models = []
+        if all([isinstance(lm, str) for lm in mp_light_model_list]):
+            self.mp_profile_type_list = mp_light_model_list
+            self.light_models = []
+            for ldx, light_plane in enumerate(self.mp_profile_type_list):
+                self.light_models.append(LightModel(
+                    light_plane,
+                    **light_model_kwargs
+                ))
+        elif all([isinstance(lm, LightModel) for lm in mp_light_model_list]):
+            self.light_models = mp_light_model_list
+            self.mp_profile_type_list = [lm.func_list for lm in self.light_models]
+        else:
+            raise ValueError(
+                "MPLightModel needs to be initialized either with a list of lists of strings, "
+                "or directly with a list of (single plane) LightModel instances."
+            )
         self.number_light_planes = len(self.mp_profile_type_list)
-        for ldx, light_plane in enumerate(self.mp_profile_type_list):
-            self.light_models.append(LightModel(
-                light_plane,
-                **light_model_kwargs[ldx]
-            ))
 
     @property
     def has_pixels(self):

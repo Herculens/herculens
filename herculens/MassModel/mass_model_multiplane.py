@@ -40,7 +40,8 @@ class MPMassModel(object):
         else:
             raise ValueError(
                 "MPMassModel needs to be initialized either with a list of lists of strings, "
-                "or directly with a list of (single plane) MassModel instances.")
+                "or directly with a list of (single plane) MassModel instances."
+            )
         self.number_mass_planes = len(self.mass_models)
         
         # Eta will be passed in flattened to `ray_shooting`, use these
@@ -228,6 +229,41 @@ class MPMassModel(object):
         '''
         A = self.A(x, y, eta_flat, kwargs, kind=kind)
         return A[..., 0, 0] * A[..., 1, 1] - A[..., 0, 1] * A[..., 1, 0]
+    
+    def magnification(self, x, y, eta_flat, kwargs, kind='auto'):
+        '''Return the magnification map for each plane of the lens
+        system.
+
+        Parameters
+        ----------
+        x : jax.numpy array
+            x-position (preferably arcsec)
+        y : jax.numpy array
+            x-position (preferably arcsec)
+        eta_flat : jax.numpy array
+            upper triangular elements of eta matrix, values defined as
+            eta_ij = D_ij D_i+1 / D_j D_ii+1 where D_ij is the angular diameter
+            distance between redshifts i and j. Only include values where
+            j > i+1. This convention implies that all einstein radii are defined
+            with respect to the **next** mass plane back (**not** the last plane in
+            the stack).
+        kwargs : list of list
+            List of lists of parameter dictionaries of lens mass model parameters
+            corresponding to each mass plane.
+        kind : str, optional
+            either "auto" or "direct". Determines how the distortion matrix is
+            computed, "auto" will using automatic differentiation using using JAX's
+            `jaxfwd` function. "direct" will using the `hessian` method for each
+            mass plane. "auto" is typically faster and is the default and recommended
+            method.
+
+        Returns
+        -------
+        jax.numpy array
+            The magnification of the lens for each position and each mass plane (including the
+            image plane) with shape (N+1, *(x.shape)) where N is the number of mass planes.
+        '''
+        return 1. / self.inverse_magnification(x, y, eta_flat, kwargs, kind=kind)
 
     def kappa(self, x, y, eta_flat, kwargs, kind='auto'):
         '''Lensing convergence k = 1/2 laplacian(phi) map for each plane of the lens
