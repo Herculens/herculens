@@ -624,6 +624,9 @@ class Plotter(object):
             kwargs_noise=None,
             likelihood_mask=None,
             masked_residuals=True,
+            show_shear_field=False,
+            extent_zoom=[-0.5, 0.5, -0.5, 0.5],
+            kwargs_grid_source=None,
         ):
         """
         Simple function with limited user-control to plot the details
@@ -638,7 +641,6 @@ class Plotter(object):
         
         # get the total number of planes as we will iterate over it
         num_planes = lens_image.MPLightModel.number_light_planes
-        num_planes_with_mass = num_planes - 1
 
         # create a figure with multiple subplots:
         # - the first row contains the data, the model and the normalized residuals, and the model with critical lines overlayed
@@ -651,7 +653,7 @@ class Plotter(object):
 
         # Create the figure and axes following the same dimensions as the model_summary function
         n_cols = 4
-        n_rows = 2 + num_planes_with_mass
+        n_rows = 2 + num_planes
         figsize = (15, n_rows*5)
         fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
 
@@ -713,13 +715,16 @@ class Plotter(object):
         )
         magnification = magnification[-1]
         # Get the shear field
-        shear_field = model_util.total_shear_deflection_field(
-            lens_image, 
-            kwargs_result['kwargs_mass'], 
-            eta_flat=kwargs_result['eta_flat'],
-            num_pixels=20,
-            k_plane=-1,
-        )
+        if show_shear_field:
+            shear_field = model_util.total_shear_deflection_field(
+                lens_image, 
+                kwargs_result['kwargs_mass'], 
+                eta_flat=kwargs_result['eta_flat'],
+                num_pixels=20,
+                k_plane=-1,
+            )
+        else:
+            shear_field = None
         # Get the conjugate points
         conj_points_per_plane = lens_image.conjugate_points
         no_conj_points = all([cp is None for cp in conj_points_per_plane])
@@ -733,8 +738,6 @@ class Plotter(object):
             traced_conj_points_per_plane.append(traced_conj_points)
         print("conjugate points:", conj_points_per_plane)
         print("traced conjugate points:", traced_conj_points_per_plane)
-
-
         
         # Populate the first of the figure
         # Data
@@ -797,33 +800,27 @@ class Plotter(object):
 
         # Conjugate points
         ax = axes[1, 0]
-        im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux)
-        im.set_rasterized(True)
-        conj_points_colors = ['tab:blue', 'tab:red', 'tab:green', 'tab:purple']
         if not no_conj_points:
-            for idx_plane in range(num_planes-1):
-                if conj_points_per_plane[idx_plane] is None:
-                    continue
-                color = conj_points_colors[idx_plane]
-                ax.scatter(*conj_points_per_plane[idx_plane].T, s=100, edgecolors=color, marker='o', linewidths=1, 
-                           facecolors='none', label="conjugate points")
-                ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=100, c=color, marker='*', linewidths=0.5,
-                            label="traced conjugate points")
-                for conj_point, traced_conj_point in zip(conj_points_per_plane[idx_plane], traced_conj_points_per_plane[idx_plane]):
-                    ax.arrow(conj_point[0], conj_point[1], traced_conj_point[0] - conj_point[0], traced_conj_point[1] - conj_point[1], 
-                             color=color, width=0.01, head_width=0.08, alpha=0.2, length_includes_head=True)
-            # ax.legend()
+            self._plot_conjugate_points(
+                ax, data, num_planes, 
+                conj_points_per_plane, traced_conj_points_per_plane,
+                extent, extent_zoom=None,
+            )
             ax.set_title("data + conjugate points", fontsize=self.base_fontsize)
-            ax.set_aspect('equal')
-            ax.set_xlim(extent[0], extent[1])
-            ax.set_ylim(extent[2], extent[3])
         else:
             ax.axis('off')
             ax.set_title("no conjugate points", fontsize=self.base_fontsize)
         
-        # Shear field
+        # Zoom-in on the traced conjuate points, or the shear field
         ax = axes[1, 1]
-        if shear_field is not None:
+        if shear_field is None:
+            self._plot_conjugate_points(
+                ax, data, num_planes, 
+                conj_points_per_plane, traced_conj_points_per_plane,
+                extent, extent_zoom=extent_zoom,
+            )
+            ax.set_title("conjugate points (zoomed in)", fontsize=self.base_fontsize)
+        else:
             x_field, y_field, gx_field, gy_field = shear_field
             ax.quiver(
                 x_field, y_field,
@@ -839,14 +836,11 @@ class Plotter(object):
             ax.set_aspect('equal')
             ax.set_xlim(extent[0], extent[1])
             ax.set_ylim(extent[2], extent[3])
-            ax.set_title("shear field", fontsize=self.base_fontsize)
-        else:
-            ax.axis('off')
-            ax.set_title("no shear field", fontsize=self.base_fontsize)
+            ax.set_title(f"shear field (for source {num_planes-1})", fontsize=self.base_fontsize)
 
         # Convergence map
         ax = axes[1, 2]
-        im = ax.imshow(kappa, extent=extent, cmap=self.cmap_default, norm=LogNorm())
+        im = ax.imshow(kappa, extent=extent, cmap=self.cmap_default, norm=LogNorm(1e-1, 1e1))
         im.set_rasterized(True)
         ax.set_title("convergence (image plane)", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -854,16 +848,27 @@ class Plotter(object):
 
         # Magnification map
         ax = axes[1, 3]
-        im = ax.imshow(magnification, extent=extent, cmap=self.cmap_default, norm=Normalize(-20, 20))
+        im = ax.imshow(magnification, extent=extent, cmap=self.cmap_default, norm=Normalize(-20, 20), alpha=0.7)
         im.set_rasterized(True)
         ax.set_title(f"magnification (for source {num_planes-1})", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
         
-        # for now: turn off all remaining axes
-        for i_row in range(2, n_rows):
-            for i_col in range(n_cols):
-                axes[i_row, i_col].axis('off')
+        # The remaining axes are the same for each single plane that contains light (lens or source) models
+        for i, idx_plane in enumerate(range(num_planes)[::-1]):
+            i_row = i + 2
+            axes_row = axes[i_row, :]
+            self._plot_data_with_single_plane_model(
+                axes_row,
+                idx_plane,
+                data,
+                lens_image,
+                kwargs_result,
+                extent,
+                kwargs_grid_source=kwargs_grid_source,
+            )
+
+        fig.tight_layout()
         return fig
 
 
@@ -883,3 +888,158 @@ class Plotter(object):
         else:
             norm_flux = self.norm_flux
         return norm_flux
+
+
+    def _plot_conjugate_points(
+            self, ax, data, num_planes, conj_points_per_plane, traced_conj_points_per_plane, 
+            extent, extent_zoom=None,
+        ):
+        conj_points_colors = ['tab:blue', 'tab:red', 'tab:green', 'tab:purple']
+        im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
+                       alpha=1 if extent_zoom is None else 0)
+        for idx_plane in range(num_planes-1):
+            if conj_points_per_plane[idx_plane] is None:
+                continue
+            color = conj_points_colors[idx_plane]
+            ax.scatter(*conj_points_per_plane[idx_plane].T, s=100, edgecolors=color, marker='o', linewidths=1, 
+                    facecolors='none', label="conjugate points")
+            ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=100, c=color, marker='*', linewidths=0.5,
+                        label="traced conjugate points")
+            for conj_point, traced_conj_point in zip(conj_points_per_plane[idx_plane], traced_conj_points_per_plane[idx_plane]):
+                ax.arrow(conj_point[0], conj_point[1], traced_conj_point[0] - conj_point[0], traced_conj_point[1] - conj_point[1], 
+                        color=color, width=0.01, head_width=0.08, alpha=0.2, length_includes_head=True)
+        # ax.legend()
+        ax.set_aspect('equal')
+        lim_extent = extent_zoom if extent_zoom is not None else extent
+        ax.set_xlim(lim_extent[0], lim_extent[1])
+        ax.set_ylim(lim_extent[2], lim_extent[3])
+        nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                      colorbar_kwargs={'orientation': 'horizontal'},
+                      invisible=True)
+        
+    def _plot_data_with_single_plane_model(
+        self,
+        axes_row,
+        k_plane,
+        data,
+        lens_image,
+        kwargs_result,
+        extent,
+        kwargs_grid_source=None,
+        ):
+        """Populate axes (single row) with, in order:
+           - the data with the light in that plane subtracted
+           - that light model in the image plane
+           - that light model in its own plane
+           - that light model in its own plane with caustics overlayed
+        """
+        # Get the lensed source model of the required plane
+        image_light_model = lens_image.model(
+            k_planes=k_plane,
+            **kwargs_result,
+        )
+        # Subtract the lensed source model from the data
+        data_subtracted = data - image_light_model
+        # Get the unlensed source model of the required plane
+        if k_plane > 0:
+            if lens_image.MPLightModel.has_pixels or kwargs_grid_source is not None:
+                if kwargs_grid_source is not None:
+                    grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
+                    x_grid_src, y_grid_src = grid_src.pixel_coordinates
+                    src_extent = grid_src.plt_extent
+                else:
+                    # TODO: the following complicated code should be implemented wthin MPLensImage (similar to LensImage)
+                    # get the adapted coordinates axes
+                    x_coord, y_coord, src_extent_tmp = lens_image.get_source_coordinates(
+                        kwargs_result['eta_flat'],
+                        kwargs_result['kwargs_mass'],
+                    )
+                    # select the right plane
+                    x_coord, y_coord = x_coord[k_plane], y_coord[k_plane]
+                    src_extent_tmp = src_extent_tmp[k_plane]
+                    # create a 2d grid out of the axes
+                    x_grid_src, y_grid_src = np.meshgrid(x_coord, y_coord)
+                    # transform the proper extent to the one usable with imshow 
+                    pix_scl_x = jnp.abs(src_extent_tmp[0]-src_extent_tmp[1])
+                    pix_scl_y = jnp.abs(src_extent_tmp[2]-src_extent_tmp[3])
+                    half_pix_scl = jnp.sqrt(pix_scl_x*pix_scl_y) / 2.
+                    src_extent = [
+                        src_extent_tmp[0]-half_pix_scl, src_extent_tmp[1]+half_pix_scl, 
+                        src_extent_tmp[2]-half_pix_scl, src_extent_tmp[3]+half_pix_scl
+                    ]
+                    # src_extent = src_extent_tmp  # FIXME
+                source_light_model = lens_image.MPLightModel.light_models[k_plane].surface_brightness(
+                    x_grid_src, y_grid_src, 
+                    kwargs_result['kwargs_light'][k_plane],
+                    pixels_x_coord=x_coord,
+                    pixels_y_coord=y_coord,
+                ) * lens_image.Grid.pixel_area
+            else:
+                # fall-back case when no grid is provided nor found
+                x_grid_src, y_grid_src = lens_image.ImageNumerics.coordinates_evaluate
+                src_extent = extent
+                source_light_model = lens_image.MPLightModel.light_models[k_plane].surface_brightness(
+                    x_grid_src, y_grid_src, 
+                    kwargs_result['kwargs_light'][k_plane],
+                    pixels_x_coord=None,
+                    pixels_y_coord=None,
+                ) * lens_image.Grid.pixel_area
+                source_light_model = lens_image.ImageNumerics.re_size_convolve(
+                    source_light_model, unconvolved=True, input_as_list=False,
+                )
+        else:
+            # for the lens plane, we do not have a source model
+            source_light_model = None
+
+        # Get the caustics
+        clines, caustics = model_util.critical_lines_caustics(
+            lens_image, 
+            kwargs_result['kwargs_mass'], 
+            eta_flat=kwargs_result['eta_flat'], 
+            return_lens_centers=False,
+            k_plane=k_plane,
+        )
+
+        # Source-subtracted data
+        ax = axes_row[0]
+        im = ax.imshow(data_subtracted, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
+        im.set_rasterized(True)
+        nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                      colorbar_kwargs={'orientation': 'horizontal'})
+        
+        # Light model in image plane
+        ax = axes_row[1]
+        im = ax.imshow(image_light_model, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
+        im.set_rasterized(True)
+        ax.set_title(f"Obs. light model from plane {k_plane}", fontsize=self.base_fontsize)
+        nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                      colorbar_kwargs={'orientation': 'horizontal'})
+        
+        # Light model in source plane
+        ax = axes_row[2]
+        if source_light_model is not None:
+            im = ax.imshow(source_light_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux)
+            im.set_rasterized(True)
+            ax.set_title(f"Light model from plane {k_plane}", fontsize=self.base_fontsize)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
+        else:
+            ax.axis('off')
+            
+        # Source model with caustics overlayed (or critical lines if k_plane = 0)
+        ax = axes_row[3]
+        if source_light_model is not None:
+            print("WAIT")
+            im = ax.imshow(source_light_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux)
+            im.set_rasterized(True)
+            ax.set_title(f"With caustics", fontsize=self.base_fontsize)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'})
+            # FIXME: caustics are not plotted correctly
+            # for j, curve in enumerate(caustics):
+            #     print(j, curve)
+            #     ax.plot(curve[0], curve[1], linewidth=2, color='white', linestyle='-')
+            # ax.set_xlim(src_extent[0], src_extent[1])
+            # ax.set_ylim(src_extent[2], src_extent[3])
+        else:
+            ax.axis('off')

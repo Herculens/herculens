@@ -129,6 +129,8 @@ class MPLensImage(object):
     def k_extend(self, k, amount):
         if k is None:
             return jnp.arange(amount)
+        elif isinstance(k, int):
+            return jnp.array([k])
         else:
             return jnp.array(k)
 
@@ -183,7 +185,7 @@ class MPLensImage(object):
             The 2D model image for the lens system
         pixel_scale : list, optional
             The pixel scale (arcsec/pixel) of each source plane, by default False.
-            Note: requites and pixelated adaptive source grid to be used and have `return_pixel_scale`
+            Note: requires pixelated adaptive source grid to be used and have `return_pixel_scale`
             set to True.
         '''
         ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
