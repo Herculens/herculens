@@ -12,6 +12,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from scipy import ndimage
 from matplotlib.colors import Normalize, LogNorm, TwoSlopeNorm
+from matplotlib.patches import FancyArrowPatch, ArrowStyle
 
 from herculens.LensImage.lens_image import LensImage, LensImage3D
 from herculens.LensImage.lens_image_multiplane import MPLensImage
@@ -398,8 +399,8 @@ class Plotter(object):
                         center = (kw['center_x'], kw['center_y'])
                         if center not in plotted_centers:
                             ax.plot(*center, linestyle='none', color='black', 
-                                    markeredgecolor='black', markersize=10, marker='o', 
-                                    fillstyle='none', markeredgewidth=0.5)
+                                    markeredgecolor='black', markersize=15, marker='o', 
+                                    fillstyle='none', markeredgewidth=1)
                         plotted_centers.append(center)
             if show_lens_lines:
                 for curve in clines:
@@ -627,6 +628,8 @@ class Plotter(object):
             show_shear_field=False,
             extent_zoom=[-0.5, 0.5, -0.5, 0.5],
             kwargs_grid_source=None,
+            linestyles_planes=[':', '-', '--', '-.', ':', '-'],
+            colors_planes=['tab:orange', 'tab:purple', 'tab:cyan', 'tab:pink', 'tab:blue', 'tab:red'],
         ):
         """
         Simple function with limited user-control to plot the details
@@ -747,7 +750,7 @@ class Plotter(object):
         if likelihood_mask is not None:
             ax.contour(likelihood_mask, extent=extent, levels=[0], 
                        colors='white', alpha=0.3, linewidths=0.5)
-        ax.set_title("data", fontsize=self.base_fontsize)
+        ax.set_title("Data", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
         
@@ -755,7 +758,7 @@ class Plotter(object):
         ax = axes[0, 1]
         im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
         im.set_rasterized(True)
-        ax.set_title("model", fontsize=self.base_fontsize)
+        ax.set_title("Model", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
         
@@ -780,19 +783,17 @@ class Plotter(object):
         ax = axes[0, 3]
         im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux)
         im.set_rasterized(True)
-        ax.set_title("data + critical lines", fontsize=self.base_fontsize)
+        ax.set_title("Data + critical lines", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
         if likelihood_mask is not None:
             ax.contour(likelihood_mask, extent=extent, levels=[0], 
                        colors='black', alpha=0.5, linewidths=0.5)
-        clines_linestyles = ['-', '--', ':', '-.']*2
-        clines_colors = ['tab:blue', 'tab:red', 'tab:green', 'tab:purple']
-        for i, clines in enumerate(clines_per_plane):
-            src_plane_idx = num_planes - i - 1
+        for i, clines in enumerate(clines_per_plane[::-1]):
+            src_plane_idx = i + 1
             for j, curve in enumerate(clines):
-                ax.plot(curve[0], curve[1], linewidth=2, color=clines_colors[i], linestyle=clines_linestyles[i], 
-                        label=f"Source {src_plane_idx}" if j == 0 else None)
+                ax.plot(curve[0], curve[1], linewidth=2, color=colors_planes[src_plane_idx], linestyle=linestyles_planes[src_plane_idx], 
+                        label=f"Source in plane {src_plane_idx}" if j == 0 else None)
         ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
         ax.legend()
         # tighten the layout and show the figure
@@ -805,11 +806,12 @@ class Plotter(object):
                 ax, data, num_planes, 
                 conj_points_per_plane, traced_conj_points_per_plane,
                 extent, extent_zoom=None,
+                colors_planes=colors_planes,
             )
-            ax.set_title("data + conjugate points", fontsize=self.base_fontsize)
+            ax.set_title("Data + conjugate points", fontsize=self.base_fontsize)
         else:
             ax.axis('off')
-            ax.set_title("no conjugate points", fontsize=self.base_fontsize)
+            # ax.set_title("No conjugate points", fontsize=self.base_fontsize)
         
         # Zoom-in on the traced conjuate points, or the shear field
         ax = axes[1, 1]
@@ -818,8 +820,9 @@ class Plotter(object):
                 ax, data, num_planes, 
                 conj_points_per_plane, traced_conj_points_per_plane,
                 extent, extent_zoom=extent_zoom,
+                colors_planes=colors_planes,
             )
-            ax.set_title("conjugate points (zoomed in)", fontsize=self.base_fontsize)
+            ax.set_title("Conjugate points (zoomed in)", fontsize=self.base_fontsize)
         else:
             x_field, y_field, gx_field, gy_field = shear_field
             ax.quiver(
@@ -842,7 +845,7 @@ class Plotter(object):
         ax = axes[1, 2]
         im = ax.imshow(kappa, extent=extent, cmap=self.cmap_default, norm=LogNorm(1e-1, 1e1))
         im.set_rasterized(True)
-        ax.set_title("convergence (image plane)", fontsize=self.base_fontsize)
+        ax.set_title(r"Convergence $\kappa$ (image plane)", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
 
@@ -850,12 +853,12 @@ class Plotter(object):
         ax = axes[1, 3]
         im = ax.imshow(magnification, extent=extent, cmap=self.cmap_default, norm=Normalize(-20, 20), alpha=0.7)
         im.set_rasterized(True)
-        ax.set_title(f"magnification (for source {num_planes-1})", fontsize=self.base_fontsize)
+        ax.set_title(r"Magnification $\mu$ " + f"(for source {num_planes-1})", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
         
         # The remaining axes are the same for each single plane that contains light (lens or source) models
-        for i, idx_plane in enumerate(range(num_planes)[::-1]):
+        for i, idx_plane in enumerate(range(num_planes)):
             i_row = i + 2
             axes_row = axes[i_row, :]
             self._plot_data_with_single_plane_model(
@@ -866,6 +869,8 @@ class Plotter(object):
                 kwargs_result,
                 extent,
                 kwargs_grid_source=kwargs_grid_source,
+                linestyle=linestyles_planes[i],
+                color=colors_planes[i],
             )
 
         fig.tight_layout()
@@ -891,23 +896,29 @@ class Plotter(object):
 
 
     def _plot_conjugate_points(
-            self, ax, data, num_planes, conj_points_per_plane, traced_conj_points_per_plane, 
+            self, ax, data, num_planes, 
+            conj_points_per_plane, traced_conj_points_per_plane, 
             extent, extent_zoom=None,
+            colors_planes=['tab:orange', 'tab:purple', 'tab:cyan', 'tab:pink', 'tab:blue', 'tab:red'],
         ):
-        conj_points_colors = ['tab:blue', 'tab:red', 'tab:green', 'tab:purple']
         im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
                        alpha=1 if extent_zoom is None else 0)
         for idx_plane in range(num_planes-1):
             if conj_points_per_plane[idx_plane] is None:
                 continue
-            color = conj_points_colors[idx_plane]
-            ax.scatter(*conj_points_per_plane[idx_plane].T, s=100, edgecolors=color, marker='o', linewidths=1, 
+            color = colors_planes[idx_plane]
+            ax.scatter(*conj_points_per_plane[idx_plane].T, s=120, edgecolors=color, marker='o', linewidths=1, 
                     facecolors='none', label="conjugate points")
-            ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=100, c=color, marker='*', linewidths=0.5,
+            ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=400 if extent_zoom else 100, c=color, marker='*', linewidths=1,
                         label="traced conjugate points")
             for conj_point, traced_conj_point in zip(conj_points_per_plane[idx_plane], traced_conj_points_per_plane[idx_plane]):
-                ax.arrow(conj_point[0], conj_point[1], traced_conj_point[0] - conj_point[0], traced_conj_point[1] - conj_point[1], 
-                        color=color, width=0.01, head_width=0.08, alpha=0.2, length_includes_head=True)
+                conj_point_arrow = FancyArrowPatch(
+                    (traced_conj_point[0], traced_conj_point[1]), 
+                    (conj_point[0], conj_point[1]), 
+                    arrowstyle=ArrowStyle("Fancy", head_length=1, head_width=1, tail_width=1), 
+                    color=color, lw=2, alpha=0.2, clip_on=True
+                )
+                ax.add_patch(conj_point_arrow)
         # ax.legend()
         ax.set_aspect('equal')
         lim_extent = extent_zoom if extent_zoom is not None else extent
@@ -926,6 +937,8 @@ class Plotter(object):
         kwargs_result,
         extent,
         kwargs_grid_source=None,
+        linestyle='-',
+        color='tab:blue',
         ):
         """Populate axes (single row) with, in order:
            - the data with the light in that plane subtracted
@@ -992,18 +1005,27 @@ class Plotter(object):
             source_light_model = None
 
         # Get the caustics
-        clines, caustics = model_util.critical_lines_caustics(
+        _, caustics = model_util.critical_lines_caustics(
             lens_image, 
             kwargs_result['kwargs_mass'], 
             eta_flat=kwargs_result['eta_flat'], 
             return_lens_centers=False,
             k_plane=k_plane,
+            supersampling=6,
+        )
+
+        # Get the traced conjugate points
+        traced_conj_points = lens_image.trace_conjugate_points(
+            kwargs_result['eta_flat'],
+            kwargs_result['kwargs_mass'], 
+            N=k_plane,
         )
 
         # Source-subtracted data
         ax = axes_row[0]
         im = ax.imshow(data_subtracted, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
         im.set_rasterized(True)
+        ax.set_title(f"Obs. light model from plane {k_plane}", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
         
@@ -1029,17 +1051,18 @@ class Plotter(object):
         # Source model with caustics overlayed (or critical lines if k_plane = 0)
         ax = axes_row[3]
         if source_light_model is not None:
-            print("WAIT")
-            im = ax.imshow(source_light_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux)
+            im = ax.imshow(source_light_model, extent=src_extent, cmap=self.cmap_bw, norm=self.norm_flux)
             im.set_rasterized(True)
-            ax.set_title(f"With caustics", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
+            ax.set_title(f"With caustics + conj. points", fontsize=self.base_fontsize)
             # FIXME: caustics are not plotted correctly
-            # for j, curve in enumerate(caustics):
-            #     print(j, curve)
-            #     ax.plot(curve[0], curve[1], linewidth=2, color='white', linestyle='-')
-            # ax.set_xlim(src_extent[0], src_extent[1])
-            # ax.set_ylim(src_extent[2], src_extent[3])
+            for j, curve in enumerate(caustics):
+                # print(j, curve)
+                ax.plot(curve[0], curve[1], linewidth=2, color=color, linestyle=linestyle)
+            ax.scatter(*traced_conj_points.T, c=color, s=300, marker='*', linewidths=1, edgecolors='white', facecolors=color)
+            ax.set_xlim(src_extent[0], src_extent[1])
+            ax.set_ylim(src_extent[2], src_extent[3])
+            ax.set_aspect('equal')
         else:
             ax.axis('off')
