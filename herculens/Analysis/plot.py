@@ -955,48 +955,45 @@ class Plotter(object):
         data_subtracted = data - image_light_model
         # Get the unlensed source model of the required plane
         if k_plane > 0:
-            if lens_image.MPLightModel.has_pixels or kwargs_grid_source is not None:
-                if kwargs_grid_source is not None:
-                    grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
-                    x_grid_src, y_grid_src = grid_src.pixel_coordinates
-                    src_extent = grid_src.plt_extent
-                else:
-                    # TODO: the following complicated code should be implemented wthin MPLensImage (similar to LensImage)
-                    # get the adapted coordinates axes
-                    x_coord, y_coord, src_extent_tmp = lens_image.get_source_coordinates(
-                        kwargs_result['eta_flat'],
-                        kwargs_result['kwargs_mass'],
-                    )
-                    # select the right plane
-                    x_coord, y_coord = x_coord[k_plane], y_coord[k_plane]
-                    src_extent_tmp = src_extent_tmp[k_plane]
-                    # create a 2d grid out of the axes
-                    x_grid_src, y_grid_src = np.meshgrid(x_coord, y_coord)
-                    # transform the proper extent to the one usable with imshow 
-                    pix_scl_x = jnp.abs(src_extent_tmp[0]-src_extent_tmp[1])
-                    pix_scl_y = jnp.abs(src_extent_tmp[2]-src_extent_tmp[3])
-                    half_pix_scl = jnp.sqrt(pix_scl_x*pix_scl_y) / 2.
-                    src_extent = [
-                        src_extent_tmp[0]-half_pix_scl, src_extent_tmp[1]+half_pix_scl, 
-                        src_extent_tmp[2]-half_pix_scl, src_extent_tmp[3]+half_pix_scl
-                    ]
-                    # src_extent = src_extent_tmp  # FIXME
-                source_light_model = lens_image.MPLightModel.light_models[k_plane].surface_brightness(
-                    x_grid_src, y_grid_src, 
-                    kwargs_result['kwargs_light'][k_plane],
-                    pixels_x_coord=x_coord,
-                    pixels_y_coord=y_coord,
-                ) * lens_image.Grid.pixel_area
+            plane_has_pixels = lens_image.MPLightModel.light_models[k_plane].has_pixels
+            if plane_has_pixels:
+                # TODO: the following complicated code should be implemented wthin MPLensImage (similar to LensImage)
+                # get the adapted coordinates axes
+                x_coord, y_coord, src_extent_tmp = lens_image.get_source_coordinates(
+                    kwargs_result['eta_flat'],
+                    kwargs_result['kwargs_mass'],
+                )
+                # select the right plane
+                x_coord, y_coord = x_coord[k_plane], y_coord[k_plane]
+                src_extent_tmp = src_extent_tmp[k_plane]  # NOTE: this is not a "plot" extent (misses half pixels at each end)
+            else:
+                x_coord, y_coord = None, None
+            if kwargs_grid_source is not None:
+                grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
+                x_grid_src, y_grid_src = grid_src.pixel_coordinates
+                src_extent = grid_src.plt_extent
+            elif plane_has_pixels:
+                # create a 2d grid out of the axes
+                x_grid_src, y_grid_src = np.meshgrid(x_coord, y_coord)
+                # transform the proper extent to the one usable with imshow 
+                pix_scl_x = jnp.abs(src_extent_tmp[0]-src_extent_tmp[1])
+                pix_scl_y = jnp.abs(src_extent_tmp[2]-src_extent_tmp[3])
+                half_pix_scl = jnp.sqrt(pix_scl_x*pix_scl_y) / 2.
+                src_extent = [
+                    src_extent_tmp[0]-half_pix_scl, src_extent_tmp[1]+half_pix_scl, 
+                    src_extent_tmp[2]-half_pix_scl, src_extent_tmp[3]+half_pix_scl
+                ]
             else:
                 # fall-back case when no grid is provided nor found
-                x_grid_src, y_grid_src = lens_image.ImageNumerics.coordinates_evaluate
+                x_grid_src, y_grid_src = lens_image.ImageNumerics.coordinates_evaluate  # NOTE: coordinates are 1d here
                 src_extent = extent
-                source_light_model = lens_image.MPLightModel.light_models[k_plane].surface_brightness(
-                    x_grid_src, y_grid_src, 
-                    kwargs_result['kwargs_light'][k_plane],
-                    pixels_x_coord=None,
-                    pixels_y_coord=None,
-                ) * lens_image.Grid.pixel_area
+            source_light_model = lens_image.MPLightModel.light_models[k_plane].surface_brightness(
+                x_grid_src, y_grid_src, 
+                kwargs_result['kwargs_light'][k_plane],
+                pixels_x_coord=x_coord,
+                pixels_y_coord=y_coord,
+            ) * lens_image.Grid.pixel_area
+            if source_light_model.ndim == 1:
                 source_light_model = lens_image.ImageNumerics.re_size_convolve(
                     source_light_model, unconvolved=True, input_as_list=False,
                 )
