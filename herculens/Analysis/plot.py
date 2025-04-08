@@ -629,7 +629,7 @@ class Plotter(object):
             extent_zoom=[-0.5, 0.5, -0.5, 0.5],
             kwargs_grid_source=None,
             linestyles_planes=[':', '-', '--', '-.', ':', '-'],
-            colors_planes=['tab:orange', 'tab:purple', 'tab:cyan', 'tab:pink', 'tab:blue', 'tab:red'],
+            colors_planes=['tab:purple', 'tab:cyan', 'tab:orange', 'tab:pink', 'tab:blue', 'tab:red'],
         ):
         """
         Simple function with limited user-control to plot the details
@@ -739,8 +739,8 @@ class Plotter(object):
                 N=idx_plane, k_mass=None,
             )
             traced_conj_points_per_plane.append(traced_conj_points)
-        print("conjugate points:", conj_points_per_plane)
-        print("traced conjugate points:", traced_conj_points_per_plane)
+        # print("conjugate points:", conj_points_per_plane)
+        # print("traced conjugate points:", traced_conj_points_per_plane)
         
         # Populate the first of the figure
         # Data
@@ -804,9 +804,10 @@ class Plotter(object):
         if not no_conj_points:
             self._plot_conjugate_points(
                 ax, data, num_planes, 
-                conj_points_per_plane, traced_conj_points_per_plane,
+                conj_points_per_plane, 
+                traced_conj_points_per_plane,
                 extent, extent_zoom=None,
-                colors_planes=colors_planes,
+                colors_planes=colors_planes[1:],
             )
             ax.set_title("Data + conjugate points", fontsize=self.base_fontsize)
         else:
@@ -820,7 +821,7 @@ class Plotter(object):
                 ax, data, num_planes, 
                 conj_points_per_plane, traced_conj_points_per_plane,
                 extent, extent_zoom=extent_zoom,
-                colors_planes=colors_planes,
+                colors_planes=colors_planes[1:],
             )
             ax.set_title("Conjugate points (zoomed in)", fontsize=self.base_fontsize)
         else:
@@ -907,16 +908,15 @@ class Plotter(object):
             if conj_points_per_plane[idx_plane] is None:
                 continue
             color = colors_planes[idx_plane]
-            ax.scatter(*conj_points_per_plane[idx_plane].T, s=120, edgecolors=color, marker='o', linewidths=1, 
-                    facecolors='none', label="conjugate points")
-            ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=400 if extent_zoom else 100, c=color, marker='*', linewidths=1,
-                        label="traced conjugate points")
+            ax.scatter(*conj_points_per_plane[idx_plane].T, s=140, edgecolors=color, marker='o', linewidths=2, 
+                    facecolors='none')
+            ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=400 if extent_zoom else 100, c=color, marker='*', linewidths=1)
             for conj_point, traced_conj_point in zip(conj_points_per_plane[idx_plane], traced_conj_points_per_plane[idx_plane]):
                 conj_point_arrow = FancyArrowPatch(
                     (traced_conj_point[0], traced_conj_point[1]), 
                     (conj_point[0], conj_point[1]), 
                     arrowstyle=ArrowStyle("Fancy", head_length=1, head_width=1, tail_width=1), 
-                    color=color, lw=2, alpha=0.2, clip_on=True
+                    color=color, lw=2, alpha=0.2, clip_on=True,
                 )
                 ax.add_patch(conj_point_arrow)
         # ax.legend()
