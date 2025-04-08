@@ -20,21 +20,24 @@ from herculens.LensImage.lensing_operator import LensingOperator
 
 
 def critical_lines_caustics(lens_image, kwargs_mass, eta_flat=None, supersampling=5, 
-                            return_lens_centers=False, k_plane=-1):
+                            return_lens_centers=False, k_plane=None):
     if config.read('jax_enable_x64') is not True:
         print("WARNING: JAX's 'jax_enable_x64' is not enabled; "
               "computation of critical lines and caustics might be inaccurate.")
     if isinstance(lens_image, (LensImage, LensImage3D)):
         mass_model = lens_image.MassModel
-        inv_mag_fn = lambda x, y: 1. / partial(mass_model.magnification, kwargs_lens=kwargs_mass)(x, y)
-        ray_shooting_fn = partial(mass_model.ray_shooting, kwargs_lens=kwargs_mass)
+        inv_mag_fn = lambda x, y: 1. / partial(mass_model.magnification, kwargs=kwargs_mass)(x, y)
+        ray_shooting_fn = partial(mass_model.ray_shooting, kwargs=kwargs_mass)
         multiplane_mode = False
     elif isinstance(lens_image, MPLensImage):
+        if k_plane is None:
+            # we take the furthest plane as the default
+            k_plane = lens_image.MPLightModel.number_light_planes - 1
         mass_model = lens_image.MPMassModel
         if eta_flat is None:
             raise ValueError("The `eta_flat` parameter must be provided when using MPLensImage.")
-        inv_mag_fn = partial(mass_model.inverse_magnification, eta_flat=eta_flat, kwargs=kwargs_mass)
-        ray_shooting_fn = partial(mass_model.ray_shooting, eta_flat=eta_flat, kwargs=kwargs_mass)
+        inv_mag_fn = lambda x, y: mass_model.inverse_magnification(x, y, eta_flat=eta_flat, kwargs=kwargs_mass)[k_plane]
+        ray_shooting_fn = lambda x, y: [rs[k_plane] for rs in mass_model.ray_shooting(x, y, eta_flat=eta_flat, kwargs=kwargs_mass)]
         multiplane_mode = True
     else:
         raise TypeError("lens_image must be an instance of LensImage, LensImage3D or MPLensImage.")
@@ -44,8 +47,6 @@ def critical_lines_caustics(lens_image, kwargs_mass, eta_flat=None, supersamplin
     x_grid_img, y_grid_img = grid.pixel_coordinates
     inv_mag_tot = inv_mag_fn(x_grid_img, y_grid_img)
     inv_mag_tot = np.array(inv_mag_tot, dtype=np.float64)
-    if multiplane_mode is True:
-        inv_mag_tot = inv_mag_tot[k_plane]
 
     # find contours corresponding to infinite magnification
     contours = measure.find_contours(inv_mag_tot, 0.)
