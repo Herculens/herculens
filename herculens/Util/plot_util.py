@@ -94,6 +94,43 @@ def nice_colorbar_residuals(mappable, res_map, vmin, vmax, position='right', pad
                   invisible=invisible, colorbar_kwargs=colorbar_kwargs, label_kwargs=label_kwargs,
                   divider_kwargs=divider_kwargs)
 
+def contour_with_legend(ax, array, kwargs_contour={}, kwargs_legend={}, logscale=True):
+    """
+    Add contours to an axis with a legend that actually works.
+    Works with a single array or a list of arrays.
+    """
+    if (isinstance(array, np.ndarray) and array.ndim == 3) or (isinstance(array, (list, tuple)) and len(array) > 1):
+        if isinstance(kwargs_contour, dict):
+            kwargs_contour_list = [kwargs_contour] * array.shape[0]
+        else:
+            kwargs_contour_list = kwargs_contour
+        if len(kwargs_contour_list) != len(array):
+            raise ValueError("The number of contour kwargs must match the number of arrays.")
+        array_list = array
+    else:
+        array_list = [array]
+        kwargs_contour_list = [kwargs_contour]
+    legend_handles = []
+    for i, (arr, kw) in enumerate(zip(array_list, kwargs_contour_list)):
+        label = kw.pop('label', f"Contour {i}")
+        arr_transf = np.log10(arr) if logscale else arr
+        ax.contour(
+            arr_transf, **kw,
+        )
+        legend_handles.append(
+            plt.Line2D(
+                [0], [0], 
+                linestyle=kw.get('linestyles', '-'),
+                linewidth=kw.get('linewidths', 1),
+                color=kw.get('colors', 'black'), 
+                label=label,
+            )
+        )
+    ax.legend(
+        handles=legend_handles,
+        **kwargs_legend,
+    )
+
 # def clip(data, nsigma):
 #     """
 #     Iteratively removes data until all is within nsigma of the median, then returns the median and std
