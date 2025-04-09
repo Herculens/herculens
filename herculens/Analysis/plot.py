@@ -626,6 +626,7 @@ class Plotter(object):
             likelihood_mask=None,
             masked_residuals=True,
             show_shear_field=False,
+            norm_kappa=LogNorm(1e-1, 1e1),
             extent_zoom=[-0.5, 0.5, -0.5, 0.5],
             kwargs_grid_source=None,
             linestyles_planes=[':', '-', '--', '-.', ':', '-'],
@@ -780,19 +781,10 @@ class Plotter(object):
         # Model
         ax = axes[0, 1]
         im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=self.norm_flux)
-        show_legend = False
-        if likelihood_mask is not None:
-            ax.contour(likelihood_mask, extent=extent, levels=[0], 
-                       colors='white', alpha=0.4, linewidths=2, linestyles='-',
-                       label="Likelhood mask")
-            show_legend = True
-        if not all([m is None for m in lens_image.source_arc_masks]):
-            for j, mask in enumerate(lens_image.source_arc_masks):
-                ax.contour(mask, extent=extent, levels=[0], 
-                           colors='white', alpha=0.4, linewidths=0.8, linestyles=':',
-                           label="Source arc mask" if j == 0 else None)
-                show_legend = True
         im.set_rasterized(True)
+        self._plot_masks_contours(
+            ax, lens_image, likelihood_mask=likelihood_mask, extent=extent, color='white', alpha=0.4,
+        )
         ax.set_title("Model", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                       colorbar_kwargs={'orientation': 'horizontal'})
@@ -801,6 +793,9 @@ class Plotter(object):
         ax = axes[0, 2]
         im = ax.imshow(residuals_plot, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
         im.set_rasterized(True)
+        self._plot_masks_contours(
+            ax, lens_image, likelihood_mask=likelihood_mask, extent=extent, color='black', alpha=0.6,
+        )
         if likelihood_mask is not None and masked_residuals is False:
             ax.contour(likelihood_mask, extent=extent, levels=[0], 
                        colors='black', alpha=0.5, linewidths=0.5)
@@ -878,7 +873,7 @@ class Plotter(object):
 
         # Convergence map
         ax = axes[1, 2]
-        im = ax.imshow(kappa, extent=extent, cmap=self.cmap_default, norm=LogNorm(1e-1, 1e1))
+        im = ax.imshow(kappa, extent=extent, cmap=self.cmap_default, norm=norm_kappa)
         im.set_rasterized(True)
         ax.set_title(r"Convergence $\kappa$ (image plane)", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -892,11 +887,11 @@ class Plotter(object):
             ], 
             [
                 dict(extent=extent, levels=10,
-                     colors='white', alpha=0.5,
+                     colors='black', alpha=0.5,
                      linewidths=0.5, linestyles='-',
                      label="Main lens mass"),
                 dict(extent=extent, levels=5,
-                     colors='white', alpha=0.5,
+                     colors='black', alpha=0.5,
                      linewidths=1, linestyles='--',
                      label="Main lens light"),
             ], 
@@ -948,6 +943,18 @@ class Plotter(object):
         else:
             norm_flux = self.norm_flux
         return norm_flux
+    
+    @staticmethod
+    def _plot_masks_contours(ax, lens_image, likelihood_mask=None, extent=None, alpha=0.5, color='red'):
+        if likelihood_mask is not None:
+            ax.contour(likelihood_mask, extent=extent, levels=[0], 
+                    colors=color, alpha=alpha, linewidths=1.5, linestyles='-',
+                    label="Likelhood mask")
+        if not all([m is None for m in lens_image.source_arc_masks]):
+            for j, mask in enumerate(lens_image.source_arc_masks):
+                ax.contour(mask, extent=extent, levels=[0], 
+                        colors=color, alpha=alpha, linewidths=1.5, linestyles=':',
+                        label="Source arc mask" if j == 0 else None)
 
 
     def _plot_conjugate_points(
@@ -1047,18 +1054,31 @@ class Plotter(object):
                 pixels_x_coord=x_coord,
                 pixels_y_coord=y_coord,
             ) * lens_image.Grid.pixel_area
-            if original_light_model.ndim == 1:
-                original_light_model = lens_image.ImageNumerics.re_size_convolve(
-                    original_light_model, unconvolved=True, input_as_list=False,
-                )
+            # if original_light_model.ndim == 1:
+            #     original_light_model = lens_image.ImageNumerics.re_size_convolve(
+            #         original_light_model, unconvolved=True, input_as_list=False,
+            #     )
         else:
             # for the lens plane, we do not have a source model
-            original_light_model = lens_image.model(
-                k_planes=k_plane,
-                unconvolved=True,
-                **kwargs_result,
-            )
+            # original_light_model = lens_image.model(
+            #     k_planes=k_plane,
+            #     unconvolved=True,
+            #     **kwargs_result,
+            # )
+            # orig_extent = extent
+            x_grid_model, y_grid_model = lens_image.ImageNumerics.coordinates_evaluate  # NOTE: coordinates are 1d here
+            original_light_model = lens_image.MPLightModel.light_models[0].surface_brightness(
+                x_grid_model, y_grid_model, 
+                kwargs_result['kwargs_light'][0],
+                pixels_x_coord=None,
+                pixels_y_coord=None,
+            ) * lens_image.Grid.pixel_area
             orig_extent = extent
+        
+        # typically when we used lens_image.ImageNumerics.coordinates_evaluate
+        if original_light_model.ndim == 1:
+            n_side = int(np.sqrt(original_light_model.size))
+            original_light_model = original_light_model.reshape((n_side, n_side))
 
         # Get the caustics
         _, caustics = model_util.critical_lines_caustics(
@@ -1098,9 +1118,9 @@ class Plotter(object):
         im = ax.imshow(original_light_model, extent=orig_extent, cmap=self.cmap_flux_alt, norm=self.norm_flux)
         im.set_rasterized(True)
         if k_plane > 0:
-            ax.set_title(f"Orig. model in plane {k_plane}", fontsize=self.base_fontsize)
+            ax.set_title(f"Unlensed model in plane {k_plane}", fontsize=self.base_fontsize)
         else:
-            ax.set_title(f"Unconv. model in plane {k_plane}", fontsize=self.base_fontsize)
+            ax.set_title(f"Unconvolved model in plane {k_plane}", fontsize=self.base_fontsize)
         nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                         colorbar_kwargs={'orientation': 'horizontal'})
             
