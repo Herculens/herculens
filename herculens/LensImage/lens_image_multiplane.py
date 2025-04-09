@@ -141,6 +141,7 @@ class MPLensImage(object):
         kwargs_mass=None,
         kwargs_light=None,
         supersampled=False,
+        unconvolved=False,
         k_mass=None,
         k_light=None,
         k_planes=None,
@@ -166,7 +167,9 @@ class MPLensImage(object):
         kwargs_light : list of list
             List of lists of parameter dictionaries corresponding to each light plane.
         supersampled : bool, optional
-            If True returns the unconvolved model on the higher resolution grid, by default False
+            If True, returns the unconvolved model on the higher resolution grid, by default False
+        unconvolved : bool, optional
+            If True, does perform convolution with the PSF, by default False
         k_mass : list of list, optional
             Only evaluate the k-th mass model (list of list of index values) for each mass
             plane, by default None
@@ -214,7 +217,7 @@ class MPLensImage(object):
         k_planes = self.k_extend(k_planes, len(light_planes))
         model = light_planes[k_planes].sum(axis=0)
         if not supersampled:
-            model = self.ImageNumerics.re_size_convolve(model)
+            model = self.ImageNumerics.re_size_convolve(model, unconvolved=unconvolved)
         if return_pixel_scale:
             pixel_scale = [x[1] - x[0] if x is not None else None for x in pixels_x_coord]
             return model, pixel_scale
