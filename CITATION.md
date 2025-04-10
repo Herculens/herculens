@@ -1,9 +1,9 @@
 # Citing Herculens
 
-If you make use of `herculens`, please cite [Galan et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract). This work presents the global architecture of the tool, and applies it to reconstruct a pixelated lens potential with wavelets.
+If you make use of `Herculens`, please cite [Galan et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract). This work presents the global architecture of the tool, and applies it to reconstruct a pixelated lens potential with wavelets.
 
 ```
-@ARTICLE{Galan2022_herculens,
+@ARTICLE{Galan2022,
        author = {{Galan}, A. and {Vernardos}, G. and {Peel}, A. and {Courbin}, F. and {Starck}, J. -L.},
         title = "{Using wavelets to capture deviations from smoothness in galaxy-scale strong lenses}",
       journal = {\aap},
@@ -22,10 +22,10 @@ archivePrefix = {arXiv},
 }
 ```
 
-In addition, if you combine `herculens` with `nifty`, for example using the `CorrelatedField` model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation).
+In addition, if you combine `Herculens` with `nifty`, for example using the `CorrelatedField` model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation). Along with the above publication, please also cite the `NIFTy.re` paper from [Edenhofer et al. 2024](https://ui.adsabs.harvard.edu/abs/2024JOSS....9.6593E/abstract).
 
 ```
-@ARTICLE{Galan2024_herculens_nifty,
+@ARTICLE{Galan2024,
        author = {{Galan}, A. and {Caminha}, G.~B. and {Knollm{\"u}ller}, J. and {Roth}, J. and {Suyu}, S.~H.},
         title = "{El Gordo needs El Anzuelo: Probing the structure of cluster members with multi-band extended arcs in JWST data}",
       journal = {arXiv e-prints},
