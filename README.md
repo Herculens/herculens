@@ -30,7 +30,7 @@ Being based on JAX means that `Herculens` runs effortlessly on CPUs, GPUs and TP
 
 ## Works using `Herculens`
 
-You can find a list of analyses that used `Herculens`, as well as their ADS bibtex entries, on [this page](PUBLICATIONS.md).
+You can find a list of analyses that used `Herculens`, as well as their ADS bibtex entries, on [this page](https://github.com/Herculens/herculens/blob/main/PUBLICATIONS.md).
 
 ## Example notebooks
 
@@ -57,17 +57,17 @@ The mandatory dependencies will be installed automatically.
 
 ### Package requirements
 
-The [`requirements.txt`](requirements.txt) file lists all required and optional package dependencies, along with their specific versions. **IMPORTANT NOTE:** do not only install blindly the required packages; please also have a look at the content of [the file](requirements.txt) itself to learn more about additional optional packages, depending on your goals.
+The [`requirements.txt`](https://github.com/Herculens/herculens/blob/main/requirements.txt) file lists all required and optional package dependencies, along with their specific versions. **IMPORTANT NOTE:** do not only install blindly the required packages; please also have a look at the content of [the file](https://github.com/Herculens/herculens/blob/main/requirements.txt) itself to learn more about additional optional packages, depending on your goals.
 
 ## Attribution
 
 ### Citation
 
-If you make use of `Herculens`, please cite [Galan et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract). If you use the [`CorrelatedField`](https://github.com/Herculens/herculens/blob/main/herculens/GenericModel/correlated_field.py) model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation). You will find in [this file](CITATION.md) the related bibtex entries.
+If you make use of `Herculens`, please cite [Galan et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract). If you use the [`CorrelatedField`](https://github.com/Herculens/herculens/blob/main/herculens/GenericModel/correlated_field.py) model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation). You will find in [this file](https://github.com/Herculens/herculens/blob/main/CITATION.md) the related bibtex entries.
 
 ### Special mention regarding Lenstronomy
 Part of the `Herculens` code originates from the open-source lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy), described in [Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283) (and references therein). In every source file, proper credits are given to the specific developers and contributors to both the original `lenstronomy` (up to version 1.9.3) and `Herculens`.
 
 ### Contributors
 
-The list of people that contributed to `Herculens` and credits to original `lenstronomy` contributors, is in [this document](AUTHORS.md).
+The list of people that contributed to `Herculens` and credits to original `lenstronomy` contributors, is in [this document](https://github.com/Herculens/herculens/blob/main/AUTHORS.md).

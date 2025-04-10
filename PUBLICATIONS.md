@@ -2,7 +2,7 @@
 
 ## Original publications
 
-- "**_Using wavelets to capture deviations from smoothness in galaxy-scale strong lenses_**" (**Galan et al. 2022**](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract)): presentation of one of the first auto-differantiable lensing modelling codes, implementing efficient wavelet-based regularisation for both surface brightness and lensing potential pixelated corrections. <ins>Please cite this work if you make use of `Herculens` in any way</ins> ([bibtex entries](CITATION.md)).
+- "**_Using wavelets to capture deviations from smoothness in galaxy-scale strong lenses_**" ([**Galan et al. 2022**](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract)): presentation of one of the first auto-differantiable lensing modelling codes, implementing efficient wavelet-based regularisation for both surface brightness and lensing potential pixelated corrections. <ins>Please cite this work if you make use of `Herculens` in any way</ins> ([bibtex entries](CITATION.md)).
 
 - In addition, you can also refer to this [Astrophysics Source Code Library entry](https://ui.adsabs.harvard.edu/abs/2022ascl.soft09002G/abstract).
 
@@ -22,8 +22,8 @@
 
 - "**_Modeling lens potentials with continuous neural fields in galaxy-scale strong lenses_**" ([**Biggio et al. 2023**](https://ui.adsabs.harvard.edu/abs/2023A%26A...675A.125B/abstract)): proof-of-concept of the use of continuous neural fields coupled to usual lens models to reconstruct the lensing potential maps at high resolution.
 
-- "**_Exploiting the diversity of modeling methods to probe systematic biases in strong lensing analyses_**": [**Galan et al. 2024b**](https://ui.adsabs.harvard.edu/abs/2024A%26A...692A..87G/abstract): Consistent comparison of 6 different modelling methods, including two methods implemented in `Herculens`, to characterize and reduce sources of systematic errors in strong lens modelling analyses.
+- "**_Exploiting the diversity of modeling methods to probe systematic biases in strong lensing analyses_**" ([**Galan et al. 2024b**](https://ui.adsabs.harvard.edu/abs/2024A%26A...692A..87G/abstract)): Consistent comparison of 6 different modelling methods, including two methods implemented in `Herculens`, to characterize and reduce sources of systematic errors in strong lens modelling analyses.
 
 ## Lensing standard integration
 
-- "**_COOLEST: COde-independent Organized LEns STandard_**": [**Galan et al. 2023**](https://ui.adsabs.harvard.edu/abs/2023JOSS....8.5567G/abstract): `Herculens` supports the COOLEST lensing standard to export, read and compare lens models.
+- "**_COOLEST: COde-independent Organized LEns STandard_**" ([**Galan et al. 2023**](https://ui.adsabs.harvard.edu/abs/2023JOSS....8.5567G/abstract)): `Herculens` supports the COOLEST lensing standard to export, read and compare lens models.
