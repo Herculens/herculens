@@ -127,36 +127,6 @@ class GLEEReader(object):
             self._raise_parser_run_error()
         return self._ptl_src_errors
     
-    def point_like_source_group_indices(self):
-        """Return a list of lists containing indices of point-like sources
-        which have the redshift, order by increasing redshift.
-        For instance: [
-            [redshift1_index1, redshift1_index2],  # redshift 1
-            [redshift2_index1],  # redshift 2
-            [redshift3_index1, redshift3_index2, redshift3_index3],  # redshift 3
-            ...
-        ]
-
-        Returns
-        -------
-        list
-            List lists of integers
-        """
-        redshifts = np.array(self.point_like_source_redshifts[0])
-        iter_indices = np.argsort(redshifts)
-        group_indices = [
-            [iter_indices[0]]
-        ]
-        unique_redshifts = [redshifts[iter_indices[0]]]
-        for i in iter_indices[1:]:
-            z_current = redshifts[i]
-            z_prev = redshifts[i-1]
-            if z_current != z_prev:
-                group_indices.append([])
-                unique_redshifts.append(z_current)
-            group_indices[-1].append(i)
-        return unique_redshifts, group_indices
-    
     @property
     def extended_source_redshifts(self):
         redshifts = [p['z'] for p in self.extended_source_parameters]
@@ -184,6 +154,58 @@ class GLEEReader(object):
     @property
     def extended_source_ref_coordinates(self):
         return [s['refcoord'] for s in self.extended_source_settings]
+    
+    def source_plane_groups(self):
+        """Return a a list of unique redshifts of all source planes, as well as
+        the list of lists containing indices of point-like sources
+        which have the redshift, order by increasing redshift.
+        For instance: [
+            [redshift1_index1, redshift1_index2],  # redshift 1
+            [redshift2_index1],  # redshift 2
+            [redshift3_index1, redshift3_index2, redshift3_index3],  # redshift 3
+            ...
+        ]
+        and a list of booleans indicating if the redshift plane contains 
+        an extended source or not.
+
+        Returns
+        -------
+        list
+            List lists of integers
+        """
+        redshifts = np.array(self.point_like_source_redshifts[0])
+        redshifts_extended = np.array(self.extended_source_redshifts[0])
+        common_redshifts = np.isin(redshifts_extended, redshifts).all()
+        if not common_redshifts:
+            raise NotImplementedError("Extended sources can only have redshifts that " \
+            "are also in point-like sources, for now.")
+        iter_indices = np.argsort(redshifts)
+        group_indices = [
+            [iter_indices[0]]
+        ]
+        unique_redshifts = [redshifts[iter_indices[0]]]
+        extended_flags = [True] if unique_redshifts[0] in redshifts_extended else [False]
+        for i in iter_indices[1:]:
+            z_current = redshifts[i]
+            z_prev = redshifts[i-1]
+            if z_current != z_prev:
+                group_indices.append([])
+                unique_redshifts.append(z_current)
+                extended_flags.append(True if z_current in redshifts_extended else False)
+            group_indices[-1].append(i)
+        return np.array(unique_redshifts), group_indices, extended_flags
+    
+    @property
+    def num_source_planes(self):
+        """Return the number of unique source planes.
+
+        Returns
+        -------
+        int
+            Number of source planes
+        """
+        redshifts, _, _ = self.source_plane_groups()
+        return len(redshifts)
 
     def parse_config(self):
         lines = self.read_and_separate_lines(self._config_path)
