@@ -29,7 +29,7 @@ from .MassModel.Profiles.pixelated import (
 )
 from .MassModel.Profiles.dpie import (
     DPIE_GLEE as DPIE,
-    DPIE_GLEE_STATIC as DPIE_STATIC,
+    # DPIE_GLEE_STATIC as DPIE_STATIC,
 )
 
 from .PointSourceModel.point_source_model import PointSourceModel
