@@ -942,9 +942,11 @@ class Plotter(object):
             mp_lens_image, 
             kwargs_result, 
             num_zooms=1, 
+            extent=None,
             extent_zoom=None,
+            redshifts=None,
             show_plot=True, 
-            figsize=None,
+            fig_width=15,
         ):
         if num_zooms > 1:
             assert len(extent_zoom) == num_zooms
@@ -952,15 +954,15 @@ class Plotter(object):
         else:
             extent_zoom_list = [extent_zoom]
         # Create the figure and axes following the same dimensions as the model_summary function
-        n_cols = 1 + num_zooms
-        n_rows = 1
-        if figsize is None:
-            figsize = (4*n_cols, 4)
+        n_cols = 1
+        n_rows = 1 + num_zooms
+        figsize = (fig_width, fig_width/3.*n_rows)
         fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
         # get the total number of planes as we will iterate over it
         num_planes = mp_lens_image.MPLightModel.number_light_planes
         # get the model extent
-        extent = mp_lens_image.Grid.plt_extent
+        if extent is None:
+            extent = mp_lens_image.Grid.plt_extent
         # Get the conjugate points
         conj_points_per_plane = mp_lens_image.conjugate_points
         #no_conj_points = all([cp is None for cp in conj_points_per_plane])
@@ -976,10 +978,12 @@ class Plotter(object):
         # create a large color palette with a variety of colors
         colors_per_planes = mpl.color_sequences['tab20'] + mpl.color_sequences['Pastel1'] + mpl.color_sequences['Pastel2']
         # if the data has been set, also show the data
-        if hasattr(self, '_data'):
-            im = axes[0].imshow(self._data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux)
-            im.set_rasterized(True)
+        data = self._data if hasattr(self, '_data') else None
         for i, ax in enumerate(axes):
+            if data is not None:
+                im = axes[0].imshow(data, extent=mp_lens_image.Grid.plt_extent, 
+                                    cmap=self.cmap_bw, norm=self.norm_flux, alpha=0.8)
+                im.set_rasterized(True)
             self._plot_conjugate_points_in_ax(
                 ax, num_planes, 
                 conj_points_per_plane, 
@@ -987,7 +991,12 @@ class Plotter(object):
                 extent, 
                 extent_zoom=extent_zoom_list[i-1] if i > 0 else None,
                 colors_planes=colors_per_planes,
+                redshift_per_plane=redshifts,
             )
+            if i == 0:
+                ax.set_title("Base view")
+            else:
+                ax.set_title(f"Zoom-in view {i}")
         fig.tight_layout()
         if show_plot:
             plt.show()
@@ -1024,19 +1033,39 @@ class Plotter(object):
     @staticmethod
     def _plot_conjugate_points_in_ax(
             ax, num_planes, 
-            conj_points_per_plane, traced_conj_points_per_plane, 
-            extent, extent_zoom=None,
+            conj_points_per_plane,
+            traced_conj_points_per_plane, 
+            extent, 
+            extent_zoom=None,
             colors_planes=['tab:orange', 'tab:purple', 'tab:cyan', 'tab:pink', 'tab:blue', 'tab:red'],
+            redshift_per_plane=None,
         ):
         idx_color = 0
         for idx_plane in range(num_planes-1):
             if conj_points_per_plane[idx_plane] is None:
                 continue
-            idx_color += 1
             color = colors_planes[idx_color % len(colors_planes)]
-            ax.scatter(*conj_points_per_plane[idx_plane].T, s=140, edgecolors=color, marker='o', linewidths=2, 
-                    facecolors='none')
-            ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=400 if extent_zoom else 100, c=color, marker='*', linewidths=1)
+            idx_color += 1
+            cps = conj_points_per_plane[idx_plane].T
+            tcps = traced_conj_points_per_plane[idx_plane].T
+            # check if the conjugate points are in the extent
+            extent_check = extent_zoom if extent_zoom is not None else extent
+            if not (np.any(
+                    ((extent_check[0] < cps[0]) & (cps[0] < extent_check[1])) &
+                    ((extent_check[2] < cps[1])) & (cps[1] < extent_check[3])
+                ) or np.any(
+                    ((extent_check[0] < tcps[0]) & (tcps[0] < extent_check[1])) &
+                    ((extent_check[2] < tcps[1])) & (tcps[1] < extent_check[3])
+                )):
+                continue
+            # plot the conjugate points and traced conjugate points
+            label = f"Plane {idx_plane+1} (z={redshift_per_plane[idx_plane] if redshift_per_plane is not None else '?'})"
+            print(label)
+            print(cps)
+            print("")
+            ax.scatter(*cps, s=140, edgecolors=color, marker='o', linewidths=2, facecolors='none',
+                       label=label)
+            ax.scatter(*tcps, s=400 if extent_zoom else 100, facecolors=color, marker='*', linewidths=1)
             for conj_point, traced_conj_point in zip(conj_points_per_plane[idx_plane], traced_conj_points_per_plane[idx_plane]):
                 conj_point_arrow = FancyArrowPatch(
                     (traced_conj_point[0], traced_conj_point[1]), 
@@ -1045,11 +1074,11 @@ class Plotter(object):
                     color=color, lw=2, alpha=0.2, clip_on=True,
                 )
                 ax.add_patch(conj_point_arrow)
-        # ax.legend()
         ax.set_aspect('equal')
         lim_extent = extent_zoom if extent_zoom is not None else extent
         ax.set_xlim(lim_extent[0], lim_extent[1])
         ax.set_ylim(lim_extent[2], lim_extent[3])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
         
     def _plot_data_with_single_plane_model(
         self,
