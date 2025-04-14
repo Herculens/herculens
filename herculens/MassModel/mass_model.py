@@ -54,8 +54,9 @@ class MassModel(MassModelBase):
         """
         if not isinstance(profile_list, (list, tuple)):
             # useful when using a single profile
-            profile_list = [profile_list]
-        self.profile_type_list = profile_list
+            self.profile_type_list = [profile_list]
+        else:
+            self.profile_type_list = profile_list
         super().__init__(self.profile_type_list, **kwargs)
         self._use_jax_scan = use_jax_scan
         self._repeated_profile_mode = False

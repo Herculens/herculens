@@ -23,24 +23,22 @@ class MPMassModel(object):
             List of lists containing Lens model profiles for each plane of
             the lens system. One inner list per plane with the outer list
             sorted by distance from observer.
+            If a mass plane has no mass model associated to it, use None.
         mass_model_kwargs : dictionary for settings related to PIXELATED
             profiles.
         '''
-        if all([isinstance(mm, str) for mm in mp_mass_model_list]):
+        string_input = all([isinstance(mm, str) or mm is None for mm in mp_mass_model_list])
+        instance_input = all([isinstance(mm, MassModel) or mm is None for mm in mp_mass_model_list])
+        if string_input:
+            self.mass_models = [MassModel(mm, **mass_model_kwargs) if mm is not None else None for mm in mp_mass_model_list]
             self.mp_profile_type_list = mp_mass_model_list
-            self.mass_models = []
-            for mass_plane in self.mp_profile_type_list:
-                self.mass_models.append(MassModel(
-                    mass_plane,
-                    **mass_model_kwargs
-                ))
-        elif all([isinstance(mm, MassModel) for mm in mp_mass_model_list]):
+        elif instance_input:
             self.mass_models = mp_mass_model_list
-            self.mp_profile_type_list = [mm.func_list for mm in self.mass_models]
+            self.mp_profile_type_list = [mm.func_list if mm is not None else None for mm in self.mass_models]
         else:
             raise ValueError(
-                "MPMassModel needs to be initialized either with a list of lists of strings, "
-                "or directly with a list of (single plane) MassModel instances."
+                "MPMassModel needs to be initialized either with a list of lists of strings (or None), "
+                "or directly with a list of (single plane) MassModel instances (or None)."
             )
         self.number_mass_planes = len(self.mass_models)
         
@@ -53,7 +51,12 @@ class MPMassModel(object):
     @property
     def has_pixels(self):
         # An list of bools indicating if a plane contains an pixelated mass model
-        return [mass_model.has_pixels for mass_model in self.mass_models]
+        return [mass_model.has_pixels if mass_model is not None else False for mass_model in self.mass_models]
+    
+    @property
+    def has_mass(self):
+        # An list of bools indicating if a plane contains a mass model
+        return [mass_model is not None for mass_model in self.mass_models]
 
     @partial(jax.jit, static_argnums=(0, 5, 6))
     def ray_shooting(self, x, y, eta_flat, kwargs, N=None, k=None):
@@ -103,26 +106,29 @@ class MPMassModel(object):
 
         # iterate the lensing equation for each mass plane
         for j in range(N):
-            dx, dy = self.mass_models[j].alpha(
-                xs[j],
-                ys[j],
-                kwargs=kwargs[j],
-                k=k[j]
-            )
+            if self.has_mass[j]:
+                dx, dy = self.mass_models[j].alpha(
+                    xs[j],
+                    ys[j],
+                    kwargs=kwargs[j],
+                    k=k[j]
+                )
+            else:
+                dx, dy = xs[j], ys[j]  # no deflection
             etas_j = etas_t[:, j:j + 1]
             xs = xs - etas_j * dx
             ys = ys - etas_j * dy
         return xs, ys
 
     def _ray_shooting_slice(self, x, y, eta_flat, kwargs):
-        '''Helper function that give *scaler* inputs of x and y give a *vector*
+        '''Helper function that give *scalar* inputs of x and y give a *vector*
         output for each mass plane. Used for the vectorization of the `A` method'''
         return jnp.stack(
             self.ray_shooting(jnp.array([x]), jnp.array([y]), eta_flat, kwargs)
         ).T.squeeze()
 
     def _A_stack(self, x, y, eta_flat, kwargs, kind='auto'):
-        '''Helper function that takes the jacobian of the ray shooting give *scaler*
+        '''Helper function that takes the jacobian of the ray shooting give *scalar*
         inputs for x and y and returns a 2x2 array.'''
         if kind == 'auto':
             return jnp.stack(
@@ -137,11 +143,14 @@ class MPMassModel(object):
             xs, ys = self.ray_shooting(jnp.array([x]), jnp.array([y]), eta_flat, kwargs)
             etas_t = self.base_eta.at[self.eta_idx].set(eta_flat)[:-1, :(N + 1)].T
             for j in range(N):
-                hxx, hxy, hyx, hyy = self.mass_models[j].hessian(
-                    xs[j][0],
-                    ys[j][0],
-                    kwargs[j]
-                )
+                if self.has_mass[j]:
+                    hxx, hxy, hyx, hyy = self.mass_models[j].hessian(
+                        xs[j][0],
+                        ys[j][0],
+                        kwargs[j]
+                    )
+                else:
+                    hxx, hxy, hyx, hyy = 0., 0., 0., 0.
                 etas_j = etas_t[:, j:j + 1]
                 A_H = A[:, j, :] @ jnp.array([[hxx, hxy], [hyx, hyy]])
                 A = A - jnp.kron(A_H, etas_j).reshape(2, N + 1, 2)
