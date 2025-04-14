@@ -11,6 +11,7 @@ import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from scipy import ndimage
+import matplotlib as mpl
 from matplotlib.colors import Normalize, LogNorm, TwoSlopeNorm
 from matplotlib.patches import FancyArrowPatch, ArrowStyle
 
@@ -832,8 +833,13 @@ class Plotter(object):
         # Conjugate points
         ax = axes[1, 0]
         if not no_conj_points:
-            self._plot_conjugate_points(
-                ax, data, num_planes, 
+            im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
+                           alpha=1 if extent_zoom is None else 0)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'},
+                          invisible=True)
+            self._plot_conjugate_points_in_ax(
+                ax, num_planes, 
                 conj_points_per_plane, 
                 traced_conj_points_per_plane,
                 extent, extent_zoom=None,
@@ -864,8 +870,13 @@ class Plotter(object):
             ax.set_ylim(extent[2], extent[3])
             ax.set_title(f"Shear field (w.r.t. plane {num_planes-1})", fontsize=self.base_fontsize)
         else:
-            self._plot_conjugate_points(
-                ax, data, num_planes, 
+            im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
+                           alpha=1 if extent_zoom is None else 0)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'},
+                          invisible=True)
+            self._plot_conjugate_points_in_ax(
+                ax, num_planes, 
                 conj_points_per_plane, traced_conj_points_per_plane,
                 extent, extent_zoom=extent_zoom,
                 colors_planes=colors_planes[1:],
@@ -926,7 +937,61 @@ class Plotter(object):
         fig.tight_layout()
         return fig
 
-
+    def plot_conjugate_points(
+            self,
+            mp_lens_image, 
+            kwargs_result, 
+            num_zooms=1, 
+            extent_zoom=None,
+            show_plot=True, 
+            figsize=None,
+        ):
+        if num_zooms > 1:
+            assert len(extent_zoom) == num_zooms
+            extent_zoom_list = extent_zoom
+        else:
+            extent_zoom_list = [extent_zoom]
+        # Create the figure and axes following the same dimensions as the model_summary function
+        n_cols = 1 + num_zooms
+        n_rows = 1
+        if figsize is None:
+            figsize = (4*n_cols, 4)
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
+        # get the total number of planes as we will iterate over it
+        num_planes = mp_lens_image.MPLightModel.number_light_planes
+        # get the model extent
+        extent = mp_lens_image.Grid.plt_extent
+        # Get the conjugate points
+        conj_points_per_plane = mp_lens_image.conjugate_points
+        #no_conj_points = all([cp is None for cp in conj_points_per_plane])
+        traced_conj_points_per_plane = []
+        for idx_plane in range(1, num_planes):
+            traced_conj_points = mp_lens_image.trace_conjugate_points(
+                kwargs_result['eta_flat'],
+                kwargs_result['kwargs_mass'], 
+                N=idx_plane, 
+                k_mass=None,
+            )
+            traced_conj_points_per_plane.append(traced_conj_points)
+        # create a large color palette with a variety of colors
+        colors_per_planes = mpl.color_sequences['tab20'] + mpl.color_sequences['Pastel1'] + mpl.color_sequences['Pastel2']
+        # if the data has been set, also show the data
+        if hasattr(self, '_data'):
+            im = axes[0].imshow(self._data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux)
+            im.set_rasterized(True)
+        for i, ax in enumerate(axes):
+            self._plot_conjugate_points_in_ax(
+                ax, num_planes, 
+                conj_points_per_plane, 
+                traced_conj_points_per_plane,
+                extent, 
+                extent_zoom=extent_zoom_list[i-1] if i > 0 else None,
+                colors_planes=colors_per_planes,
+            )
+        fig.tight_layout()
+        if show_plot:
+            plt.show()
+        return fig
 
     def imshow_flux(self, ax, image, colorbar=True):
         im = ax.imshow(image, cmap=self.cmap_flux, norm=self.norm_flux)
@@ -956,19 +1021,19 @@ class Plotter(object):
                         colors=color, alpha=alpha, linewidths=1.5, linestyles=':',
                         label="Source arc mask" if j == 0 else None)
 
-
-    def _plot_conjugate_points(
-            self, ax, data, num_planes, 
+    @staticmethod
+    def _plot_conjugate_points_in_ax(
+            ax, num_planes, 
             conj_points_per_plane, traced_conj_points_per_plane, 
             extent, extent_zoom=None,
             colors_planes=['tab:orange', 'tab:purple', 'tab:cyan', 'tab:pink', 'tab:blue', 'tab:red'],
         ):
-        im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
-                       alpha=1 if extent_zoom is None else 0)
+        idx_color = 0
         for idx_plane in range(num_planes-1):
             if conj_points_per_plane[idx_plane] is None:
                 continue
-            color = colors_planes[idx_plane]
+            idx_color += 1
+            color = colors_planes[idx_color % len(colors_planes)]
             ax.scatter(*conj_points_per_plane[idx_plane].T, s=140, edgecolors=color, marker='o', linewidths=2, 
                     facecolors='none')
             ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=400 if extent_zoom else 100, c=color, marker='*', linewidths=1)
@@ -985,9 +1050,6 @@ class Plotter(object):
         lim_extent = extent_zoom if extent_zoom is not None else extent
         ax.set_xlim(lim_extent[0], lim_extent[1])
         ax.set_ylim(lim_extent[2], lim_extent[3])
-        nice_colorbar(im, position='top', pad=0.4, size=0.2, 
-                      colorbar_kwargs={'orientation': 'horizontal'},
-                      invisible=True)
         
     def _plot_data_with_single_plane_model(
         self,
