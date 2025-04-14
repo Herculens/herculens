@@ -353,9 +353,13 @@ class MPMassModel(object):
         return gamma1, gamma2
 
     @staticmethod
-    def build_eta_matrix(cosmology, redshift_list, return_also_full=True):
+    def build_eta_matrix(cosmology, redshift_list, 
+                         return_matrix=False, return_labels=False):
         """Utility function to build the eta matrix with the right conventions
         for use in a multi-plane lens model.
+
+        For more details, see comments in the Pull Request #37:
+        https://github.com/Herculens/herculens/pull/37#issuecomment-2343179184
 
         Parameters
         ----------
@@ -364,14 +368,17 @@ class MPMassModel(object):
         redshift_list : list or ndarray
             List or 1D array containing the redshift for each plane, starting 
             from the lowest redshift one.
-        return_also_full : bool
+        return_matrix : bool
             If True, returns also the full matrix which includes
             trivial elements of the matrix (0s and 1s). Default is False.
+        return_labels : bool
+            If True, returns the labels for each eta element. Default is False.
         """
         np.testing.assert_equal(np.sort(redshift_list), redshift_list)
         num_tot_planes = len(redshift_list)
         num_mass_planes = num_tot_planes - 1
         eta_flat = []
+        eta_labels = []
         for i in range(num_tot_planes):
             for j in range(i+2, num_tot_planes):
                 z_i = redshift_list[i]
@@ -386,11 +393,15 @@ class MPMassModel(object):
                 eta_ij = (D_ij * D_i1) / (D_j * D_ii1)
 
                 eta_flat.append(eta_ij)
+                eta_labels.append(f"eta_{i}{j} = ( D_{i}{j} D_{i+1} ) / ( D_{j} D_{i}{i+1} )")
                 # print(f"eta_{i:03}_{j:03}", eta_ij)
         eta_flat = np.array(eta_flat)
 
-        if not return_also_full:
-            return eta_flat, None
+        if not return_matrix:
+            if return_labels is True:
+                return eta_flat, eta_labels
+            else:
+                return eta_flat
             
         # TODO: below is a duplicate of some code above; this can be avoided.
         N = num_mass_planes
@@ -398,5 +409,8 @@ class MPMassModel(object):
         eta_full = np.eye(N + 1, k=1)
         eta_full[eta_idx] = eta_flat
         eta_full = eta_full[:-1, :(N + 1)]  #.T
-        return eta_flat, eta_full
+        if return_labels is True:
+            return eta_flat, eta_full, eta_labels
+        else:
+            return eta_flat, eta_full
     
