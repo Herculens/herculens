@@ -13,7 +13,12 @@ from herculens.MassModel.mass_model import MassModel
 
 
 class MPMassModel(object):
-    def __init__(self, mp_mass_model_list, **mass_model_kwargs):
+    def __init__(
+            self, 
+            mp_mass_model_list, 
+            profile_scaling_convention='standard', 
+            **mass_model_kwargs,
+        ):
         '''
         Create a MPMassModel object.
 
@@ -26,9 +31,21 @@ class MPMassModel(object):
             If a mass plane has no mass model associated to it, use None.
         mass_model_kwargs : dictionary for settings related to PIXELATED
             profiles.
+        profile_scaling_convention : str, optional
+            Either 'standard' or 'glee'. Determines the convention used for
+            the eta matrix. The default is 'standard' (see build_eta_matrix() docstring). 
+            If 'glee' is used, the eta matrix is built by assuming additional
+            distance ratio factors as is done in the GLEE lens modelling software. 
+            The default is 'standard'.
         '''
         string_input = all([isinstance(mm, str) or mm is None for mm in mp_mass_model_list])
         instance_input = all([isinstance(mm, MassModel) or mm is None for mm in mp_mass_model_list])
+        if profile_scaling_convention.lower() not in ('standard', 'glee'):
+            raise ValueError(
+                "MPMassModel convention must be either 'standard' or 'glee'."
+            )
+        else:
+            self.scaling_convention = profile_scaling_convention.lower()
         if string_input:
             self.mass_models = [MassModel(mm, **mass_model_kwargs) if mm is not None else None for mm in mp_mass_model_list]
             self.mp_profile_type_list = mp_mass_model_list
@@ -41,12 +58,18 @@ class MPMassModel(object):
                 "or directly with a list of (single plane) MassModel instances (or None)."
             )
         self.number_mass_planes = len(self.mass_models)
-        
-        # Eta will be passed in flattened to `ray_shooting`, use these
-        # index values to un-flatten it back into an array
-        self.eta_idx = np.triu_indices(self.number_mass_planes + 1, k=2)
-        # The know values for the un-flattened eta array
-        self.base_eta = jnp.eye(self.number_mass_planes + 1, k=1)
+        if self.scaling_convention == 'glee':
+            # Eta will be passed in flattened to `ray_shooting`, use these
+            # index values to un-flatten it back into an array
+            self.eta_idx = np.triu_indices(self.number_mass_planes + 1, k=1)
+            # The know values for the un-flattened eta array
+            self.base_eta = jnp.zeros((self.number_mass_planes + 1, self.number_mass_planes + 1))
+        else:
+            # Eta will be passed in flattened to `ray_shooting`, use these
+            # index values to un-flatten it back into an array
+            self.eta_idx = np.triu_indices(self.number_mass_planes + 1, k=2)
+            # The know values for the un-flattened eta array
+            self.base_eta = jnp.eye(self.number_mass_planes + 1, k=1)
 
     @property
     def has_pixels(self):
@@ -73,8 +96,7 @@ class MPMassModel(object):
             eta_ij = D_ij D_i+1 / D_j D_ii+1 where D_ij is the angular diameter
             distance between redshifts i and j. Only include values where
             j > i+1. This convention implies that all einstein radii are defined
-            with respect to the **next** mass plane back (**not** the last plane in
-            the stack).
+            with respect to the **next** mass plane back (**not** the last plane in the stack).
         kwargs: list of list
             List of lists of parameter dictionaries of lens mass model parameters
             corresponding to each mass plane.
@@ -351,66 +373,165 @@ class MPMassModel(object):
         gamma1 = 0.5 * (A[..., 1, 1] - A[..., 0, 0])
         gamma2 = -A[..., 0, 1]
         return gamma1, gamma2
-
-    @staticmethod
-    def build_eta_matrix(cosmology, redshift_list, 
-                         return_matrix=False, return_labels=False):
+    
+    def build_eta_matrix(
+            self,
+            cosmology, 
+            redshifts, 
+            return_matrix=False, 
+            return_labels=False,
+        ):
         """Utility function to build the eta matrix with the right conventions
         for use in a multi-plane lens model.
 
         For more details, see comments in the Pull Request #37:
         https://github.com/Herculens/herculens/pull/37#issuecomment-2343179184
 
+        Note however that when profile_scaling_convention is set to 'glee', the
+        eta matrix is built by assuming the GLEE convention, which contains
+        additional scaling factors, including in the upper diagonal elements of the matrix.
+
         Parameters
         ----------
         cosmology : Astropy cosmology
             Instance of an Astropy cosmology (e.g. `LambdaCDM`).
-        redshift_list : list or ndarray
-            List or 1D array containing the redshift for each plane, starting 
-            from the lowest redshift one.
+        redshifts : list or ndarray
+            List or 1D array containing the redshift for each plane, starting from the lowest redshift one.
         return_matrix : bool
             If True, returns also the full matrix which includes
             trivial elements of the matrix (0s and 1s). Default is False.
         return_labels : bool
-            If True, returns the labels for each eta element. Default is False.
+            If True, returns the strings for each eta element that detail
+            the distance ratios and their individual values. Default is False.
         """
-        np.testing.assert_equal(np.sort(redshift_list), redshift_list)
-        num_tot_planes = len(redshift_list)
-        num_mass_planes = num_tot_planes - 1
+        # check that the redshifts are sorted
+        np.testing.assert_equal(np.sort(redshifts), redshifts)
+        # check that the redshifts are unique
+        np.testing.assert_equal(np.unique(redshifts), redshifts)
+        if self.scaling_convention == 'glee':
+            return self._build_eta_matrix_glee(
+                cosmology, 
+                redshifts, 
+                return_matrix=return_matrix, 
+                return_labels=return_labels,
+            )
+        else:
+            return self._build_eta_matrix_std(
+                cosmology, 
+                redshifts, 
+                return_matrix=return_matrix, 
+                return_labels=return_labels,
+            )
+    
+    def eta_flat_to_matrix(self, eta_flat):
+        """Un-flatten the eta matrix from the flat version to the full version
+        (including the trivial elements of the matrix)."""
+        #N = self.number_mass_planes
+        # un-flatten eta_flat into full eta array
+        return self.base_eta.at[self.eta_idx].set(eta_flat) #[:-1, :(N + 1)]
+    
+    def _build_eta_matrix_std(
+            self,
+            cosmology, 
+            redshifts, 
+            return_matrix=False, 
+            return_labels=False,
+        ):
+        # iterate over the planes
+        num_tot_planes = len(redshifts)
         eta_flat = []
         eta_labels = []
         for i in range(num_tot_planes):
             for j in range(i+2, num_tot_planes):
-                z_i = redshift_list[i]
-                z_i1 = redshift_list[i+1]
-                z_j  = redshift_list[j]
 
-                D_j  = cosmology.angular_diameter_distance_z1z2(0, z_j).value
-                D_ij = cosmology.angular_diameter_distance_z1z2(z_i, z_j).value
-                D_i1 = cosmology.angular_diameter_distance_z1z2(0, z_i1).value
-                D_ii1 = cosmology.angular_diameter_distance_z1z2(z_i, z_i1).value
+                z_i = redshifts[i]
+                z_ip1 = redshifts[i+1]
+                z_j  = redshifts[j]
 
-                eta_ij = (D_ij * D_i1) / (D_j * D_ii1)
+                D_j  = cosmology.angular_diameter_distance(z_j).value
+                D_i_j = cosmology.angular_diameter_distance_z1z2(z_i, z_j).value
+                D_ip1 = cosmology.angular_diameter_distance(z_ip1).value
+                D_i_ip1 = cosmology.angular_diameter_distance_z1z2(z_i, z_ip1).value
+
+                eta_ij = (D_i_j * D_ip1) / (D_j * D_i_ip1)
+
+                eta_labels.append(
+                    f"eta_{i}_{j} "
+                    f"= ( D_{i}_{j}({z_i:.3f}, {z_j:.3f}) x D_{i+1}(0, {z_ip1:.3f}) ) / ( D_{j}(0, {z_j:.3f}) x D_{i}_{i+1}({z_i:.3f}, {z_ip1:.3f}) ) "
+                    f"= ( {D_i_j:.1f} x {D_ip1:.1f} ) / ( {D_j:.1f} x {D_i_ip1:.1f} ) "
+                    f"= {eta_ij:.2f}"
+                )
+                # print(f"eta_{i:03}_{j:03}", eta_ij)
 
                 eta_flat.append(eta_ij)
-                eta_labels.append(f"eta_{i}{j} = ( D_{i}{j} D_{i+1} ) / ( D_{j} D_{i}{i+1} )")
-                # print(f"eta_{i:03}_{j:03}", eta_ij)
+
         eta_flat = np.array(eta_flat)
 
-        if not return_matrix:
+        if return_matrix is False:
             if return_labels is True:
                 return eta_flat, eta_labels
             else:
                 return eta_flat
-            
-        # TODO: below is a duplicate of some code above; this can be avoided.
-        N = num_mass_planes
-        eta_idx = np.triu_indices(N + 1, k=2)
-        eta_full = np.eye(N + 1, k=1)
-        eta_full[eta_idx] = eta_flat
-        eta_full = eta_full[:-1, :(N + 1)]  #.T
+        
+        eta_full = self.eta_flat_to_matrix(eta_flat)
+
         if return_labels is True:
             return eta_flat, eta_full, eta_labels
         else:
             return eta_flat, eta_full
+        
+    def _build_eta_matrix_glee(
+            self,
+            cosmology, 
+            redshifts, 
+            return_matrix=False, 
+            return_labels=False,
+        ):
+        """
+        TODO
+        """
+        # iterate over the planes
+        num_tot_planes = len(redshifts)
+        eta_flat = []
+        eta_labels = []
+        for i in range(num_tot_planes-1):
+            z_i = redshifts[i]
+            z_ip1 = redshifts[i+1]
+
+            D_i = cosmology.angular_diameter_distance(z_i).value
+            D_ip1 = cosmology.angular_diameter_distance(z_ip1).value
+            D_i_ip1 = cosmology.angular_diameter_distance_z1z2(z_i, z_ip1).value
+
+            eta_i_ip1 = (D_i_ip1 / D_i)
+            eta_flat.append(eta_i_ip1)
+            
+            for j in range(i+2, num_tot_planes):
+                z_j  = redshifts[j]
+
+                D_j  = cosmology.angular_diameter_distance(z_j).value
+                D_i_j = cosmology.angular_diameter_distance_z1z2(z_i, z_j).value
+
+                eta_ij = (D_i_j * D_ip1) / (D_j * D_i_ip1) * (D_i_j / D_j)
+                eta_labels.append(
+                    "N/A"  # TODO
+                )
+                # print(f"eta_{i:03}_{j:03}", eta_ij)
+
+                eta_flat.append(eta_ij)
+
+        eta_flat = np.array(eta_flat)
+
+        if return_matrix is False:
+            if return_labels is True:
+                return eta_flat, eta_labels
+            else:
+                return eta_flat
+        
+        eta_full = self.eta_flat_to_matrix(eta_flat)
+
+        if return_labels is True:
+            return eta_flat, eta_full, eta_labels
+        else:
+            return eta_flat, eta_full
+        
     
