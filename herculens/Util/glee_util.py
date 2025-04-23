@@ -48,6 +48,7 @@ class GLEEReader(object):
         print("> Number of point-like sources:", self.num_point_like_sources)
         print(f"  leading to {self.num_point_like_images} point-like multiple images")
         print("> Number of extended sources:", self.num_extended_sources)
+        print("> Number of unique source redshifts:", self.num_source_planes)
         print("="*60)
 
     @property
@@ -156,7 +157,7 @@ class GLEEReader(object):
         return [s['refcoord'] for s in self.extended_source_settings]
     
     def source_plane_groups(self):
-        """Return a a list of unique redshifts of all source planes, as well as
+        """Return a a list of unique redshifts of all planes source containing 'sources', as well as
         the list of lists containing indices of point-like sources
         which have the redshift, order by increasing redshift.
         For instance: [
@@ -179,7 +180,7 @@ class GLEEReader(object):
         if not common_redshifts:
             raise NotImplementedError("Extended sources can only have redshifts that " \
             "are also in point-like sources, for now.")
-        iter_indices = np.argsort(redshifts)
+        iter_indices = [int(i) for i in np.argsort(redshifts)]
         group_indices = [
             [iter_indices[0]]
         ]
