@@ -959,7 +959,10 @@ class Plotter(object):
             assert len(extent_zoom) == num_zooms
             extent_zoom_list = extent_zoom
         else:
-            extent_zoom_list = [extent_zoom]
+            if len(extent_zoom) == 4:
+                extent_zoom_list = [extent_zoom]
+            else:
+                extent_zoom_list = extent_zoom
         if not isinstance(index_source_plane_lines, (list, tuple)):
             index_source_plane_lines = [index_source_plane_lines]
         # Create the figure and axes following the same dimensions as the model_summary function
@@ -967,6 +970,8 @@ class Plotter(object):
         n_rows = 1 + num_zooms
         figsize = (fig_width, fig_width/3.*n_rows)
         fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
+        if n_rows == 1:
+            axes = [axes]
         # get the total number of planes as we will iterate over it
         num_planes = mp_lens_image.MPLightModel.number_light_planes
         # get the model extent
