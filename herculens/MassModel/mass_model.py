@@ -12,11 +12,13 @@ import numpy as np
 import jax.numpy as jnp
 import jax
 from jax import jit, lax
+from jax.tree_util import register_pytree_node
 
 from herculens.MassModel.mass_model_base import MassModelBase
+from herculens.MassModel.Profiles.zero_mass import ZeroMass
 
 
-__all__ = ['MassModel']
+__all__ = ['MassModel', 'ZeroMassModel']
 
 
 def alpha_static_single(
@@ -179,8 +181,10 @@ class MassModel(MassModelBase):
         :param k: only evaluate the k-th lens model
         :return: deflection angles in units of arcsec
         """
-        # below is a solution for scanning over the profiles based on (credits to @krawczyk)
-        # list of alpha functions with keywords filled in
+        if k is not None:
+            raise NotImplementedError("Specific k is not yet supported when using jax.lax.scan for deflection angles.")
+        # below is a solution for scanning over the profiles based on
+        # list of alpha functions with keywords filled in (credits to @krawczyk)
         alpha_list = [
             partial(
                 self.func_list[i].derivatives,
@@ -302,3 +306,149 @@ class MassModel(MassModelBase):
         f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k)
         det_A = (1 - f_xx) * (1 - f_yy) - f_xy * f_yx
         return 1. / det_A  # attention, if dividing by zero
+
+
+class ZeroMassModel(MassModelBase):
+    """Dummy mass model that does not have any mass associated with it."""
+
+    def __init__(self, **kwargs):
+        self.profile_type_list = [ZeroMass()]
+        super().__init__(self.profile_type_list, **kwargs)
+
+    @partial(jit, static_argnums=(0, 4))
+    def ray_shooting(self, x, y, kwargs, k=None):
+        """
+        maps image to source position (inverse deflection)
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: source plane positions corresponding to (x, y) in the image plane
+        """
+        return x, y
+
+    def fermat_potential(self, x_image, y_image, kwargs_lens, x_source=None, y_source=None, k=None):
+        """
+        fermat potential (negative sign means earlier arrival time)
+
+        :param x_image: image position
+        :param y_image: image position
+        :param x_source: source position
+        :param y_source: source position
+        :param kwargs_lens: list of keyword arguments of lens model parameters matching the lens model classes
+        :return: fermat potential in arcsec**2 without geometry term (second part of Eqn 1 in Suyu et al. 2013) as a list
+        """
+        return jnp.zeros_like(x_image)
+
+    def potential(self, x, y, kwargs, k=None):
+        """
+        lensing potential
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: lensing potential in units of arcsec^2
+        """
+        return jnp.zeros_like(x)
+
+    # @partial(jit, static_argnums=(0, 4))
+    def alpha(self, x, y, kwargs, k=None):
+
+        """
+        deflection angles
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: deflection angles in units of arcsec
+        """
+        return jnp.array([0.*x, 0.*y])
+
+    def hessian(self, x, y, kwargs, k=None):
+        """
+        hessian matrix
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: f_xx, f_xy, f_yx, f_yy components
+        """
+        return jnp.array([0.*x, 0.*x, 0.*x, 0.*x])
+
+    def kappa(self, x, y, kwargs, k=None):
+        """
+        lensing convergence k = 1/2 laplacian(phi)
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: lensing convergence
+        """
+        return jnp.zeros_like(x)
+
+    def curl(self, x, y, kwargs, k=None):
+        """
+        curl computation F_yx - F_xy
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: curl at position (x, y)
+        """
+        return jnp.zeros_like(x)
+
+    def gamma(self, x, y, kwargs, k=None):
+        """
+        shear computation
+        g1 = 1/2(d^2phi/dx^2 - d^2phi/dy^2)
+        g2 = d^2phi/dxdy
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: gamma1, gamma2
+        """
+        return jnp.array([0.*x, 0.*x])
+
+    def magnification(self, x, y, kwargs, k=None):
+        """
+        magnification
+        mag = 1/det(A)
+        A = 1 - d^2phi/d_ij
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: magnification
+        """
+        return jnp.zeros_like(x)
+
+def flatten_func(self):
+    children = ()
+    aux_data = {}
+    return (children, aux_data)
+
+def unflatten_func(aux_data, children):
+    return ZeroMassModel()
+
+register_pytree_node(ZeroMassModel, flatten_func, unflatten_func)

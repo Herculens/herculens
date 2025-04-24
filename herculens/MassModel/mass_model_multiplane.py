@@ -9,7 +9,22 @@ import jax
 import jax.numpy as jnp
 
 from functools import partial
-from herculens.MassModel.mass_model import MassModel
+from herculens.MassModel.mass_model import MassModel, ZeroMassModel
+
+
+
+# def ray_shooting_static_for_scan(
+#         alpha_list,
+#         eta_matrix_t,
+#         carry,
+#         j,
+#     ):
+#     xs, ys = carry
+#     dx, dy = jax.lax.switch(j, alpha_list, xs[j], ys[j])
+#     etas_j = jax.lax.dynamic_slice(eta_matrix_t, (0, j), (len(alpha_list)+1, 1))
+#     xs = xs - etas_j * dx
+#     ys = ys - etas_j * dy
+#     return (xs, ys), None
 
 
 class MPMassModel(object):
@@ -46,11 +61,12 @@ class MPMassModel(object):
             )
         else:
             self.scaling_convention = profile_scaling_convention.lower()
+        zero_mass = ZeroMassModel()
         if string_input:
-            self.mass_models = [MassModel(mm, **mass_model_kwargs) if mm is not None else None for mm in mp_mass_model_list]
+            self.mass_models = [MassModel(mm, **mass_model_kwargs) if mm is not None else zero_mass for mm in mp_mass_model_list]
             self.mp_profile_type_list = mp_mass_model_list
         elif instance_input:
-            self.mass_models = mp_mass_model_list
+            self.mass_models = [mm if mm is not None else zero_mass for mm in mp_mass_model_list]
             self.mp_profile_type_list = [mm.func_list if mm is not None else None for mm in self.mass_models]
         else:
             raise ValueError(
@@ -74,12 +90,23 @@ class MPMassModel(object):
     @property
     def has_pixels(self):
         # An list of bools indicating if a plane contains an pixelated mass model
-        return [mass_model.has_pixels if mass_model is not None else False for mass_model in self.mass_models]
+        if not hasattr(self, '_has_pixels'):
+            self._has_pixels = [mass_model.has_pixels if mass_model is not None else False for mass_model in self.mass_models]
+        return self._has_pixels
     
     @property
     def has_mass(self):
-        # An list of bools indicating if a plane contains a mass model
-        return [mass_model is not None for mass_model in self.mass_models]
+        if not hasattr(self, '_has_mass'):
+            # An list of bools indicating if a plane contains a mass model
+            self._has_mass = [not isinstance(mass_model, ZeroMassModel) for mass_model in self.mass_models]
+        return self._has_mass
+    
+    @property
+    def indices_planes_with_mass(self):
+        if not hasattr(self, '_indices_planes_with_mass'):
+            # An list of bools indicating if a plane contains a mass model
+            self._indices_planes_with_mass = [i for i in range(self.number_mass_planes) if self.has_mass[i]]
+        return self._indices_planes_with_mass
 
     @partial(jax.jit, static_argnums=(0, 5, 6))
     def ray_shooting(self, x, y, eta_flat, kwargs, N=None, k=None):
@@ -128,18 +155,39 @@ class MPMassModel(object):
 
         # iterate the lensing equation for each mass plane
         for j in range(N):
-            if self.has_mass[j]:
-                dx, dy = self.mass_models[j].alpha(
-                    xs[j],
-                    ys[j],
-                    kwargs=kwargs[j],
-                    k=k[j]
-                )
-            else:
-                dx, dy = xs[j], ys[j]  # no deflection
+            dx, dy = self.mass_models[j].alpha(
+                xs[j],
+                ys[j],
+                kwargs=kwargs[j],
+                k=k[j]
+            )
             etas_j = etas_t[:, j:j + 1]
             xs = xs - etas_j * dx
             ys = ys - etas_j * dy
+
+        # WIP: the following code is better jax code but can still be improved
+        # alpha_list = [
+        #     partial(
+        #         self.mass_models[j].alpha,
+        #         kwargs=kwargs[j],
+        #         k=k[j],
+        #     ) for j in range(N)
+        # ]
+        # # recursive function with keywords filled in
+        # partial_ray_shooting = partial(
+        #     ray_shooting_static_for_scan,
+        #     alpha_list,
+        #     etas_t,
+        # )
+        # # run recursion function
+        # xs = jnp.stack([x] * (N + 1), axis=0)
+        # ys = jnp.stack([y] * (N + 1), axis=0)
+        # (xs, ys), _ = jax.lax.scan(
+        #     partial_ray_shooting,
+        #     (xs, ys),
+        #     jnp.arange(N, dtype=int),
+        # )
+
         return xs, ys
 
     def _ray_shooting_slice(self, x, y, eta_flat, kwargs):
