@@ -118,7 +118,8 @@ class Plotter(object):
             show_lens_light=False, show_lens_potential=False, show_lens_others=False,
             only_pixelated_potential=False, shift_pixelated_potential='none',
             likelihood_mask=None, potential_mask=None, 
-            show_lens_lines=False, show_shear_field=False, show_lens_position=False,
+            show_lens_lines=False, supersampling_lens_lines=3,
+            show_shear_field=False, show_lens_position=False,
             kwargs_grid_source=None,
             lock_colorbars=False, masked_residuals=True,
             vmin_pot=None, vmax_pot=None,
@@ -372,7 +373,10 @@ class Plotter(object):
 
         if show_lens_lines:
             clines, caustics, centers = model_util.critical_lines_caustics(
-                lens_image, kwargs_result['kwargs_lens'], return_lens_centers=True
+                lens_image, 
+                kwargs_result['kwargs_lens'], 
+                return_lens_centers=True,
+                supersampling=supersampling_lens_lines,
             )
 
 
@@ -633,6 +637,7 @@ class Plotter(object):
             kwargs_grid_source=None,
             linestyles_planes=[':', '-', '--', '-.', ':', '-'],
             colors_planes=['tab:purple', 'tab:cyan', 'tab:orange', 'tab:pink', 'tab:blue', 'tab:red'],
+            supersampling_lens_lines=3,
         ):
         """
         Simple function with limited user-control to plot the details
@@ -704,7 +709,7 @@ class Plotter(object):
                 eta_flat=kwargs_result['eta_flat'], 
                 return_lens_centers=True,
                 k_plane=idx_plane,
-                supersampling=3,
+                supersampling=supersampling_lens_lines,
             )
             clines_per_plane.append(clines)
             caustics_per_plane.append(caustics)
