@@ -121,7 +121,7 @@ class Numerics(object):
         """
         # add supersampled region to lower resolution on
         image_low_res, image_high_res_partial = self._grid.flux_array2image_low_high(flux_array, high_res_return=self._high_res_return)
-        if unconvolved is True or self._psf_type == 'NONE':
+        if unconvolved is True or self._conv is None:
             image_conv = image_low_res
         else:
             # convolve low res grid and high res grid
