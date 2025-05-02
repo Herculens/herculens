@@ -288,6 +288,24 @@ class MassModel(MassModelBase):
         gamma2 = f_xy
         return gamma1, gamma2
 
+    def inverse_magnification(self, x, y, kwargs, k=None):
+        """
+        inverse magnification det(A)
+        A = 1 - d^2phi/d_ij
+
+        :param x: x-position (preferentially arcsec)
+        :type x: numpy array
+        :param y: y-position (preferentially arcsec)
+        :type y: numpy array
+        :param kwargs: list of keyword arguments of lens model parameters matching the lens model classes
+        :param k: only evaluate the k-th lens model
+        :return: magnification
+        """
+
+        f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k)
+        det_A = (1 - f_xx) * (1 - f_yy) - f_xy * f_yx
+        return det_A
+    
     def magnification(self, x, y, kwargs, k=None):
         """
         magnification
@@ -303,9 +321,7 @@ class MassModel(MassModelBase):
         :return: magnification
         """
 
-        f_xx, f_xy, f_yx, f_yy = self.hessian(x, y, kwargs, k=k)
-        det_A = (1 - f_xx) * (1 - f_yy) - f_xy * f_yx
-        return 1. / det_A  # attention, if dividing by zero
+        return 1. / self.inverse_magnification(x, y, kwargs, k=k)  # attention, if dividing by zero
 
 
 class ZeroMassModel(MassModelBase):
