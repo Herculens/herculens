@@ -98,13 +98,6 @@ class MPLensImage(object):
                 np.ones(self.Grid.num_pixel_axes) if m is None else m for m in source_arc_masks
             ])
 
-        # import matplotlib.pyplot as plt
-        # plt.imshow(self.source_arc_masks[0], cmap='gray')
-        # plt.show()
-        # plt.imshow(self.source_arc_masks[1], cmap='gray')
-        # plt.show()
-        # raise
-
         self._src_adaptive_grid = self.MPLightModel.pixel_is_adaptive
 
         if kwargs_numerics is None:
