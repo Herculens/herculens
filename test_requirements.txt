@@ -3,6 +3,7 @@ numpyro>=0.16.0     # for SVI and HMC sampling
 optax>=0.1.0        # for optimizers
 jaxopt>=0.5.5       # for optimizers
 matplotlib>=3.7.0   # for plotting
+astropy>=5.0.0      # for reading FITS files
 git+https://github.com/adam-coogan/jaxinterp2d@9881075#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
 git+https://github.com/Herculens/helens.git@main#egg=helens  # lens equation solver
 git+https://gitlab.mpcdf.mpg.de/ift/nifty.git@NIFTy_8#egg=nifty8  # correlated field

@@ -30,9 +30,9 @@ z       0.4000  exact:
 def get_grid_and_target_maps(glee_scale_flag):
     # Load from the glee output
     if glee_scale_flag is True:
-        filename = 'dipe_config_withscale.fits'
+        filename = 'dpie_config_withscale.fits'
     else:
-        filename = 'dipe_config_withoutscale.fits'
+        filename = 'dpie_config_withoutscale.fits'
 
     # in the FITS file, the HDUs are:
     # x1, x2, alpha1, alpha2, kappa, gamma1, gamma2 (assuming for Dds/Ds=1)
