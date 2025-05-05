@@ -8,31 +8,18 @@ import numpy as np
 from jax import config
 config.update("jax_enable_x64", True)  # could actually make a difference in jifty
 
-from herculens.MassModel.Profiles.dpie import DPIE
-# from herculens.Util import param_util
+from herculens.MassModel.Profiles.piemd import PIEMD
 
 
-GLEE_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'glee_files', 'dpie')
-
-"""GLEE config file used to generate the reference maps:
-dpie
-z       0.4000  exact:
-0.0  #x-coord   flat:-10,10  step:0.1
-0.0  #y-coord   flat:-10,10  step:0.1
-0.8  #b/a       flat:0.23,1  step:0.05
-0.2  #theta     flat:0,3.14  step:0.05
-4    #theta_e   flat:0,100  step:0.1
-1    #r_core    flat:0,35  step:0.1
-20   #r_trunc   exact:
-"""
+GLEE_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'glee_files', 'piemd')
 
 
-def get_grid_and_target_maps(glee_scale_flag):
+def get_grid_and_target_maps(glee_scale_flag, index_map):
     # Load from the glee output
     if glee_scale_flag is True:
-        filename = 'dipe_config_withscale.fits'
+        filename = f'piemd_config_{index_map}_scale.fits'
     else:
-        filename = 'dipe_config_withoutscale.fits'
+        filename = f'piemd_config_{index_map}_withoutscale.fits'
 
     # in the FITS file, the HDUs are:
     # x1, x2, alpha1, alpha2, kappa, gamma1, gamma2 (assuming for Dds/Ds=1)
@@ -47,20 +34,37 @@ def get_grid_and_target_maps(glee_scale_flag):
     gamma_1_ref = glee_cube[5]
     gamma_2_ref = glee_cube[6]
 
-    # npix, npix_y = x_grid.shape
-    # assert npix == x_grid.shape[1]
-    # pix_scl = abs(x_grid[0, 0] - x_grid[0, 1])
-    # assuming x and y are sorted increasingly
-    # plt_extent = [x_grid.min()-pix_scl/2., x_grid.max()+pix_scl/2, y_grid.min()-pix_scl/2., y_grid.max()+pix_scl/2]
-
+    if index_map == 1:
+        x_centre = 0.
+        y_centre = 0.
+        q = 0.8
+        pa = 0.2
+        theta_E = 4.
+        w = 0.2
+    elif index_map == 2:
+        x_centre = 4.12
+        y_centre = 3.90
+        q = 0.75
+        pa = 3.74
+        theta_E = 1.75
+        w = 0.001
+    elif index_map == 3:
+        x_centre = 2.32
+        y_centre = 2.1
+        q = 0.642
+        pa = 2.22222
+        theta_E = 3.1
+        w = 0.0001
+    else:
+        raise ValueError("Invalid index_map. Must be 1, 2, or 3.")
+        
     kwargs_lens_ref = {
-        'theta_E': 4.,
-        'r_core': 1.,
-        'r_trunc': 20.,
-        'q': 0.8, 
-        'phi': 0.2,
-        'center_x': 0., 
-        'center_y': 0.,
+        'theta_E': theta_E,
+        'r_core': w,
+        'q': q, 
+        'phi': pa,
+        'center_x': x_centre, 
+        'center_y': y_centre,
     }
     return (
         x_grid, y_grid, 
@@ -73,13 +77,16 @@ def get_grid_and_target_maps(glee_scale_flag):
 @pytest.mark.parametrize(
     "glee_scale_flag", [False, True],
 )
-def test_alpha_against_glee(glee_scale_flag):
+@pytest.mark.parametrize(
+    "index_map", [1, 2, 3],
+)
+def test_alpha_against_glee(glee_scale_flag, index_map):
     (
         x, y,
         alpha_1_ref, alpha_2_ref, _, _, _, 
         kwargs_lens_ref,
-    ) = get_grid_and_target_maps(glee_scale_flag)
-    profile = DPIE(r_soft=1e-8, scale_flag=glee_scale_flag)
+    ) = get_grid_and_target_maps(glee_scale_flag, index_map)
+    profile = PIEMD(r_soft=1e-8, scale_flag=glee_scale_flag)
     alpha_1, alpha_2 = profile.derivatives(
         x, y, **kwargs_lens_ref,
     )
@@ -89,13 +96,16 @@ def test_alpha_against_glee(glee_scale_flag):
 @pytest.mark.parametrize(
     "glee_scale_flag", [False, True],
 )
-def test_kappa_against_glee(glee_scale_flag):
+@pytest.mark.parametrize(
+    "index_map", [1, 2, 3],
+)
+def test_kappa_against_glee(glee_scale_flag, index_map):
     (
         x, y,
         _, _, kappa_ref, _, _, 
         kwargs_lens_ref,
-    ) = get_grid_and_target_maps(glee_scale_flag)
-    profile = DPIE(r_soft=1e-8, scale_flag=glee_scale_flag)
+    ) = get_grid_and_target_maps(glee_scale_flag, index_map)
+    profile = PIEMD(r_soft=1e-8, scale_flag=glee_scale_flag)
     f_xx, f_yy, _ = profile.hessian(
         x, y, **kwargs_lens_ref,
     )
@@ -105,13 +115,16 @@ def test_kappa_against_glee(glee_scale_flag):
 # @pytest.mark.parametrize(
 #     "glee_scale_flag", [False, True],
 # )
-# def test_gamma_against_glee(glee_scale_flag):
+# @pytest.mark.parametrize(
+#     "index_map", [1, 2, 3],
+# )
+# def test_gamma_against_glee(glee_scale_flag, index_map):
 #     (
 #         x, y,
 #         _, _, _, gamma_1_ref, gamma_2_ref, 
 #         kwargs_lens_ref,
-#     ) = get_grid_and_target_maps(glee_scale_flag)
-#     profile = DPIE(r_soft=1e-8, scale_flag=glee_scale_flag)
+#     ) = get_grid_and_target_maps(glee_scale_flag, index_map)
+#     profile = PIEMD(r_soft=1e-8, scale_flag=glee_scale_flag)
 #     f_xx, f_yy, f_xy = profile.hessian(
 #         x, y, **kwargs_lens_ref,
 #     )
