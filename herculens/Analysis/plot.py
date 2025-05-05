@@ -11,6 +11,7 @@ import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from scipy import ndimage
+import matplotlib as mpl
 from matplotlib.colors import Normalize, LogNorm, TwoSlopeNorm
 from matplotlib.patches import FancyArrowPatch, ArrowStyle
 
@@ -117,7 +118,8 @@ class Plotter(object):
             show_lens_light=False, show_lens_potential=False, show_lens_others=False,
             only_pixelated_potential=False, shift_pixelated_potential='none',
             likelihood_mask=None, potential_mask=None, 
-            show_lens_lines=False, show_shear_field=False, show_lens_position=False,
+            show_lens_lines=False, supersampling_lens_lines=3,
+            show_shear_field=False, show_lens_position=False,
             kwargs_grid_source=None,
             lock_colorbars=False, masked_residuals=True,
             vmin_pot=None, vmax_pot=None,
@@ -371,7 +373,11 @@ class Plotter(object):
 
         if show_lens_lines:
             clines, caustics, centers = model_util.critical_lines_caustics(
-                lens_image, kwargs_result['kwargs_lens'], return_lens_centers=True)
+                lens_image, 
+                kwargs_result['kwargs_lens'], 
+                return_lens_centers=True,
+                supersampling=supersampling_lens_lines,
+            )
 
 
         ##### BUILD UP THE PLOTS #####
@@ -631,6 +637,7 @@ class Plotter(object):
             kwargs_grid_source=None,
             linestyles_planes=[':', '-', '--', '-.', ':', '-'],
             colors_planes=['tab:purple', 'tab:cyan', 'tab:orange', 'tab:pink', 'tab:blue', 'tab:red'],
+            supersampling_lens_lines=3,
         ):
         """
         Simple function with limited user-control to plot the details
@@ -702,6 +709,7 @@ class Plotter(object):
                 eta_flat=kwargs_result['eta_flat'], 
                 return_lens_centers=True,
                 k_plane=idx_plane,
+                supersampling=supersampling_lens_lines,
             )
             clines_per_plane.append(clines)
             caustics_per_plane.append(caustics)
@@ -832,13 +840,19 @@ class Plotter(object):
         # Conjugate points
         ax = axes[1, 0]
         if not no_conj_points:
-            self._plot_conjugate_points(
-                ax, data, num_planes, 
+            im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
+                           alpha=1 if extent_zoom is None else 0)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'},
+                          invisible=True)
+            self._plot_conjugate_points_in_ax(
+                ax, num_planes, 
                 conj_points_per_plane, 
                 traced_conj_points_per_plane,
                 extent, extent_zoom=None,
                 colors_planes=colors_planes[1:],
             )
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
             ax.set_title("Data + conjugate points", fontsize=self.base_fontsize)
         else:
             ax.axis('off')
@@ -864,12 +878,18 @@ class Plotter(object):
             ax.set_ylim(extent[2], extent[3])
             ax.set_title(f"Shear field (w.r.t. plane {num_planes-1})", fontsize=self.base_fontsize)
         else:
-            self._plot_conjugate_points(
-                ax, data, num_planes, 
+            im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
+                           alpha=1 if extent_zoom is None else 0)
+            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                          colorbar_kwargs={'orientation': 'horizontal'},
+                          invisible=True)
+            self._plot_conjugate_points_in_ax(
+                ax, num_planes, 
                 conj_points_per_plane, traced_conj_points_per_plane,
                 extent, extent_zoom=extent_zoom,
                 colors_planes=colors_planes[1:],
             )
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
 
         # Convergence map
         ax = axes[1, 2]
@@ -926,7 +946,99 @@ class Plotter(object):
         fig.tight_layout()
         return fig
 
-
+    def plot_conjugate_points(
+            self,
+            mp_lens_image, 
+            kwargs_result, 
+            num_zooms=1, 
+            extent=None,
+            extent_zoom=None,
+            redshifts_conjugate_points=None,
+            ref_source_plane_positions=None,
+            index_source_plane_lines=1,
+            supersampling_critical_lines=2,
+            show_plot=True, 
+            fig_width=15,
+        ):
+        if num_zooms > 1:
+            assert len(extent_zoom) == num_zooms
+            extent_zoom_list = extent_zoom
+        else:
+            if len(extent_zoom) == 4:
+                extent_zoom_list = [extent_zoom]
+            else:
+                extent_zoom_list = extent_zoom
+        if not isinstance(index_source_plane_lines, (list, tuple)):
+            index_source_plane_lines = [index_source_plane_lines]
+        # Create the figure and axes following the same dimensions as the model_summary function
+        n_cols = 1
+        n_rows = 1 + num_zooms
+        figsize = (fig_width, fig_width/3.*n_rows)
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
+        if n_rows == 1:
+            axes = [axes]
+        # get the total number of planes as we will iterate over it
+        num_planes = mp_lens_image.MPLightModel.number_light_planes
+        # get the model extent
+        if extent is None:
+            extent = mp_lens_image.Grid.plt_extent
+        # Get the conjugate points
+        conj_points_per_plane = mp_lens_image.conjugate_points
+        #no_conj_points = all([cp is None for cp in conj_points_per_plane])
+        traced_conj_points_per_plane = []
+        for idx_plane in range(1, num_planes):
+            traced_conj_points = mp_lens_image.trace_conjugate_points(
+                kwargs_result['eta_flat'],
+                kwargs_result['kwargs_mass'], 
+                N=idx_plane, 
+                k_mass=None,
+            )
+            traced_conj_points_per_plane.append(traced_conj_points)
+        clines_per_plane = []
+        for idx_plane in index_source_plane_lines:
+            clines, _ = model_util.critical_lines_caustics(
+                mp_lens_image, 
+                kwargs_result['kwargs_mass'], 
+                eta_flat=kwargs_result['eta_flat'], 
+                return_lens_centers=False,
+                k_plane=idx_plane+1,
+                supersampling=supersampling_critical_lines,
+            )
+            clines_per_plane.append((idx_plane, clines))
+        # create a large color palette with a variety of colors
+        colors_per_planes = mpl.color_sequences['tab20'] + mpl.color_sequences['Pastel1'] + mpl.color_sequences['Pastel2']
+        # if the data has been set, also show the data
+        data = self._data if hasattr(self, '_data') else None
+        for i, ax in enumerate(axes):
+            if data is not None:
+                im = axes[0].imshow(data, extent=mp_lens_image.Grid.plt_extent, 
+                                    cmap=self.cmap_bw, norm=self.norm_flux, alpha=0.8)
+                im.set_rasterized(True)
+            self._plot_conjugate_points_in_ax(
+                ax, num_planes, 
+                conj_points_per_plane, 
+                traced_conj_points_per_plane,
+                extent, 
+                extent_zoom=extent_zoom_list[i-1] if i > 0 else None,
+                colors_planes=colors_per_planes,
+                redshift_per_plane=redshifts_conjugate_points,
+                ref_traced_conj_points_per_plane=ref_source_plane_positions,
+            )
+            for idx_plane, clines in clines_per_plane:
+                for j, curve in enumerate(clines):
+                    ax.plot(curve[0], curve[1], 
+                            color=colors_per_planes[idx_plane],   # -1 because colors_per_planes starts at 0
+                            linestyle='--', linewidth=1.5, alpha=1, 
+                            label=f"Critical lines for z={redshifts_conjugate_points[idx_plane] if redshifts_conjugate_points is not None else -1.:.3f}" if j == 0 else None)
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
+            if i == 0:
+                ax.set_title("Base view")
+            else:
+                ax.set_title(f"Zoom-in view {i}")
+        fig.tight_layout()
+        if show_plot:
+            plt.show()
+        return fig
 
     def imshow_flux(self, ax, image, colorbar=True):
         im = ax.imshow(image, cmap=self.cmap_flux, norm=self.norm_flux)
@@ -956,22 +1068,42 @@ class Plotter(object):
                         colors=color, alpha=alpha, linewidths=1.5, linestyles=':',
                         label="Source arc mask" if j == 0 else None)
 
-
-    def _plot_conjugate_points(
-            self, ax, data, num_planes, 
-            conj_points_per_plane, traced_conj_points_per_plane, 
-            extent, extent_zoom=None,
+    @staticmethod
+    def _plot_conjugate_points_in_ax(
+            ax, num_planes, 
+            conj_points_per_plane,
+            traced_conj_points_per_plane, 
+            extent, 
+            extent_zoom=None,
             colors_planes=['tab:orange', 'tab:purple', 'tab:cyan', 'tab:pink', 'tab:blue', 'tab:red'],
+            redshift_per_plane=None,
+            ref_traced_conj_points_per_plane=None,
         ):
-        im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
-                       alpha=1 if extent_zoom is None else 0)
         for idx_plane in range(num_planes-1):
             if conj_points_per_plane[idx_plane] is None:
                 continue
-            color = colors_planes[idx_plane]
-            ax.scatter(*conj_points_per_plane[idx_plane].T, s=140, edgecolors=color, marker='o', linewidths=2, 
-                    facecolors='none')
-            ax.scatter(*traced_conj_points_per_plane[idx_plane].T, s=400 if extent_zoom else 100, c=color, marker='*', linewidths=1)
+            color = colors_planes[idx_plane % len(colors_planes)]
+            cps = conj_points_per_plane[idx_plane].T
+            tcps = traced_conj_points_per_plane[idx_plane].T
+            # check if the conjugate points are in the extent
+            extent_check = extent_zoom if extent_zoom is not None else extent
+            if not (np.any(
+                    ((extent_check[0] < cps[0]) & (cps[0] < extent_check[1])) &
+                    ((extent_check[2] < cps[1])) & (cps[1] < extent_check[3])
+                ) or np.any(
+                    ((extent_check[0] < tcps[0]) & (tcps[0] < extent_check[1])) &
+                    ((extent_check[2] < tcps[1])) & (tcps[1] < extent_check[3])
+                )):
+                continue
+            # plot the conjugate points and traced conjugate points
+            label = f"Plane {idx_plane+1} (z={redshift_per_plane[idx_plane] if redshift_per_plane is not None else -1.:.3f})"
+            ax.scatter(*cps, s=140, edgecolors=color, marker='o', linewidths=2, facecolors='none',
+                       label=label)
+            ax.scatter(*tcps, s=400 if extent_zoom else 140, facecolors='none', edgecolors=color, marker='*', linewidths=2)
+            if (ref_traced_conj_points_per_plane is not None
+                and ref_traced_conj_points_per_plane[idx_plane] is not None):
+                ref_tcps = ref_traced_conj_points_per_plane[idx_plane].T
+                ax.scatter(*ref_tcps, s=400 if extent_zoom else 140, facecolors=color, edgecolors='none', marker='*', linewidths=0)
             for conj_point, traced_conj_point in zip(conj_points_per_plane[idx_plane], traced_conj_points_per_plane[idx_plane]):
                 conj_point_arrow = FancyArrowPatch(
                     (traced_conj_point[0], traced_conj_point[1]), 
@@ -980,14 +1112,10 @@ class Plotter(object):
                     color=color, lw=2, alpha=0.2, clip_on=True,
                 )
                 ax.add_patch(conj_point_arrow)
-        # ax.legend()
         ax.set_aspect('equal')
         lim_extent = extent_zoom if extent_zoom is not None else extent
         ax.set_xlim(lim_extent[0], lim_extent[1])
         ax.set_ylim(lim_extent[2], lim_extent[3])
-        nice_colorbar(im, position='top', pad=0.4, size=0.2, 
-                      colorbar_kwargs={'orientation': 'horizontal'},
-                      invisible=True)
         
     def _plot_data_with_single_plane_model(
         self,

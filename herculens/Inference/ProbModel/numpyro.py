@@ -42,6 +42,7 @@ class NumpyroModel(BaseProbModel):
             log_prob, model_trace = util.log_density(self.model, (), {}, params)
         else:
             # do this for optimisation in unconstrained space
+            # TODO: use the new numpyro function potential_fn instead
             log_prob = - my_util.potential_energy(self.model, (), {}, params)
         return log_prob
     

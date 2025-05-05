@@ -15,6 +15,7 @@ from jax import config
 from functools import partial
 
 from herculens.LensImage.lens_image import LensImage, LensImage3D
+from herculens.LensImage.lens_image_future import LensImage as LensImageFuture
 from herculens.LensImage.lens_image_multiplane import MPLensImage
 from herculens.LensImage.lensing_operator import LensingOperator
 
@@ -26,13 +27,13 @@ def critical_lines_caustics(lens_image, kwargs_mass, eta_flat=None, supersamplin
               "computation of critical lines and caustics might be inaccurate.")
     if isinstance(lens_image, (LensImage, LensImage3D)):
         mass_model = lens_image.MassModel
-        inv_mag_fn = lambda x, y: 1. / partial(mass_model.magnification, kwargs=kwargs_mass)(x, y)
+        inv_mag_fn = partial(mass_model.inverse_magnification, kwargs=kwargs_mass)
         ray_shooting_fn = partial(mass_model.ray_shooting, kwargs=kwargs_mass)
         multiplane_mode = False
     elif isinstance(lens_image, MPLensImage):
         if k_plane is None:
             # we take the furthest plane as the default
-            k_plane = lens_image.MPLightModel.number_light_planes - 1
+            k_plane = lens_image.MPLightModel.number_light_planes
         mass_model = lens_image.MPMassModel
         if eta_flat is None:
             raise ValueError("The `eta_flat` parameter must be provided when using MPLensImage.")

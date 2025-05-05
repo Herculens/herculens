@@ -116,6 +116,10 @@ class MPLensImage(object):
             self.MPLightModel.number_light_planes,
             -1
         )
+        # plt.imshow(self._source_arc_masks_flat[0].reshape(self.Grid.num_pixel_axes), cmap='gray')
+        # plt.show()
+        # plt.imshow(self._source_arc_masks_flat[1].reshape(self.Grid.num_pixel_axes), cmap='gray')
+        # plt.show()
         # get the (flattened) outline of the super sampled masks
         # these boundaries are used to define the extent of pixelated grids
         self._source_arc_masks_flat_bool = np.stack([
@@ -134,7 +138,7 @@ class MPLensImage(object):
         else:
             return jnp.array(k)
 
-    @partial(jax.jit, static_argnums=(0, 4, 5, 6, 7, 8))
+    @partial(jax.jit, static_argnums=(0, 4, 5, 6, 7, 8, 9))
     def model(
         self,
         eta_flat=None,
@@ -292,7 +296,7 @@ class MPLensImage(object):
         return np.sum(norm_res**2) / num_data_points
 
     @partial(jax.jit, static_argnums=(0, 3, 4))
-    def trace_conjugate_points(self, eta, kwargs_mass, N=1, k_mass=None):
+    def trace_conjugate_points(self, eta_flat, kwargs_mass, N=1, k_mass=None):
         '''
         Helper function that can be used to ray-trace the list of conjugate points
         provided to the class on initialization to their corresponding source planes.
@@ -302,7 +306,7 @@ class MPLensImage(object):
             x, y = self.conjugate_points[i].T
             conj_x, conj_y = self.MPMassModel.ray_shooting(
                 x, y,
-                eta,
+                eta_flat,
                 kwargs_mass,
                 k=k_mass,
                 N=N,

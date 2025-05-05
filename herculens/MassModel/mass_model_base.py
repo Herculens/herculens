@@ -31,13 +31,19 @@ class MassModelBase(object):
         ----------
         profile_list : list of strings or profile instances
             List of mass profiles. If not a list, wrap the passed argument in a list. 
+            It can also be None, in which case the model has no mass profile associated to it.
         kwargs_pixelated : dict
             Settings related to the creation of the pixelated grid.
             See herculens.PixelGrid.create_model_grid for details.
         profile_specific_kwargs : dict
             See docstring for get_class_from_string().
         """
-        if not isinstance(profile_list, (list, tuple)):
+        if profile_list is None:
+            self.func_list = []
+            self._pix_idx = None
+            self._num_func = 0
+            self._model_list = []
+        elif not isinstance(profile_list, (list, tuple)):
             raise TypeError("The profile list should be a list or a tuple.")
         self.func_list, self._pix_idx = self._load_model_instances(
             profile_list, **profile_specific_kwargs,
