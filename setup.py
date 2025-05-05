@@ -18,7 +18,7 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 long_description = readme.replace('<img src="https://raw.githubusercontent.com/Herculens/herculens/main/images/horizontal_dark_bg.png#gh-dark-mode-only" width="600" alt="Herculens logo" />', '')
 
 # Python version
-python_requires = '>=3.9'
+python_requires = '>=3.12'
 
 # Minimal required packages (see requirements.txt for versions)
 install_requires = [
