@@ -64,5 +64,5 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo '::set-output name=matrix::["3.12"]'
           else
-            echo '::set-output name=matrix::["3.8", "3.9", "3.10", "3.11", "3.12"]'
+            echo '::set-output name=matrix::["3.10", "3.11", "3.12"]'
           fi
