@@ -7,7 +7,7 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["dev-aym"]  # temporary, just testing things out
+    branches: ["main"]
 
 jobs:
   build:
