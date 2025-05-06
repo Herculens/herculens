@@ -5,7 +5,8 @@ try:
     import nifty8.re as jft
 except ImportError:
     raise ImportError("The nifty8.re module is not installed. "
-                      "Please NIFTy8 in order to use the CorrelatedField class "
+                      "Please install NIFTy8 (see https://github.com/NIFTy-PPL/NIFTy) "
+                      "in order to use the CorrelatedField class "
                       "or the jifty_util submodule of Herculens.")
 from nifty8.re.tree_math import ShapeWithDtype
 
