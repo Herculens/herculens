@@ -237,7 +237,7 @@ class CorrelatedField(object):
             self._shape_direct = (self._num_pix_wl, self._num_pix, self._num_pix)
         # Nice message to say everything went smoothly
         print(f"New '{self._field_type}' CorrelatedField model successfully created "
-              f"(final shape is {str(tuple(self._shape_direct))}.")
+              f"(final shape is {str(tuple(self._shape_direct))}).")
 
     def __call__(self, params):
         """Handy alias to make the class callable."""

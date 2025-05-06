@@ -7,7 +7,7 @@
 __author__ = 'sibirrer', 'dangilman', 'aymgal'
 
 import numpy as np
-from scipy import interpolate #, ndimage
+from scipy.interpolate import RectBivariateSpline
 from scipy.ndimage import interpolation as interp
 from jax import random
 import jax.numpy as jnp
@@ -159,8 +159,6 @@ def re_size_array(x_in, y_in, input_values, x_out, y_out):
     :param y_out:
     :return:
     """
-    interp_2d = interpolate.interp2d(x_in, y_in, input_values, kind='linear')
-    out_values = interp_2d.__call__(x_out, y_out)
-    # interp_2d = BilinearInterpolator(x_in, y_in, input_values)
-    # out_values = interp_2d(x_out, y_out)
+    interp_2d = RectBivariateSpline(x_in, y_in, z=input_values, kx=1, ky=1, s=0)
+    out_values = interp_2d(x_out, y_out)
     return out_values

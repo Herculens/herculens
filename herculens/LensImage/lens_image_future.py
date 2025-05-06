@@ -33,31 +33,38 @@ class LensImage(MPLensImage):
                  noise_class=None, lens_mass_model_class=None,
                  source_model_class=None, lens_light_model_class=None,
                  point_source_model_class=None, 
-                 source_arc_mask=None, source_grid_scale=None,
+                 source_arc_mask=None, 
+                 source_grid_scale=1.,
                  kwargs_numerics=None,
-                 kwargs_lens_equation_solver=None):
+                 kwargs_lens_equation_solver=None,
+                 conjugate_points=None,
+                 deflection_scaling_convention='standard',
+                 deflection_scaling=1.,):
         """
         WIP
         """
         # mp_mass_model_list = [lens_mass_model_class.func_list]  # single mass plane
-        mp_mass_model_class = MPMassModel([lens_mass_model_class])  # TODO: do the same with LightModels below (i.e. give directly the class, not the strings)
-        mp_light_model_list = []
-        light_model_kwargs = []
-        if lens_light_model_class is not None:
-            # first light plane
-            mp_light_model_list.append(lens_light_model_class.func_list)
-            light_model_kwargs.append({'kwargs_pixelated': lens_light_model_class.pixel_grid_settings})
-        else:
-            mp_light_model_list.append([])
-            light_model_kwargs.append({})
-        if source_model_class is not None:
-            # second light plane
-            mp_light_model_list.append(source_model_class.func_list)
-            light_model_kwargs.append({'kwargs_pixelated': source_model_class.pixel_grid_settings})
-        else:
-            mp_light_model_list.append([])
-            light_model_kwargs.append({})
-        mp_light_model_class = MPLightModel(mp_light_model_list, light_model_kwargs)
+        mp_mass_model_class = MPMassModel(
+            [lens_mass_model_class],
+            deflection_scaling_convention=deflection_scaling_convention,
+        )
+        # mp_light_model_list = []
+        # light_model_kwargs = []
+        # if lens_light_model_class is not None:
+        #     # first light plane
+        #     mp_light_model_list.append(lens_light_model_class.func_list)
+        #     light_model_kwargs.append({'kwargs_pixelated': lens_light_model_class.pixel_grid_settings})
+        # else:
+        #     mp_light_model_list.append([])
+        #     light_model_kwargs.append({})
+        # if source_model_class is not None:
+        #     # second light plane
+        #     mp_light_model_list.append(source_model_class.func_list)
+        #     light_model_kwargs.append({'kwargs_pixelated': source_model_class.pixel_grid_settings})
+        # else:
+        #     mp_light_model_list.append([])
+        #     light_model_kwargs.append({})
+        mp_light_model_class = MPLightModel([lens_light_model_class, source_model_class])
         super().__init__(
             grid_class,
             psf_class,
@@ -66,10 +73,10 @@ class LensImage(MPLensImage):
             mp_light_model_class,
             source_arc_masks=[None, source_arc_mask],  # no mask for lens light plane
             source_grid_scale=[None, source_grid_scale],  # no grid scale for lens light
-            conjugate_points=None,  # TODO
+            conjugate_points=[conjugate_points],
             kwargs_numerics=kwargs_numerics
         )
-        self._eta_flat_fixed = np.array([1.])  # this is fixed in single lens plane mode
+        self.eta_flat_fixed = np.array([deflection_scaling])  # this is fixed in single lens plane mode
 
         # the following attributes are to mimick the original implementation of LensImage
         self.MassModel = lens_mass_model_class
@@ -122,8 +129,6 @@ class LensImage(MPLensImage):
         """
         if kwargs_point_source is not None:
             raise NotImplementedError
-        if unconvolved is True or source_add is False or lens_light_add is False:
-            raise NotImplementedError
         if k_lens is None:
             k_mass = None
         else:
@@ -133,13 +138,14 @@ class LensImage(MPLensImage):
         else:
             raise NotImplementedError
         model = super().model(
-            eta_flat=self._eta_flat_fixed,
+            eta_flat=self.eta_flat_fixed,
             kwargs_mass=[kwargs_lens],
-            kwargs_light=[kwargs_lens_light] + [kwargs_source],
+            kwargs_light=[kwargs_lens_light, kwargs_source],
             supersampled=supersampled,
+            unconvolved=unconvolved,
             k_mass=k_mass,
             k_light=k_light,
-            k_planes=None,
+            k_planes=-1,
             return_pixel_scale=False,
         )
         return model
@@ -251,7 +257,7 @@ class LensImage(MPLensImage):
         # as expected from pyplot routines! # TODO: fix this 
         kwargs_mass = [kwargs_lens]  # wraps the single mass model for multiplane conventions
         x_coord_list, y_coord_list, extent_list = super().get_source_coordinates(
-            self._eta_flat_fixed,
+            self.eta_flat_fixed,
             kwargs_mass,
             force=False,
             npix_src=100,  # not used when force=False
@@ -277,7 +283,7 @@ class LensImage(MPLensImage):
         ra_grid_planes, dec_grid_planes = self.MPMassModel.ray_shooting(
             ra_grid_img,
             dec_grid_img,
-            self._eta_flat_fixed,
+            self.eta_flat_fixed,
             kwargs_mass
         )
         x_coord_list, y_coord_list, _ = super().adapt_source_coordinates(
@@ -300,14 +306,16 @@ class LensImage(MPLensImage):
                                                                pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord)
         return source_light
 
-    def normalized_residuals(self, data, model, mask=None):
+    def normalized_residuals(self, data, model, kwargs_noise=None, mask=None):
         """
         compute the map of normalized residuals,
         given the data and the model image
         """
+        if kwargs_noise is None:
+            kwargs_noise = {}
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        noise_var = self.Noise.C_D_model(model)
+        noise_var = self.Noise.C_D_model(model, **kwargs_noise)
         noise = np.sqrt(noise_var)
         norm_res_model = (data - model) / noise * mask
         norm_res_tot = norm_res_model
@@ -319,13 +327,26 @@ class LensImage(MPLensImage):
         norm_res_tot = np.where(np.isfinite(norm_res_tot), norm_res_tot, 0.)
         return norm_res_model, norm_res_tot
 
-    def reduced_chi2(self, data, model, mask=None):
+    def reduced_chi2(self, data, model, kwargs_noise=None, mask=None):
         """
         compute the reduced chi2 of the data given the model
         """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        norm_res, _ = self.normalized_residuals(data, model, mask=mask)
+        norm_res, _ = self.normalized_residuals(data, model, kwargs_noise=kwargs_noise, mask=mask)
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
         
+    @partial(jit, static_argnums=(0, 2))
+    def trace_conjugate_points(self, kwargs_mass, k_mass=None):
+        '''
+        Helper function that can be used to ray-trace the list of conjugate points
+        provided to the class on initialization to their corresponding source planes.
+        '''
+        return super().trace_conjugate_points(
+            self.eta_flat_fixed,
+            kwargs_mass,
+            N=1,
+            k_mass=k_mass,
+        )
+    

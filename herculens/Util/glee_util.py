@@ -48,6 +48,7 @@ class GLEEReader(object):
         print("> Number of point-like sources:", self.num_point_like_sources)
         print(f"  leading to {self.num_point_like_images} point-like multiple images")
         print("> Number of extended sources:", self.num_extended_sources)
+        print("> Number of unique source redshifts:", self.num_source_planes)
         print("="*60)
 
     @property
@@ -96,6 +97,12 @@ class GLEEReader(object):
         if not hasattr(self, '_lens_labels'):
             self._raise_parser_run_error()
         return self._lens_labels
+    
+    @property
+    def lens_scalings(self):
+        if not hasattr(self, '_lens_scalings'):
+            self._raise_parser_run_error()
+        return self._lens_scalings
 
     @property
     def point_like_source_redshifts(self):
@@ -127,36 +134,6 @@ class GLEEReader(object):
             self._raise_parser_run_error()
         return self._ptl_src_errors
     
-    def point_like_source_group_indices(self):
-        """Return a list of lists containing indices of point-like sources
-        which have the redshift, order by increasing redshift.
-        For instance: [
-            [redshift1_index1, redshift1_index2],  # redshift 1
-            [redshift2_index1],  # redshift 2
-            [redshift3_index1, redshift3_index2, redshift3_index3],  # redshift 3
-            ...
-        ]
-
-        Returns
-        -------
-        list
-            List lists of integers
-        """
-        redshifts = np.array(self.point_like_source_redshifts[0])
-        iter_indices = np.argsort(redshifts)
-        group_indices = [
-            [iter_indices[0]]
-        ]
-        unique_redshifts = [redshifts[iter_indices[0]]]
-        for i in iter_indices[1:]:
-            z_current = redshifts[i]
-            z_prev = redshifts[i-1]
-            if z_current != z_prev:
-                group_indices.append([])
-                unique_redshifts.append(z_current)
-            group_indices[-1].append(i)
-        return unique_redshifts, group_indices
-    
     @property
     def extended_source_redshifts(self):
         redshifts = [p['z'] for p in self.extended_source_parameters]
@@ -184,6 +161,58 @@ class GLEEReader(object):
     @property
     def extended_source_ref_coordinates(self):
         return [s['refcoord'] for s in self.extended_source_settings]
+    
+    def source_plane_groups(self):
+        """Return a a list of unique redshifts of all planes source containing 'sources', as well as
+        the list of lists containing indices of point-like sources
+        which have the redshift, order by increasing redshift.
+        For instance: [
+            [redshift1_index1, redshift1_index2],  # redshift 1
+            [redshift2_index1],  # redshift 2
+            [redshift3_index1, redshift3_index2, redshift3_index3],  # redshift 3
+            ...
+        ]
+        and a list of booleans indicating if the redshift plane contains 
+        an extended source or not.
+
+        Returns
+        -------
+        list
+            List lists of integers
+        """
+        redshifts = np.array(self.point_like_source_redshifts[0])
+        redshifts_extended = np.array(self.extended_source_redshifts[0])
+        common_redshifts = np.isin(redshifts_extended, redshifts).all()
+        if not common_redshifts:
+            raise NotImplementedError("Extended sources can only have redshifts that " \
+            "are also in point-like sources, for now.")
+        iter_indices = [int(i) for i in np.argsort(redshifts)]
+        group_indices = [
+            [iter_indices[0]]
+        ]
+        unique_redshifts = [redshifts[iter_indices[0]]]
+        extended_flags = [True] if unique_redshifts[0] in redshifts_extended else [False]
+        for i in iter_indices[1:]:
+            z_current = redshifts[i]
+            z_prev = redshifts[i-1]
+            if z_current != z_prev:
+                group_indices.append([])
+                unique_redshifts.append(z_current)
+                extended_flags.append(True if z_current in redshifts_extended else False)
+            group_indices[-1].append(i)
+        return np.array(unique_redshifts), group_indices, extended_flags
+    
+    @property
+    def num_source_planes(self):
+        """Return the number of unique source planes.
+
+        Returns
+        -------
+        int
+            Number of source planes
+        """
+        redshifts, _, _ = self.source_plane_groups()
+        return len(redshifts)
 
     def parse_config(self):
         lines = self.read_and_separate_lines(self._config_path)
@@ -192,7 +221,7 @@ class GLEEReader(object):
             lines, ['lenses_vary', 'sources', 'esources'],
         )
         # parse the lens block
-        self._lens_profiles, self._lens_params, self._lens_priors, self._lens_labels \
+        self._lens_profiles, self._lens_params, self._lens_priors, self._lens_labels, self._lens_scalings \
             = self._parse_lens_model(model_component_blocks['lenses_vary'])
         # parse the point-like source block
         self._ptl_src_params, self._ptl_src_priors, self._ptl_src_labels, self._ptl_src_errors \
@@ -218,29 +247,32 @@ class GLEEReader(object):
         params_list = []
         priors_list = []
         labels_list = []
+        scalings_list = []
         for i, (type_, block) in enumerate(zip(types, blocks)):
             header = block[0]
             content = block[1:]
             assert self.get_line_item(header) == type_, f"Inconsistent lens profile type ({i})"
-            kwargs_params, kwargs_priors, kwargs_labels = self._parse_lens_profile(i, content)
+            kwargs_params, kwargs_priors, kwargs_labels, kwargs_scalings = self._parse_lens_profile(i, content)
             params_list.append(kwargs_params)
             priors_list.append(kwargs_priors)
             labels_list.append(kwargs_labels)
-        return types, params_list, priors_list, labels_list
+            scalings_list.append(kwargs_scalings)
+        return types, params_list, priors_list, labels_list, scalings_list
     
     def _parse_lens_profile(self, i, lines):
         redshift, redshift_prior, redshift_label = self._parse_redshift(i, lines[0])
-        kwargs_params, kwargs_priors, kwargs_labels = self._parse_lens_parameters(lines[1:])
+        kwargs_params, kwargs_priors, kwargs_labels, kwargs_scalings = self._parse_lens_parameters(lines[1:])
         # add the redshift to the rest of the parameters
         kwargs_params['z'] = redshift
         kwargs_priors['z'] = redshift_prior
         kwargs_labels['z'] = redshift_label
-        return kwargs_params, kwargs_priors, kwargs_labels
+        return kwargs_params, kwargs_priors, kwargs_labels, kwargs_scalings
 
     def _parse_lens_parameters(self, lines):
         kwargs_params = {}
         kwargs_priors = {}
         kwargs_labels = {}
+        kwargs_scalings = {}
         for line in lines:
             if self.line_is_empty(line):
                 continue
@@ -248,10 +280,12 @@ class GLEEReader(object):
             name = self.get_line_item(line, pos=1).replace('#', '')
             prior = self._parse_prior(line)
             label = self._parse_label(line)
+            scaling = self._parse_scaling(line)
             kwargs_params[name] = value
             kwargs_priors[name] = prior
             kwargs_labels[name] = label
-        return kwargs_params, kwargs_priors, kwargs_labels
+            kwargs_scalings[name] = scaling
+        return kwargs_params, kwargs_priors, kwargs_labels, kwargs_scalings
 
     def _parse_point_like_source_model(self, block):
         header = block[0]
@@ -401,7 +435,7 @@ class GLEEReader(object):
         return (prior_type, val1, val2)
 
     def _parse_error(self, line):
-        error_item = self.get_line_item(line, start_with='error')
+        error_item = self.get_line_item(line, start_with='error:')
         if error_item is None:
             return None
         error_item = error_item.split(':')
@@ -411,11 +445,21 @@ class GLEEReader(object):
         return error_value
 
     def _parse_label(self, line):
-        label_item = self.get_line_item(line, start_with='label')
+        label_item = self.get_line_item(line, start_with='label:')
         if label_item is None:
             return None
         label = label_item.split(':')[1]
         return label
+    
+    def _parse_scaling(self, line):
+        scaling_item = self.get_line_item(line, start_with='a:')
+        if scaling_item is None:
+            return (None, None, None)
+        scaling_item = scaling_item.split(':')[1].split(',')
+        coeff_add = float(scaling_item[0])
+        coeff_mul = float(scaling_item[1])
+        coeff_pow = float(scaling_item[2])
+        return (coeff_add, coeff_mul, coeff_pow)
     
     def _extract_blocks(self, lines, separator_strings, with_duplicates=False):
         num_lines = len(lines)

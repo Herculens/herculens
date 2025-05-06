@@ -6,6 +6,7 @@ from .Instrument.noise import Noise
 
 # NOTE: non-elliptical profiles will be suppressed in the future
 from .LightModel.light_model import LightModel
+from .LightModel.light_model_multiplane import MPLightModel
 from .LightModel.Profiles.gaussian import Gaussian as GaussianLight, GaussianEllipse as GaussianEllipseLight
 from .LightModel.Profiles.multipole import Multipole
 from .LightModel.Profiles.sersic import Sersic, SersicElliptic
@@ -14,6 +15,7 @@ from .LightModel.Profiles.uniform import Uniform
 from .LightModel.Profiles.pixelated import Pixelated as PixelatedLight
 
 from .MassModel.mass_model import MassModel
+from .MassModel.mass_model_multiplane import MPMassModel
 from .MassModel.Profiles.sis import SIS  # NOTE: this will be suppressed in the future
 from .MassModel.Profiles.sie import SIE
 from .MassModel.Profiles.nie import NIE
@@ -25,10 +27,8 @@ from .MassModel.Profiles.multipole import Multipole
 from .MassModel.Profiles.pixelated import (
     PixelatedPotential, PixelatedPotentialDirac, PixelatedFixed
 )
-from .MassModel.Profiles.dpie import (
-    DPIE_GLEE as DPIE,
-    DPIE_GLEE_STATIC as DPIE_STATIC,
-)
+from .MassModel.Profiles.piemd import PIEMD
+from .MassModel.Profiles.dpie import DPIE
 
 from .PointSourceModel.point_source_model import PointSourceModel
 
@@ -39,6 +39,7 @@ except ImportError:
     pass
 
 from .LensImage.lens_image import LensImage, LensImage3D
+from .LensImage.lens_image_multiplane import MPLensImage
 from .Inference.loss import Loss
 from .Inference.ProbModel.numpyro import NumpyroModel
 from .Inference.Optimization.jaxopt import JaxoptOptimizer

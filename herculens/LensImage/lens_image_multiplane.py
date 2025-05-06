@@ -116,6 +116,10 @@ class MPLensImage(object):
             self.MPLightModel.number_light_planes,
             -1
         )
+        # plt.imshow(self._source_arc_masks_flat[0].reshape(self.Grid.num_pixel_axes), cmap='gray')
+        # plt.show()
+        # plt.imshow(self._source_arc_masks_flat[1].reshape(self.Grid.num_pixel_axes), cmap='gray')
+        # plt.show()
         # get the (flattened) outline of the super sampled masks
         # these boundaries are used to define the extent of pixelated grids
         self._source_arc_masks_flat_bool = np.stack([
@@ -129,20 +133,23 @@ class MPLensImage(object):
     def k_extend(self, k, amount):
         if k is None:
             return jnp.arange(amount)
+        elif isinstance(k, int):
+            return jnp.array([k])
         else:
             return jnp.array(k)
 
-    @partial(jax.jit, static_argnums=(0, 4, 5, 6, 7, 8))
+    @partial(jax.jit, static_argnums=(0, 4, 5, 6, 7, 8, 9))
     def model(
         self,
         eta_flat=None,
         kwargs_mass=None,
         kwargs_light=None,
         supersampled=False,
+        unconvolved=False,
         k_mass=None,
         k_light=None,
         k_planes=None,
-        return_pixel_scale=False
+        return_pixel_scale=False,
     ):
         '''Create the 2D model image from the parameter values.  Note: due to JIT compilation,
         the first call to this method will be slower.
@@ -156,13 +163,17 @@ class MPLensImage(object):
             j > i+1. This convention implies that all einstein radii are defined
             with respect to the **next** mass plane back (**not** the last plane in
             the stack).
+            For more details, see comments in the Pull Request #37:
+            https://github.com/Herculens/herculens/pull/37#issuecomment-2343179184
         kwargs_mass : list of list
             List of lists of parameter dictionaries of lens mass model parameters
             corresponding to each mass plane.
         kwargs_light : list of list
             List of lists of parameter dictionaries corresponding to each light plane.
         supersampled : bool, optional
-            If True returns the unconvolved model on the higher resolution grid, by default False
+            If True, returns the unconvolved model on the higher resolution grid, by default False
+        unconvolved : bool, optional
+            If True, does perform convolution with the PSF, by default False
         k_mass : list of list, optional
             Only evaluate the k-th mass model (list of list of index values) for each mass
             plane, by default None
@@ -181,7 +192,7 @@ class MPLensImage(object):
             The 2D model image for the lens system
         pixel_scale : list, optional
             The pixel scale (arcsec/pixel) of each source plane, by default False.
-            Note: requites and pixelated adaptive source grid to be used and have `return_pixel_scale`
+            Note: requires pixelated adaptive source grid to be used and have `return_pixel_scale`
             set to True.
         '''
         ra_grid_img, dec_grid_img = self.ImageNumerics.coordinates_evaluate
@@ -210,7 +221,7 @@ class MPLensImage(object):
         k_planes = self.k_extend(k_planes, len(light_planes))
         model = light_planes[k_planes].sum(axis=0)
         if not supersampled:
-            model = self.ImageNumerics.re_size_convolve(model)
+            model = self.ImageNumerics.re_size_convolve(model, unconvolved=unconvolved)
         if return_pixel_scale:
             pixel_scale = [x[1] - x[0] if x is not None else None for x in pixels_x_coord]
             return model, pixel_scale
@@ -247,30 +258,45 @@ class MPLensImage(object):
         if compute_true_noise_map is True:
             self.Noise.compute_noise_map_from_model(model)
         return simu
+    
+    def C_D_model(self, model, **kwargs_noise):
+        return self.Noise.C_D_model(model, **kwargs_noise)
 
-    def normalized_residuals(self, data, model, mask=None):
+    def normalized_residuals(self, data, model, kwargs_noise=None, mask=None):
         """
         compute the map of normalized residuals,
         given the data and the model image
         """
+        if kwargs_noise is None:
+            kwargs_noise = {}
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        noise_var = self.Noise.C_D_model(model)
-        norm_res = (model - data) / np.sqrt(noise_var) * mask
-        return norm_res
+        noise_var = self.C_D_model(model, **kwargs_noise)
+        noise = np.sqrt(noise_var)
+        norm_res_model = (data - model) / noise * mask
+        norm_res_tot = norm_res_model
+        if mask is not None:
+            # outside the mask just add pure data
+            norm_res_tot += (data / noise) * (1. - mask)
+        # make sure there is no NaN or infinite values
+        norm_res_model = np.where(np.isfinite(norm_res_model), norm_res_model, 0.)
+        norm_res_tot = np.where(np.isfinite(norm_res_tot), norm_res_tot, 0.)
+        return norm_res_model, norm_res_tot
 
-    def reduced_chi2(self, data, model, mask=None):
+    def reduced_chi2(self, data, model, kwargs_noise=None, mask=None):
         """
         compute the reduced chi2 of the data given the model
         """
         if mask is None:
             mask = np.ones(self.Grid.num_pixel_axes)
-        norm_res = self.normalized_residuals(data, model, mask=mask)
+        norm_res, _ = self.normalized_residuals(
+            data, model, kwargs_noise=kwargs_noise, mask=mask
+        )
         num_data_points = np.sum(mask)
         return np.sum(norm_res**2) / num_data_points
 
     @partial(jax.jit, static_argnums=(0, 3, 4))
-    def trace_conjugate_points(self, eta, kwargs_mass, N=1, k_mass=None):
+    def trace_conjugate_points(self, eta_flat, kwargs_mass, N=1, k_mass=None):
         '''
         Helper function that can be used to ray-trace the list of conjugate points
         provided to the class on initialization to their corresponding source planes.
@@ -280,7 +306,7 @@ class MPLensImage(object):
             x, y = self.conjugate_points[i].T
             conj_x, conj_y = self.MPMassModel.ray_shooting(
                 x, y,
-                eta,
+                eta_flat,
                 kwargs_mass,
                 k=k_mass,
                 N=N,

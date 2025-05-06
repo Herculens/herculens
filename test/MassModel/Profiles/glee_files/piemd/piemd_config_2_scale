@@ -1,0 +1,26 @@
+chi2type            2
+minimiser       siman
+seed                1
+siman_iter          1
+siman_nT         1000
+siman_dS            1
+siman_Sf          1.1
+siman_k             2
+siman_Ti            1
+siman_Tf          1.1
+siman_Tmin        0.1
+mcmc_n          24000
+mcmc_dS     0.0325
+mcmc_dSini          0
+mcmc_k              2
+
+
+lenses_vary 1
+    piemd
+    4.12  #x-coord   flat:-10,10  step:0.1
+    3.90  #y-coord   flat:-10,10  step:0.1
+    0.75  #b/a       flat:0.23,1  step:0.05
+    3.74  #theta     exact:
+    1.75    #theta_e   flat:0,100  step:0.1 scale:
+    0.001   #r_core    flat:0,35  step:0.1
+   

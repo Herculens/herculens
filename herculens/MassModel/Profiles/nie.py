@@ -19,7 +19,7 @@ __all__ = ['NIE', 'NIEMajorAxis']
 class NIE(object):
     """
     Non-singular isothermal ellipsoid
-    kappa = theta_E/2 [s2IE + r2(1 − e * cos(2*phi)]−1/2
+    kappa = theta_E/2 [s2IE + r2(1 - e * cos(2*phi)]^-1/2
     """
     param_names = ['theta_E', 'e1', 'e2', 's_scale', 'center_x', 'center_y']
     lower_limit_default = {'theta_E': 0, 'e1': -0.5, 'e2': -0.5, 's_scale': 0, 'center_x': -100, 'center_y': -100}
@@ -32,8 +32,8 @@ class NIE(object):
 
     def param_conv(self, theta_E, e1, e2, s_scale):
         """
-        convert parameters from 2*kappa = bIE [s2IE + r2(1 − e *cos(2*phi)]−1/2 to
-        2*kappa=  b *(q2(s2 + x2) + y2􏰉)−1/2
+        convert parameters from 2*kappa = bIE [s2IE + r2(1 - e *cos(2*phi)]^-1/2 to
+        2*kappa=  b *(q2(s2 + x2) + y2)^-1/2
         see expressions after Equation 8 in Keeton and Kochanek 1998, https://arxiv.org/pdf/astro-ph/9705194.pdf
 
         :param theta_E: Einstein radius
@@ -138,7 +138,7 @@ class NIE(object):
 
         :param theta_E: Einstein radius in lenstronomy conventions
         :param q: axis ratio minor/major
-        :return: theta_E in convention of kappa=  b *(q2(s2 + x2) + y2􏰉)−1/2
+        :return: theta_E in convention of kappa=  b *(q2(s2 + x2) + y2)^-1/2
         """
         theta_E_new = theta_E / (jnp.sqrt((1. + q**2) / (2. * q))) #/ (1+(1-q)/2.)
         return theta_E_new
@@ -150,7 +150,7 @@ class NIEMajorAxis(object):
     See Keeton and Kochanek 1998, https://arxiv.org/pdf/astro-ph/9705194.pdf
 
     .. math::
-        \kappa =  b *(q2(s2 + x2) + y2􏰉)^{−1/2}`
+        \kappa =  b *(q2(s2 + x2) + y2)^{-1/2}`
 
     """
 

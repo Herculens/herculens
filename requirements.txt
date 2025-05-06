@@ -1,22 +1,22 @@
 numpy>=1.20.3
 scipy>=1.6.3
-jax>=0.3.14
-jaxlib>=0.3.14
-objax>=1.7.0
+jax>=0.5.0
+jaxlib>=0.5.0
+objax>=1.8.0
 scikit-image>=0.20.0
 git+https://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolution, interpolation, etc.)
 
 # the following packages are optional (pay attention to the versions)
-#optax>=0.1.0        # for optimizers
-#jaxopt>=0.5.5       # for optimizers
+#optax>=0.2.0        # for optimizers
+#jaxopt>=0.8.0       # for optimizers
 #matplotlib>=3.7.0   # for plotting
 #findiff==0.8.9      # for building matrix with finite difference coefficients
 #tqdm>=4.61.0        # for progress bars with certain optimizers and samplers
 #numpyro>=0.16.0     # for SVI and HMC sampling
-#blackjax==0.9.6     # for JAX-based HMC sampling
+#blackjax==1.0.0     # for JAX-based HMC sampling
 #emcee==3.0.2        # for Ensemble MCMC sampling
 #gigalens==0.1.8     # for a JAX implementation of Shapelets
 #lenstronomy>=1.9.0  # for interpolated Shapelets (via `gigalens`), or for Particle Swarm Optimization
 #git://github.com/adam-coogan/jaxinterp2d@master#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
 #git+https://github.com/Herculens/helens.git@main#egg=helens   # JAX lens equation solver for some point source features
-#nifty8==8.5.6       # for NIFTy8 (for CorrelatedField model)
+#nifty8>=8.5.7       # for NIFTy8 (for CorrelatedField model)
