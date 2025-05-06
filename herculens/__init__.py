@@ -35,7 +35,8 @@ from .PointSourceModel.point_source_model import PointSourceModel
 try:
     from .GenericModel.correlated_field import CorrelatedField
 except ImportError:
-    print(f"NIFTy8 should be installed to import the CorrelatedField model.")
+    # an error will be raised via the from herculens.Util.jifty_util submodule, 
+    # typically when instantiating the CorrelatedField class
     pass
 
 from .LensImage.lens_image import LensImage, LensImage3D
@@ -48,4 +49,3 @@ from .Analysis.plot import Plotter
 
 from .Util import param_util as prmu
 from .Util import plot_util as pltu
-# from .Util import jifty_util as jftu
