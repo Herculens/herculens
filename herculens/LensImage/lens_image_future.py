@@ -29,9 +29,13 @@ __all__ = [
 class LensImage(MPLensImage):
     """Generate lensed images from source light, lens mass/light, and point source models."""
 
-    def __init__(self, grid_class, psf_class,
-                 noise_class=None, lens_mass_model_class=None,
-                 source_model_class=None, lens_light_model_class=None,
+    def __init__(self, 
+                 grid_class, 
+                 psf_class,
+                 noise_class=None, 
+                 lens_mass_model_class=None,
+                 source_model_class=None, 
+                 lens_light_model_class=None,
                  point_source_model_class=None, 
                  source_arc_mask=None, 
                  source_grid_scale=1.,
@@ -39,7 +43,8 @@ class LensImage(MPLensImage):
                  kwargs_lens_equation_solver=None,
                  conjugate_points=None,
                  deflection_scaling_convention='standard',
-                 deflection_scaling=1.,):
+                 deflection_scaling=1.,
+                 extra_surface_brightness=None):
         """
         WIP
         """
@@ -90,6 +95,10 @@ class LensImage(MPLensImage):
                 point_source_type_list=[], mass_model=lens_mass_model_class,
             )
         self.PointSourceModel = point_source_model_class
+
+        # WIP: extra surface brightness image to add to the model (should be already convolved)
+        self.add_fixed_light = extra_surface_brightness is not None
+        self._extra_light_model = extra_surface_brightness
 
     # WIP
     def set_static_model_grid(self):
@@ -148,6 +157,8 @@ class LensImage(MPLensImage):
             k_planes=-1,
             return_pixel_scale=False,
         )
+        if self.add_fixed_light:
+            model += self._extra_light_model
         return model
 
     # def source_surface_brightness(self, kwargs_source, kwargs_lens=None,
