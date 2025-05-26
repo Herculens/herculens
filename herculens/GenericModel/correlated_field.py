@@ -36,6 +36,9 @@ class CorrelatedField(object):
         Either the amplitude spectrum ('amplitude') or the power spectrum ('power') of 
         the field are parameterized by the parameters below. By default 'amplitude'.
         The power spectrum is just the amplitude spectrum squared.
+    kernel_type : str, optional
+        Type of kernel to use for the field, either 'powerlaw' or 'matern', by default 'powerlaw'.
+        If 'matern', use the `prior_matern_...` parameters below instead.
     prior_loglogavgslope : tuple, optional
         The mean and scatter of the log-normal distribution for the average slope
          of the power-spectrum in log-log space, by default (-4., 0.5).
@@ -45,6 +48,12 @@ class CorrelatedField(object):
         The mean and scatter of the log-normal distribution for the flexibility, by default None.
     prior_asperity : object, optional
         The mean and scatter of the log-normal distribution for the asperity, by default None.
+    prior_matern_scale : tuple, optional
+        The mean and scatter of the log-normal distribution for the scale of the Matern kernel, by default (1.0, 0.5).  
+    prior_matern_loglogslope : tuple, optional
+        The mean and scatter of the log-normal distribution for the log-log slope of the Matern kernel, by default (-4., 0.5).
+    prior_matern_cutoff : tuple, optional
+        The mean and scatter of the log-normal distribution for the cutoff of the Matern kernel, by default (-10., 1.).
     cropped_border_size : int, optional
         The field can optionally be evaluated on a larger grid size,
         and then cropped to return the model in direct space, by default 0.
@@ -89,14 +98,21 @@ class CorrelatedField(object):
             # General parameters
             offset_mean=np.log(1e-2),
             prior_offset_std=(0.5, 1e-6),
-
-            # Parameters along the spatial dimensions (`xy_dim`)
             correlation_type='amplitude',
+            kernel_type='powerlaw',
+            cropped_border_size=0,
+
+            # Parameters along the spatial dimensions (`xy_dim`) for kernel_type='powerlaw'
             prior_loglogavgslope=(-4., 0.5), 
             prior_fluctuations=(1.5, 0.8),
             prior_flexibility=None,
             prior_asperity=None,
-            cropped_border_size=0,
+
+            # Parameters along the spatial dimensions (`xy_dim`) for kernel_type='matern'
+            prior_matern_scale=(1.0, 0.5),
+            prior_matern_loglogslope=(-4., 0.5), 
+            prior_matern_cutoff=(10., 1.), 
+            matern_renorm_amp=False,
 
             # Parameters along the spectral, or wavelength dimensions (`wl_dim`)
             num_pix_wl=1,
@@ -142,6 +158,9 @@ class CorrelatedField(object):
         else:
             # stack of 2D correlated fields (i.e. uncorrelated along the spectral dimension)
             self._field_type = '2d_stack'
+
+        # Set the type of correlation kernel
+        self._kernel_type = kernel_type
         
         # Pack the prior choices
         if any([p is None for p in [offset_mean, prior_offset_std, prior_loglogavgslope, prior_fluctuations]]):
@@ -150,18 +169,28 @@ class CorrelatedField(object):
             'offset_mean': offset_mean,
             'offset_std': prior_offset_std,
         }
-        self._kw_fluctuations = {
-            # Amplitude of field fluctuations
-            'fluctuations': prior_fluctuations,
 
-            # Exponent of power law power spectrum component
-            'loglogavgslope': prior_loglogavgslope,
+        if kernel_type == 'powerlaw':
+            self._kw_fluctuations = {
+                # Amplitude of field fluctuations
+                'fluctuations': prior_fluctuations,
 
-            # Extra degrees of freedom
-            # NOTE: I did not test much these two in a strong lensing context
-            'flexibility': prior_flexibility, 
-            'asperity': prior_asperity,
-        }
+                # Exponent of power law power spectrum component
+                'loglogavgslope': prior_loglogavgslope,
+
+                # Extra degrees of freedom
+                # NOTE: I did not test much these two in a strong lensing context
+                'flexibility': prior_flexibility, 
+                'asperity': prior_asperity,
+            }
+        elif kernel_type == 'matern':
+            self._kw_fluctuations = {
+                # Matern kernel parameters
+                'scale': prior_matern_scale,
+                'loglogslope': prior_matern_loglogslope,
+                'cutoff': prior_matern_cutoff,
+            }
+
         if self._field_type == '3d':
             self._kw_fluctuations_wl = {
                 'fluctuations': prior_fluctuations_wl,
@@ -192,6 +221,7 @@ class CorrelatedField(object):
                 cropped_border_size,
                 kwargs_amplitude=self._kw_amplitude_offset,
                 kwargs_fluctuations=self._kw_fluctuations,
+                matern_renorm_amp=matern_renorm_amp,
                 num_pix_wl=self._num_pix_wl, 
                 border_wl=cropped_border_size_wl if self._num_pix_wl > 1 else 0,
                 kwargs_fluctuations_wl=self._kw_fluctuations_wl,
@@ -201,6 +231,7 @@ class CorrelatedField(object):
                 param_key_wl=self._key_wl,
                 correlation_type=correlation_type,
                 correlation_type_wl=correlation_type_wl,
+                kernel_type=kernel_type,
             )
             self._cfm_list, self._jft_model_list = None, None  # irrelevant variables for this case
         else:
@@ -224,6 +255,7 @@ class CorrelatedField(object):
                     param_key_wl=self._key_wl,
                     correlation_type=correlation_type,
                     correlation_type_wl='none',
+                    kernel_type=kernel_type,
                 )
                 self._cfm_list.append(cfm)
                 self._jft_model_list.append(jft_model)
@@ -236,7 +268,8 @@ class CorrelatedField(object):
             self._shape_latent = (self._num_pix_wl_tot, self._num_pix_tot, self._num_pix_tot)
             self._shape_direct = (self._num_pix_wl, self._num_pix, self._num_pix)
         # Nice message to say everything went smoothly
-        print(f"New '{self._field_type}' CorrelatedField model successfully created "
+        print(f"New '{self._field_type}' CorrelatedField model "
+              f"with kernel '{kernel_type}' successfully created "
               f"(final shape is {str(tuple(self._shape_direct))}).")
 
     def __call__(self, params):
@@ -290,10 +323,10 @@ class CorrelatedField(object):
         jnp.Array
             Field model (in direct space), as 2d array.
         """
-        sample_method = getattr(self, f'_numpyro_sample_pixels_{self._field_type}')
+        sample_method = getattr(self, f'_numpyro_sample_pixels_{self._kernel_type}_{self._field_type}')
         return sample_method()
         
-    def _numpyro_sample_pixels_2d(self):
+    def _numpyro_sample_pixels_powerlaw_2d(self):
         # TODO: reduce code duplication
         # imports here to prevent the need for numpyro to be installed
         # if the CorrelatedField class is used in a non-numpyro context.
@@ -333,6 +366,41 @@ class CorrelatedField(object):
                 f'{key_base}_{self._key_xy}_asperity', 
                 Normal(0., 1.),
             )
+        return self.model(params)
+    
+    def _numpyro_sample_pixels_matern_2d(self):
+        # TODO: reduce code duplication
+        # imports here to prevent the need for numpyro to be installed
+        # if the CorrelatedField class is used in a non-numpyro context.
+        import numpyro
+        from numpyro.distributions import Normal, Independent
+        # Base field parameters
+        key_base = f'{self._param_prefix}_{self._field_key}'
+        params = {
+            f'{key_base}_xi': numpyro.sample(
+                f'{key_base}_xi', 
+                Independent(Normal(
+                    jnp.zeros((self._num_pix_tot, self._num_pix_tot)), 
+                    jnp.ones((self._num_pix_tot, self._num_pix_tot))
+                ), reinterpreted_batch_ndims=2)
+            ),
+            f'{key_base}_zeromode': numpyro.sample(
+                f'{key_base}_zeromode', 
+                Normal(0., 1.),
+            ),
+            f'{key_base}_{self._key_xy}_scale': numpyro.sample(
+                f'{key_base}_{self._key_xy}_scale', 
+                Normal(0., 1.),
+            ),
+            f'{key_base}_{self._key_xy}_cutoff': numpyro.sample(
+                f'{key_base}_{self._key_xy}_cutoff', 
+                Normal(0., 1.),
+            ),
+            f'{key_base}_{self._key_xy}_loglogslope': numpyro.sample(
+                f'{key_base}_{self._key_xy}_loglogslope', 
+                Normal(0., 1.),
+            ),
+        }
         return self.model(params)
     
     def _numpyro_sample_pixels_3d(self):
