@@ -109,9 +109,9 @@ class CorrelatedField(object):
             prior_asperity=None,
 
             # Parameters along the spatial dimensions (`xy_dim`) for kernel_type='matern'
-            prior_matern_scale=(1.0, 0.5),
-            prior_matern_loglogslope=(-4., 0.5), 
-            prior_matern_cutoff=(10., 1.), 
+            prior_matern_scale=(0.5, 0.1),
+            prior_matern_loglogslope=(-8., 0.5), 
+            prior_matern_cutoff=(2., 0.5), 
             matern_renorm_amp=False,
 
             # Parameters along the spectral, or wavelength dimensions (`wl_dim`)
