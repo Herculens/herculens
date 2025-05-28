@@ -21,6 +21,9 @@ class CorrelatedField(object):
     a visual intuition of the different parameters:
     https://ift.pages.mpcdf.de/nifty/user/old_nifty_getting_started_4_CorrelatedFields.html
 
+    WARNING: the flexibility and asperity parameters have not been thoroughly tested!
+    Use these with caution. Moreover, flexibility and asperity are not properly implemented along the spectral direction.
+
     Parameters
     ----------
     param_prefix : str
@@ -48,6 +51,7 @@ class CorrelatedField(object):
         The mean and scatter of the log-normal distribution for the flexibility, by default None.
     prior_asperity : object, optional
         The mean and scatter of the log-normal distribution for the asperity, by default None.
+        Can only be set if prior_flexibility is also set.
     prior_matern_scale : tuple, optional
         The mean and scatter of the log-normal distribution for the scale of the Matern kernel, by default (1.0, 0.5).  
     prior_matern_loglogslope : tuple, optional
@@ -72,7 +76,7 @@ class CorrelatedField(object):
     prior_flexibility_wl : object, optional
         The mean and scatter of the log-normal distribution for the flexibility along the spectral dimensions, by default None.
     prior_asperity_wl : object, optional
-        The mean and scatter of the log-normal distribution for the asperity along the spectral dimensions, by default None.
+        The mean and scatter of the log-normal distribution for the asperity along the spectral dimensions, by default None. Can only be set if prior_flexibility_wl is also set.
     num_wl : int, optional
         The number of spectral bands, by default 1.
     cropped_border_size_wl : int, optional
@@ -361,10 +365,21 @@ class CorrelatedField(object):
                 f'{key_base}_{self._key_xy}_flexibility', 
                 Normal(0., 1.),
             )
-        if self._kw_fluctuations['asperity'] is not None:
-            params[f'{key_base}_{self._key_xy}_asperity'] = numpyro.sample(
-                f'{key_base}_{self._key_xy}_asperity', 
-                Normal(0., 1.),
+            if self._kw_fluctuations['asperity'] is not None:
+                params[f'{key_base}_{self._key_xy}_asperity'] = numpyro.sample(
+                    f'{key_base}_{self._key_xy}_asperity', 
+                    Normal(0., 1.),
+                )
+            # we now the xy_dim is the last one in the list of correlated field grids
+            # TODO: make it better to also support the wavelength dimension in a 3d or stacked 2d field
+            idx_target_grid = -1
+            log_vol_size = self._cfm._target_grids[idx_target_grid].harmonic_grid.log_volume.size
+            params[f'{key_base}_{self._key_xy}_spectrum'] = numpyro.sample(
+                f'{key_base}_{self._key_xy}_spectrum', 
+                Independent(Normal(
+                    jnp.zeros((log_vol_size, 2)), 
+                    jnp.ones((log_vol_size, 2))
+                ), reinterpreted_batch_ndims=2)
             )
         return self.model(params)
     
@@ -446,21 +461,21 @@ class CorrelatedField(object):
                 f'{key_base}_{self._key_xy}_flexibility', 
                 Normal(0., 1.),
             )
-        if self._kw_fluctuations['asperity'] is not None:
-            params[f'{key_base}_{self._key_xy}_asperity'] = numpyro.sample(
-                f'{key_base}_{self._key_xy}_asperity', 
-                Normal(0., 1.),
-            )
+            if self._kw_fluctuations['asperity'] is not None:
+                params[f'{key_base}_{self._key_xy}_asperity'] = numpyro.sample(
+                    f'{key_base}_{self._key_xy}_asperity', 
+                    Normal(0., 1.),
+                )
         if self._kw_fluctuations_wl['flexibility'] is not None:
             params[f'{key_base}_{self._key_wl}_flexibility'] = numpyro.sample(
                 f'{key_base}_{self._key_wl}_flexibility', 
                 Normal(0., 1.),
             )
-        if self._kw_fluctuations_wl['asperity'] is not None:
-            params[f'{key_base}_{self._key_wl}_asperity'] = numpyro.sample(
-                f'{key_base}_{self._key_wl}_asperity', 
-                Normal(0., 1.),
-            )
+            if self._kw_fluctuations_wl['asperity'] is not None:
+                params[f'{key_base}_{self._key_wl}_asperity'] = numpyro.sample(
+                    f'{key_base}_{self._key_wl}_asperity', 
+                    Normal(0., 1.),
+                )
         return self.model(params)
     
     def _numpyro_sample_pixels_2d_stack(self):
@@ -505,15 +520,15 @@ class CorrelatedField(object):
                         )
                     }
                 )
-            if self._kw_fluctuations['asperity'] is not None:
-                params.update(
-                    {
-                        f'{key_base}_stack{i_wl}_{self._key_xy}_asperity': numpyro.sample(
-                            f'{key_base}_stack{i_wl}_{self._key_xy}_asperity', 
-                            Normal(0., 1.),
-                        )
-                    }
-                )
+                if self._kw_fluctuations['asperity'] is not None:
+                    params.update(
+                        {
+                            f'{key_base}_stack{i_wl}_{self._key_xy}_asperity': numpyro.sample(
+                                f'{key_base}_stack{i_wl}_{self._key_xy}_asperity', 
+                                Normal(0., 1.),
+                            )
+                        }
+                    )
             # model = self._jft_model_list[i_wl](params)[self._param_prefix]
             # models_per_band.append(model)
         return self.model(params)
