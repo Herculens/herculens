@@ -841,7 +841,7 @@ class Plotter(object):
         ax = axes[1, 0]
         if not no_conj_points:
             im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
-                           alpha=1 if extent_zoom is None else 0)
+                           alpha=1)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'},
                           invisible=True)
@@ -852,7 +852,7 @@ class Plotter(object):
                 extent, extent_zoom=None,
                 colors_planes=colors_planes[1:],
             )
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
+            ax.legend(loc='best', fontsize=8)
             ax.set_title("Data + conjugate points", fontsize=self.base_fontsize)
         else:
             ax.axis('off')
@@ -878,8 +878,7 @@ class Plotter(object):
             ax.set_ylim(extent[2], extent[3])
             ax.set_title(f"Shear field (w.r.t. plane {num_planes-1})", fontsize=self.base_fontsize)
         else:
-            im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, 
-                           alpha=1 if extent_zoom is None else 0)
+            im = ax.imshow(data, extent=extent, cmap=self.cmap_bw, norm=self.norm_flux, alpha=0)  # zero opacity
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'},
                           invisible=True)
@@ -889,7 +888,7 @@ class Plotter(object):
                 extent, extent_zoom=extent_zoom,
                 colors_planes=colors_planes[1:],
             )
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
+            ax.legend(loc='best', fontsize=8)
 
         # Convergence map
         ax = axes[1, 2]
@@ -1096,7 +1095,9 @@ class Plotter(object):
                 )):
                 continue
             # plot the conjugate points and traced conjugate points
-            label = f"Plane {idx_plane+1} (z={redshift_per_plane[idx_plane] if redshift_per_plane is not None else -1.:.3f})"
+            label = f"Plane {idx_plane+1}"
+            if redshift_per_plane is not None:
+                label += f" (z={redshift_per_plane[idx_plane]:.3f})"
             ax.scatter(*cps, s=140, edgecolors=color, marker='o', linewidths=2, facecolors='none',
                        label=label)
             ax.scatter(*tcps, s=400 if extent_zoom else 140, facecolors='none', edgecolors=color, marker='*', linewidths=2)
