@@ -22,7 +22,7 @@ __all__ = ['MassModel', 'ZeroMassModel']
 
 
 def tree_stack(trees):
-    return jax.tree_map(lambda *v: jnp.stack(v), *trees)
+    return jax.tree.map(lambda *v: jnp.stack(v), *trees)
 
 
 def alpha_static_single(
