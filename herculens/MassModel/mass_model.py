@@ -21,6 +21,10 @@ from herculens.MassModel.Profiles.zero_mass import ZeroMass
 __all__ = ['MassModel', 'ZeroMassModel']
 
 
+def tree_stack(trees):
+    return jax.tree_map(lambda *v: jnp.stack(v), *trees)
+
+
 def alpha_static_single(
         x, y, alpha_func,
     ):
@@ -152,12 +156,8 @@ class MassModel(MassModelBase):
         if k is not None:
             raise NotImplementedError   # TODO: implement case with k not None
         alpha_func = alpha_static_single(x, y, self.func_list[0].derivatives)
-        return jnp.sum(
-            jnp.array([
-                alpha_func(**kwargs[i]) for i in range(self._num_func)
-            ]),
-            axis=0,
-        )
+        kwargs_stack = tree_stack(kwargs)
+        return jnp.array(jax.vmap(alpha_func)(**kwargs_stack)).sum(axis=1)
 
     def _alpha_loop(self, x, y, kwargs, k=None):
         bool_list = self._bool_list(k)
