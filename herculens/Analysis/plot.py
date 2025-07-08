@@ -159,6 +159,10 @@ class Plotter(object):
             The likelihood mask, by default None.
         potential_mask : ndarray, optional
             The potential mask, by default None.
+        apply_mask_to_model : bool, optional
+            Whether to apply the likelihood mask to the model image, in order
+            to hide away regions of the model that were not used in the likelihood.
+            By default False.
         show_lens_lines : bool, optional
             Whether to show lens lines, by default False.
         show_shear_field : bool, optional
