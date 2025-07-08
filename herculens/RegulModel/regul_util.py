@@ -126,7 +126,7 @@ def data_noise_to_wavelet_light(lens_image, kwargs_res, model_type='source',
             if sigma_clipping is True:
                 # here we clip values that are 5 times the standard deviation
                 thresh = 5. * jnp.std(tmp)
-                tmp = jnp.where(jnp.abs(tmp) > thresh, x=thresh, y=tmp)
+                tmp = jnp.where(jnp.abs(tmp) > thresh, thresh, tmp)
             return Phi_T(tmp)
 
         # draw many realizations of the noise, scaled by the inverse cov matrix
