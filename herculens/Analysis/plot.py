@@ -117,7 +117,7 @@ class Plotter(object):
             show_image=True, show_source=True, 
             show_lens_light=False, show_lens_potential=False, show_lens_others=False,
             only_pixelated_potential=False, shift_pixelated_potential='none',
-            likelihood_mask=None, potential_mask=None, 
+            likelihood_mask=None, potential_mask=None, apply_mask_to_model=False,
             show_lens_lines=False, supersampling_lens_lines=3,
             show_shear_field=False, show_lens_position=False,
             kwargs_grid_source=None,
@@ -436,7 +436,11 @@ class Plotter(object):
                           colorbar_kwargs={'orientation': 'horizontal'})
             
             ax = axes[i_row, 1]
-            im = ax.imshow(model, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
+            if apply_mask_to_model is True:
+                model_to_show = model * likelihood_mask
+            else:
+                model_to_show = model
+            im = ax.imshow(model_to_show, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
             im.set_rasterized(True)
             ax.set_title("model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -565,7 +569,11 @@ class Plotter(object):
                 ax.axis('off')
 
             ax = axes[i_row, 1]
-            im = ax.imshow(potential_model * potential_mask, extent=extent,
+            if apply_mask_to_model is True:
+                potential_model_to_show = model * potential_mask
+            else:
+                potential_model_to_show = potential_model
+            im = ax.imshow(potential_model_to_show, extent=extent,
                            vmin=vmin_pot, vmax=vmax_pot,
                            cmap=self.cmap_default)
             ax.set_title(r"$\psi_{\rm pix}$", fontsize=self.base_fontsize)
