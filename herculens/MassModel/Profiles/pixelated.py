@@ -30,7 +30,6 @@ class PixelatedPotential(object):
 
     def __init__(self, interpolation_type='fast_bilinear', derivative_type='autodiff'):
         """Lensing potential on a fixed coordinate grid."""
-        print("CHECK", interpolation_type, derivative_type)
         if interpolation_type not in self._interp_types:
             raise ValueError(f"Invalid interpolated mode ('{interpolation_type}'). Must be in {self._interp_types}.")
         if derivative_type not in self._deriv_types:
@@ -61,9 +60,10 @@ class PixelatedPotential(object):
 
     def function(self, x, y, pixels=None):
         if self._interp_type == 'fast_bilinear':
-            return self._function_fast(x, y, pixels)
+            f = self._function_fast(x, y, pixels)
         elif self._interp_type == 'bicubic':
-            return self._function_std(x, y, pixels)
+            f = self._function_std(x, y, pixels)
+        return f
 
     def _function_fast(self, x, y, pixels):
         # ensure the coordinates are cartesian by converting angular to pixel units
@@ -100,12 +100,6 @@ class PixelatedPotential(object):
         return interp(y_, x_)
 
     def derivatives(self, x, y, pixels):
-        if self._deriv_type == 'interpol':
-            return self.derivatives_interpol(x, y, pixels)
-        elif self._deriv_type == 'autodiff':
-            return self.derivatives_autodiff(x, y, pixels)
-
-    def derivatives_interpol(self, x, y, pixels):
         """Spatial first derivatives of the lensing potential.
 
         Parameters
@@ -116,17 +110,28 @@ class PixelatedPotential(object):
             Values of the lensing potential at fixed coordinate grid positions.
 
         """
+        if self._deriv_type == 'interpol':
+            return self._derivatives_interpol(x, y, pixels)
+        elif self._deriv_type == 'autodiff':
+            return self._derivatives_autodiff(x, y, pixels)
+
+    def _derivatives_interpol(self, x, y, pixels):
         # ensure the coordinates are cartesian by converting angular to pixel units
         x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
         x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
-        interp = BicubicInterpolator(self._y_coords, self._x_coords, pixels)
-        f_x = interp(y_, x_, dy=1)
-        f_y = interp(y_, x_, dx=1)
+        if 'bilinear' in self._interp_type:
+            interp = BilinearInterpolator(self._y_coords, self._x_coords, pixels)
+        else:
+            interp = BicubicInterpolator(self._y_coords, self._x_coords, pixels)
+        f_x = interp(y_, x_, dy=1) / self._delta_x
+        f_y = interp(y_, x_, dx=1) / self._delta_y
         return f_x, f_y
 
-    def derivatives_autodiff(self, x, y, pixels):
+    def _derivatives_autodiff(self, x, y, pixels):
         def function(params):
-            res = self.function(params[0], params[1], pixels) #[0]
+            res = self.function(params[0], params[1], pixels)
+            if self._interp_type != 'fast_bilinear':
+                res = res[0]
             return res
         grad_func = grad(function)
         param_array = jnp.array([x.flatten(), y.flatten()]).T
@@ -136,12 +141,6 @@ class PixelatedPotential(object):
         return f_x, f_y
 
     def hessian(self, x, y, pixels):
-        if self._deriv_type == 'interpol':
-            return self.hessian_interpol(x, y, pixels)
-        elif self._deriv_type == 'autodiff':
-            return self.hessian_autodiff(x, y, pixels)
-
-    def hessian_interpol(self, x, y, pixels):
         """Spatial second derivatives of the lensing potential.
 
         Parameters
@@ -152,19 +151,27 @@ class PixelatedPotential(object):
             Values of the lensing potential at fixed coordinate grid positions.
 
         """
+        if self._deriv_type == 'interpol':
+            return self._hessian_interpol(x, y, pixels)
+        elif self._deriv_type == 'autodiff':
+            return self._hessian_autodiff(x, y, pixels)
+
+    def _hessian_interpol(self, x, y, pixels):
         # ensure the coordinates are cartesian by converting angular to pixel units
         x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
         x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
+        # second-oder derivatives can only be obtained with bicubic interpolation (or higher orders)
         interp = BicubicInterpolator(self._y_coords, self._x_coords, pixels)
-        # TODO Why doesn't this follow the pattern of the first derivatives ?
-        f_xx = interp(y_, x_, dx=2)
-        f_yy = interp(y_, x_, dy=2)
-        f_xy = interp(y_, x_, dx=1, dy=1)
+        f_xx = interp(y_, x_, dy=2) / self._delta_x**2
+        f_yy = interp(y_, x_, dx=2) / self._delta_y**2
+        f_xy = interp(y_, x_, dx=1, dy=1) /self._delta_x*self._delta_y
         return f_xx, f_yy, f_xy
 
-    def hessian_autodiff(self, x, y, pixels):
+    def _hessian_autodiff(self, x, y, pixels):
         def function(params):
-            res = self.function(params[0], params[1], pixels)[0]
+            res = self.function(params[0], params[1], pixels)
+            if self._interp_type != 'fast_bilinear':
+                res = res[0]
             return res
         hessian_func = jacfwd(jacrev(function))
         param_array = jnp.array([x.flatten(), y.flatten()]).T
@@ -177,8 +184,11 @@ class PixelatedPotential(object):
 
     def set_pixel_grid(self, pixel_grid):
         self._pixel_grid = pixel_grid
-        # ensure the coordinates are cartesian by converting angular to pixel units
+        # compute the original pixel size (used for proper scaling of derivatives)
         x_grid, y_grid = self.pixel_grid.pixel_coordinates
+        self._delta_x = abs(x_grid[0, 1] - x_grid[0, 0])
+        self._delta_y = abs(y_grid[1, 0] - y_grid[0, 0])
+        # ensure the coordinates are cartesian by converting angular to pixel units
         x_grid, y_grid = self.pixel_grid.map_coord2pix(util.image2array(x_grid), util.image2array(y_grid))
         x_grid, y_grid = util.array2image(x_grid), util.array2image(y_grid)
         self._x_coords = x_grid[0, :]
