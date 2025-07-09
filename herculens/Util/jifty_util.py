@@ -15,7 +15,9 @@ def prepare_correlated_field(
         key, num_pix_xy, border_xy, 
         kwargs_amplitude, 
         kwargs_fluctuations,
+        kernel_type='powerlaw',
         correlation_type='power',
+        matern_renorm_amp=False,
         num_pix_wl=1, 
         border_wl=0, 
         kwargs_fluctuations_wl=None,
@@ -39,6 +41,12 @@ def prepare_correlated_field(
         Parameters of the field (see nifty.re documentation)
     kwargs_fluctuations : _type_
         Parameters of the field (see nifty.re documentation)
+    kernel_type : str, optional
+        Type of kernel to use for the field, either 'powerlaw' or 'matern', by default 'powerlaw'.
+        If 'matern', the kwargs_fluctuations are given to the CorrelatedFieldMaker's
+        method `add_fluctuations_matern()`, instead of `add_fluctuations()`.
+        See the nifty.re documentation for more details. Note that the 'matern' kernel
+        is only supported for the spatial dimensions, not for the spectral dimensions.
     num_pix_wl : int, optional
         Same as num_pix_xy but for the spectral (i.e. along wavelengths) dimensions, by default 1.
     border_wl : int, optional
@@ -61,6 +69,11 @@ def prepare_correlated_field(
     ValueError
         If the non-linearity is not implemented.
     """
+    if non_linearity not in ['exp', 'none']:
+        raise ValueError(f"Non-linearity '{non_linearity}' not implemented.")
+    if kernel_type not in ['powerlaw', 'matern']:
+        raise ValueError(f"Kernel type '{kernel_type}' not supported. Supported types are 'powerlaw' and 'matern'.")
+    
     # Correlated field parameters
     cfm = jft.CorrelatedFieldMaker(key + f'_{field_key}_')
     cfm.set_amplitude_total_offset(**kwargs_amplitude)
@@ -81,22 +94,31 @@ def prepare_correlated_field(
 
     # Setup the power-spectrum in the spatial dimensions
     num_pix_xy_tot = num_pix_xy + 2 * border_xy
-    cfm.add_fluctuations(
-        [num_pix_xy_tot, num_pix_xy_tot],
-        distances=1./num_pix_xy_tot,  # only makes a difference to get proper units for wavenumbers and certain types of covariance kernels
-        **kwargs_fluctuations,
-        prefix=param_key_xy+'_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
-        non_parametric_kind=correlation_type,
-        harmonic_type='fourier',
-    )
+    if kernel_type == 'powerlaw':
+        cfm.add_fluctuations(
+            [num_pix_xy_tot, num_pix_xy_tot],
+            distances=1./num_pix_xy_tot,  # only makes a difference to get proper units for wavenumbers and certain types of covariance kernels
+            **kwargs_fluctuations,
+            prefix=param_key_xy+'_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
+            non_parametric_kind=correlation_type,
+            harmonic_type='fourier',
+        )
+    elif kernel_type == 'matern':
+        cfm.add_fluctuations_matern(
+            [num_pix_xy_tot, num_pix_xy_tot],
+            distances=1./num_pix_xy_tot,  # only makes a difference to get proper units for wavenumbers and certain types of covariance kernels
+            renormalize_amplitude=matern_renorm_amp,
+            **kwargs_fluctuations,
+            prefix=param_key_xy+'_',  # prefix key to e.g. distinguish between multiple fields along different dimensions
+            non_parametric_kind=correlation_type,
+            harmonic_type='fourier',
+        )
     # NOTE: in the pure nifty version, the distances are also 1/num_pix in the SimpleCorrelatedField model
 
     # Finalize the correlated field
     field_transform = cfm.finalize()
 
     # Apply non-linear transformation to get the final light model
-    if non_linearity not in ['exp', 'none']:
-        raise ValueError(f"Non-linearity '{non_linearity}' not implemented.")
     if non_linearity == 'exp':
         field_transform = ExpCroppedFieldTransform(key, field_transform, border_xy, border_wl)
         
