@@ -10,6 +10,8 @@ import numpy as np
 import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev, vmap
 
+from utax.interpolation import BilinearInterpolator, BicubicInterpolator
+
 from herculens.Util import util
 
 
@@ -51,10 +53,8 @@ class Pixelated(object):
                 self._interp_class = CartesianGrid
         if self._interp_class is None:
             if self._interp_type == 'bilinear':
-                from utax.interpolation import BilinearInterpolator
                 self._interp_class = BilinearInterpolator
             elif self._interp_type == 'bicubic':
-                from utax.interpolation import BicubicInterpolator
                 self._interp_class = BicubicInterpolator
         self._extrapol_bool = allow_extrapolation
         self._adaptive_grid = adaptive_grid
@@ -98,7 +98,8 @@ class Pixelated(object):
         else:
             limits = self._limits
         interp = self._interp_class(limits, pixels, cval=0.)
-        return interp(y_, x_)
+        f = interp(y_, x_)
+        return f
 
     def _function_std(self, x, y, pixels_x_coord, pixels_y_coord, pixels):
         """Interpolated evaluation of a pixelated light profile.
@@ -126,15 +127,10 @@ class Pixelated(object):
         interp = self._interp_class(pixels_y_coord, pixels_x_coord, pixels,
                                     allow_extrapolation=self._extrapol_bool)
         # evaluate the interpolator
-        return interp(y_, x_)
+        f = interp(y_, x_)
+        return f
 
-    def derivatives(self, x, y, pixels):
-        if self._deriv_type == 'interpol':
-            return self.derivatives_interpol(x, y, pixels)
-        elif self._deriv_type == 'autodiff':
-            return self.derivatives_autodiff(x, y, pixels)
-
-    def derivatives_interpol(self, x, y, pixels):
+    def derivatives(self, x, y, pixels_x_coord=None, pixels_y_coord=None, pixels=None):
         """Spatial first derivatives of the pixelated light profile.
 
         Parameters
@@ -145,32 +141,60 @@ class Pixelated(object):
             Values of the surface brightness at fixed coordinate grid positions (surf. bright. units / arcsec)
 
         """
+        if self._deriv_type == 'interpol':
+            f_x, f_y = self._derivatives_interpol(x, y, pixels_x_coord, pixels_y_coord, pixels)
+        elif self._deriv_type == 'autodiff':
+            f_x, f_y = self._derivatives_autodiff(x, y, pixels_x_coord, pixels_y_coord, pixels)
+        # normalize for correct units when evaluated by LensImage methods
+        return f_x / self._data_pixel_area, f_y / self._data_pixel_area
+
+    def _derivatives_interpol(self, x, y, pixels_x_coord, pixels_y_coord, pixels):
+        if self._interp_type not in ['bilinear', 'bicubic']:
+            raise ValueError(f"Invalid interpolation type '{self._interp_type}' for "
+                             f"'interpolated' derivatives computation. "
+                             f"Either use 'autodiff' derivatives computation, "
+                             f"or choose interpolation type 'bilinear' or 'bicubic'.")
+        elif self._interp_type == 'bilinear':
+            interp_class = BilinearInterpolator
+        else:
+            interp_class = BicubicInterpolator
         # ensure the coordinates are cartesian by converting angular to pixel units
         x_, y_ = self.pixel_grid.map_coord2pix(x.flatten(), y.flatten())
         x_, y_ = x_.reshape(*x.shape), y_.reshape(*y.shape)
         # setup interpolation, assuming cartesian grid
-        interp = self._interp_class(self._y_coords, self._x_coords, pixels)
+        if not self._adaptive_grid:  # in this case pixels_x_coord and pixels_y_coord should be None
+            pixels_x_coord, pixels_y_coord = self._x_coords, self._y_coords
+        interp = interp_class(pixels_y_coord, pixels_x_coord, pixels,
+                              allow_extrapolation=self._extrapol_bool)
         # evaluate the interpolator
-        f_x = interp(y, x, dy=1) 
-        f_y = interp(y, x, dx=1) / self._data_pixel_area
-        return f_x / self._data_pixel_area, f_y / self._data_pixel_area
+        f_x = interp(y_, x_, dy=1) / self._delta_x
+        f_y = interp(y_, x_, dx=1) / self._delta_y
+        return f_x, f_y
 
-    def derivatives_autodiff(self, x, y, pixels):
+    def _derivatives_autodiff(self, x, y, pixels_x_coord, pixels_y_coord, pixels):
         def function(params):
-            res = self.function(params[0], params[1], pixels)[0]
+            res = self.function(
+                params[0], params[1], 
+                pixels_x_coord=pixels_x_coord, pixels_y_coord=pixels_y_coord,
+                pixels=pixels)
+            if self._interp_type != 'fast_bilinear':
+                res = res[0]
             return res
         grad_func = grad(function)
         param_array = jnp.array([x.flatten(), y.flatten()]).T
         res = vmap(grad_func)(param_array)
         f_x = res[:, 0].reshape(*x.shape)
         f_y = res[:, 1].reshape(*x.shape)
-        return f_x / self._data_pixel_area, f_y / self._data_pixel_area
+        return f_x, f_y
     
     def set_pixel_grid(self, pixel_grid, data_pixel_area):
         self._data_pixel_area = data_pixel_area
         self._pixel_grid = pixel_grid
-        # ensure the coordinates are cartesian by converting angular to pixel units
+        # compute the original pixel size (used for proper scaling of derivatives)
         x_grid, y_grid = self.pixel_grid.pixel_coordinates
+        self._delta_x = abs(x_grid[0, 1] - x_grid[0, 0])
+        self._delta_y = abs(y_grid[1, 0] - y_grid[0, 0])
+        # ensure the coordinates are cartesian by converting angular to pixel units
         nx, ny = x_grid.shape
         x_grid, y_grid = self.pixel_grid.map_coord2pix(util.image2array(x_grid), 
                                                        util.image2array(y_grid))
