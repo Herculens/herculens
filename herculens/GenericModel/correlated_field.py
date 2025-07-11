@@ -12,9 +12,7 @@ try:
     import nifty8
 except ImportError:
     raise ImportError("The package `nifty8` must be installed to use the CorrelatedField class. "
-                      "Please install NIFTy8 (see https://github.com/NIFTy-PPL/NIFTy) "
-                      "in order to use the CorrelatedField class "
-                      "or the jifty_util submodule of Herculens.")
+                      "See https://github.com/NIFTy-PPL/NIFTy to install it.")
 from herculens.Util import jifty_util
 
 
