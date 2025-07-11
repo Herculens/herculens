@@ -4,7 +4,7 @@ import jax.scipy.stats as jstats
 try:
     import nifty8.re as jft
 except ImportError:
-    raise ImportError("The nifty8.re module is not installed. "
+    raise ImportError("The package `nifty8` must be installed to use the jifty_util submodule. "
                       "Please install NIFTy8 (see https://github.com/NIFTy-PPL/NIFTy) "
                       "in order to use the CorrelatedField class "
                       "or the jifty_util submodule of Herculens.")
