@@ -1,15 +1,26 @@
 # Set of utilities that extends some of numpyro functionalities
 # In the future, these may be incorporated within numpyro 
 
-
+import jax
 import jax.numpy as jnp
 from functools import partial
 
 import numpyro
-from numpyro import handlers
+from numpyro.handlers import seed, trace, substitute
 from numpyro.distributions import transforms, constraints
 from numpyro.distributions.util import sum_rightmost
 from numpyro.infer import util
+
+
+def count_sampled_parameters(model, model_args=(), model_kwargs={}):
+    seeded_model = seed(model, rng_seed=0)
+    traced_model = trace(seeded_model).get_trace(*model_args, **model_kwargs)
+    num_param = 0
+    for site in traced_model.values():
+        if (site['type'] == 'sample' and not site['is_observed']
+            or site['type'] == 'param'):
+            num_param += site['value'].size
+    return num_param
 
 
 def unconstrain_reparam(params, site):
@@ -76,7 +87,7 @@ def potential_energy(model, model_args, model_kwargs, params):
     :param dict params: unconstrained parameters of `model`.
     :return: potential energy given unconstrained parameters.
     """
-    substituted_model = handlers.substitute(
+    substituted_model = substitute(
         model, substitute_fn=partial(unconstrain_reparam, params)
     )
     # no param is needed for log_density computation because we already substitute
