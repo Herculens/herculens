@@ -13,6 +13,7 @@ from .LightModel.Profiles.sersic import Sersic, SersicElliptic
 from .LightModel.Profiles.shapelets import Shapelets
 from .LightModel.Profiles.uniform import Uniform
 from .LightModel.Profiles.pixelated import Pixelated as PixelatedLight
+# NOTE: some of the pixelated light profiles may require `jaxinterp2d` or `utax` to be installed.
 
 from .MassModel.mass_model import MassModel
 from .MassModel.mass_model_multiplane import MPMassModel
@@ -26,18 +27,15 @@ from .MassModel.Profiles.point_mass import PointMass
 from .MassModel.Profiles.multipole import Multipole
 from .MassModel.Profiles.pixelated import (
     PixelatedPotential, PixelatedPotentialDirac, PixelatedFixed
-)
+) # NOTE: some of the pixelated mass profiles may require `jaxinterp2d` or `utax` to be installed.
 from .MassModel.Profiles.piemd import PIEMD
 from .MassModel.Profiles.dpie import DPIE
 
+# NOTE: some PointSourceModel setups may require `helens` to be installed.
 from .PointSourceModel.point_source_model import PointSourceModel
 
-try:
-    from .GenericModel.correlated_field import CorrelatedField
-except ImportError:
-    # an error will be raised via the from herculens.Util.jifty_util submodule, 
-    # typically when instantiating the CorrelatedField class
-    pass
+# NOTE: CorrelatedField requires `nifty8` to be installed.
+from .GenericModel.correlated_field import CorrelatedField
 
 from .LensImage.lens_image import LensImage, LensImage3D
 from .LensImage.lens_image_multiplane import MPLensImage

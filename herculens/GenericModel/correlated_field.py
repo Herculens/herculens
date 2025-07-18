@@ -7,6 +7,12 @@ __author__ = 'aymgal'
 import numpy as np
 import jax
 import jax.numpy as jnp
+
+try:
+    import nifty8
+except ImportError:
+    raise ImportError("The package `nifty8` must be installed to use the CorrelatedField class. "
+                      "See https://github.com/NIFTy-PPL/NIFTy to install it.")
 from herculens.Util import jifty_util
 
 
