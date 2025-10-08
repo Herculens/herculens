@@ -5,7 +5,7 @@
 from herculens.MassModel.Profiles.gaussian_potential import Gaussian
 from herculens.MassModel.Profiles.point_mass import PointMass
 from herculens.MassModel.Profiles.multipole import Multipole
-from herculens.MassModel.Profiles.shear import Shear, ShearGammaPsi
+from herculens.MassModel.Profiles.shear import Shear, ShearGammaPhi
 from herculens.MassModel.Profiles.sis import SIS
 from herculens.MassModel.Profiles.sie import SIE
 from herculens.MassModel.Profiles.nie import NIE
