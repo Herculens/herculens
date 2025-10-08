@@ -29,7 +29,7 @@ STRING_MAPPING = {
     'GAUSSIAN': Gaussian,
     'POINT_MASS': PointMass,
     'SHEAR': Shear,
-    'SHEAR_GAMMA_PSI': ShearGammaPsi,
+    'SHEAR_GAMMA_PHI': ShearGammaPhi,
     'MULTIPOLE': Multipole,
     'PIXELATED': PixelatedPotential,
     'PIXELATED_DIRAC': PixelatedPotentialDirac,
