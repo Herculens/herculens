@@ -41,11 +41,16 @@ class GLEEReader(object):
     def print_summary(self):
         if not self._parsed:
             self._raise_parser_run_error()
+        # count number of point-like source with varying redshift
+        num_fixed_z_ptl = sum(
+            [1 for p in self.point_like_source_priors if p['z'][0] != 'exact']
+        )
+        num_free_z_ptl = len(self.point_like_source_parameters) - num_fixed_z_ptl
         print("="*60)
         print("Parsed GLEE model:")
         print("-"*18)
         print("> Number of lenses:", self.num_lenses)
-        print("> Number of point-like sources:", self.num_point_like_sources)
+        print(f"> Number of point-like sources (incl. {num_free_z_ptl} with free redshift):", self.num_point_like_sources)
         print(f"  leading to {self.num_point_like_images} point-like multiple images")
         print("> Number of extended sources:", self.num_extended_sources)
         print("> Number of unique source redshifts:", self.num_source_planes)
