@@ -42,10 +42,10 @@ class GLEEReader(object):
         if not self._parsed:
             self._raise_parser_run_error()
         # count number of point-like source with varying redshift
-        num_fixed_z_ptl = sum(
-            [1 for p in self.point_like_source_priors if p['z'][0] != 'exact']
+        num_free_z_ptl = sum(
+            [1 for p in self.point_like_source_priors if p['z'][0] in ('flat', 'gaussian')]
         )
-        num_free_z_ptl = len(self.point_like_source_parameters) - num_fixed_z_ptl
+        num_free_z_ptl = num_free_z_ptl
         print("="*60)
         print("Parsed GLEE model:")
         print("-"*18)
