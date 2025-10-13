@@ -6,6 +6,31 @@ import numpy as np
 from pprint import pprint
 
 
+
+def get_pix2world_func(data_header, format='float'):
+    from astropy.wcs import WCS
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    if format not in ('float', 'string'):
+        raise ValueError("`format` must be either 'float' or 'string'.")
+    cd_matrix = np.array([
+        [float(data_header['CD1_1']), float(data_header['CD1_2'])],
+        [float(data_header['CD2_1']), float(data_header['CD2_2'])],
+    ]) * 3600.  # degrees to arcsec
+    pix_scl = np.sqrt(np.abs(np.linalg.det(cd_matrix)))
+    wcs = WCS(data_header)
+    def pix2world(x, y):
+        if x is np.nan or y is np.nan:
+            return np.nan, np.nan
+        ra, dec = wcs.all_pix2world(x/pix_scl, y/pix_scl, 0)
+        if format == 'float':
+            return ra, dec
+        else:
+            coord = SkyCoord(ra, dec, unit=(u.deg, u.deg))
+            return coord.to_string(style='hmsdms', sep=':').split(' ')
+    return pix2world
+
+
 class GLEEReader(object):
     """Load and parse a GLEE config file.
 
@@ -232,10 +257,85 @@ class GLEEReader(object):
         self._ptl_src_params, self._ptl_src_priors, self._ptl_src_labels, self._ptl_src_errors \
             = self._parse_point_like_source_model(model_component_blocks['sources'])
         # parse the extended source block
-        self._ext_src_params, self._ext_src_priors, self._ext_src_settings \
-            = self._parse_extended_sources_block(model_component_blocks['esources'])
+        if len(model_component_blocks['esources']) > 0:
+            self._ext_src_params, self._ext_src_priors, self._ext_src_settings \
+                = self._parse_extended_sources_block(model_component_blocks['esources'])
+        else:
+            print("No extended source block found.")
+            self._ext_src_params, self._ext_src_priors, self._ext_src_settings = [], [], []
         # if successful so far, then we say it's parsed
         self._parsed = True
+
+    def export_as_catalog(
+            self, 
+            filename, 
+            include=['point_like_sources', 'extended_sources', 'lenses'],
+            extended_source_refcoord_idx=0,
+            data_header=None,
+            radec_format='string',
+        ):
+        """Write in a text file all coordinates of the point-like sources,
+        extended sources and lenses, depending on the `include` list.
+        The file is simply a space-separated text file with header, with columns as follows:
+        - right ascension (RA) in arcsec in image plane
+        - declination (Dec) in arcsec in image plane
+        - right ascension (RA) in arcsec in source plane (for non-point-like sources, will be nan)
+        - declination (Dec) in arcsec in source plane (for non-point-like sources, will be nan)
+        - redshift (z)
+        - type (lens, ptl_src, ext_src)
+        - profile (for lenses only, e.g. 'dpie', 'shear', etc.; 'N/A' otherwise)
+        - label (if any, otherwise 'N/A')
+
+        If a `data_header` is provided, the coordinates will be in RA/Dec (J2000), otherwise it will remain in model coordinates (usually arcsec).
+        """
+        if not self._parsed:
+            self._raise_parser_run_error()
+        lines = []
+        catalog_header = "# RA_IMG[arcsec] DEC_IMG[arcsec] RA_SRC[arcsec] DEC_SRC[arcsec] REDSHIFT TYPE PROFILE LABEL"
+        lines.append(catalog_header)
+        if len(self.extended_source_ref_coordinates) > 0:
+            ref_x, ref_y = self.extended_source_ref_coordinates[
+                extended_source_refcoord_idx
+            ]
+        else:
+            ref_x, ref_y = 0.0, 0.0
+        if data_header is not None:
+            coord_to_string = get_pix2world_func(data_header, format=radec_format)
+        else:
+            coord_to_string = lambda x, y: (f"{x:.6f}", f"{y:.6f}")
+        if 'lenses' in include:
+            for profile_type, params, labels in zip(self.lens_profiles, self.lens_parameters, self.lens_labels):
+                x_src, y_src = np.nan, np.nan  # we don't have a source-plane positions for lenses
+                x_img = params.get('x-coord', np.nan) - ref_x
+                y_img = params.get('y-coord', np.nan) - ref_y
+                x_img, y_img = coord_to_string(x_img, y_img)
+                z = params.get('z', np.nan)
+                line = f"{x_img} {y_img} {x_src} {y_src} {z:.6f} lens {profile_type} N/A"
+                lines.append(line)
+        if 'point_like_sources' in include:
+            for params, labels in zip(self.point_like_source_parameters, self.point_like_source_labels):
+                x_src = params.get('x_src', np.nan) - ref_x
+                y_src = params.get('y_src', np.nan) - ref_y
+                x_img = np.array(params.get('x_img', [np.nan])) - ref_x
+                y_img = np.array(params.get('y_img', [np.nan])) - ref_y
+                z = params.get('z', np.nan)
+                x_src, y_src = coord_to_string(x_src, y_src)
+                z_label = labels.get('z', 'N/A')  # we take the label of x_src as representative
+                if z_label is None: z_label = 'N/A'
+                for x_i, y_i in zip(x_img, y_img):
+                    x_i_, y_i_ = coord_to_string(x_i, y_i)
+                    line = f"{x_i_} {y_i_} {x_src} {y_src} {z:.6f} ptl_src N/A {z_label}"
+                    lines.append(line)
+        if 'extended_sources' in include:
+            for params in self.extended_source_parameters:
+                x_src = np.nan  # we don't have a well-defined position for extended sources
+                y_src = np.nan
+                z = params.get('z', np.nan)
+                line = f"nan nan {x_src:.6f} {y_src:.6f} {z:.6f} ext_src N/A N/A"
+                lines.append(line)
+        with open(filename, 'w') as f:
+            f.write('\n'.join(lines))
+        print(f"Catalog written to '{filename}'")
 
     def _parse_lens_model(self, block):
         header = block[0]
@@ -543,3 +643,5 @@ class GLEEReader(object):
     
     def _raise_parser_run_error(self):
         raise RuntimeError("You must run parse_config() beforehand.")
+
+    
