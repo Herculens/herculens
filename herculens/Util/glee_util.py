@@ -273,6 +273,7 @@ class GLEEReader(object):
             extended_source_refcoord_idx=0,
             data_header=None,
             radec_format='string',
+            pixel_ref_coord=None,
         ):
         """Write in a text file all coordinates of the point-like sources,
         extended sources and lenses, depending on the `include` list.
@@ -291,18 +292,29 @@ class GLEEReader(object):
         if not self._parsed:
             self._raise_parser_run_error()
         lines = []
-        catalog_header = "# RA_IMG[arcsec] DEC_IMG[arcsec] RA_SRC[arcsec] DEC_SRC[arcsec] REDSHIFT TYPE PROFILE LABEL"
-        lines.append(catalog_header)
-        if len(self.extended_source_ref_coordinates) > 0:
-            ref_x, ref_y = self.extended_source_ref_coordinates[
-                extended_source_refcoord_idx
-            ]
+        lines.append(f"# Catalog generated from GLEE config file '{self._config_path}'")
+        if len(include) == 0:
+            print("No component type specified in `include`. Nothing to write.")
+            return
+        catalog_header = "# RA_IMG[arcsec] DEC_IMG[arcsec] RA_SRC[arcsec] DEC_SRC[arcsec] REDSHIFT REDSHIFT_PRIOR TYPE PROFILE LABEL"
+        if data_header is not None:
+            catalog_header = catalog_header.replace('arcsec', 'deg')  # since we will convert to RA/Dec
+        if pixel_ref_coord is None:
+            if len( self.extended_source_ref_coordinates) == 0:
+                raise ValueError("No extended source reference coordinates found in the procided GLEE config file. "
+                                 "Please provide an explicit reference pixel coordinates.")
+            else:
+                ref_x, ref_y = self.extended_source_ref_coordinates[
+                    extended_source_refcoord_idx
+                ]
         else:
-            ref_x, ref_y = 0.0, 0.0
+            ref_x, ref_y = pixel_ref_coord
+        print(f"Using reference coordinates (x,y) = ({ref_x}, {ref_y}) for conversion to RA/Dec.")
         if data_header is not None:
             coord_to_string = get_pix2world_func(data_header, format=radec_format)
         else:
             coord_to_string = lambda x, y: (f"{x:.6f}", f"{y:.6f}")
+        
         if 'lenses' in include:
             for profile_type, params, labels in zip(self.lens_profiles, self.lens_parameters, self.lens_labels):
                 x_src, y_src = np.nan, np.nan  # we don't have a source-plane positions for lenses
@@ -310,29 +322,47 @@ class GLEEReader(object):
                 y_img = params.get('y-coord', np.nan) - ref_y
                 x_img, y_img = coord_to_string(x_img, y_img)
                 z = params.get('z', np.nan)
-                line = f"{x_img} {y_img} {x_src} {y_src} {z:.6f} lens {profile_type} N/A"
+                line = f"{x_img} {y_img} {x_src} {y_src} {z:.6f} N/A lens {profile_type} N/A"
                 lines.append(line)
+        
         if 'point_like_sources' in include:
-            for params, labels in zip(self.point_like_source_parameters, self.point_like_source_labels):
+            for params, priors, labels in zip(
+                    self.point_like_source_parameters, 
+                    self.point_like_source_priors, 
+                    self.point_like_source_labels
+                ):
                 x_src = params.get('x_src', np.nan) - ref_x
                 y_src = params.get('y_src', np.nan) - ref_y
                 x_img = np.array(params.get('x_img', [np.nan])) - ref_x
                 y_img = np.array(params.get('y_img', [np.nan])) - ref_y
                 z = params.get('z', np.nan)
+                z_prior = priors.get('z', (None, None, None))
+                if z_prior[0] in ('exact', 'flat', 'gaussian'):
+                    z_prior_type = z_prior[0]
+                elif z_prior[0] == 'link':
+                    z_prior_type = f"link_{z_prior[1]}"
                 x_src, y_src = coord_to_string(x_src, y_src)
                 z_label = labels.get('z', 'N/A')  # we take the label of x_src as representative
                 if z_label is None: z_label = 'N/A'
                 for x_i, y_i in zip(x_img, y_img):
                     x_i_, y_i_ = coord_to_string(x_i, y_i)
-                    line = f"{x_i_} {y_i_} {x_src} {y_src} {z:.6f} ptl_src N/A {z_label}"
+                    line = f"{x_i_} {y_i_} {x_src} {y_src} {z:.6f} {z_prior_type} ptl_src N/A {z_label}"
                     lines.append(line)
+        
         if 'extended_sources' in include:
             for params in self.extended_source_parameters:
                 x_src = np.nan  # we don't have a well-defined position for extended sources
                 y_src = np.nan
                 z = params.get('z', np.nan)
-                line = f"nan nan {x_src:.6f} {y_src:.6f} {z:.6f} ext_src N/A N/A"
+                line = f"nan nan {x_src:.6f} {y_src:.6f} {z:.6f} N/A ext_src N/A N/A"
                 lines.append(line)
+                
+        # count the number of entries and put it in the header
+        num_entries = len(lines) - 1  # minus the first line which is in the header
+        # add header lines
+        lines.insert(1, catalog_header)
+        lines.insert(1, f"# Number of entries below: {num_entries}")
+        # write to file
         with open(filename, 'w') as f:
             f.write('\n'.join(lines))
         print(f"Catalog written to '{filename}'")
