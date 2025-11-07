@@ -10,7 +10,6 @@ __author__ = 'sibirrer', 'austinpeel', 'aymgal'
 import warnings
 import numpy as np
 from herculens.Util import util, kernel_util
-from utax.convolution.functions import build_convolution_matrix
 
 
 __all__ = ['PSF']
@@ -178,6 +177,7 @@ class PSF(object):
     def blurring_matrix(self, data_shape):
         num_pixels = data_shape[0] * data_shape[1]
         if not hasattr(self, '_blurring_matrix') or self._blurring_matrix.shape != (num_pixels, num_pixels):
+            from utax.convolution.functions import build_convolution_matrix
             psf_kernel_2d = np.array(self.kernel_point_source)
             self._blurring_matrix = build_convolution_matrix(
                 psf_kernel_2d, data_shape)
