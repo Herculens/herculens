@@ -326,6 +326,7 @@ class GLEEReader(object):
                 lines.append(line)
         
         if 'point_like_sources' in include:
+            num_indiv_ptl_src = len(self.point_like_source_parameters)  # number of individual point-like sources
             for params, priors, labels in zip(
                     self.point_like_source_parameters, 
                     self.point_like_source_priors, 
@@ -361,7 +362,10 @@ class GLEEReader(object):
         num_entries = len(lines) - 1  # minus the first line which is in the header
         # add header lines
         lines.insert(1, catalog_header)
-        lines.insert(1, f"# Number of entries below: {num_entries}")
+        stats_header = f"# Number of entries: {num_entries}"
+        if 'num_indiv_ptl_src' in locals(): 
+            stats_header += f" (incl. indiv. point-like sources: {num_indiv_ptl_src})"
+        lines.insert(1, stats_header)
         # write to file
         with open(filename, 'w') as f:
             f.write('\n'.join(lines))
