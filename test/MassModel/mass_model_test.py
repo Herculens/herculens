@@ -5,7 +5,7 @@ import numpy as np
 
 from herculens.MassModel.mass_model import MassModel
 from herculens.MassModel.Profiles.epl import EPL
-from herculens.MassModel.Profiles.shear import ShearGammaPsi
+from herculens.MassModel.Profiles.shear import ShearGammaPhi
 from herculens.MassModel.Profiles.multipole import Multipole
 
 from herculens.MassModel.profile_mapping import SUPPORTED_MODELS
@@ -18,7 +18,7 @@ def base_setup():
     # Create an instance of the MassModel class with some initial parameters
     # Replace the arguments with appropriate values for your use case
     mass_model = MassModel([
-        EPL(), ShearGammaPsi(), Multipole(),
+        EPL(), ShearGammaPhi(), Multipole(),
     ], use_jax_scan=False)
 
     # Populate kwargs with parameters associated to the base_mass_model
@@ -66,11 +66,11 @@ def get_mass_model_instance(alpha_method):
     elif alpha_method in ('scan', 'loop'):
         if alpha_method == 'scan':
             mass_model = MassModel([
-                EPL(), ShearGammaPsi(), Multipole(),
+                EPL(), ShearGammaPhi(), Multipole(),
             ], use_jax_scan=True)
         else:
             mass_model = MassModel([
-                EPL(), ShearGammaPsi(), Multipole(),
+                EPL(), ShearGammaPhi(), Multipole(),
             ], use_jax_scan=False)
         kwargs_mass = [
             {
