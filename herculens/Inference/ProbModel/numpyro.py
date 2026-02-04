@@ -37,7 +37,7 @@ class NumpyroModel(BaseProbModel):
                 print("Error while calling the property NumpyroModel.num_parameters."
                       "The cause might be that the underlying numpyro model requires"
                       "specific positional and/or keyword arguments."
-                      "Use the count_sampled_parameters() method instead.\n"
+                      "Use the count_sampled_parameters(model_args=(), model_kwargs={}) method instead.\n"
                       f"Here is the original error:\n{e}")
         return self._num_param
     
