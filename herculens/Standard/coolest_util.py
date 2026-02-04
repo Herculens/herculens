@@ -271,7 +271,7 @@ def update_mass_field_model(lens_image, name, mass_field=None,
     
     # instantiate the external shear
     if mass_field is None:
-        mass_field = MassField(name, mass_model=MassModel(*mass_profiles_out), redshift=redshift)
+        mass_field = MassField(name, redshift, mass_model=MassModel(*mass_profiles_out))
     else:
         assert isinstance(mass_field, MassField), "Inconsistent entity type"
 
@@ -324,9 +324,10 @@ def update_galaxy_model(lens_image, name, galaxy=None,
     if galaxy is None:
         # instantiate the galaxy
         galaxy = Galaxy(name,
+                        redshift,
+                        lensed,
                         mass_model=MassModel(*mass_profiles_out), 
-                        light_model=LightModel(*light_profiles_out),
-                        redshift=redshift)
+                        light_model=LightModel(*light_profiles_out))
     else:
         assert isinstance(galaxy, Galaxy), "Inconsistent entity type"
 
