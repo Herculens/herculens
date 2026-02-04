@@ -40,10 +40,32 @@ from .GenericModel.correlated_field import CorrelatedField
 from .LensImage.lens_image import LensImage, LensImage3D
 from .LensImage.lens_image_multiplane import MPLensImage
 from .Inference.loss import Loss
-from .Inference.ProbModel.numpyro import NumpyroModel
-from .Inference.Optimization.jaxopt import JaxoptOptimizer
-from .Inference.Optimization.optax import OptaxOptimizer
-from .Analysis.plot import Plotter
 
 from .Util import param_util as prmu
 from .Util import plot_util as pltu
+
+# The following aliases are related to optional packages
+try:
+    import matplotlib
+except ImportError:
+    pass
+else:
+    from .Analysis.plot import Plotter
+try:
+    import numpyro
+except ImportError:
+    pass
+else:
+    from .Inference.ProbModel.numpyro import NumpyroModel
+try:
+    import jaxopt
+except ImportError:
+    pass
+else:
+    from .Inference.Optimization.jaxopt import JaxoptOptimizer
+try:
+    import optax
+except ImportError:
+    pass
+else:
+    from .Inference.Optimization.optax import OptaxOptimizer
