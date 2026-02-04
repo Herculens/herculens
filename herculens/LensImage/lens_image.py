@@ -23,13 +23,19 @@ __all__ = ['LensImage', 'LensImage3D']
 class LensImage(object):
     """Generate lensed images from source light, lens mass/light, and point source models."""
 
-    def __init__(self, grid_class, psf_class,
-                 noise_class=None, lens_mass_model_class=None,
-                 source_model_class=None, lens_light_model_class=None,
-                 point_source_model_class=None, 
-                 source_arc_mask=None,
-                 kwargs_numerics=None,
-                 kwargs_lens_equation_solver=None):
+    def __init__(
+            self,
+            grid_class, 
+            psf_class,
+            noise_class=None, 
+            lens_mass_model_class=None,
+            source_model_class=None,
+            lens_light_model_class=None,
+            point_source_model_class=None, 
+            source_arc_mask=None,
+            kwargs_numerics=None,
+            kwargs_lens_equation_solver=None
+        ):
         """
         :param grid_class: coordinate system, instance of PixelGrid() from herculens.Coordinates.pixel_grid
         :param psf_class: point spread function, instance of PSF() from herculens.Instrument.psf
