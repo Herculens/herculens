@@ -1,7 +1,7 @@
 numpy>=1.20.3
 scipy>=1.6.3
-jax>=0.7.0
-jaxlib>=0.7.0
+jax>=0.5.0
+jaxlib>=0.5.0
 objax>=1.8.0
 scikit-image>=0.20.0
 git+https://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolution, interpolation, etc.)

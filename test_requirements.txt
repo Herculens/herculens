@@ -1,5 +1,5 @@
 tqdm>=4.61.0        # for progress bars with certain optimizers and samplers
-numpyro==0.19.0     # for SVI and HMC sampling
+numpyro==0.16.1     # for SVI and HMC sampling
 optax>=0.1.0        # for optimizers
 jaxopt>=0.5.5       # for optimizers
 matplotlib>=3.7.0   # for plotting
