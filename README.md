@@ -3,7 +3,7 @@
 
 # Herculens: differentiable gravitational lensing
 
-![PyPi python support](https://img.shields.io/badge/Python-3.10%20%7C%203.12-blue)
+![PyPi python support](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue)
 [![Tests](https://github.com/austinpeel/herculens/actions/workflows/ci_tests.yml/badge.svg?branch=main)](https://github.com/austinpeel/herculens/actions/workflows/ci_tests.yml)
 [![arXiv](https://img.shields.io/badge/arXiv-2207.05763-b31b1b.svg)](https://arxiv.org/abs/2207.05763)
 ![License](https://img.shields.io/github/license/austinpeel/herculens)
