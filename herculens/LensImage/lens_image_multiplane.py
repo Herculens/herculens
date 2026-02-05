@@ -138,7 +138,7 @@ class MPLensImage(object):
         else:
             return jnp.array(k)
 
-    @partial(jax.jit, static_argnums=(0, 4, 5, 6, 7, 8, 9))
+    @partial(jax.jit, static_argnums=(0, 4, 5, 6, 7, 8, 9, 10))
     def model(
         self,
         eta_flat=None,
@@ -149,6 +149,7 @@ class MPLensImage(object):
         k_mass=None,
         k_light=None,
         k_planes=None,
+        apply_mask=True,
         return_pixel_scale=False,
     ):
         '''Create the 2D model image from the parameter values.  Note: due to JIT compilation,
@@ -182,6 +183,8 @@ class MPLensImage(object):
             plane, by default None
         k_planes : list, optional
             List of light plane index values to include in the output, by default None
+        apply_mask : bool, optional
+            If True, applies the source arc mask to each light plane, by default True
         return_pixel_scale : bool, optional
             If True returns the pixel scale (arcsec/pixel) of each source plane, by default False.
             Note: requites and pixelated adaptive source grid to be used.
@@ -217,7 +220,9 @@ class MPLensImage(object):
             pixels_x_coord,
             pixels_y_coord,
             k=k_light,
-        ) * self._source_arc_masks_flat
+        )
+        if apply_mask:
+            light_planes = light_planes * self._source_arc_masks_flat
         k_planes = self.k_extend(k_planes, len(light_planes))
         model = light_planes[k_planes].sum(axis=0)
         if not supersampled:
