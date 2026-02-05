@@ -122,7 +122,7 @@ class MassModel(MassModelBase):
         if isinstance(k, int):
             return self.func_list[k].function(x, y, **kwargs[k])
         bool_list = self._bool_list(k)
-        potential = np.zeros_like(x)
+        potential = jnp.zeros_like(x)
         for i, func in enumerate(self.func_list):
             if bool_list[i] is True:
                 potential += func.function(x, y, **kwargs[i])
