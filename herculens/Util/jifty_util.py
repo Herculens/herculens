@@ -2,11 +2,11 @@ import jax.numpy as jnp
 import jax.scipy.stats as jstats
 
 try:
-    import nifty8.re as jft
+    import nifty.re as jft
 except ImportError:
     raise ImportError("The package `nifty8` must be installed to use the jifty_util submodule. "
                       "See https://github.com/NIFTy-PPL/NIFTy to install it.")
-from nifty8.re.tree_math import ShapeWithDtype
+from nifty.re.tree_math import ShapeWithDtype
 
 
 def prepare_correlated_field(
