@@ -43,7 +43,7 @@ jobs:
         cd nifty
         git checkout tags/9.1.0
         pip install --user --editable '.[re]'
-        cd ../herculens
+        cd ../../herculens
 
         # install herculens' requirements
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi  # will re-install a newer version of jax
