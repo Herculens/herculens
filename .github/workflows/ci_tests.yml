@@ -33,10 +33,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest pytest-cov coveralls
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        if [ -f test_requirements.txt ]; then pip install -r test_requirements.txt; fi
     
         # install nifty.re
+        # (we do this first because it causes too older versions of jax to be installed)
         cd ..
         mkdir git_packages
         cd git_packages
@@ -44,8 +43,11 @@ jobs:
         cd nifty
         git checkout tags/9.1.0
         pip install --user --editable '.[re]'
-        cd ..
-        cd herculens
+        cd ../herculens
+
+        # install herculens' requirements
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi  # will re-install a newer version of jax
+        if [ -f test_requirements.txt ]; then pip install -r test_requirements.txt; fi
 
         # install herculens
         pip install --editable .
