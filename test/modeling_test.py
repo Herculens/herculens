@@ -225,7 +225,7 @@ def test_model_fit(data_type, supersampling_factor):
                         kwargs_lens_light=kwargs_lens_light)
 
     prob_model = ProbModel()
-    n_param = prob_model.num_parameters
+    n_param = prob_model.count_sampled_parameters()
     # print("Number of parameters:", n_param)
 
     # Defines the loss function

@@ -1,12 +1,28 @@
 import jax.numpy as jnp
 import jax.scipy.stats as jstats
 
-try:
-    import nifty8.re as jft
-except ImportError:
-    raise ImportError("The package `nifty8` must be installed to use the jifty_util submodule. "
-                      "See https://github.com/NIFTy-PPL/NIFTy to install it.")
-from nifty8.re.tree_math import ShapeWithDtype
+def jft_imports():
+    try:
+        import nifty.re as jft
+    except ImportError:
+        try:
+            import nifty8.re as jft
+        except ImportError:
+            raise ImportError("The package `nifty` with the `.re` extension (version >=9.1.0) "
+                              "- alternatively the older package nifty8 (version >=8.5.7) -"
+                              "must be installed to use the CorrelatedField class. "
+                              "See https://github.com/NIFTy-PPL/NIFTy to install it.")
+    try:
+        from nifty.re.tree_math import ShapeWithDtype
+    except ImportError:
+        try:
+            from nifty8.re.tree_math import ShapeWithDtype
+        except ImportError:
+            pass  # no need to treat exceptions as we did it above already
+    return jft, ShapeWithDtype
+
+
+jft, ShapeWithDtype = jft_imports()
 
 
 def prepare_correlated_field(

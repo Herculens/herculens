@@ -58,4 +58,4 @@ def test_num_parameters_numpyro():
             
     prob_model = MyProbModel()
 
-    assert prob_model.num_parameters == 22
+    assert prob_model.count_sampled_parameters() == 22
