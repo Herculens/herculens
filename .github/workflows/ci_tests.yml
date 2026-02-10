@@ -35,7 +35,20 @@ jobs:
         python -m pip install flake8 pytest pytest-cov coveralls
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f test_requirements.txt ]; then pip install -r test_requirements.txt; fi
-        pip install -e .
+    
+        # install nifty.re
+        cd ..
+        mkdir git_packages
+        cd git_packages
+        git clone https://gitlab.mpcdf.mpg.de/ift/nifty.git
+        cd nifty
+        git checkout tags/9.1.0
+        pip install --user --editable '.[re]'
+        cd ..
+        cd herculens
+
+        # install herculens
+        pip install --editable .
 
     # - name: Lint with flake8
     #   run: |
