@@ -26,7 +26,7 @@ class Loss(Differentiable):
         unconstrained space
         """
         if isinstance(prob_model_or_log_prob, BaseProbModel):
-            model = prob_model_or_log_prob.model
+            model = prob_model_or_log_prob
             self._log_prob = lambda args: model.log_prob(args, constrained=constrained_space)
         elif isinstance(prob_model_or_log_prob, types.FunctionType):
             self._log_prob = prob_model_or_log_prob
