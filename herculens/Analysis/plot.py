@@ -243,7 +243,7 @@ class Plotter(object):
             else:
                 data = np.zeros_like(model)
 
-        if show_source:
+        if show_source and kwargs_result.get('kwargs_source', None) is not None:
             kwargs_source = copy.deepcopy(kwargs_result['kwargs_source'])
             if lens_image.SourceModel.has_pixels or kwargs_grid_source is not None:
                 if kwargs_grid_source is not None:
@@ -291,17 +291,26 @@ class Plotter(object):
                 ref_src_extent = None
                 show_source_diff = False
 
-            if len(lens_image.PointSourceModel.type_list) > 0:
-                #TODO: support several point source models
-                ps0_params = kwargs_result['kwargs_point_source'][0]
-                all_ps_src_x, all_ps_src_y = lens_image.PointSourceModel.get_source_plane_points(
-                    kwargs_result['kwargs_point_source'],
-                    kwargs_lens=kwargs_result['kwargs_lens'],
-                    with_amplitude=False,
-                )
-                ps_src_pos = (all_ps_src_x[0], all_ps_src_y[0])
-            else:
-                ps_src_pos = None
+        elif show_source:
+            source_model = None
+            ref_source = None
+            if kwargs_grid_source is not None:
+                grid_src = lens_image.Grid.create_model_grid(**kwargs_grid_source)
+                x_grid_src, y_grid_src = grid_src.pixel_coordinates
+                src_extent = grid_src.plt_extent
+                source_model = np.zeros(x_grid_src.shape)
+
+        if len(lens_image.PointSourceModel.type_list) > 0:
+            #TODO: support several point source models
+            ps0_params = kwargs_result['kwargs_point_source'][0]
+            all_ps_src_x, all_ps_src_y = lens_image.PointSourceModel.get_source_plane_points(
+                kwargs_result['kwargs_point_source'],
+                kwargs_lens=kwargs_result['kwargs_lens'],
+                with_amplitude=False,
+            )
+            ps_src_pos = (all_ps_src_x[0], all_ps_src_y[0])
+        else:
+            ps_src_pos = None
 
         if show_lens_light:
             kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
@@ -490,9 +499,10 @@ class Plotter(object):
             else:
                 ax.axis('off')
             ax = axes[i_row, 1]
-            im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
-            #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
-            im.set_rasterized(True)
+            if source_model is not None:
+                im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
+                #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
+                im.set_rasterized(True)
             ax.set_title("source model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
@@ -507,7 +517,7 @@ class Plotter(object):
                            label="point source")
                 ax.legend()
             ax = axes[i_row, 2]
-            if ref_source is not None and show_source_diff is True:
+            if ref_source is not None and source_model is not None and show_source_diff is True:
                 diff = source_model - ref_source
                 vmax_diff = ref_source.max() / 10.
                 im = ax.imshow(diff, extent=src_extent, 
