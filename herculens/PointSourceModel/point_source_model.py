@@ -185,7 +185,6 @@ class PointSourceModel(object):
         from the model image positions.
         """
         error_source = 0.
-        kwargs_point_source = kwargs_params['kwargs_point_source']
         for i, ps_type in enumerate(self.type_list):
             if ps_type == 'IMAGE_POSITIONS':
                 ps = self.point_sources[i]
@@ -202,7 +201,6 @@ class PointSourceModel(object):
         to be consistent with the lens deflection field.
         """
         log_prob = 0.
-        kwargs_point_source = kwargs_params['kwargs_point_source']
         for i, ps_type in enumerate(self.type_list):
             if ps_type == 'IMAGE_POSITIONS':
                 ps = self.point_sources[i]

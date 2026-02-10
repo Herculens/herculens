@@ -214,7 +214,7 @@ def update_lensing_entities(lens_image, lensing_entity_mapping,
 
     if parameters is not None and isinstance(parameters, dict):
         parameters = unjaxify_kwargs(parameters)
-    if samples is not None and isinstance(samples, dict):
+    if samples is None and isinstance(samples, dict):
         samples = unjaxify_kwargs(samples)
 
     # initialize list of lensing entities
@@ -271,7 +271,7 @@ def update_mass_field_model(lens_image, name, mass_field=None,
     
     # instantiate the external shear
     if mass_field is None:
-        mass_field = MassField(name, mass_model=MassModel(*mass_profiles_out), redshift=redshift)
+        mass_field = MassField(name, redshift, mass_model=MassModel(*mass_profiles_out))
     else:
         assert isinstance(mass_field, MassField), "Inconsistent entity type"
 
@@ -324,9 +324,10 @@ def update_galaxy_model(lens_image, name, galaxy=None,
     if galaxy is None:
         # instantiate the galaxy
         galaxy = Galaxy(name,
+                        redshift,
+                        lensed,
                         mass_model=MassModel(*mass_profiles_out), 
-                        light_model=LightModel(*light_profiles_out),
-                        redshift=redshift)
+                        light_model=LightModel(*light_profiles_out))
     else:
         assert isinstance(galaxy, Galaxy), "Inconsistent entity type"
 
@@ -365,7 +366,7 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
             if kwargs_all is not None:
                 h2c_powerlaw_values(galaxy.mass_model[ic], kwargs_all[key][ih], 
                                     isothermal=isothermal, spherical=spherical)
-            if kwargs_all_samples.get(key, None) is not None:
+            if kwargs_all_samples is not None:
                 h2c_powerlaw_posteriors(galaxy.mass_model[ic], kwargs_all_samples[key][ih], 
                                         isothermal=isothermal, spherical=spherical)
 
@@ -380,7 +381,7 @@ def update_galaxy_mass_model(galaxy, lens_image, kwargs_all, kwargs_all_samples,
                         file_dir=file_dir,
                         fits_file_suffix=fits_file_suffix+f'-{galaxy_name}_{ic}'
                     )
-                if kwargs_all_samples.get(key, None) is not None:
+                if kwargs_all_samples is not None:
                     print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
                         f"is not yet supported; samples are ignored.")
             else:
@@ -427,24 +428,24 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
         if profile_names[ic] == 'SERSIC_ELLIPSE':
             if kwargs_all is not None:
                 h2c_Sersic_values(galaxy.light_model[ic], kwargs_all[key][ih])
-            if kwargs_all_samples.get(key, None) is not None:
+            if kwargs_all_samples is not None:
                 h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih])
         elif profile_names[ic] == 'SERSIC':
             if kwargs_all is not None:
                 h2c_Sersic_values(galaxy.light_model[ic], kwargs_all[key][ih], spherical=True)
-            if kwargs_all_samples.get(key, None) is not None:
+            if kwargs_all_samples is not None:
                 h2c_Sersic_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih], spherical=True)
         elif profile_names[ic] == 'SHAPELETS':
             if kwargs_all is not None:
                 h2c_Shapelets_values(galaxy.light_model[ic], kwargs_all[key][ih],
                                      class_comp.func_list[ih])  # TODO: improve access to e.g. n_max 
-            if kwargs_all_samples.get(key, None) is not None:
+            if kwargs_all_samples is not None:
                 print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
                       f"is not yet supported; samples are ignored.")
         elif profile_names[ic] == 'UNIFORM':
             if kwargs_all is not None:
                 h2c_Uniform_values(galaxy.light_model[ic], kwargs_all[key][ih])
-            if kwargs_all_samples.get(key, None) is not None:
+            if kwargs_all_samples is not None:
                 h2c_Uniform_posteriors(galaxy.light_model[ic], kwargs_all_samples[key][ih])
         elif profile_names[ic] == 'PIXELATED':
             if kwargs_all is not None:
@@ -456,7 +457,7 @@ def update_galaxy_light_model(galaxy, lens_image, kwargs_all, kwargs_all_samples
                                      fits_file_suffix=fits_file_suffix+f'-{comp_name}_{ic}',
                                      description="Pixelated surface brightness model",
                                      )  # TODO: improve access to e.g. pixel_grid 
-            if kwargs_all_samples.get(key, None) is not None:
+            if kwargs_all_samples is not None:
                 print(f"COOLEST-warning: Posterior stats for profile '{profile_names[ic]}' "
                       f"is not yet supported; samples are ignored.")
         else:
