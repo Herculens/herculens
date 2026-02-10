@@ -8,12 +8,6 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-try:
-    import nifty.re
-except ImportError:
-    raise ImportError("The package `nifty`, in particular `nifty.re`, "
-                      "must be installed to use the CorrelatedField class. "
-                      "See https://github.com/NIFTy-PPL/NIFTy to install it.")
 from herculens.Util import jifty_util
 
 
@@ -322,6 +316,31 @@ class CorrelatedField(object):
             model = self._model_std(self._jft_model_list[i_wl], params)
             model_per_band.append(model)
         return jnp.stack(model_per_band, axis=0)
+    
+    @property
+    def nifty_model(self):
+        """Returns the underlying NIFTy model, which is a `nifty.re.Model` instance.
+        
+        This can be useful for advanced users who want to use the NIFTy API directly, for example to define custom sampling methods.
+
+        Returns
+        -------
+        nifty.re.Model or list of nifty.re.Model
+            The underlying NIFTy model, as a single instance if `correlation_type_wl` is not 'none', or as a list of instances otherwise.
+        """
+        return self._jft_model if self._field_type in ('2d', '3d') else self._jft_model_list
+    
+    def nifty_field_maker(self):
+        """Returns the underlying NIFTy field maker, which is a `nifty.re.correlated_field.CorrelatedFieldMaker` instance.
+        
+        This can be useful for advanced users who want to use the NIFTy API directly, for example to define custom sampling methods.
+
+        Returns
+        -------
+        nifty.re.correlated_field.CorrelatedFieldMaker or list of nifty.re.correlated_field.CorrelatedFieldMaker
+            The underlying NIFTy field maker, as a single instance if `correlation_type_wl` is not 'none', or as a list of instances otherwise.
+        """
+        return self._cfm if self._field_type in ('2d', '3d') else self._cfm_list
 
     def numpyro_sample_pixels(self):
         """Defines the numpyro model to be used in a Pixelated (light or mass) profile.
