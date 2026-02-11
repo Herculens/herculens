@@ -5,7 +5,7 @@
 from herculens.MassModel.Profiles.gaussian_potential import Gaussian
 from herculens.MassModel.Profiles.point_mass import PointMass
 from herculens.MassModel.Profiles.multipole import Multipole
-from herculens.MassModel.Profiles.shear import Shear, ShearGammaPsi
+from herculens.MassModel.Profiles.shear import Shear, ShearGammaPhi
 from herculens.MassModel.Profiles.sis import SIS
 from herculens.MassModel.Profiles.sie import SIE
 from herculens.MassModel.Profiles.nie import NIE
@@ -29,7 +29,7 @@ STRING_MAPPING = {
     'GAUSSIAN': Gaussian,
     'POINT_MASS': PointMass,
     'SHEAR': Shear,
-    'SHEAR_GAMMA_PSI': ShearGammaPsi,
+    'SHEAR_GAMMA_PHI': ShearGammaPhi,
     'MULTIPOLE': Multipole,
     'PIXELATED': PixelatedPotential,
     'PIXELATED_DIRAC': PixelatedPotentialDirac,
