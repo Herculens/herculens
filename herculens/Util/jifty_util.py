@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 import jax.scipy.stats as jstats
 
@@ -161,7 +162,7 @@ def concatenate_fields(*fields):
 
 def NormalTransform(m, s, key):
     """m: mean, s: std"""
-    print(f"Normal prior for '{key}' ({m}, {s})")
+    #print(f"Normal prior for '{key}' ({m}, {s})")
     if not hasattr(m, 'shape'):
         shape = ()
     else:
@@ -177,7 +178,7 @@ def NormalTransform_inverse_func(x, m, s):
 
 def LognormalTransform(m, s, key):
     """m: mean, s: std"""
-    print(f"Log-normal prior for '{key}' ({m}, {s})")
+    #print(f"Log-normal prior for '{key}' ({m}, {s})")
     log_s = jnp.sqrt(jnp.log1p((s/m)**2))
     log_m = jnp.log(m) - log_s**2/2.
     if not hasattr(m, 'shape'):
@@ -191,7 +192,7 @@ def LognormalTransform(m, s, key):
 
 def UniformTransform(l, h, key):
     """l: low, h: high"""
-    print(f"Uniform prior for '{key}' [{l}, {h}]")
+    #print(f"Uniform prior for '{key}' [{l}, {h}]")
     if not hasattr(l, 'shape'):
         shape = ()
     else:
@@ -206,7 +207,7 @@ def UniformTransform_inverse_func(x, l, h):
     return jstats.norm.ppf( (x - l) / (h - l) )
 
 def ExpCroppedFieldTransform(key, cf, bxy, bwl):
-    print(f"Exponential Cropped correlated field prior for '{key}'")
+    #print(f"Exponential Cropped correlated field prior for '{key}'")
     def crop(x):
         x_ = cf(x)
         if bwl == 0:
@@ -221,3 +222,105 @@ def ExpCroppedFieldTransform(key, cf, bxy, bwl):
         lambda x: {key: jnp.exp(crop(x))},  # here the target key is different from domain keys below
         domain=cf.domain,
     )
+
+def numpyro_model_to_nifty_field(
+        prob_model, 
+        model_args=(), 
+        model_kwargs={},
+        field_components=None):
+    """Utility to convert a numpyro probabilistic model into a NIFTy field-like prior model, 
+    by iterating through the model trace and converting all sampled parameters 
+    with supported distributions (currently Normal, Log-normal and Uniform) 
+    into the corresponding NIFTy field transforms.
+    
+    Parameters
+    ----------
+    prob_model : numpyro.infer.MCMC or similar
+        A numpyro probabilistic model object containing a `model` attribute.
+    model_args : tuple, optional
+        Positional arguments to pass to the numpyro model. Default is empty tuple.
+    model_kwargs : dict, optional
+        Keyword arguments to pass to the numpyro model. Default is empty dict.
+    Returns
+    -------
+    NIFTy field transform or concatenated field transforms
+        A single field transform if only one parameter is found, 
+        or a concatenation of multiple field transforms if several parameters are found.
+        Each transform corresponds to a sampled parameter from the model trace.
+    Raises
+    ------
+    ValueError
+        If site name does not match the name in site properties,
+        or if no sampled parameters are found in the model trace.
+    NotImplementedError
+        If a distribution type in the model is not supported. 
+        Currently supported types are Normal, LogNormal, and Uniform.
+    Notes
+    -----
+    - Only sampled parameters (with type 'sample') are converted.
+    - Observed sites are skipped.
+    - Fixed parameters and point-like parameters may not be properly handled yet.
+    - Parameters that depends on other parameters in the model may not be properly handled yet.
+    """
+    if field_components is None:
+        field_components = {}
+    def _check_if_field(site_name):
+        for field_name, field_component in field_components.items():
+            for field_latent_param in field_component.latent_parameter_props.keys():
+                if site_name == field_latent_param:
+                    return field_name, field_component
+        return None, None
+
+    from numpyro import handlers
+    import numpyro.distributions as dist
+    # get the model trace, i.e. a description of the parameter space and priors
+    model = prob_model.model
+    trace = handlers.trace(
+        handlers.seed(model, jax.random.PRNGKey(0))
+    ).get_trace(*model_args, **model_kwargs)
+    # get the 
+    # iterate through the parameters and build the corresponding NIFTy field-like priors
+    fields = []
+    for site_name, site_props in trace.items():
+        if site_name != site_props['name']:
+            # this should never happen, but we check it just in case
+            raise ValueError(f"Site name '{site_name}' does not match the name in site properties '{site_props['name']}'.")
+                
+        # we skip all observed sites and non-sampled parameters
+        if site_props['type'] != 'sample' or site_props['is_observed'] is True:
+            # NOTE: this may be problematic for models that have fixed parameters, 
+            # or point-like (free but not sampled) parameters
+            print(f"Skipping site '{site_name}' of type '{site_props['type']}' and is_observed={site_props['is_observed']}.")
+            continue
+
+        # check if the site is a latent variable of a field model
+        field_name, field_component = _check_if_field(site_name)
+        if field_component is not None:
+            print(f"Site '{site_name}' is a latent parameter of the field model '{field_name}'. Adding the model directly to the list of fields.")
+            fields.append(field_component.nifty_model)
+            continue
+        
+        # otherwise set the transform from the standard normal distribution
+        else:
+            dist_fn = site_props['fn']
+            if isinstance(dist_fn, dist.Normal):
+                print(f"Adding Normal prior for '{site_name}' with mean {dist_fn.loc} and std {dist_fn.scale}")
+                fields.append(NormalTransform(dist_fn.loc, dist_fn.scale, site_name))
+            elif isinstance(dist_fn, dist.LogNormal):
+                print(f"Adding Log-normal prior for '{site_name}' with mean {dist_fn.loc} and std {dist_fn.scale}")
+                fields.append(LognormalTransform(dist_fn.loc, dist_fn.scale, site_name))
+            elif isinstance(dist_fn, dist.Uniform):
+                print(f"Adding Uniform prior for '{site_name}' with low {dist_fn.low} and high {dist_fn.high}")
+                fields.append(UniformTransform(dist_fn.low, dist_fn.high, site_name))
+            else:
+                raise NotImplementedError(f"Distribution type '{type(dist_fn)}' not supported. Supported types are Normal, LogNormal and Uniform.")
+        
+    # concatenate all the fields to get the final prior model
+    if len(fields) == 0:
+        raise ValueError("No sampled parameters found in the model trace. Cannot convert to NIFTy field.")
+    elif len(fields) == 1:
+        fields = fields[0]
+    else:
+        fields = concatenate_fields(*fields)
+
+    return fields

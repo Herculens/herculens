@@ -95,6 +95,11 @@ class CorrelatedField(object):
     ValueError
         If the number of pixels has not been set at creation of the LightModel or MassModel instance.
     """
+
+    _field_key = 'field'
+    _key_xy = 'xy_dim'
+    _key_wl = 'wl_dim'
+
     def __init__(
             self, 
             param_prefix, 
@@ -208,9 +213,6 @@ class CorrelatedField(object):
 
         # Setup the correlated field model
         self._param_prefix = param_prefix
-        self._field_key = 'field'
-        self._key_xy = 'xy_dim'
-        self._key_wl = 'wl_dim'
 
         # There are three possibilities:
         # - either it's a 2D correlated field (only along spatial dimensions)
@@ -268,14 +270,14 @@ class CorrelatedField(object):
         # Save the expected shapes of the field
         if self._field_type == '2d':
             self._shape_latent = (self._num_pix_tot, self._num_pix_tot)
-            self._shape_direct = (self._num_pix, self._num_pix)
+            self._shape_target = (self._num_pix, self._num_pix)
         elif self._field_type in ('3d', '2d_stack'):
             self._shape_latent = (self._num_pix_wl_tot, self._num_pix_tot, self._num_pix_tot)
-            self._shape_direct = (self._num_pix_wl, self._num_pix, self._num_pix)
+            self._shape_target = (self._num_pix_wl, self._num_pix, self._num_pix)
         # Nice message to say everything went smoothly
         print(f"New '{self._field_type}' CorrelatedField model "
               f"with kernel '{kernel_type}' successfully created "
-              f"(final shape is {str(tuple(self._shape_direct))}).")
+              f"(final shape is {str(tuple(self._shape_target))}).")
 
     def __call__(self, params):
         """Handy alias to make the class callable."""
@@ -330,6 +332,7 @@ class CorrelatedField(object):
         """
         return self._jft_model if self._field_type in ('2d', '3d') else self._jft_model_list
     
+    @property
     def nifty_field_maker(self):
         """Returns the underlying NIFTy field maker, which is a `nifty.re.correlated_field.CorrelatedFieldMaker` instance.
         
@@ -341,6 +344,35 @@ class CorrelatedField(object):
             The underlying NIFTy field maker, as a single instance if `correlation_type_wl` is not 'none', or as a list of instances otherwise.
         """
         return self._cfm if self._field_type in ('2d', '3d') else self._cfm_list
+    
+    @property
+    def target_parameter_props(self):
+        return {self._param_prefix: self.final_shape}
+    
+    @property
+    def latent_parameter_props(self):
+        key_base = f'{self._param_prefix}_{self._field_key}'
+        if (self._kernel_type, self._field_type) == ('powerlaw', '2d'):
+            param_props = {
+                # NOTE: such grids of independent variables could be achieved using the 'plate' feature
+                # of numpyro. However, this causes issues downstream when using
+                # the numpyro wrapper and utilities from Herculens.
+                f'{key_base}_xi': (self._num_pix_tot, self._num_pix_tot),
+                f'{key_base}_zeromode': (),
+                f'{key_base}_{self._key_xy}_fluctuations': (),
+                f'{key_base}_{self._key_xy}_loglogavgslope': (),
+            }
+            if self._kw_fluctuations['flexibility'] is not None:
+                param_props[f'{key_base}_{self._key_xy}_flexibility'] = ()
+                if self._kw_fluctuations['asperity'] is not None:
+                    param_props[f'{key_base}_{self._key_xy}_asperity'] = ()
+                param_props[f'{key_base}_{self._key_xy}_spectrum'] = (
+                    self._cfm._target_grids[-1].harmonic_grid.log_volume.size, 2
+                )
+        else:
+            # TODO
+            raise NotImplementedError("The method `latent_parameter_names` is only implemented for the 'powerlaw' kernel and '2d' field type for now.")
+        return param_props
 
     def numpyro_sample_pixels(self):
         """Defines the numpyro model to be used in a Pixelated (light or mass) profile.
@@ -351,11 +383,14 @@ class CorrelatedField(object):
         Returns
         -------
         jnp.Array
-            Field model (in direct space), as 2d array.
+            Field model (in the target space), as 2d array.
         """
-        sample_method = getattr(self, f'_numpyro_sample_pixels_{self._kernel_type}_{self._field_type}')
-        return sample_method()
-        
+        method = self._numpyro_sample_method()
+        return method()
+    
+    def _numpyro_sample_method(self):
+        return getattr(self, f'_numpyro_sample_pixels_{self._kernel_type}_{self._field_type}')
+            
     def _numpyro_sample_pixels_powerlaw_2d(self):
         # TODO: reduce code duplication
         # imports here to prevent the need for numpyro to be installed
@@ -365,6 +400,9 @@ class CorrelatedField(object):
         # Base field parameters
         key_base = f'{self._param_prefix}_{self._field_key}'
         params = {
+            # NOTE: such grids of independent variables could be achieved using the 'plate' feature
+            # of numpyro. However, this causes issues downstream when using
+            # the numpyro wrapper and utilities from Herculens.
             f'{key_base}_xi': numpyro.sample(
                 f'{key_base}_xi', 
                 Independent(Normal(
@@ -385,6 +423,7 @@ class CorrelatedField(object):
                 Normal(0., 1.),
             ),
         }
+
         # Additional optional field parameters
         if self._kw_fluctuations['flexibility'] is not None:
             params[f'{key_base}_{self._key_xy}_flexibility'] = numpyro.sample(
@@ -585,10 +624,6 @@ class CorrelatedField(object):
         return model_samples
     
     @property
-    def correlated_field_maker(self):
-        return self._cfm
-    
-    @property
     def num_pix_field(self):
         return self._num_pix_tot
     
@@ -606,7 +641,7 @@ class CorrelatedField(object):
 
     @property
     def final_shape(self):
-        return self._shape_direct
+        return self._shape_target
     
     @property
     def field_latent(self):
