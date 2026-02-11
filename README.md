@@ -59,6 +59,10 @@ The mandatory dependencies will be installed automatically.
 
 The [`requirements.txt`](https://github.com/Herculens/herculens/blob/main/requirements.txt) file lists all required and optional package dependencies, along with their specific versions. **IMPORTANT NOTE:** do not only install blindly the required packages; please also have a look at the content of [the file](https://github.com/Herculens/herculens/blob/main/requirements.txt) itself to learn more about additional optional packages, depending on your goals.
 
+## Slack channel
+
+We have a [Slack workspace](https://herculens.slack.com) dedicated to users of Herculens, for getting help and sharing ideas. Please feel free to [send an email](mailto:aymeric.galan@gmail.com) to be added to the workspace.
+
 ## Attribution
 
 ### Citation
