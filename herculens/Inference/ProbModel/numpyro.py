@@ -14,7 +14,7 @@ from numpyro import handlers
 from numpyro.infer import util
 
 from herculens.Inference.ProbModel.base_model import BaseProbModel
-from herculens.Util import numpyro_util as my_util
+from herculens.Util import numpyro_util
 
 
 __all__ = ['NumpyroModel']
@@ -42,7 +42,7 @@ class NumpyroModel(BaseProbModel):
         return self._num_param
     
     def count_sampled_parameters(self, model_args=(), model_kwargs={}):
-        return my_util.count_sampled_parameters(self.model, model_args=model_args, model_kwargs=model_kwargs)
+        return numpyro_util.count_sampled_parameters(self.model, model_args=model_args, model_kwargs=model_kwargs)
         
     def log_prob(self, params, constrained=False, model_args=(), model_kwargs={}):
         """returns the logarithm of the data likelihood plus the logarithm of the prior"""
@@ -52,7 +52,7 @@ class NumpyroModel(BaseProbModel):
         else:
             # do this for optimisation in unconstrained space
             # TODO: use the new numpyro function potential_fn instead
-            log_prob = - my_util.potential_energy(self.model, model_args, model_kwargs, params)
+            log_prob = - numpyro_util.potential_energy(self.model, model_args, model_kwargs, params)
         return log_prob
     
     def log_likelihood(self, params, obs_site_key='obs', model_args=(), model_kwargs={}):
