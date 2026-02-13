@@ -363,15 +363,16 @@ def numpyro_to_nifty_prior(
     return fields
 
 
-def numpyro_to_nifty_likelihood(
+def prepare_nifty_likelihood(
         data,
         lens_image,
         nifty_prior,
         params2kwargs_fn,
         likelihood_mask=None,
     ):
-    """Utility to convert a numpyro probabilistic model into a NIFTy likelihood model,
-    by building the signal response (i.e. the forward model in nifty wording) from the lens image model and the priors, and by setting up the likelihood mask operator to mask the data and the model before computing the likelihood.
+    """Utility to build a NIFTy likelihood instance, by building the signal response
+    (i.e. the forward model in nifty wording) from the lens image model and the priors, 
+    and by setting up the likelihood mask operator to mask the data and the model before computing the likelihood.
     
     Parameters
     ----------
