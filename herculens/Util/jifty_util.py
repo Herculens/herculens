@@ -1,3 +1,4 @@
+import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.scipy.stats as jstats
@@ -224,29 +225,46 @@ def ExpCroppedFieldTransform(key, cf, bxy, bwl):
     )
 
 def numpyro_model_to_nifty_field(
-        prob_model, 
+        numpyro_model, 
         model_args=(), 
         model_kwargs={},
-        field_components=None):
+        field_components=None,
+        verbose=False,
+    ):
     """Utility to convert a numpyro probabilistic model into a NIFTy field-like prior model, 
     by iterating through the model trace and converting all sampled parameters 
     with supported distributions (currently Normal, Log-normal and Uniform) 
-    into the corresponding NIFTy field transforms.
+    into the corresponding NIFTy field transforms. Such a conversion is needed 
+    as NIFTy's VI algrithms always assume that the (latent) model parameters are
+    sampled from a standard normal distribution.
+
+    A few notes:
+    - Only sampled parameters (with type 'sample') are converted.
+    - Observed sites are skipped.
+    - Fixed parameters and point-like parameters may not be properly handled yet.
+    - Parameters that depends on other parameters in the model may not be properly handled yet.
     
     Parameters
     ----------
-    prob_model : numpyro.infer.MCMC or similar
-        A numpyro probabilistic model object containing a `model` attribute.
+    numpyro_model : function
+        A numpyro probabilistic model object containing a `numpyro.sample` statements.
     model_args : tuple, optional
         Positional arguments to pass to the numpyro model. Default is empty tuple.
     model_kwargs : dict, optional
         Keyword arguments to pass to the numpyro model. Default is empty dict.
+    field_components : dict, optional
+        A dictionary mapping field component names to their corresponding NIFTy field components (e.g. a CorrelatedFieldMaker instance). 
+        This is used to directly add the NIFTy field models to the list of fields if the model parameters match the latent parameters of the field components.
+    verbose : bool, optional
+        Whether to print detailed information about the conversion process, by default False.
+
     Returns
     -------
     NIFTy field transform or concatenated field transforms
         A single field transform if only one parameter is found, 
         or a concatenation of multiple field transforms if several parameters are found.
         Each transform corresponds to a sampled parameter from the model trace.
+
     Raises
     ------
     ValueError
@@ -255,12 +273,6 @@ def numpyro_model_to_nifty_field(
     NotImplementedError
         If a distribution type in the model is not supported. 
         Currently supported types are Normal, LogNormal, and Uniform.
-    Notes
-    -----
-    - Only sampled parameters (with type 'sample') are converted.
-    - Observed sites are skipped.
-    - Fixed parameters and point-like parameters may not be properly handled yet.
-    - Parameters that depends on other parameters in the model may not be properly handled yet.
     """
     if field_components is None:
         field_components = {}
@@ -274,9 +286,8 @@ def numpyro_model_to_nifty_field(
     from numpyro import handlers
     import numpyro.distributions as dist
     # get the model trace, i.e. a description of the parameter space and priors
-    model = prob_model.model
     trace = handlers.trace(
-        handlers.seed(model, jax.random.PRNGKey(0))
+        handlers.seed(numpyro_model, jax.random.PRNGKey(0))
     ).get_trace(*model_args, **model_kwargs)
     # get the 
     # iterate through the parameters and build the corresponding NIFTy field-like priors
@@ -290,28 +301,54 @@ def numpyro_model_to_nifty_field(
         if site_props['type'] != 'sample' or site_props['is_observed'] is True:
             # NOTE: this may be problematic for models that have fixed parameters, 
             # or point-like (free but not sampled) parameters
-            print(f"Skipping site '{site_name}' of type '{site_props['type']}' and is_observed={site_props['is_observed']}.")
+            if verbose:
+                print(f"Skipping site '{site_name}' of type '{site_props['type']}' and is_observed={site_props['is_observed']}.")
             continue
 
         # check if the site is a latent variable of a field model
         field_name, field_component = _check_if_field(site_name)
         if field_component is not None:
-            print(f"Site '{site_name}' is a latent parameter of the field model '{field_name}'. Adding the model directly to the list of fields.")
+            if verbose:
+                print(f"Site '{site_name}' is a latent parameter of the field model '{field_name}'. Adding the model directly to the list of fields.")
             fields.append(field_component.nifty_model)
             continue
         
         # otherwise set the transform from the standard normal distribution
         else:
             dist_fn = site_props['fn']
+
+            # Supported transforms
+            # - Normal
             if isinstance(dist_fn, dist.Normal):
-                print(f"Adding Normal prior for '{site_name}' with mean {dist_fn.loc} and std {dist_fn.scale}")
+                if verbose:
+                    print(f"Adding Normal prior for '{site_name}' with mean {dist_fn.loc} and std {dist_fn.scale}")
                 fields.append(NormalTransform(dist_fn.loc, dist_fn.scale, site_name))
+            
+            # - Log-normal            
             elif isinstance(dist_fn, dist.LogNormal):
-                print(f"Adding Log-normal prior for '{site_name}' with mean {dist_fn.loc} and std {dist_fn.scale}")
-                fields.append(LognormalTransform(dist_fn.loc, dist_fn.scale, site_name))
+                # the formulas correspond to those in numpyro.distributions.continuous.LogNormal
+                m = np.exp(dist_fn.loc + dist_fn.scale**2 / 2)
+                s = np.sqrt( (np.exp(dist_fn.scale**2) - 1) * np.exp(2 * dist_fn.loc + dist_fn.scale**2) )
+                if verbose:
+                    print(f"Adding Log-normal prior for '{site_name}' with mean {dist_fn.loc} and std {dist_fn.scale} "
+                      f"(which corresponds to mean {m} and standard deviation {s} in the NIFTy transform)")
+                fields.append(LognormalTransform(m, s, site_name))
+            
+            # - Uniform
             elif isinstance(dist_fn, dist.Uniform):
-                print(f"Adding Uniform prior for '{site_name}' with low {dist_fn.low} and high {dist_fn.high}")
+                if verbose:
+                    print(f"Adding Uniform prior for '{site_name}' with low {dist_fn.low} and high {dist_fn.high}")
                 fields.append(UniformTransform(dist_fn.low, dist_fn.high, site_name))
+
+            # Approximated transforms
+            # - Truncated normal           
+            elif (isinstance(dist_fn, dist.TwoSidedTruncatedDistribution) and
+                  isinstance(dist_fn.base_dist, dist.Normal)):
+                if verbose:
+                    print(f"Adding *Normal* instead of *TruncatedNormal* prior for '{site_name}' with mean {dist_fn.base_dist.loc} and std {dist_fn.base_dist.scale}")
+                fields.append(NormalTransform(dist_fn.base_dist.loc, dist_fn.base_dist.scale, site_name))
+
+            # Any other unsupported transforms
             else:
                 raise NotImplementedError(f"Distribution type '{type(dist_fn)}' not supported. Supported types are Normal, LogNormal and Uniform.")
         
