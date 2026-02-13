@@ -224,7 +224,7 @@ def ExpCroppedFieldTransform(key, cf, bxy, bwl):
         domain=cf.domain,
     )
 
-def numpyro_model_to_nifty_field(
+def numpyro_to_nifty_prior(
         numpyro_model, 
         model_args=(), 
         model_kwargs={},
@@ -361,3 +361,319 @@ def numpyro_model_to_nifty_field(
         fields = concatenate_fields(*fields)
 
     return fields
+
+
+def numpyro_to_nifty_likelihood(
+        data,
+        lens_image,
+        nifty_prior,
+        params2kwargs_fn,
+        likelihood_mask=None,
+    ):
+    """Utility to convert a numpyro probabilistic model into a NIFTy likelihood model,
+    by building the signal response (i.e. the forward model in nifty wording) from the lens image model and the priors, and by setting up the likelihood mask operator to mask the data and the model before computing the likelihood.
+    
+    Parameters
+    ----------
+    lens_image : LensImage
+        A lens image object containing the forward lensing model to convert into a NIFTy signal response.
+    nifty_prior : NIFTy field transform
+        The NIFTy field transform acting as a prior on the latent space,
+        e.g. as returned by the numpyro_to_nifty_prior() function.
+    params2kwargs_fn : function
+        A user-defined function that is takes the output of the nifty_prior and 
+        converts it into a dictionary of keyword arguments to pass to the lens_image.model()
+        method. This is typically what is defined in a Numpyro probabilistic model class,
+        but with calls to nifty-based components like the CorrelatedField factored out.
+        Note that if no nifty-based field is used, the function should not be modified. 
+
+        Here is an example:
+        ```
+        # Original function from the user-defined numpyro model class
+        # which calls the source_field.model() to generate the pixelated source model
+        # prior to lens_image.model() call.
+
+        def params2kwargs(params):
+            kwargs_lens = [
+                {
+                    'theta_E': params['lens_theta_E'],
+                    'e1': params['lens_e1'],
+                    'e2': params['lens_e2'],
+                    'center_x': 0., #params['lens_center_x'],
+                    'center_y': 0., #params['lens_center_y'],
+                },
+                {
+                    'gamma1': params['lens_gamma1'],
+                    'gamma2': params['lens_gamma2'],
+                    'ra_0': 0.0, 'dec_0': 0.0
+                }
+            ]
+            kwargs_source = [{'pixels': source_field.model(params)}]
+            }
+            return {
+                'kwargs_lens': kwargs_lens,
+                'kwargs_source': kwargs_source,
+            }
+
+            
+        # Slightly adapted function suitable to define the NIFTy-based likelihood
+        # which does *not* call the source_field.model() - since it is already
+        # called within the nifty priors - but simply grabs the source pixels 
+        # from the parameters dictionary
+
+        def params2kwargs_adapted(params):
+            kwargs_lens = [
+                {
+                    'theta_E': params['lens_theta_E'],
+                    'e1': params['lens_e1'],
+                    'e2': params['lens_e2'],
+                    'center_x': 0., #params['lens_center_x'],
+                    'center_y': 0., #params['lens_center_y'],
+                },
+                {
+                    'gamma1': params['lens_gamma1'],
+                    'gamma2': params['lens_gamma2'],
+                    'ra_0': 0.0, 'dec_0': 0.0
+                }
+            ]
+            # ONLY THIS LINE IS DIFFERENT in this particular example
+            kwargs_source = [{'pixels': params['source_pixels']}]
+            return {
+                'kwargs_lens': kwargs_lens,
+                'kwargs_source': kwargs_source,
+            }
+        # This params2kwargs_adapted() is the function to pass to numpyro_to_nifty_likelihood().
+        ```
+    data : array-like
+        The observed data to fit, which is used to set up the likelihood.
+
+    likelihood_mask : array-like, optional
+        A boolean mask to apply to the data and the model before computing
+        the likelihood, by default None (i.e. no mask is applied).
+        This can be useful to exclude certain pixels from the likelihood computation, 
+        for instance to exclude masked regions or to focus on specific areas of the image.
+
+    Returns
+    -------
+    NIFTy likelihood model : 
+         A NIFTy model that computes the negative log-likelihood of the data given the model parameters, which can be used in NIFTy's VI algorithms.
+    """
+    # Build the signal response (i.e. the forward model in nifty wording)
+    signal_response = jft.Model(
+        lambda x: lens_image.model(
+            **params2kwargs_fn(nifty_prior(x))
+        ),
+        domain=nifty_prior.domain,
+    )
+
+    # Setup the likelihood mask operator
+    if likelihood_mask is None:
+        likelihood_mask = np.ones_like(data, dtype=bool)  # we don't have any mask but it's for the sake of generality
+    ll_mask = likelihood_mask.astype(bool)
+    likelihood_mask_op = lambda x: x[ll_mask]
+
+    # Mask the data
+    masked_data = likelihood_mask_op(data)
+
+    # Define a suitable function as expected by the NIFTy likelihood  
+    def masked_model_and_inv_std(x):
+        model = signal_response(x)
+        masked_model = likelihood_mask_op(model)
+        masked_inv_std = likelihood_mask_op(1. / jnp.sqrt(lens_image.C_D_model(model)))
+        return (masked_model, masked_inv_std)
+
+    # Defines the energy function
+    neg_log_likelihood = jft.VariableCovarianceGaussian(masked_data).amend(masked_model_and_inv_std)
+
+    # Set the domain so it can be accessed later
+    # neg_log_likelihood.domain = nifty_prior.domain # TODO: does not work! So we need to pass explicitly the domain to run_nifty_vi()
+
+    return neg_log_likelihood
+
+
+def run_vi(
+        run_key,
+        nifty_prior,
+        nifty_likelihood,
+        n_total_iterations,
+        algorithm='MGVI',  # 'MGVI'/'linear' or 'geoVI'/'nonlinear'
+        n_samples=None,
+        sample_mode=None,
+        init_key=None,
+        init_position=None,
+        init_spread_factor=0.1,
+        quick_run=False,
+        output_dir=None,
+        callback_fn=None,
+        draw_linear_kwargs=None,
+        nonlinearly_update_kwargs=None,
+        kl_kwargs=None,
+    ):
+    """Function that sets up and run variational inference strategies implemented in NIFTy.
+    The two families of algorithms currently supported are:
+    - Metric Gaussian Variational Inference (MGVI, a.k.a. 'linear VI')
+    - Geometric Variational Inference (geoVI, a.k.a. 'non-linear VI')
+    (TODO: add references).
+
+    These algorithms work particularly well for a lens model that contains 
+    field components such as a CorrelatedField model for pixelated components.
+
+    For complete details about the algorithms and specific settings, please see:
+    - NIFTy documentation:
+    - NIFTy source code, in particular the submodule `nifty.re.optimize_kl`
+
+    Parameters
+    ----------
+    run_key : jax.random.PRNGKey
+        Key to initialize VI sampling.
+    nifty_prior : nifty.re.Model
+        Transformation from the latent (standard normal) to the target
+        (as passed to the lensing model) parameter space. Here it is only used
+        to retrieve the parameter space domain.
+    nifty_likelihood : nifty.re.Likelihood
+        _description_
+    n_total_iterations : int
+        Total number of VI iterations to run.
+    algorithm : str, optional
+        Type of VI algorithm to use, either 'MGVI'/'linear' or 'geoVI'/'nonlinear', by default 'MGVI'.
+    n_samples : int or function, optional
+        Number of samples to use at each iteration. Can be a fixed integer or a function that
+    sample_mode : str or function, optional
+        Whether to use resampling or not at each iteration. Can be a fixed string ('linear_resample', 'linear_sample', 'nonlinear_resample', 'nonlinear_sample') or a function that takes the iteration number as input and returns the corresponding string. If None (default), some nice settings are used that work well for lens modeling, which typically use resampling at the beginning of the process and then switch to sampling only.
+    init_position : dict or jft.Vector, optional
+        Initial position in the latent parameter space. If None, it is randomly drawn from the latent prior, by default None.
+    init_spread_factor : float, optional
+        Factor to multiply the initial position drawn from the latent prior, typically to reduce the initial spread if < 1, by default 0.1.
+    quick_run : bool, optional
+        Whether to use settings that are suitable for a quick run (e.g. for testing or debugging).
+    output_dir : str, optional
+        Directory to store NIFTy outputs such as stats and last VI samples, by default None (i.e. no output is stored).
+    callback_fn : function, optional
+        A callback function that is called at each iteration with the current samples and other info, which can be used to store intermediate results (e.g. plots) during the VI process, by default None (i.e. no intermediate results are stored).
+    draw_linear_kwargs : dict, optional
+        Keyword arguments to pass to the underlying linear sampling step.
+        See NIFTy source code for more details about the supported settings.
+        If None (default), some nice settings are used that work well for lens modeling.
+    nonlinearly_update_kwargs : dict, optional
+        Keyword arguments to pass to the underlying linear sampling step.
+        See NIFTy source code for more details about the supported settings.
+        If None (default), some nice settings are used that work well for lens modeling.
+    kl_kwargs : dict, optional
+        Keyword arguments to pass to the underlying KL optimization step.
+        See NIFTy source code for more details about the supported settings.
+        If None (default), some nice settings are used that work well for lens modeling.
+
+    Returns
+    -------
+    tuple of (samples_vi, latent_samples_vi, final_state_vi)
+        - samples_vi: the VI samples in the target parameter space (i.e. transformed from the latent space by nifty_prior)
+        - latent_samples_vi: the VI samples in the latent parameter space (i.e. the output of the NIFTy optimization)
+        - final_state_vi: the final state of the NIFTy optimization, which contains useful information about the optimization process and can be used for diagnostics and analysis.
+
+    Raises
+    ------
+    ValueError
+        If the algorithm type is not recognized. Supported types are 'MGVI'/'linear' and 'geoVI'/'nonlinear'.
+    """
+    # Get the initial position in parameter space (this could be a set of samples as well)
+    if init_position is None:
+        # drawing initial value from the latent prior (multivariate standard normal distribution)
+        init_position = jft.random_like(init_key, nifty_prior.domain) # NOTE: the domain can be obtained via nifty_prior.domain
+
+        # multiply by some factor, typically to reduce the initial spread if < 1
+        for k in init_position.keys():
+            init_position[k] *= init_spread_factor
+
+        # wrapping the dictionary to a jifty Vector
+        init_position = jft.Vector(init_position)
+
+    elif not isinstance(init_position, jft.Vector):
+        init_position = jft.Vector(init_position)
+
+    # Set th number of samples
+    # NOTE: 2 x the number of samples is effectively used and returned (it is called "mirror sampling")
+    if n_samples is None:
+        if quick_run is True:
+            n_samples = 16
+        elif n_samples is None:
+            def n_samples(iiter):
+                if iiter < n_total_iterations // 3:
+                    return 4
+                elif iiter < 2 * n_total_iterations // 3:
+                    return 8
+                elif iiter < n_total_iterations - 1:
+                    return 16
+                else:
+                    return 64
+            
+    # Choose the type of VI algorithm
+    if algorithm.lower() in ('geovi', 'nonlinear'):
+        base_method = 'nonlinear'
+    elif algorithm.lower() in ('mgvi', 'linear'):
+        base_method = 'linear'
+    else:
+        raise ValueError(f"Algorithm type '{algorithm}' not recognized. Supported samplers are 'geoVI' and 'MGVI'.")
+
+    # Choose if there is resampling (see NIFTy doc for more details)
+    if quick_run is True:
+        sample_mode = f'{base_method}_sample'
+    elif sample_mode is None:
+        def sample_mode(iiter):
+            # just a suggestion from the NIFTy experts
+            if iiter < 5:
+                return f'{base_method}_resample'
+            else:
+                return f'{base_method}_sample'
+
+    # Choose settings of each underlying sampling step
+    # Below are some specific values that were found to work well for lens modeling.
+    if draw_linear_kwargs is None:
+        draw_linear_kwargs = dict(
+            cg_name="SL",
+            cg_kwargs=dict(
+                absdelta=0.05, 
+                maxiter=100 if not quick_run else 10
+            ),
+        )
+    if nonlinearly_update_kwargs is None:  # only relevant for geoVI
+        nonlinearly_update_kwargs = dict(
+            minimize_kwargs=dict(
+                name="SN", 
+                cg_kwargs=dict(name=None),
+                xtol=0.001,
+                maxiter=15 if not quick_run else 3,
+            )
+        )
+    if kl_kwargs is None:
+        kl_kwargs = dict(
+            minimize_kwargs=dict(
+                name="M", 
+                cg_kwargs=dict(name=None), 
+                absdelta=0.5,
+                maxiter=10 if not quick_run else 3,
+            )
+        )
+
+    # Run the VI optimization
+    # NOTE: most of the arguments can be fixed variable or functions (the input being the iteration number) such that settings can be dynamically varied during the process
+    latent_samples_vi, final_state_vi = jft.optimize_kl(
+        nifty_likelihood, 
+        init_position, 
+        key=run_key,
+        n_total_iterations=n_total_iterations,
+        n_samples=n_samples,
+        draw_linear_kwargs=draw_linear_kwargs,
+        nonlinearly_update_kwargs=nonlinearly_update_kwargs,
+        kl_kwargs=kl_kwargs,
+        sample_mode=sample_mode,
+        odir=output_dir,  # this is where nifty will store some stats and last VI samples
+        resume=False,
+
+        # NOTE: to get intermediate results at each iteration, we need to specify a callback function that saves the samples and other info at each iteration
+        callback=callback_fn,
+    )
+
+    # transform the latent parameter values to target parameter values
+    samples_vi = jax.vmap(nifty_prior)(latent_samples_vi.samples)
+
+    return samples_vi, latent_samples_vi, final_state_vi
