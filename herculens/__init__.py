@@ -48,34 +48,41 @@ from .MassModel.Profiles.pixelated import (
 # if solving the lens equation is required
 from .PointSourceModel.point_source_model import PointSourceModel
 
-# the CorrelatedField model requires `nifty` to be installed.
-try:
-    from .GenericModel.correlated_field import CorrelatedField
-except ImportError as e:
-    print(f"Warning: the CorrelatedField class could not be imported:\n{e}")
-
 try:
     import matplotlib
-except ImportError:
-    pass
+except ImportError as e:
+    from .unimports import unimport_class
+    Plotter = unimport_class('Plotter', 'matplotlib', e)
 else:
     from .Analysis.plot import Plotter
+
 try:
     import numpyro
 except ImportError:
-    pass
+    from .unimports import unimport_class
+    NumpyroModel = unimport_class('NumpyroModel', 'numpyro', e)
 else:
     from .Inference.ProbModel.numpyro import NumpyroModel
+
 try:
     import jaxopt
-except ImportError:
-    pass
+except ImportError as e:
+    from .unimports import unimport_class
+    JaxoptOptimizer = unimport_class('JaxoptOptimizer', 'jaxopt', e)
 else:
     from .Inference.Optimization.jaxopt import JaxoptOptimizer
+
 try:
     import optax
-except ImportError:
-    pass
+except ImportError as e:
+    from .unimports import unimport_class
+    OptaxOptimizer = unimport_class('OptaxOptimizer', 'optax', e)
 else:
     from .Inference.Optimization.optax import OptaxOptimizer
+
+try:
+    from .GenericModel.correlated_field import CorrelatedField
+except ImportError as e:
+    from .unimports import unimport_class
+    CorrelatedField = unimport_class('CorrelatedField', 'nifty', e)
     
