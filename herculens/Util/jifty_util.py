@@ -1,3 +1,8 @@
+# This submodule contains utility functions to set up field models and 
+# run variational inference strategies implemented in NIFTy.
+# 
+# Copyright (c) 2024, herculens and nifty developers and contributors
+
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -356,17 +361,17 @@ def numpyro_to_nifty_prior(
     if len(fields) == 0:
         raise ValueError("No sampled parameters found in the model trace. Cannot convert to NIFTy field.")
     elif len(fields) == 1:
-        fields = fields[0]
+        prior_transform = fields[0]
     else:
-        fields = concatenate_fields(*fields)
+        prior_transform = concatenate_fields(*fields)
 
-    return fields
+    return prior_transform
 
 
 def prepare_nifty_likelihood(
         data,
         lens_image,
-        nifty_prior,
+        prior_transform,
         params2kwargs_fn,
         likelihood_mask=None,
     ):
@@ -378,11 +383,11 @@ def prepare_nifty_likelihood(
     ----------
     lens_image : LensImage
         A lens image object containing the forward lensing model to convert into a NIFTy signal response.
-    nifty_prior : NIFTy field transform
+    prior_transform : NIFTy field transform
         The NIFTy field transform acting as a prior on the latent space,
         e.g. as returned by the numpyro_to_nifty_prior() function.
     params2kwargs_fn : function
-        A user-defined function that is takes the output of the nifty_prior and 
+        A user-defined function that is takes the output of the prior_transform and 
         converts it into a dictionary of keyword arguments to pass to the lens_image.model()
         method. This is typically what is defined in a Numpyro probabilistic model class,
         but with calls to nifty-based components like the CorrelatedField factored out.
@@ -459,43 +464,41 @@ def prepare_nifty_likelihood(
     NIFTy likelihood model : 
          A NIFTy model that computes the negative log-likelihood of the data given the model parameters, which can be used in NIFTy's VI algorithms.
     """
-    # Build the signal response (i.e. the forward model in nifty wording)
-    signal_response = jft.Model(
-        lambda x: lens_image.model(
-            **params2kwargs_fn(nifty_prior(x))
-        ),
-        domain=nifty_prior.domain,
-    )
-
-    # Setup the likelihood mask operator
+    # Create a likelihood mask operator if any
     if likelihood_mask is None:
-        likelihood_mask = np.ones_like(data, dtype=bool)  # we don't have any mask but it's for the sake of generality
-    ll_mask = likelihood_mask.astype(bool)
-    likelihood_mask_op = lambda x: x[ll_mask]
-
-    # Mask the data
-    masked_data = likelihood_mask_op(data)
+        apply_mask = lambda x: x 
+        masked_data = data
+    else:
+        mask = likelihood_mask.astype(bool)
+        apply_mask = lambda x: x[mask]
+    
+    # Apply the mask to the data
+    masked_data = apply_mask(data)
 
     # Define a suitable function as expected by the NIFTy likelihood  
-    def masked_model_and_inv_std(x):
-        model = signal_response(x)
-        masked_model = likelihood_mask_op(model)
-        masked_inv_std = likelihood_mask_op(1. / jnp.sqrt(lens_image.C_D_model(model)))
+    def masked_model_and_inv_std_fn(x):
+        model = lens_image.model(
+            **params2kwargs_fn(prior_transform(x))
+        )
+        masked_model = apply_mask(model)
+        masked_inv_std = apply_mask(1. / jnp.sqrt(lens_image.C_D_model(model)))
         return (masked_model, masked_inv_std)
+    
+    # Wrap it as a nifty Model so that the domain gets properly tracked
+    masked_model_and_inv_std =jft.Model(
+        call=masked_model_and_inv_std_fn,
+        domain=prior_transform.domain,
+    )
 
-    # Defines the energy function
+    # Defines the negative log-likelihood function
     neg_log_likelihood = jft.VariableCovarianceGaussian(masked_data).amend(masked_model_and_inv_std)
-
-    # Set the domain so it can be accessed later
-    # neg_log_likelihood.domain = nifty_prior.domain # TODO: does not work! So we need to pass explicitly the domain to run_nifty_vi()
 
     return neg_log_likelihood
 
 
 def run_vi(
         run_key,
-        nifty_prior,
-        nifty_likelihood,
+        neg_log_likelihood,
         n_total_iterations,
         algorithm='MGVI',  # 'MGVI'/'linear' or 'geoVI'/'nonlinear'
         n_samples=None,
@@ -527,12 +530,9 @@ def run_vi(
     ----------
     run_key : jax.random.PRNGKey
         Key to initialize VI sampling.
-    nifty_prior : nifty.re.Model
-        Transformation from the latent (standard normal) to the target
-        (as passed to the lensing model) parameter space. Here it is only used
-        to retrieve the parameter space domain.
-    nifty_likelihood : nifty.re.Likelihood
-        _description_
+    neg_log_likelihood : nifty.re.Likelihood
+        Negative log-likelihood function to minimize, as a nifty Likelihood instance
+        (e.g., as returned by the prepare_nifty_likelihood() function).
     n_total_iterations : int
         Total number of VI iterations to run.
     algorithm : str, optional
@@ -579,7 +579,7 @@ def run_vi(
     # Get the initial position in parameter space (this could be a set of samples as well)
     if init_position is None:
         # drawing initial value from the latent prior (multivariate standard normal distribution)
-        init_position = jft.random_like(init_key, nifty_prior.domain) # NOTE: the domain can be obtained via nifty_prior.domain
+        init_position = jft.random_like(init_key, neg_log_likelihood.domain)
 
         # multiply by some factor, typically to reduce the initial spread if < 1
         for k in init_position.keys():
@@ -630,7 +630,7 @@ def run_vi(
     # Below are some specific values that were found to work well for lens modeling.
     if draw_linear_kwargs is None:
         draw_linear_kwargs = dict(
-            cg_name="SL",
+            cg_name="Linear sampling",
             cg_kwargs=dict(
                 absdelta=0.05, 
                 maxiter=100 if not quick_run else 10
@@ -639,7 +639,7 @@ def run_vi(
     if nonlinearly_update_kwargs is None:  # only relevant for geoVI
         nonlinearly_update_kwargs = dict(
             minimize_kwargs=dict(
-                name="SN", 
+                name="Non-linear sampling", 
                 cg_kwargs=dict(name=None),
                 xtol=0.001,
                 maxiter=15 if not quick_run else 3,
@@ -648,7 +648,7 @@ def run_vi(
     if kl_kwargs is None:
         kl_kwargs = dict(
             minimize_kwargs=dict(
-                name="M", 
+                name="KL minimization", 
                 cg_kwargs=dict(name=None), 
                 absdelta=0.5,
                 maxiter=10 if not quick_run else 3,
@@ -658,7 +658,7 @@ def run_vi(
     # Run the VI optimization
     # NOTE: most of the arguments can be fixed variable or functions (the input being the iteration number) such that settings can be dynamically varied during the process
     latent_samples_vi, final_state_vi = jft.optimize_kl(
-        nifty_likelihood, 
+        neg_log_likelihood, 
         init_position, 
         key=run_key,
         n_total_iterations=n_total_iterations,
@@ -674,7 +674,4 @@ def run_vi(
         callback=callback_fn,
     )
 
-    # transform the latent parameter values to target parameter values
-    samples_vi = jax.vmap(nifty_prior)(latent_samples_vi.samples)
-
-    return samples_vi, latent_samples_vi, final_state_vi
+    return latent_samples_vi, final_state_vi

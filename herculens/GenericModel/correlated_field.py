@@ -1,6 +1,8 @@
 # This module defines a generic pixelated model that can be used in conjunction with LightModel or MassModel's pixelated profiles.
 # This is a forward model based on Gaussian processes, called a correlated field.
 # The implementation is a wrapper around the NIFTy.re (a.k.a JIFTy) correlated field model.
+# 
+# Copyright (c) 2024, herculens developers and contributors
 
 __author__ = 'aymgal'
 
