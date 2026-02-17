@@ -22,23 +22,24 @@ archivePrefix = {arXiv},
 }
 ```
 
-In addition, if you combine `Herculens` with `nifty`, for example using the `CorrelatedField` model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation). Along with the above publication, please also cite the `NIFTy.re` paper from [Edenhofer et al. 2024](https://ui.adsabs.harvard.edu/abs/2024JOSS....9.6593E/abstract).
+In addition, if you combine `Herculens` with `nifty`, for example using the `CorrelatedField` model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation). The relevant `nifty` reference is the `NIFTy.re` paper from [Edenhofer et al. 2024](https://ui.adsabs.harvard.edu/abs/2024JOSS....9.6593E/abstract).
 
 ```
-@ARTICLE{Galan2024,
+@ARTICLE{Galan2024a,
        author = {{Galan}, A. and {Caminha}, G.~B. and {Knollm{\"u}ller}, J. and {Roth}, J. and {Suyu}, S.~H.},
         title = "{El Gordo needs El Anzuelo: Probing the structure of cluster members with multi-band extended arcs in JWST data}",
-      journal = {arXiv e-prints},
-     keywords = {Astrophysics - Astrophysics of Galaxies, Astrophysics - Cosmology and Nongalactic Astrophysics, Astrophysics - Instrumentation and Methods for Astrophysics},
+      journal = {\aap},
+     keywords = {gravitational lensing: strong, methods: data analysis, galaxies: clusters: general, galaxies: evolution, galaxies: individual: ACT-CL J0102-4915, infrared: galaxies, Astrophysics - Astrophysics of Galaxies, Astrophysics - Cosmology and Nongalactic Astrophysics, Astrophysics - Instrumentation and Methods for Astrophysics},
          year = 2024,
-        month = feb,
-          eid = {arXiv:2402.18636},
-        pages = {arXiv:2402.18636},
-          doi = {10.48550/arXiv.2402.18636},
+        month = sep,
+       volume = {689},
+          eid = {A304},
+        pages = {A304},
+          doi = {10.1051/0004-6361/202449876},
 archivePrefix = {arXiv},
        eprint = {2402.18636},
  primaryClass = {astro-ph.GA},
-       adsurl = {https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2024A&A...689A.304G},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 ```

@@ -25,17 +25,8 @@ from .MassModel.Profiles.shear import Shear, ShearGammaPhi
 from .MassModel.Profiles.gaussian_potential import Gaussian as GaussianPotential
 from .MassModel.Profiles.point_mass import PointMass
 from .MassModel.Profiles.multipole import Multipole
-from .MassModel.Profiles.pixelated import (
-    PixelatedPotential, PixelatedPotentialDirac, PixelatedFixed
-) # NOTE: some of the pixelated mass profiles may require `jaxinterp2d` or `utax` to be installed.
 from .MassModel.Profiles.piemd import PIEMD
 from .MassModel.Profiles.dpie import DPIE
-
-# NOTE: some PointSourceModel setups may require `helens` to be installed.
-from .PointSourceModel.point_source_model import PointSourceModel
-
-# NOTE: CorrelatedField requires `nifty8` to be installed.
-from .GenericModel.correlated_field import CorrelatedField
 
 from .LensImage.lens_image import LensImage, LensImage3D
 from .LensImage.lens_image_multiplane import MPLensImage
@@ -44,7 +35,25 @@ from .Inference.loss import Loss
 from .Util import param_util as prmu
 from .Util import plot_util as pltu
 
-# The following aliases are related to optional packages
+
+
+# The following imports may require additional optional packages
+
+# Some of the pixelated mass profiles may require `jaxinterp2d` or `utax` to be installed.
+from .MassModel.Profiles.pixelated import (
+    PixelatedPotential, PixelatedPotentialDirac, PixelatedFixed
+)
+
+# Some PointSourceModel setups may require `helens` to be installed
+# if solving the lens equation is required
+from .PointSourceModel.point_source_model import PointSourceModel
+
+# the CorrelatedField model requires `nifty` to be installed.
+try:
+    from .GenericModel.correlated_field import CorrelatedField
+except ImportError as e:
+    print(f"Warning: the CorrelatedField class could not be imported:\n{e}")
+
 try:
     import matplotlib
 except ImportError:

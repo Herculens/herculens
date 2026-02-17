@@ -59,11 +59,15 @@ The mandatory dependencies will be installed automatically.
 
 The [`requirements.txt`](https://github.com/Herculens/herculens/blob/main/requirements.txt) file lists all required and optional package dependencies, along with their specific versions. **IMPORTANT NOTE:** do not only install blindly the required packages; please also have a look at the content of [the file](https://github.com/Herculens/herculens/blob/main/requirements.txt) itself to learn more about additional optional packages, depending on your goals.
 
+## Slack channel
+
+We have a [Slack workspace](https://herculens.slack.com) dedicated to users of Herculens, for getting help and sharing ideas. Please feel free to [send an email](mailto:aymeric.galan@gmail.com) to be added to the workspace.
+
 ## Attribution
 
 ### Citation
 
-If you make use of `Herculens`, please cite [Galan et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract). If you use the [`CorrelatedField`](https://github.com/Herculens/herculens/blob/main/herculens/GenericModel/correlated_field.py) model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240218636G/exportcitation). You will find in [this file](https://github.com/Herculens/herculens/blob/main/CITATION.md) the related bibtex entries.
+If you make use of `Herculens`, please cite [Galan et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...668A.155G/abstract). If you use the [`CorrelatedField`](https://github.com/Herculens/herculens/blob/main/herculens/GenericModel/correlated_field.py) model, please also cite [Galan et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...689A.304G/abstract). The corresponding bibtex entries are available in [this file](https://github.com/Herculens/herculens/blob/main/CITATION.md).
 
 ### Special mention regarding Lenstronomy
 Part of the `Herculens` code originates from the open-source lens modeling software package [`lenstronomy`](https://github.com/sibirrer/lenstronomy), described in [Birrer et al. 2021](https://joss.theoj.org/papers/10.21105/joss.03283) (and references therein). In every source file, proper credits are given to the specific developers and contributors to both the original `lenstronomy` (up to version 1.9.3) and `Herculens`.
