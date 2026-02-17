@@ -361,17 +361,17 @@ def numpyro_to_nifty_prior(
     if len(fields) == 0:
         raise ValueError("No sampled parameters found in the model trace. Cannot convert to NIFTy field.")
     elif len(fields) == 1:
-        fields = fields[0]
+        prior_transform = fields[0]
     else:
-        fields = concatenate_fields(*fields)
+        prior_transform = concatenate_fields(*fields)
 
-    return fields
+    return prior_transform
 
 
 def prepare_nifty_likelihood(
         data,
         lens_image,
-        nifty_prior,
+        prior_transform,
         params2kwargs_fn,
         likelihood_mask=None,
     ):
@@ -383,11 +383,11 @@ def prepare_nifty_likelihood(
     ----------
     lens_image : LensImage
         A lens image object containing the forward lensing model to convert into a NIFTy signal response.
-    nifty_prior : NIFTy field transform
+    prior_transform : NIFTy field transform
         The NIFTy field transform acting as a prior on the latent space,
         e.g. as returned by the numpyro_to_nifty_prior() function.
     params2kwargs_fn : function
-        A user-defined function that is takes the output of the nifty_prior and 
+        A user-defined function that is takes the output of the prior_transform and 
         converts it into a dictionary of keyword arguments to pass to the lens_image.model()
         method. This is typically what is defined in a Numpyro probabilistic model class,
         but with calls to nifty-based components like the CorrelatedField factored out.
@@ -478,7 +478,7 @@ def prepare_nifty_likelihood(
     # Define a suitable function as expected by the NIFTy likelihood  
     def masked_model_and_inv_std_fn(x):
         model = lens_image.model(
-            **params2kwargs_fn(nifty_prior(x))
+            **params2kwargs_fn(prior_transform(x))
         )
         masked_model = apply_mask(model)
         masked_inv_std = apply_mask(1. / jnp.sqrt(lens_image.C_D_model(model)))
@@ -487,7 +487,7 @@ def prepare_nifty_likelihood(
     # Wrap it as a nifty Model so that the domain gets properly tracked
     masked_model_and_inv_std =jft.Model(
         call=masked_model_and_inv_std_fn,
-        domain=nifty_prior.domain,
+        domain=prior_transform.domain,
     )
 
     # Defines the negative log-likelihood function
@@ -498,7 +498,7 @@ def prepare_nifty_likelihood(
 
 def run_vi(
         run_key,
-        nifty_likelihood,
+        neg_log_likelihood,
         n_total_iterations,
         algorithm='MGVI',  # 'MGVI'/'linear' or 'geoVI'/'nonlinear'
         n_samples=None,
@@ -530,8 +530,9 @@ def run_vi(
     ----------
     run_key : jax.random.PRNGKey
         Key to initialize VI sampling.
-    nifty_likelihood : nifty.re.Likelihood
-        _description_
+    neg_log_likelihood : nifty.re.Likelihood
+        Negative log-likelihood function to minimize, as a nifty Likelihood instance
+        (e.g., as returned by the prepare_nifty_likelihood() function).
     n_total_iterations : int
         Total number of VI iterations to run.
     algorithm : str, optional
@@ -578,7 +579,7 @@ def run_vi(
     # Get the initial position in parameter space (this could be a set of samples as well)
     if init_position is None:
         # drawing initial value from the latent prior (multivariate standard normal distribution)
-        init_position = jft.random_like(init_key, nifty_likelihood.domain)
+        init_position = jft.random_like(init_key, neg_log_likelihood.domain)
 
         # multiply by some factor, typically to reduce the initial spread if < 1
         for k in init_position.keys():
@@ -657,7 +658,7 @@ def run_vi(
     # Run the VI optimization
     # NOTE: most of the arguments can be fixed variable or functions (the input being the iteration number) such that settings can be dynamically varied during the process
     latent_samples_vi, final_state_vi = jft.optimize_kl(
-        nifty_likelihood, 
+        neg_log_likelihood, 
         init_position, 
         key=run_key,
         n_total_iterations=n_total_iterations,
@@ -673,7 +674,4 @@ def run_vi(
         callback=callback_fn,
     )
 
-    # transform the latent parameter values to target parameter values
-    samples_vi = jax.vmap(nifty_prior)(latent_samples_vi.samples)
-
-    return samples_vi, latent_samples_vi, final_state_vi
+    return latent_samples_vi, final_state_vi
