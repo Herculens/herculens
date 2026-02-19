@@ -32,7 +32,7 @@ class NumpyroModel(BaseProbModel):
         """
         if not hasattr(self, '_num_param'):
             try:
-                self._num_param = self.count_sampled_parameters(self.model, model_args=(), model_kwargs={})
+                self._num_param = self.count_sampled_parameters(model_args=(), model_kwargs={})
             except TypeError as e:
                 print("Error while calling the property NumpyroModel.num_parameters."
                       "The cause might be that the underlying numpyro model requires"
