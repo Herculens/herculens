@@ -33,7 +33,7 @@ class MPLightModel(object):
         light_model_kwargs : dictionary for settings related to PIXELATED
             profiles.
         '''
-        string_input = all([isinstance(lm, str) or lm is None for lm in mp_light_model_list])
+        string_input = all([isinstance(lm, list) or lm is None for lm in mp_light_model_list])
         instance_input = all([isinstance(lm, LightModel) or lm is None for lm in mp_light_model_list])
         if string_input:
             self.light_models = [LightModel(lm, **light_model_kwargs) if lm is None else None for lm in mp_light_model_list]

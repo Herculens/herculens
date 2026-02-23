@@ -53,7 +53,7 @@ class MPMassModel(object):
             distance ratio factors as is done in the GLEE lens modelling software. 
             The default is 'standard'.
         '''
-        string_input = all([isinstance(mm, str) or mm is None for mm in mp_mass_model_list])
+        string_input = all([isinstance(mm, list) or mm is None for mm in mp_mass_model_list])
         instance_input = all([isinstance(mm, MassModel) or mm is None for mm in mp_mass_model_list])
         if deflection_scaling_convention.lower() not in ('standard', 'glee'):
             raise ValueError(
