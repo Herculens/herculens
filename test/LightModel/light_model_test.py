@@ -22,7 +22,7 @@ def base_setup():
     # Create an instance of the LightModel class with some initial parameters
     # Replace the arguments with appropriate values for your use case
     profile_list = [
-        hcl.SersicElliptic(), 
+        hcl.Sersic(), 
         hcl.GaussianEllipseLight(), 
         hcl.PixelatedLight(
             interpolation_type='fast_bilinear', allow_extrapolation=True, 
@@ -78,9 +78,9 @@ def get_light_model_instance(alpha_method):
     # returns a LightModel instance with the different setups that lead
     # to different implementations to compute light profiles
     if alpha_method == 'repeated':
-        light_model = LightModel([hcl.SersicElliptic(), hcl.SersicElliptic(), hcl.SersicElliptic()], verbose=True)
+        light_model = LightModel([hcl.Sersic(), hcl.Sersic(), hcl.Sersic()], verbose=True)
     else:
-        light_model = LightModel(3 * [hcl.SersicElliptic()], verbose=True)
+        light_model = LightModel(3 * [hcl.Sersic()], verbose=True)
     kwargs_light = [
         {
             'amp': 123.,
@@ -135,8 +135,8 @@ def test_summation_methods(xy):
 
 def test_single_profile():
     # Create an instance of the LightModel class with a single profile
-    light_model1 = LightModel([hcl.SersicElliptic()])
-    light_model2 = LightModel(hcl.SersicElliptic())
+    light_model1 = LightModel([hcl.Sersic()])
+    light_model2 = LightModel(hcl.Sersic())
     light_model3 = LightModel('SERSIC_ELLIPSE')  # will be deprecated in the future
     assert isinstance(light_model2.func_list[0], type(light_model1.func_list[0]))
     assert isinstance(light_model3.func_list[0], type(light_model1.func_list[0]))

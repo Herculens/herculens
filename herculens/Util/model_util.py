@@ -100,7 +100,7 @@ def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
     if shear_idx is None:
         return None
     if shear_type == 'SHEAR_GAMMA_PSI':
-        phi_ext, gamma_ext = kwargs_lens[shear_idx]['phi_ext'], kwargs_lens[shear_idx]['gamma_ext']
+        phi_ext, gamma_ext = kwargs_lens[shear_idx]['psi_ext'], kwargs_lens[shear_idx]['gamma_ext']
     else:
         # imports are here to avoid issues with circular imports
         from herculens.Util.param_util import shear_cartesian2polar_numpy

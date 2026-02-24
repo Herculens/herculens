@@ -54,20 +54,20 @@ def simulate_data(data_type, supersampling_factor):
     # Define input model components
     if data_type == 'full':
         lens_mass_input = hcl.MassModel([hcl.EPL(), hcl.Shear()])
-        lens_light_input = hcl.LightModel([hcl.SersicElliptic()])
-        source_input = hcl.LightModel([hcl.SersicElliptic()])
+        lens_light_input = hcl.LightModel([hcl.Sersic()])
+        source_input = hcl.LightModel([hcl.Sersic()])
     elif data_type == 'lens_light_only':
         lens_mass_input = hcl.MassModel([])
-        lens_light_input = hcl.LightModel([hcl.SersicElliptic()])
+        lens_light_input = hcl.LightModel([hcl.Sersic()])
         source_input = hcl.LightModel([])
     elif data_type == 'lensed_source_only':
         lens_mass_input = hcl.MassModel([hcl.EPL(), hcl.Shear()])
         lens_light_input = hcl.LightModel([])
-        source_input = hcl.LightModel([hcl.SersicElliptic()], verbose=True)
+        source_input = hcl.LightModel([hcl.Sersic()], verbose=True)
     elif data_type == 'source_only':
         lens_mass_input = hcl.MassModel([])
         lens_light_input = hcl.LightModel([])
-        source_input = hcl.LightModel([hcl.SersicElliptic()])
+        source_input = hcl.LightModel([hcl.Sersic()])
 
     lens_image_input = hcl.LensImage(pixel_grid, psf, noise_class=noise,
                                  lens_mass_model_class=lens_mass_input,

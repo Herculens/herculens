@@ -10,7 +10,7 @@ class TestLightModelBase(unittest.TestCase):
         self.grid_class = hcl.PixelGrid(nx=10, ny=10)
         # Create a sample profile list
         self.profile_list_base_strings = ['SERSIC_ELLIPSE', 'GAUSSIAN_ELLIPSE']
-        self.profile_list_base_instances = [hcl.SersicElliptic(), hcl.GaussianEllipseLight()]
+        self.profile_list_base_instances = [hcl.Sersic(), hcl.GaussianEllipseLight()]
         self.profile_list_pixelated = [hcl.PixelatedLight()]
         self.profile_list_pixelated_adapt = [hcl.PixelatedLight(adaptive_grid=True)]
         self.kwargs_pixelated = {'num_pixels': 10}
@@ -50,22 +50,18 @@ class TestLightModelBase(unittest.TestCase):
             )
         with self.assertRaises(TypeError):
             light_model_base = LightModelBase(
-                hcl.SersicElliptic(),
+                hcl.Sersic(),
                 self.kwargs_pixelated,
             )
 
     def test_is_light_profile_class(self):
-        self.assertTrue(LightModelBase.is_light_profile_class(hcl.SersicElliptic))
+        self.assertTrue(LightModelBase.is_light_profile_class(hcl.Sersic))
         self.assertFalse(LightModelBase.is_light_profile_class('INVALID_PROFILE'))
 
     # Test the get_class_from_string method
     def test_get_class_from_string_SERSIC(self):
         profile_class = LightModelBase.get_class_from_string('SERSIC_ELLIPSE')
-        self.assertTrue(isinstance(profile_class, hcl.SersicElliptic))
-        profile_class = LightModelBase.get_class_from_string('SERSIC')
         self.assertTrue(isinstance(profile_class, hcl.Sersic))
-        profile_class = LightModelBase.get_class_from_string('SERSIC_SUPERELLIPSE')
-        self.assertTrue(isinstance(profile_class, hcl.SersicElliptic))
         # profile_class = LightModelBase.get_class_from_string('SHAPELETS')  # requires gigalens
         # self.assertTrue(isinstance(profile_class, hcl.Shapelets))
 

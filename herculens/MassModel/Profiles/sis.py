@@ -62,8 +62,7 @@ class SIS(object):
         """
         return self.profile.hessian(x, y, theta_E, self._e, self._e, center_x, center_y)
 
-    @staticmethod
-    def theta2rho(theta_E):
+    def theta2rho(self, theta_E):
         """
         converts projected density parameter (in units of deflection) into 3d density parameter
         :param theta_E:
@@ -71,8 +70,7 @@ class SIS(object):
         """
         self.profile.theta2rho(theta_E)
 
-    @staticmethod
-    def mass_3d(r, rho0):
+    def mass_3d(self, r, rho0):
         """
         mass enclosed a 3d sphere or radius r
         :param r: radius in angular units
