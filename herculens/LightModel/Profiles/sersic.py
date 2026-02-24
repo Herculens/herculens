@@ -9,118 +9,161 @@ __author__ = 'sibirrer', 'jiwoncpark', 'austinpeel', 'aymgal'
 
 import numpy as np
 import jax.numpy as jnp
+from jax.scipy import special
 from jax import jit, grad
-from functools import partial
 
-from herculens.MassModel.Profiles.sersic_utils import SersicUtil
 import herculens.Util.param_util as param_util
 
 
-__all__ = ['Sersic', 'SersicElliptic']
+__all__ = ['Sersic', 'CoreSersic']
 
 
-class Sersic(SersicUtil):
-    """
-    this class contains functions to evaluate an spherical Sersic function
+class SersicBase(object):
 
-    .. math::
+    def __init__(
+            self, 
+            smoothing=0.0001, 
+            exponent=2, 
+            radius_major_axis=True
+        ):
+        """Base class for Sersic profiles.
 
-        I(R) = I_0 \exp \left[ -b_n (R/R_{\rm Sersic})^{\frac{1}{n}}\right]
-
-    with :math:`I_0 = amp`
-    and
-    with :math:`b_{n}\approx 1.999\,n-0.327`
-
-    """
-
-    param_names = ['amp', 'R_sersic', 'n_sersic', 'center_x', 'center_y']
-    lower_limit_default = {'amp': 0, 'R_sersic': 0, 'n_sersic': 0.5, 'center_x': -100, 'center_y': -100}
-    upper_limit_default = {'amp': 100, 'R_sersic': 100, 'n_sersic': 8, 'center_x': 100, 'center_y': 100}
-    fixed_default = {key: False for key in param_names}
-
-    def __init__(self, smoothing=0.00001, exponent=2.):
-        super().__init__(smoothing=smoothing, exponent=exponent)
-
-    def function(self, x, y, R_sersic, n_sersic, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
+        Parameters
+        ----------
+        smoothing : float, optional
+            Smoothing scale of the innermost part of the profile (for numerical reasons).
+            Default is 0.0001.
+        exponent : float, optional
+            Exponent parameter. Default is 2.
+        radius_major_axis : bool, optional
+            If True, defines the half-light radius of the Sersic light profile along
+            the semi-major axis. If False, uses the product average
+            of semi-major and semi-minor axis.
+            Default is False.
         """
+        self._radius_major_axis = radius_major_axis
+        self._super = False if exponent == 2 else True
+        self._e = float(exponent)
+        self._s = float(smoothing)
 
-        :param x:
+    @staticmethod
+    def b_n(n):
+        """B(n) computation. This is the approximation of the exact solution to the
+        relation, 2*incomplete_gamma_function(2n; b_n) = Gamma_function(2*n).
+
+        :param n: the sersic index
+        :return: b(n)
+        """
+        bn = 1.9992 * n - 0.3271
+        return jnp.maximum(bn, 1e-5)
+
+    def radial_distance(self, x, y, e1, e2, center_x, center_y):
+        """Get the distance from the center of Sersic, accounting for orientation and
+        axis ratio :param x:
+
         :param y:
-        :param amp: surface brightness/amplitude value at the half light radius
-        :param R_sersic: semi-major axis half light radius
+        :param e1: eccentricity
+        :param e2: eccentricity
+        :param center_x: center x of sersic
+        :param center_y: center y of sersic
+        """
+        if self._radius_major_axis:
+            phi_G, q = param_util.ellipticity2phi_q(e1, e2)
+            x_shift = x - center_x
+            y_shift = y - center_y
+            cos_phi = jnp.cos(phi_G)
+            sin_phi = jnp.sin(phi_G)
+            xt1 = cos_phi * x_shift + sin_phi * y_shift
+            xt2 = -sin_phi * x_shift + cos_phi * y_shift
+            if not self._super:
+                xt2difq2 = xt2 / (q * q)
+                r = jnp.sqrt(xt1 * xt1 + xt2 * xt2difq2)
+            else:
+                r = jnp.power(jnp.power(jnp.abs(xt1), self._e) + jnp.power(jnp.abs(xt2/q), self._e), 1/self._e)
+        else:
+            x_, y_ = param_util.transform_e1e2_product_average(
+                x, y, e1, e2, center_x, center_y
+            )
+            if not self._super:
+                r = jnp.sqrt(x_**2 + y_**2)
+            else:
+                r = jnp.power(jnp.power(jnp.abs(x_), self._e) + jnp.power(jnp.abs(y_), self._e), 1/self._e)
+        print("RAD HERC", r)
+        return r
+
+    def _total_flux(self, I_eff, r_eff, n_sersic):
+        """Computes total flux of a round Sersic profile.
+
+        :param r_eff: projected half light radius
+        :param I_eff: surface brightness at r_eff (in same units as r_eff)
         :param n_sersic: Sersic index
-        :param center_x: center in x-coordinate
-        :param center_y: center in y-coordinate
-        :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
-        :return: Sersic profile value at (x, y)
+        :return: integrated flux to infinity
         """
-        R = self.get_distance_from_center(x, y, phi_G=0.0, q=1.0, center_x=center_x, center_y=center_y)
-        result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
-        return amp * result
+        bn = self.b_n(n_sersic)
+        return (
+            I_eff
+            * r_eff**2
+            * 2
+            * jnp.pi
+            * n_sersic
+            * jnp.exp(bn)
+            / bn ** (2 * n_sersic)
+            * special.gamma(2 * n_sersic)
+        )
 
-    def derivatives(self, x, y, R_sersic, n_sersic, center_x, center_y, amp, max_R_frac=100.0):
-        """
+    def total_flux(self, amp, R_sersic, n_sersic, e1, e2, **kwargs):
+        """Computes analytical integral to compute total flux of the Sersic profile.
 
-        :param x:
-        :param y:
-        :param amp: surface brightness/amplitude value at the half light radius
-        :param R_sersic: semi-major axis half light radius
+        :param amp: amplitude parameter in Sersic function (surface brightness at
+            R_sersic
+        :param R_sersic: half-light radius in semi-major axis
         :param n_sersic: Sersic index
-        :param e1: eccentricity parameter
-        :param e2: eccentricity parameter
-        :param center_x: center in x-coordinate
-        :param center_y: center in y-coordinate
-        :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
-        :return: partial derivatives of Sersic profile value at (x, y) with respect to x and y
+        :param e1: eccentricity
+        :param e2: eccentricity
+        :return: Analytic integral of the total flux of the Sersic profile
         """
-        def _function(p):
-            return self.function(p[0], p[1], 
-                                 R_sersic, n_sersic,
-                                 center_x, center_y, amp,
-                                 max_R_frac=max_R_frac)
-        
-        grad_function = grad(_function)
+        # compute product average half-light radius
+        if self._radius_major_axis:
+            _, q = param_util.ellipticity2phi_q(e1, e2)
+            # translate semi-major axis R_eff into product averaged definition for circularization
+            r_eff = R_sersic * jnp.sqrt(q)
+        else:
+            r_eff = R_sersic
+        return self._total_flux(amp, r_eff, n_sersic)
 
-        @jit
-        def _grad_function(x, y):
-            return grad_function([x, y])[0], grad_function([x, y])[1]
-        
-        f_x, f_y = jnp.vectorize(_grad_function)(x, y)
-        return f_x, f_y
+    def _R_stable(self, R):
+        """Floor R_ at self._s for numerical stability.
 
-    def derivatives_explicit(self, x, y, R_sersic, n_sersic, center_x=0, center_y=0, amp=1., max_R_frac=100.0):
+        :param R: radius
+        :return: smoothed and stabilized radius
+        """
+        return jnp.maximum(self._s, R)
+
+    def _r_sersic(
+            self, R, R_sersic, n_sersic, max_R_frac=1000.0,
+        ):
         """
 
-        :param x:
-        :param y:
-        :param amp: surface brightness/amplitude value at the half light radius
-        :param R_sersic: semi-major axis half light radius
-        :param n_sersic: Sersic index
-        :param e1: eccentricity parameter
-        :param e2: eccentricity parameter
-        :param center_x: center in x-coordinate
-        :param center_y: center in y-coordinate
-        :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
-        :return: partial derivatives of Sersic profile value at (x, y) with respect to x and y
+        :param R: radius (array or float)
+        :param R_sersic: Sersic radius (half-light radius)
+        :param n_sersic: Sersic index (float)
+        :param max_R_frac: maximum window outside which the mass is zeroed, in units of R_sersic (float)
+        :return: kernel of the Sersic surface brightness at R
         """
-        x_ = np.array(x) - center_x
-        y_ = np.array(y) - center_y
-        r = np.sqrt(x_**2 + y_**2)
-        #if isinstance(r, int) or isinstance(r, float):
-        #    r = max(self._s, r)
-        #else:
-        #    r[r < self._s] = self._s
-        alpha = -self.alpha_abs(x, y, n_sersic, R_sersic, amp, center_x, center_y)
-        f_x = alpha * x_ / r
-        f_y = alpha * y_ / r
-        return f_x, f_y
+        R_ = self._R_stable(R)
+        R_sersic_ = self._R_stable(R_sersic)
+        bn = self.b_n(n_sersic)
+        R_frac = R_ / R_sersic_
+        good_inds = (jnp.asarray(R_frac) <= max_R_frac).astype(int)
+        result = good_inds * jnp.exp(-bn * (R_frac**(1. / n_sersic) - 1.))
+        return jnp.nan_to_num(result)
 
     @property
     def num_amplitudes(self):
         return 1
 
 
-class SersicElliptic(SersicUtil):
+class Sersic(SersicBase):
     """
     this class contains functions to evaluate an elliptical Sersic function
     """
@@ -129,10 +172,15 @@ class SersicElliptic(SersicUtil):
     upper_limit_default = {'amp': 100, 'R_sersic': 100, 'n_sersic': 8, 'e1': 0.5, 'e2': 0.5,'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
 
-    def __init__(self, smoothing=0.00001, exponent=2.):
-        super().__init__(smoothing=smoothing, exponent=exponent)
+    def __init__(
+            self, 
+            smoothing=0.00001, 
+            exponent=2., 
+            radius_major_axis=True,
+        ):
+        super().__init__(smoothing=smoothing, exponent=exponent, radius_major_axis=radius_major_axis)
 
-    def function(self, x, y, R_sersic, n_sersic, e1, e2, center_x, center_y, amp, max_R_frac=1000.0):
+    def function(self, x, y, amp, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, max_R_frac=1000.0):
         """
 
         :param x:
@@ -147,14 +195,12 @@ class SersicElliptic(SersicUtil):
         :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
         :return: Sersic profile value at (x, y)
         """
-
         R_sersic = jnp.maximum(0, R_sersic)
-        phi_G, q = param_util.ellipticity2phi_q(e1, e2)
-        R = self.get_distance_from_center(x, y, phi_G, q, center_x, center_y)
+        R = self.radial_distance(x, y, e1, e2, center_x, center_y)
         result = self._r_sersic(R, R_sersic, n_sersic, max_R_frac)
         return amp * result
 
-    def derivatives(self, x, y, R_sersic, n_sersic, e1, e2, center_x, center_y, amp, max_R_frac=1000.0):
+    def derivatives(self, x, y, amp, R_sersic, n_sersic, e1, e2, center_x, center_y, max_R_frac=1000.0):
         """
 
         :param x:
@@ -184,6 +230,107 @@ class SersicElliptic(SersicUtil):
         f_x, f_y = jnp.vectorize(_grad_function)(x, y)
         return f_x, f_y
 
-    @property
-    def num_amplitudes(self):
-        return 1
+
+class CoreSersic(SersicBase):
+    """This class contains the Core-Sersic function introduced by e.g. Trujillo et al.
+    2004.
+
+    .. math::
+
+        I(R) = I' \\left[1 + (R_break/R)^{\\alpha} \\right]^{\\gamma_in / \\alpha}
+        \\exp \\left{ -b_n \\left[(R^{\\alpha} + R_break^{\\alpha})/R_e^{\\alpha}  \\right]^{1 / (n\\alpha)}  \\right}
+
+    with
+
+    .. math::
+        I' = I_b 2^{-\\gamma_in/ \\alpha} \\exp \\left[b_n 2^{1 / (n\\alpha)} (R_break/R_e)^{1/n}  \\right]
+
+    where :math:`I_b` is the intensity at the break radius and :math:`R = \\sqrt{q \\theta^2_x + \\theta^2_y/q}`.
+    """
+
+    param_names = ['amp', 'R_sersic', 'R_break', 'n_sersic', 'gamma_in', 'alpha', 'center_x', 'center_y']
+    lower_limit_default = {'amp': 0, 'R_sersic': 0, 'R_break': 0, 'n_sersic': 0.5, 'gamma_in': 0, 'alpha': 1e-5, 'center_x': -100, 'center_y': -100}
+    upper_limit_default = {'amp': 100, 'R_sersic': 100, 'R_break': 90, 'n_sersic': 8, 'gamma_in': 10, 'alpha': 100, 'center_x': 100, 'center_y': 100}
+    fixed_default = {key: False for key in param_names}
+
+    def function(
+        self,
+        x,
+        y,
+        amp,
+        R_sersic,
+        n_sersic,
+        e1,
+        e2,
+        R_break,
+        gamma_in,
+        alpha=3.,
+        center_x=0,
+        center_y=0,
+        max_R_frac=1000.0,
+    ):
+        """Evaluates the 'core-Sersic' profile defined in Trujillo et al. 2004.
+
+        Note that the approximation from b to b_n is used, see Trujillo et al. 2004 for more details.
+
+        Parameters
+        ----------
+        x : float or ndarray
+            x-coordinate
+        y : float or ndarray
+            y-coordinate
+        amp : float
+            Surface brightness/amplitude value at the half light radius
+        R_sersic : float
+            Half light radius (either semi-major axis or product average of semi-major and semi-minor axis)
+        R_break : float
+            Core radius
+        n_sersic : float
+            Sersic index
+        gamma_in : float
+            Inner power-law exponent
+        e1 : float
+            Eccentricity parameter e1
+        e2 : float
+            Eccentricity parameter e2
+        center_x : float
+            Center in x-coordinate
+        center_y : float
+            Center in y-coordinate
+        alpha : float, optional
+            Sharpness of the transition between the cusp and the outer Sersic profile.
+            Default is 3.0.
+        max_R_frac : float, optional
+            Maximum window outside which the mass is zeroed, in units of R_sersic.
+            Default is 1000.0.
+
+        Returns
+        -------
+        float or jax.Array
+            Cored Sersic profile value at (x, y)
+        """
+        # NOTE: max_R_frac not implemented
+        R_ = self.radial_distance(x, y, e1, e2, center_x, center_y)
+        R = self._R_stable(R_)
+        bn = self.b_n(n_sersic)
+        result = (
+            amp
+            * (1 + (R_break / R) ** alpha) ** (gamma_in / alpha)
+            * jnp.exp(
+                -bn
+                * (
+                    ((R**alpha + R_break**alpha) / R_sersic**alpha)
+                    ** (1.0 / (alpha * n_sersic))
+                    - 1.0
+                )
+            )
+        )
+        return result
+    
+    def total_flux(self, *args, **kwargs):
+        print("Warning: Note that the CoreSersic.total_flux() simply calls the simpler "
+              "case of a non-cored elliptical Sersic profile, namely it ignores "
+              "the break radius, inner slope and transition strength parameters. "
+              "This is probably a good approximation when the core radius is small compared to the half-light radius, but may not be accurate otherwise.")
+        return super().total_flux(*args, **kwargs)
+    
