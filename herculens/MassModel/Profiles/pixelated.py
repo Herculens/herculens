@@ -6,7 +6,7 @@ __author__ = 'austinpeel', 'aymgal'
 
 
 import numpy as np
-import jax
+import warnings
 import jax.numpy as jnp
 from jax import grad, jacfwd, jacrev, vmap
 # from functools import partial

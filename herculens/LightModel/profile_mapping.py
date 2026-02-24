@@ -13,7 +13,6 @@ from herculens.LightModel.Profiles.shapelets import Shapelets
 # mapping between the string name to the mass profile class.
 STRING_MAPPING = {
     'SERSIC_ELLIPSE': Sersic,
-    'SERSIC_SUPERELLIPSE': Sersic,
     'CORE_SERSIC': CoreSersic,
     'GAUSSIAN': Gaussian,
     'GAUSSIAN_ELLIPSE': GaussianEllipse,
