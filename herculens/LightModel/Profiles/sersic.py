@@ -48,24 +48,70 @@ class SersicBase(object):
 
     @staticmethod
     def b_n(n):
-        """B(n) computation. This is the approximation of the exact solution to the
-        relation, 2*incomplete_gamma_function(2n; b_n) = Gamma_function(2*n).
-
-        :param n: the sersic index
-        :return: b(n)
+        """
+        Compute the b_n parameter for Sérsic profiles.
+        
+        This function computes B(n), which is an approximation of the exact solution
+        to the relation: 2*incomplete_gamma_function(2n; b_n) = Gamma_function(2*n).
+        
+        Parameters
+        ----------
+        n : float or array-like
+            The Sérsic index.
+        
+        Returns
+        -------
+        float or ndarray
+            The b_n parameter value(s), with a minimum floor of 1e-5 to ensure
+            numerical stability.
+        
+        Notes
+        -----
+        The approximation used is: b_n = 1.9992 * n - 0.3271
+        
+        References
+        ----------
+        The b_n parameter is a key component in defining the normalized Sérsic
+        light profile and relates to the concentration of light in the profile.
         """
         bn = 1.9992 * n - 0.3271
         return jnp.maximum(bn, 1e-5)
 
     def radial_distance(self, x, y, e1, e2, center_x, center_y):
-        """Get the distance from the center of Sersic, accounting for orientation and
-        axis ratio :param x:
+        """
+        Calculate the radial distance from the center of a Sersic profile.
 
-        :param y:
-        :param e1: eccentricity
-        :param e2: eccentricity
-        :param center_x: center x of sersic
-        :param center_y: center y of sersic
+        Accounts for orientation and axis ratio of the elliptical profile. Supports
+        both standard elliptical and superelliptical distance calculations.
+
+        Parameters
+        ----------
+        x : float or ndarray
+            x-coordinate(s)
+        y : float or ndarray
+            y-coordinate(s)
+        e1 : float
+            First eccentricity component
+        e2 : float
+            Second eccentricity component
+        center_x : float
+            x-coordinate of the Sersic profile center
+        center_y : float
+            y-coordinate of the Sersic profile center
+
+        Returns
+        -------
+        float or ndarray
+            Radial distance from the center, computed according to the major axis
+            convention and superelliptical parameters if enabled.
+
+        Notes
+        -----
+        The calculation depends on internal flags:
+        - `_radius_major_axis`: Determines which transformation method to use
+        - `_super`: If True, uses superelliptical distance metric; otherwise uses
+          standard elliptical distance
+        - `_e`: Exponent parameter for superelliptical distance calculation
         """
         if self._radius_major_axis:
             phi_G, q = param_util.ellipticity2phi_q(e1, e2)
@@ -92,12 +138,21 @@ class SersicBase(object):
         return r
 
     def _total_flux(self, I_eff, r_eff, n_sersic):
-        """Computes total flux of a round Sersic profile.
+        """Compute the total flux of a round Sersic profile.
 
-        :param r_eff: projected half light radius
-        :param I_eff: surface brightness at r_eff (in same units as r_eff)
-        :param n_sersic: Sersic index
-        :return: integrated flux to infinity
+        Parameters
+        ----------
+        I_eff : float
+            Surface brightness at the effective radius (in same units as r_eff)
+        r_eff : float
+            Projected half-light radius
+        n_sersic : float
+            Sersic index
+
+        Returns
+        -------
+        float
+            Integrated flux to infinity
         """
         bn = self.b_n(n_sersic)
         return (
@@ -112,15 +167,33 @@ class SersicBase(object):
         )
 
     def total_flux(self, amp, R_sersic, n_sersic, e1, e2, **kwargs):
-        """Computes analytical integral to compute total flux of the Sersic profile.
+        """Compute the analytical integral of the total flux for a Sersic profile.
 
-        :param amp: amplitude parameter in Sersic function (surface brightness at
-            R_sersic
-        :param R_sersic: half-light radius in semi-major axis
-        :param n_sersic: Sersic index
-        :param e1: eccentricity
-        :param e2: eccentricity
-        :return: Analytic integral of the total flux of the Sersic profile
+        Parameters
+        ----------
+        amp : float
+            Amplitude parameter in Sersic function (surface brightness at R_sersic).
+        R_sersic : float
+            Half-light radius in semi-major axis.
+        n_sersic : float
+            Sersic index.
+        e1 : float
+            First eccentricity component.
+        e2 : float
+            Second eccentricity component.
+        **kwargs
+            Additional keyword arguments.
+
+        Returns
+        -------
+        float
+            Analytic integral of the total flux of the Sersic profile.
+
+        Notes
+        -----
+        If `_radius_major_axis` is True, the semi-major axis R_eff is converted to a
+        product-averaged definition by accounting for the axis ratio q derived from
+        eccentricity parameters e1 and e2. Otherwise, R_eff is set equal to R_sersic.
         """
         # compute product average half-light radius
         if self._radius_major_axis:
@@ -132,24 +205,13 @@ class SersicBase(object):
         return self._total_flux(amp, r_eff, n_sersic)
 
     def _R_stable(self, R):
-        """Floor R_ at self._s for numerical stability.
-
-        :param R: radius
-        :return: smoothed and stabilized radius
-        """
+        """Floor R_ at self._s for numerical stability."""
         return jnp.maximum(self._s, R)
 
     def _r_sersic(
             self, R, R_sersic, n_sersic, max_R_frac=1000.0,
         ):
-        """
-
-        :param R: radius (array or float)
-        :param R_sersic: Sersic radius (half-light radius)
-        :param n_sersic: Sersic index (float)
-        :param max_R_frac: maximum window outside which the mass is zeroed, in units of R_sersic (float)
-        :return: kernel of the Sersic surface brightness at R
-        """
+        """Evaluate the Sersic profile at radius R."""
         R_ = self._R_stable(R)
         R_sersic_ = self._R_stable(R_sersic)
         bn = self.b_n(n_sersic)
@@ -164,8 +226,27 @@ class SersicBase(object):
 
 
 class Sersic(SersicBase):
-    """
-    this class contains functions to evaluate an elliptical Sersic function
+    """Class to evaluate an (elliptical) Sersic profile.
+
+    .. math::
+
+        I(R) = I_{\\rm e} \\exp \\left( -b_n \\left[(R/R_{\\rm Sersic})^{\\frac{1}{n}}-1\\right]\\right)
+
+    with :math:`I_0 = amp`,
+    :math:`R = \\sqrt{q \\theta^2_x + \\theta^2_y/q}`
+    and
+    with :math:`b_{n}\\approx 1.999n-0.327`
+
+    Parameters
+    ----------
+    smoothing : float, optional
+        Smoothing length to avoid numerical divergence at r==, by default 0.00001
+    exponent : _type_, optional
+        If different from 2, corresponds to the 'super-ellipse' profile, by default 2.
+    radius_major_axis : bool, optional
+        If True, all radius parameters are defined along the major axis
+        otherwise they are defined along the intermediate axis (product average 
+        of semi-major and semi-minor axis), by default True
     """
     param_names = ['amp', 'R_sersic', 'n_sersic', 'e1', 'e2', 'center_x', 'center_y']
     lower_limit_default = {'amp': 0, 'R_sersic': 0, 'n_sersic': 0.5, 'e1': -0.5, 'e2': -0.5,'center_x': -100, 'center_y': -100}
@@ -182,18 +263,36 @@ class Sersic(SersicBase):
 
     def function(self, x, y, amp, R_sersic, n_sersic, e1, e2, center_x=0, center_y=0, max_R_frac=1000.0):
         """
+        Compute the Sersic profile at given coordinates.
 
-        :param x:
-        :param y:
-        :param amp: surface brightness/amplitude value at the half light radius
-        :param R_sersic: semi-major axis half light radius
-        :param n_sersic: Sersic index
-        :param e1: eccentricity parameter
-        :param e2: eccentricity parameter
-        :param center_x: center in x-coordinate
-        :param center_y: center in y-coordinate
-        :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
-        :return: Sersic profile value at (x, y)
+        Parameters
+        ----------
+        x : float or array_like
+            X-coordinate(s).
+        y : float or array_like
+            Y-coordinate(s).
+        amp : float
+            Surface brightness/amplitude value at the half light radius.
+        R_sersic : float
+            Semi-major axis half light radius.
+        n_sersic : float
+            Sersic index.
+        e1 : float
+            Eccentricity parameter (first component).
+        e2 : float
+            Eccentricity parameter (second component).
+        center_x : float, optional
+            Center x-coordinate. Default is 0.
+        center_y : float, optional
+            Center y-coordinate. Default is 0.
+        max_R_frac : float, optional
+            Maximum window outside of which the profile is zeroed, in units of R_sersic.
+            Default is 1000.0.
+
+        Returns
+        -------
+        float or array_like
+            Sersic profile value(s) at the given coordinate(s) (x, y).
         """
         R_sersic = jnp.maximum(0, R_sersic)
         R = self.radial_distance(x, y, e1, e2, center_x, center_y)
@@ -202,18 +301,38 @@ class Sersic(SersicBase):
 
     def derivatives(self, x, y, amp, R_sersic, n_sersic, e1, e2, center_x, center_y, max_R_frac=1000.0):
         """
-
-        :param x:
-        :param y:
-        :param amp: surface brightness/amplitude value at the half light radius
-        :param R_sersic: semi-major axis half light radius
-        :param n_sersic: Sersic index
-        :param e1: eccentricity parameter
-        :param e2: eccentricity parameter
-        :param center_x: center in x-coordinate
-        :param center_y: center in y-coordinate
-        :param max_R_frac: maximum window outside of which the mass is zeroed, in units of R_sersic (float)
-        :return: partial derivatives of Sersic profile value at (x, y) with respect to x and y
+        Compute partial derivatives of the Sersic profile.
+        This method calculates the partial derivatives of the Sersic light profile
+        with respect to spatial coordinates x and y using automatic differentiation.
+        Parameters
+        ----------
+        x : float or ndarray
+            x-coordinate(s).
+        y : float or ndarray
+            y-coordinate(s).
+        amp : float
+            Surface brightness/amplitude value at the half-light radius.
+        R_sersic : float
+            Semi-major axis half-light radius.
+        n_sersic : float
+            Sersic index.
+        e1 : float
+            Eccentricity parameter (first component).
+        e2 : float
+            Eccentricity parameter (second component).
+        center_x : float
+            Center x-coordinate.
+        center_y : float
+            Center y-coordinate.
+        max_R_frac : float, optional
+            Maximum window outside of which the profile is zeroed,
+            in units of R_sersic. Default is 1000.0.
+        Returns
+        -------
+        f_x : float or ndarray
+            Partial derivative of the Sersic profile with respect to x.
+        f_y : float or ndarray
+            Partial derivative of the Sersic profile with respect to y.
         """
         def _function(p):
             return self.function(p[0], p[1], 
@@ -254,21 +373,21 @@ class CoreSersic(SersicBase):
     fixed_default = {key: False for key in param_names}
 
     def function(
-        self,
-        x,
-        y,
-        amp,
-        R_sersic,
-        n_sersic,
-        e1,
-        e2,
-        R_break,
-        gamma_in,
-        alpha=3.,
-        center_x=0,
-        center_y=0,
-        max_R_frac=1000.0,
-    ):
+            self,
+            x,
+            y,
+            amp,
+            R_sersic,
+            n_sersic,
+            e1,
+            e2,
+            R_break,
+            gamma_in,
+            alpha=3.,
+            center_x=0,
+            center_y=0,
+            max_R_frac=1000.0,
+        ):
         """Evaluates the 'core-Sersic' profile defined in Trujillo et al. 2004.
 
         Note that the approximation from b to b_n is used, see Trujillo et al. 2004 for more details.
