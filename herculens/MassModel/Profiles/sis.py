@@ -23,7 +23,7 @@ class SIS(object):
     
     def __init__(self):
         self.profile = SIE()
-        self._e = 1e-4
+        self._e = 1e-8
         super(SIS, self).__init__()
 
     def function(self, x, y, theta_E, center_x=0, center_y=0):
