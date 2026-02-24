@@ -134,7 +134,6 @@ class SersicBase(object):
                 r = jnp.sqrt(x_**2 + y_**2)
             else:
                 r = jnp.power(jnp.power(jnp.abs(x_), self._e) + jnp.power(jnp.abs(y_), self._e), 1/self._e)
-        print("RAD HERC", r)
         return r
 
     def _total_flux(self, I_eff, r_eff, n_sersic):
