@@ -82,7 +82,7 @@ def critical_lines_caustics(lens_image, kwargs_mass, eta_flat=None, supersamplin
 
 
 def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
-    from herculens.MassModel.Profiles.shear import Shear, ShearGammaPhi
+    from herculens.MassModel.Profiles.shear import Shear, ShearGammaPsi
     shear_idx, shear_type = None, None
     num_profiles = len(lens_image.MassModel.profile_type_list)
     assert num_profiles == len(kwargs_lens)
@@ -93,14 +93,14 @@ def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
             shear_type = 'SHEAR'
             break
         elif (lens_image.MassModel.profile_type_list[i] == 'SHEAR_GAMMA_PSI' or
-              isinstance(lens_image.MassModel.profile_type_list[i], ShearGammaPhi)):
+              isinstance(lens_image.MassModel.profile_type_list[i], ShearGammaPsi)):
             shear_idx = i
             shear_type = 'SHEAR_GAMMA_PSI'
             break
     if shear_idx is None:
         return None
     if shear_type == 'SHEAR_GAMMA_PSI':
-        phi_ext, gamma_ext = kwargs_lens[shear_idx]['phi_ext'], kwargs_lens[shear_idx]['gamma_ext']
+        phi_ext, gamma_ext = kwargs_lens[shear_idx]['psi_ext'], kwargs_lens[shear_idx]['gamma_ext']
     else:
         # imports are here to avoid issues with circular imports
         from herculens.Util.param_util import shear_cartesian2polar_numpy
