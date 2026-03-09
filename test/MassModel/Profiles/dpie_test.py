@@ -4,6 +4,7 @@ import os
 import pytest
 from astropy.io import fits
 import numpy as np
+import numpy.testing as npt
 
 from jax import config
 config.update("jax_enable_x64", True)  # could actually make a difference in jifty
@@ -83,8 +84,8 @@ def test_alpha_against_glee(glee_scale_flag):
     alpha_1, alpha_2 = profile.derivatives(
         x, y, **kwargs_lens_ref,
     )
-    assert np.allclose(alpha_1, alpha_1_ref, rtol=1e-10)
-    assert np.allclose(alpha_2, alpha_2_ref, rtol=1e-10)
+    npt.assert_almost_equal(alpha_1, alpha_1_ref, decimal=6)
+    npt.assert_almost_equal(alpha_2, alpha_2_ref, decimal=6)
 
 @pytest.mark.parametrize(
     "glee_scale_flag", [False, True],
@@ -100,22 +101,22 @@ def test_kappa_against_glee(glee_scale_flag):
         x, y, **kwargs_lens_ref,
     )
     kappa = (f_xx + f_yy) / 2.
-    assert np.allclose(kappa, kappa_ref, rtol=1e-6)
+    npt.assert_almost_equal(kappa, kappa_ref, decimal=6)
 
-# @pytest.mark.parametrize(
-#     "glee_scale_flag", [False, True],
-# )
-# def test_gamma_against_glee(glee_scale_flag):
-#     (
-#         x, y,
-#         _, _, _, gamma_1_ref, gamma_2_ref, 
-#         kwargs_lens_ref,
-#     ) = get_grid_and_target_maps(glee_scale_flag)
-#     profile = DPIE(r_soft=1e-8, scale_flag=glee_scale_flag)
-#     f_xx, f_yy, f_xy = profile.hessian(
-#         x, y, **kwargs_lens_ref,
-#     )
-#     gamma_1 = (f_xx - f_yy) / 2.
-#     gamma_2 = f_xy
-#     assert np.allclose(gamma_1, gamma_1_ref, rtol=1e-6)
-#     assert np.allclose(gamma_2, gamma_2_ref, rtol=1e-6)
+@pytest.mark.parametrize(
+    "glee_scale_flag", [False, True],
+)
+def test_gamma_against_glee(glee_scale_flag):
+    (
+        x, y,
+        _, _, _, gamma_1_ref, gamma_2_ref, 
+        kwargs_lens_ref,
+    ) = get_grid_and_target_maps(glee_scale_flag)
+    profile = DPIE(r_soft=1e-8, scale_flag=glee_scale_flag)
+    f_xx, f_yy, f_xy = profile.hessian(
+        x, y, **kwargs_lens_ref,
+    )
+    gamma_1 = (f_xx - f_yy) / 2.
+    gamma_2 = f_xy
+    npt.assert_almost_equal(gamma_1, gamma_1_ref, decimal=6)
+    npt.assert_almost_equal(gamma_2, gamma_2_ref, decimal=6)

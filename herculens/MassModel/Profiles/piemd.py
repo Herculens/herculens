@@ -105,15 +105,28 @@ class PIEMD(object):
     
     @partial(jax.jit, static_argnums=(0,))
     def hessian(self, x, y, theta_E, r_core, q, phi, center_x=0, center_y=0):
-        e = (1.-q)/(1.+q)
-        w = r_core
-        theta_E = jnp.where(self._scale_flag, theta_E**2/(jnp.sqrt(theta_E*theta_E + w * w) - w), theta_E)
-        return jax.lax.cond(
-            e!=0, 
-            self._hessian_elliptical, 
-            self._hessian_spherical,
-            x, y, center_x, center_y, e, phi, theta_E, w
-        )
+        # NOTE: we use jax's autodiff to compute the Hessian, as the analytical expressions are likely not correct (see comment below).
+        func_x = lambda p: self.derivatives(p[0], p[1], theta_E, r_core, q, phi, center_x=center_x, center_y=center_y)[0]
+        func_y = lambda p: self.derivatives(p[0], p[1], theta_E, r_core, q, phi, center_x=center_x, center_y=center_y)[1]
+        grad_x = jax.vmap(jax.grad(func_x))(jnp.array([x.flatten(), y.flatten()]).T)
+        grad_y = jax.vmap(jax.grad(func_y))(jnp.array([x.flatten(), y.flatten()]).T)
+        f_xx = grad_x[:, 0].reshape(*x.shape)
+        f_xy = grad_x[:, 1].reshape(*x.shape)
+        f_yy = grad_y[:, 1].reshape(*x.shape)
+        return f_xx, f_yy, f_xy
+
+        # NOTE: the analytical expressions are likely not correct as they do not match
+        # the output of the GLEE C code, which itself computes the Hessian via numerical differentiation.
+        # (however, the analytical formula are consistent with the ones from the GLEE C code, which are commented out.)
+        # e = (1.-q)/(1.+q)
+        # w = r_core
+        # theta_E = jnp.where(self._scale_flag, theta_E**2/(jnp.sqrt(theta_E*theta_E + w * w) - w), theta_E)
+        # return jax.lax.cond(
+        #     e!=0, 
+        #     self._hessian_elliptical, 
+        #     self._hessian_spherical,
+        #     x, y, center_x, center_y, e, phi, theta_E, w
+        # )
     
     @partial(jax.jit, static_argnums=(0,))
     def kappa(self, x, y, theta_E, r_core, q, phi, center_x=0, center_y=0):
@@ -179,69 +192,75 @@ class PIEMD(object):
         alp_x, alp_y = rotation(alp_x, alp_y, -pa)
         return alp_x, alp_y
     
-    def _hessian_spherical(self, x, y, x_centre, y_centre, e, pa ,theta_E, w):
-        xx =  x - x_centre
-        yy =  y - y_centre
-        dx, dy = rotation(xx, yy, pa)
-        psi11 = (theta_E*(w*w*(-(dx)*(dx) + (dy)*(dy)) +(dy)*(dy)*((dx)*(dx) + (dy)*(dy)) +
-		          w*((dx) - (dy))*((dx) + (dy))*jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy))))/(jnp.power((dx)*(dx) + (dy)*(dy),2)*jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy)))
+    # def _hessian_spherical(self, x, y, x_centre, y_centre, e, pa ,theta_E, w):
+    #     xx =  x - x_centre
+    #     yy =  y - y_centre
+    #     dx, dy = rotation(xx, yy, pa)
+    #     psi11 = (theta_E*(w*w*(-(dx)*(dx) + (dy)*(dy)) +(dy)*(dy)*((dx)*(dx) + (dy)*(dy)) +
+	# 	          w*((dx) - (dy))*((dx) + (dy))*jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy))))/(jnp.power((dx)*(dx) + (dy)*(dy),2)*jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy)))
 
-        psi22 = (theta_E*(w*w*((dx) - (dy))*((dx) + (dy)) + (dx)*(dx)*((dx)*(dx) + (dy)*(dy)) + w*(-(dx)*(dx) + (dy)*(dy))* jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy))))/(jnp.power((dx)*(dx) + (dy)*(dy),2)*jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy)))
-        psi12 = -((theta_E*(dx)*(dy)*((dx)*(dx) + (dy)*(dy) + 2*w*(w - jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy)))))/(jnp.power((dx)*(dx) + (dy)*(dy),2)*jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy))))
-        return psi11, psi22, psi12
+    #     psi22 = (theta_E*(w*w*((dx) - (dy))*((dx) + (dy)) + (dx)*(dx)*((dx)*(dx) + (dy)*(dy)) + w*(-(dx)*(dx) + (dy)*(dy))* jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy))))/(jnp.power((dx)*(dx) + (dy)*(dy),2)*jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy)))
+    #     psi12 = -((theta_E*(dx)*(dy)*((dx)*(dx) + (dy)*(dy) + 2*w*(w - jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy)))))/(jnp.power((dx)*(dx) + (dy)*(dy),2)*jnp.sqrt(w*w + (dx)*(dx) + (dy)*(dy))))
+    #     return psi11, psi22, psi12
 
-    def _hessian_elliptical(self, x, y, x_centre, y_centre, e, pa ,theta_E, w):
-        xx =  x - x_centre
-        yy =  y - y_centre
-        dx, dy = rotation(xx, yy, pa)
+    # def _hessian_elliptical(self, x, y, x_centre, y_centre, e, pa ,theta_E, w):
+    #     xx =  x - x_centre
+    #     yy =  y - y_centre
+    #     dx, dy = rotation(xx, yy, pa)
 
-        psi11= jnp.imag(((1 - (e*e))*theta_E*((2.j)*jnp.sqrt(e)*w + (dx) - (1.j)*(dy))*
-		            (((1 - e)/(1 + e) + ((2.j)*jnp.sqrt(e)*(dx))/
-		             (((1+e)*(1+e))*jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-		                    (dy)*(dy)/((1-e)*(1-e)))))/
-		            ((2.j)*jnp.sqrt(e)*w + (dx) - (1.j)*(dy)) -
-		             (((1 - e)*(dx))/(1 + e) - ((1.j)*(1 + e)*(dy))/(1 - e) +
-		             (2.j)*jnp.sqrt(e)*
-	               jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-		                  (dy)*(dy)/((1-e)*(1-e))))/
-	              jnp.power((2.j)*jnp.sqrt(e)*w + (dx) - (1.j)*(dy),2)))/
-		          (jnp.sqrt(e)*(((1 - e)*(dx))/(1 + e) -
-		                    ((1.j)*(1 + e)*(dy))/(1 - e) +
-		                    (2.j)*jnp.sqrt(e)*
-		                  jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-	                          (dy)*(dy)/((1-e)*(1-e))))))/2.
-
-        psi22=-jnp.real(((1 - (e*e))*theta_E*(2.j*jnp.sqrt(e)*w + (dx) - 1.j*(dy))*
-		              ((((-1.j)*(1 + e))/(1 - e) +
-		                (2.j*jnp.sqrt(e)*(dy))/
-		               (((1-e)*(1-e))*
-		                jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-		                      (dy)*(dy)/((1-e)*(1-e)))))/
-		            (2.j*jnp.sqrt(e)*w + (dx) - 1.j*(dy)) +
-	                 (1.j*(((1 - e)*(dx))/(1 + e) -
-	                  (1.j*(1 + e)*(dy))/(1 - e) + 2.j*jnp.sqrt(e)*
-		                   jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-	                        (dy)*(dy)/((1-e)*(1-e)))))/
-	              jnp.power(2.j*jnp.sqrt(e)*w + (dx) - 1.j*(dy),2)))/
-		          (jnp.sqrt(e)*(((1 - e)*(dx))/(1 + e) -
-		                      (1.j*(1 + e)*(dy))/(1 - e) +
-	                      2.j*jnp.sqrt(e)*jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-		                           (dy)*(dy)/((1-e)*(1-e))))))/2.
-
-        psi12=-jnp.real(((1 - (e*e))*theta_E*(2.j*jnp.sqrt(e)*w + (dx) - 1.j*(dy))*
-		             (((1 - e)/(1 + e) + (2.j*jnp.sqrt(e)*(dx))/
-		                (((1+e)*(1+e))*jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-		                     (dy)*(dy)/((1-e)*(1-e)))))/
-		              (2.j*jnp.sqrt(e)*w + (dx) - 1.j*(dy)) -
-		              (((1 - e)*(dx))/(1 + e) - (1.j*(1 + e)*(dy))/(1 - e) +
-	               2.j*jnp.sqrt(e)*jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-		                    (dy)*(dy)/((1-e)*(1-e))))/
-		             jnp.power(2.j*jnp.sqrt(e)*w + (dx) - 1.j*(dy),2)))/
-		 	   (jnp.sqrt(e)*(((1 - e)*(dx))/(1 + e) -
-	                       (1.j*(1 + e)*(dy))/(1 - e) +
-	                       2.j*jnp.sqrt(e)*jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
-	                        (dy)*(dy)/((1-e)*(1-e))))))/2.
-        return psi11, psi22, psi12
+    #     psi11 = jnp.imag(((1 - (e*e))*theta_E*((2j)*jnp.sqrt(e)*w + (dx) - (1j)*(dy))*
+	# 	            (((1 - e)/(1 + e) + ((2j)*jnp.sqrt(e)*(dx))/
+	# 	              (((1+e)*(1+e))*
+	# 	               jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                    (dy)*(dy)/((1-e)*(1-e)))))/
+	# 	             ((2j)*jnp.sqrt(e)*w + (dx) - (1j)*(dy)) -
+	# 	             (((1 - e)*(dx))/(1 + e) - ((1j)*(1 + e)*(dy))/(1 - e) +
+	# 	              (2j)*jnp.sqrt(e)*
+	# 	              jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                   (dy)*(dy)/((1-e)*(1-e))))/
+	# 	             jnp.power((2j)*jnp.sqrt(e)*w + (dx) - (1j)*(dy),2)))/
+	# 	           (jnp.sqrt(e)*(((1 - e)*(dx))/(1 + e) -
+	# 	                     ((1j)*(1 + e)*(dy))/(1 - e) +
+	# 	                     (2.j)*jnp.sqrt(e)*
+	# 	                     jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                          (dy)*(dy)/((1-e)*(1-e))))))/2.
+        
+    #     psi12=-jnp.real(((1 - (e*e))*theta_E*(2j*jnp.sqrt(e)*w + (dx) - 1j*(dy))*
+	# 	             (((1 - e)/(1 + e) + (2.j*jnp.sqrt(e)*(dx))/
+	# 	               (((1+e)*(1+e))*
+	# 	                jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                     (dy)*(dy)/((1-e)*(1-e)))))/
+	# 	              (2j*jnp.sqrt(e)*w + (dx) - 1j*(dy)) -
+	# 	              (((1 - e)*(dx))/(1 + e) - (1j*(1 + e)*(dy))/(1 - e) +
+	# 	               2.j*jnp.sqrt(e)*
+	# 	               jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                    (dy)*(dy)/((1-e)*(1-e))))/
+	# 	              jnp.power(2j*jnp.sqrt(e)*w + (dx) - 1j*(dy),2)))/
+	# 	 	   (jnp.sqrt(e)*(((1 - e)*(dx))/(1 + e) -
+	# 	                      (1j*(1 + e)*(dy))/(1 - e) +
+	# 	                      2j*jnp.sqrt(e)*
+	# 	                      jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                           (dy)*(dy)/((1-e)*(1-e))))))/2.
+        
+    #     psi22=-jnp.real(((1 - (e*e))*theta_E*(2j*jnp.sqrt(e)*w + (dx) - 1j*(dy))*
+	# 	             ((((-1j)*(1 + e))/(1 - e) +
+	# 	               (2j*jnp.sqrt(e)*(dy))/
+	# 	               (((1-e)*(1-e))*
+	# 	                jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                     (dy)*(dy)/((1-e)*(1-e)))))/
+	# 	              (2j*jnp.sqrt(e)*w + (dx) - 1j*(dy)) +
+	# 	              (1j*(((1 - e)*(dx))/(1 + e) -
+	# 	                  (1j*(1 + e)*(dy))/(1 - e) +
+	# 	                  2j*jnp.sqrt(e)*
+	# 	                  jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                       (dy)*(dy)/((1-e)*(1-e)))))/
+	# 	              jnp.power(2j*jnp.sqrt(e)*w + (dx) - 1j*(dy),2)))/
+	# 	            (jnp.sqrt(e)*(((1 - e)*(dx))/(1 + e) -
+	# 	                      (1j*(1 + e)*(dy))/(1 - e) +
+	# 	                      2j*jnp.sqrt(e)*
+	# 	                      jnp.sqrt(w*w + (dx)*(dx)/((1+e)*(1+e)) +
+	# 	                           (dy)*(dy)/((1-e)*(1-e))))))/2.
+    #     return psi11, psi22, psi12
 
 def flatten_func(self):
     children = ()
