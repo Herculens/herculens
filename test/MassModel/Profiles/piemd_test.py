@@ -11,8 +11,6 @@ jax.config.update("jax_enable_x64", True)
 
 from herculens.MassModel.Profiles.piemd import PIEMD
 
-from piemd_original import Piemd_GPU
-
 
 GLEE_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'glee_files', 'piemd')
 
