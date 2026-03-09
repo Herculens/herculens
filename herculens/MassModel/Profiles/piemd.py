@@ -50,7 +50,7 @@ class PIEMD(object):
 
     If `scale_flag=False`, then E0 = thetaE
 
-    If `scale_flag=True`, then E0 = thetaE, E0 = E0*E0 / (sqrt(E0 * E0 + w * w) - w)
+    If `scale_flag=True`, then E0 = thetaE**2 / (sqrt(thetaE**2 + w**2) - w)
 
     If (w < r_soft) then w will be set to `r_soft`.
 
@@ -63,8 +63,9 @@ class PIEMD(object):
     r_soft : _type_, optional
         Softening radius, by default 1e-8
     scale_flag : bool, optional
-        'scale' flag usually given in GLEE config files, by default True, 
-        which leads to theta_E being simply the lensing strength.
+        'scale' flag usually given in GLEE config files.
+        If True (default): theta_E corresponds the Einstein radius.
+        If False: theta_E corresponds to the lensing strength E0.
     """
 
     param_names = ['theta_E', 'r_core', 'q', 'phi', 'center_x', 'center_y']
