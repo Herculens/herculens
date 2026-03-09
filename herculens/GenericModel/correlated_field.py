@@ -45,6 +45,8 @@ class CorrelatedField(object):
     kernel_type : str, optional
         Type of kernel to use for the field, either 'powerlaw' or 'matern', by default 'powerlaw'.
         If 'matern', use the `prior_matern_...` parameters below instead.
+        For now, the 'matern' type used with correlation_type_wl != 'none' is only implemented 
+        for the case num_pix_wl=1 (i.e. a stack of 2D fields).
     prior_loglogavgslope : tuple, optional
         The mean and scatter of the log-normal distribution for the average slope
          of the power-spectrum in log-log space, by default (-4., 0.5).
@@ -167,6 +169,12 @@ class CorrelatedField(object):
         elif correlation_type_wl != 'none':
             # correlated field along both spatial and spectral dimensions
             self._field_type = '3d'
+            if kernel_type == 'matern':
+                raise NotImplementedError("The 'matern' kernel type is not implemented "
+                                          "yet for the case of a '3D' field (i.e. with correlation "
+                                          "along both spatial and spectral dimensions). "
+                                          "Use the 'powerlaw' kernel type instead, or set `correlation_type_wl` "
+                                          "to 'none' to get a stack of 2D fields.")
         else:
             # stack of 2D correlated fields (i.e. uncorrelated along the spectral dimension)
             self._field_type = '2d_stack'
@@ -485,8 +493,9 @@ class CorrelatedField(object):
         }
         return self.model(params)
     
-    def _numpyro_sample_pixels_3d(self):
+    def _numpyro_sample_pixels_powerlaw_3d(self):
         # TODO: reduce code duplication
+        # TODO: implement the 'matern' kernel case for the 3d field type
         # imports here to prevent the need for numpyro to be installed
         # if the CorrelatedField class is used in a non-numpyro context.
         import numpyro
