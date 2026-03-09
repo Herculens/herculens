@@ -1,14 +1,18 @@
 # Describes a collection of mass models used for multi-plane lensing
-# 
+#
 # Copyright (c) 2024, herculens developers and contributors
 
-__author__ = 'krawczyk'
+__author__ = 'krawczyk', 'martin-millon'
 
 import numpy as np
 import jax
 import jax.numpy as jnp
+import jax_cosmo as jc
 
 from functools import partial
+
+from scipy.constants import arcsec
+
 from herculens.MassModel.mass_model import MassModel, ZeroMassModel
 
 
@@ -29,9 +33,9 @@ from herculens.MassModel.mass_model import MassModel, ZeroMassModel
 
 class MPMassModel(object):
     def __init__(
-            self, 
-            mp_mass_model_list, 
-            deflection_scaling_convention='standard', 
+            self,
+            mp_mass_model_list,
+            deflection_scaling_convention='standard',
             **mass_model_kwargs,
         ):
         '''
@@ -48,9 +52,9 @@ class MPMassModel(object):
             profiles.
         deflection_scaling_convention : str, optional
             Either 'standard' or 'glee'. Determines the convention used for
-            the eta matrix. The default is 'standard' (see build_eta_matrix() docstring). 
+            the eta matrix. The default is 'standard' (see build_eta_matrix() docstring).
             If 'glee' is used, the eta matrix is built by assuming additional
-            distance ratio factors as is done in the GLEE lens modelling software. 
+            distance ratio factors as is done in the GLEE lens modelling software.
             The default is 'standard'.
         '''
         string_input = all([isinstance(mm, list) or mm is None for mm in mp_mass_model_list])
@@ -93,14 +97,14 @@ class MPMassModel(object):
         if not hasattr(self, '_has_pixels'):
             self._has_pixels = [mass_model.has_pixels if mass_model is not None else False for mass_model in self.mass_models]
         return self._has_pixels
-    
+
     @property
     def has_mass(self):
         if not hasattr(self, '_has_mass'):
             # An list of bools indicating if a plane contains a mass model
             self._has_mass = [not isinstance(mass_model, ZeroMassModel) for mass_model in self.mass_models]
         return self._has_mass
-    
+
     @property
     def indices_planes_with_mass(self):
         if not hasattr(self, '_indices_planes_with_mass'):
@@ -148,7 +152,7 @@ class MPMassModel(object):
             k = [None] * N
         # un-flatten eta_flat into full eta array
         etas_t = self.base_eta.at[self.eta_idx].set(eta_flat)[:-1, :(N + 1)].T
-        
+
         # create output array
         xs = jnp.stack([x] * (N + 1), axis=0)
         ys = jnp.stack([y] * (N + 1), axis=0)
@@ -308,7 +312,7 @@ class MPMassModel(object):
         '''
         A = self.A(x, y, eta_flat, kwargs, kind=kind)
         return A[..., 0, 0] * A[..., 1, 1] - A[..., 0, 1] * A[..., 1, 0]
-    
+
     def magnification(self, x, y, eta_flat, kwargs, kind='auto'):
         '''Return the magnification map for each plane of the lens
         system.
@@ -421,12 +425,12 @@ class MPMassModel(object):
         gamma1 = 0.5 * (A[..., 1, 1] - A[..., 0, 0])
         gamma2 = -A[..., 0, 1]
         return gamma1, gamma2
-    
+
     def build_eta_matrix(
             self,
-            cosmology, 
-            redshifts, 
-            return_matrix=False, 
+            cosmology,
+            redshifts,
+            return_matrix=False,
             return_labels=False,
         ):
         """Utility function to build the eta matrix with the right conventions
@@ -458,31 +462,31 @@ class MPMassModel(object):
         np.testing.assert_equal(np.unique(redshifts), redshifts)
         if self._scaling_conv == 'glee':
             return self._build_eta_matrix_glee(
-                cosmology, 
-                redshifts, 
-                return_matrix=return_matrix, 
+                cosmology,
+                redshifts,
+                return_matrix=return_matrix,
                 return_labels=return_labels,
             )
         else:
             return self._build_eta_matrix_std(
-                cosmology, 
-                redshifts, 
-                return_matrix=return_matrix, 
+                cosmology,
+                redshifts,
+                return_matrix=return_matrix,
                 return_labels=return_labels,
             )
-    
+
     def eta_flat_to_matrix(self, eta_flat):
         """Un-flatten the eta matrix from the flat version to the full version
         (including the trivial elements of the matrix)."""
         #N = self.number_mass_planes
         # un-flatten eta_flat into full eta array
         return self.base_eta.at[self.eta_idx].set(eta_flat) #[:-1, :(N + 1)]
-    
+
     def _build_eta_matrix_std(
             self,
-            cosmology, 
-            redshifts, 
-            return_matrix=False, 
+            cosmology,
+            redshifts,
+            return_matrix=False,
             return_labels=False,
         ):
         # iterate over the planes
@@ -520,19 +524,19 @@ class MPMassModel(object):
                 return eta_flat, eta_labels
             else:
                 return eta_flat
-        
+
         eta_full = self.eta_flat_to_matrix(eta_flat)
 
         if return_labels is True:
             return eta_flat, eta_full, eta_labels
         else:
             return eta_flat, eta_full
-        
+
     def _build_eta_matrix_glee(
             self,
-            cosmology, 
-            redshifts, 
-            return_matrix=False, 
+            cosmology,
+            redshifts,
+            return_matrix=False,
             return_labels=False,
         ):
         """
@@ -552,7 +556,7 @@ class MPMassModel(object):
 
             eta_i_ip1 = (D_i_ip1 / D_ip1)
             eta_flat.append(eta_i_ip1)
-            
+
             for j in range(i+2, num_tot_planes):
                 z_j  = redshifts[j]
 
@@ -564,9 +568,9 @@ class MPMassModel(object):
                 # print("(D_i_j / D_j)", (D_i_j / D_j))
 
                 # eta_ij = (D_i_j * D_ip1) / (D_j * D_i_ip1) * (D_i_j / D_j)
-                
+
                 eta_ij = (D_i_j / D_j)
-                
+
                 eta_labels.append(
                     "N/A"  # TODO
                 )
@@ -581,12 +585,58 @@ class MPMassModel(object):
                 return eta_flat, eta_labels
             else:
                 return eta_flat
-        
+
         eta_full = self.eta_flat_to_matrix(eta_flat)
 
         if return_labels is True:
             return eta_flat, eta_full, eta_labels
         else:
             return eta_flat, eta_full
-        
-    
+
+    def fermat_potential(self, ximg, yimg, kwargs_lens, eta_flat, i=0):
+        """
+        Assumed convention: eta convention for fermat potential
+
+        Tau_{i, i+1} as defined in Eq. 16 of Johnson, Fleury and Millon (2026) (https://arxiv.org/pdf/2602.02697)
+
+        For the Beta convention (as in glee for example), see Eq. A6
+        """
+
+        beta_x, beta_y = self.ray_shooting(ximg, yimg, eta_flat, kwargs_lens)
+        potential_i = self.mass_models[i].potential(beta_x[i], beta_y[i], kwargs_lens[i])
+
+        d_beta_x = beta_x[i+1] - beta_x[i]
+        d_beta_y = beta_y[i+1] - beta_y[i]
+        fermat_pot = (d_beta_x**2 + d_beta_y**2) / 2. - potential_i
+
+        return fermat_pot
+
+    def arrival_time(self, ximg, yimg, kwargs_lens, cosmo, redshift_list, eta_flat):
+        """
+
+        :param ximg:
+        :param yimg:
+        :param kwargs_lens:
+        :param cosmo:
+        :param redshift_list: list of redshifts, it should be in the format in increasing order, up to the last source redshift
+
+        """
+
+        assert len(redshift_list) == self.number_mass_planes + 1, "Redshift list should contain one more redshift than the number of mass planes"
+        assert len(eta_flat) == self.number_mass_planes - 1 , "Number of mass planes does not correspond to eta_flat"
+        dt = np.zeros(len(ximg))
+        c = 8.39428867311569e-10 # in Mpc / day
+        arcsec2 = 2.350443053817325e-11 #arcsec^2 in rad^2
+        for i in range(self.number_mass_planes):
+            fermat_potential = self.fermat_potential(ximg, yimg, kwargs_lens, eta_flat, i)
+            Di = cosmo.angular_diameter_distance(redshift_list[i]).value
+            Dj = cosmo.angular_diameter_distance(redshift_list[i+1]).value
+            Dij = cosmo.angular_diameter_distance_z1z2(redshift_list[i], redshift_list[i+1]).value
+            dt += (1 / c) * (1 + redshift_list[i]) * (Di * Dj) / Dij * fermat_potential * arcsec2
+
+        return dt
+
+    def time_delay(self, ximg, yimg, kwargs_lens, cosmo, redshift_list, eta_flat):
+
+        arrival_time = self.arrival_time(ximg, yimg, kwargs_lens, cosmo, redshift_list, eta_flat)
+        return arrival_time[1:] - arrival_time[0]
