@@ -82,7 +82,7 @@ def critical_lines_caustics(lens_image, kwargs_mass, eta_flat=None, supersamplin
 
 
 def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
-    from herculens.MassModel.Profiles.shear import Shear, ShearGammaPsi
+    from herculens.MassModel.Profiles.shear import Shear, ShearGammaPhi
     shear_idx, shear_type = None, None
     num_profiles = len(lens_image.MassModel.profile_type_list)
     assert num_profiles == len(kwargs_lens)
@@ -93,7 +93,7 @@ def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
             shear_type = 'SHEAR'
             break
         elif (lens_image.MassModel.profile_type_list[i] == 'SHEAR_GAMMA_PSI' or
-              isinstance(lens_image.MassModel.profile_type_list[i], ShearGammaPsi)):
+              isinstance(lens_image.MassModel.profile_type_list[i], ShearGammaPhi)):
             shear_idx = i
             shear_type = 'SHEAR_GAMMA_PSI'
             break

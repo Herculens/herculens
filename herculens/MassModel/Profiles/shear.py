@@ -11,7 +11,7 @@ import numpy as np
 from herculens.Util import param_util
 
 
-__all__ = ['Shear', 'ShearGammaPsi']
+__all__ = ['Shear', 'ShearGammaPhi']
 
 
 class Shear(object):
@@ -74,39 +74,39 @@ class Shear(object):
         return f_xx, f_yy, f_xy
 
 
-class ShearGammaPsi(object):
+class ShearGammaPhi(object):
     """External shear in terms of magnitude and position angle."""
-    param_names = ['gamma_ext', 'psi_ext', 'ra_0', 'dec_0']
-    lower_limit_default = {'gamma_ext': 0, 'psi_ext': -np.pi, 'ra_0': -100, 'dec_0': -100}
-    upper_limit_default = {'gamma_ext': 1, 'psi_ext': np.pi, 'ra_0': 100, 'dec_0': 100}
-    fixed_default = {'gamma_ext': False, 'psi_ext': False, 'ra_0': True, 'dec_0': True}
+    param_names = ['gamma_ext', 'phi_ext', 'ra_0', 'dec_0']
+    lower_limit_default = {'gamma_ext': 0, 'phi_ext': -np.pi, 'ra_0': -100, 'dec_0': -100}
+    upper_limit_default = {'gamma_ext': 1, 'phi_ext': np.pi, 'ra_0': 100, 'dec_0': 100}
+    fixed_default = {'gamma_ext': False, 'phi_ext': False, 'ra_0': True, 'dec_0': True}
     
     def __init__(self):
         self._shear_e1e2 = Shear()
-        super(ShearGammaPsi, self).__init__()
+        super(ShearGammaPhi, self).__init__()
 
     @staticmethod
-    def function(x, y, gamma_ext, psi_ext, ra_0=0, dec_0=0):
+    def function(x, y, gamma_ext, phi_ext, ra_0=0, dec_0=0):
         """
 
         :param x: x-coordinate (angle)
         :param y: y0-coordinate (angle)
         :param gamma_ext: shear strength
-        :param psi_ext: shear angle (radian)
+        :param phi_ext: shear angle (radian)
         :param ra_0: x/ra position where shear deflection is 0
         :param dec_0: y/dec position where shear deflection is 0
         :return:
         """
         # change to polar coordinate
         r, phi = param_util.cart2polar(x-ra_0, y-dec_0)
-        f_ = 1. / 2 * gamma_ext * r ** 2 * np.cos(2 * (phi - psi_ext))
+        f_ = 1. / 2 * gamma_ext * r ** 2 * np.cos(2 * (phi - phi_ext))
         return f_
 
-    def derivatives(self, x, y, gamma_ext, psi_ext, ra_0=0, dec_0=0):
+    def derivatives(self, x, y, gamma_ext, phi_ext, ra_0=0, dec_0=0):
         # rotation angle
-        gamma1, gamma2 = param_util.shear_polar2cartesian(psi_ext, gamma_ext)
+        gamma1, gamma2 = param_util.shear_polar2cartesian(phi_ext, gamma_ext)
         return self._shear_e1e2.derivatives(x, y, gamma1, gamma2, ra_0, dec_0)
 
-    def hessian(self, x, y, gamma_ext, psi_ext, ra_0=0, dec_0=0):
-        gamma1, gamma2 = param_util.shear_polar2cartesian(psi_ext, gamma_ext)
+    def hessian(self, x, y, gamma_ext, phi_ext, ra_0=0, dec_0=0):
+        gamma1, gamma2 = param_util.shear_polar2cartesian(phi_ext, gamma_ext)
         return self._shear_e1e2.hessian(x, y, gamma1, gamma2, ra_0, dec_0)
