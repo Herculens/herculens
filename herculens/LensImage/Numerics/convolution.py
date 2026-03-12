@@ -57,26 +57,31 @@ class PixelKernelConvolution(object):
             return kernel_util.cut_psf(self._kernel, num_pix)
         return self._kernel
 
-    def convolution2d(self, image):
+    def convolution2d(self, image, kernel=None):
         """
 
         :param image: 2d array (image) to be convolved
         :return: fft convolution
         """
+        kernel_in_use = self._kernel if kernel is None else kernel
         if self._conv_type == 'jax_scipy_fft':
-            return jsp.signal.fftconvolve(image, self._kernel, mode='same')
+            return jsp.signal.fftconvolve(image, kernel_in_use, mode='same')
         elif self._conv_type == 'jax_scipy':
-            return jsp.signal.convolve2d(image, self._kernel, mode='same')
+            return jsp.signal.convolve2d(image, kernel_in_use, mode='same')
         elif self._conv_type == 'matrix':
+            if kernel is not None:
+                raise NotImplementedError(
+                    "Dynamic kernel override is not supported for matrix convolution."
+                )
             return self._conv_matrix.dot(image.flatten()).reshape(*self._output_shape)
 
-    def re_size_convolve(self, image_low_res, image_high_res=None):
+    def re_size_convolve(self, image_low_res, image_high_res=None, kernel=None):
         """
 
         :param image_high_res: supersampled image/model to be convolved on a regular pixel grid
         :return: convolved and re-sized image
         """
-        return self.convolution2d(image_low_res)
+        return self.convolution2d(image_low_res, kernel=kernel)
 
     @property
     def convolution_matrix(self):
