@@ -87,7 +87,7 @@ class Numerics(object):
 
         self._point_source_supersampling_factor = point_source_supersampling_factor
 
-    def re_size_convolve(self, flux_array, unconvolved=False, input_as_list=False):
+    def re_size_convolve(self, flux_array, unconvolved=False, input_as_list=False, psf_kernel=None):
         """
         Resize and convolve the flux array.
 
@@ -107,12 +107,20 @@ class Numerics(object):
             Convolved image on the regular pixel grid.
         """
         if input_as_list is False:
-            return self._re_size_convolve_sgl(flux_array, unconvolved=unconvolved)
+            return self._re_size_convolve_sgl(
+                flux_array,
+                unconvolved=unconvolved,
+                psf_kernel=psf_kernel,
+            )
         return [
-            self._re_size_convolve_sgl(flux_array[i], unconvolved=unconvolved) for i in range(len(flux_array))
+            self._re_size_convolve_sgl(
+                flux_array[i],
+                unconvolved=unconvolved,
+                psf_kernel=psf_kernel,
+            ) for i in range(len(flux_array))
         ]
     
-    def _re_size_convolve_sgl(self, flux_array, unconvolved=False):
+    def _re_size_convolve_sgl(self, flux_array, unconvolved=False, psf_kernel=None):
         """
 
         :param flux_array: 1d array, flux values corresponding to coordinates_evaluate
@@ -124,11 +132,23 @@ class Numerics(object):
         if unconvolved is True or self._conv is None:
             image_conv = image_low_res
         else:
-            # convolve low res grid and high res grid
-            image_conv = self._conv.re_size_convolve(image_low_res, image_high_res_partial)
+            if psf_kernel is not None and self._psf_type == 'PIXEL':
+                if self._high_res_return:
+                    raise NotImplementedError(
+                        "Explicit `psf_kernel` override is not supported when "
+                        "supersampling_convolution=True."
+                    )
+                image_conv = self._conv.re_size_convolve(
+                    image_low_res,
+                    image_high_res_partial,
+                    kernel=psf_kernel,
+                )
+            else:
+                # convolve low res grid and high res grid
+                image_conv = self._conv.re_size_convolve(image_low_res, image_high_res_partial)
         return image_conv * self._pixel_width**2
 
-    def render_point_sources(self, theta_x, theta_y, amplitude):
+    def render_point_sources(self, theta_x, theta_y, amplitude, psf_kernel=None):
         """Put the PSF at the locations of multiply imaged point sources.
 
         Parameters
@@ -164,7 +184,12 @@ class Numerics(object):
                 "example, if `pixel_size` was not provided for type GAUSSIAN.")
             raise ValueError(err_msg)
 
-        kernel = self._psf.kernel_point_source.T  # taking the transpose for map_coordinates
+        if psf_kernel is None:
+            kernel = self._psf.kernel_point_source.T  # taking the transpose for map_coordinates
+        else:
+            kernel = jnp.asarray(psf_kernel).T
+            if kernel.ndim != 2:
+                raise ValueError("`psf_kernel` must be a 2D array.")
         nx, ny = self._pixel_grid.num_pixel_axes
         xrange = jnp.arange(nx) + kernel.shape[0] // 2
         yrange = jnp.arange(ny) + kernel.shape[1] // 2

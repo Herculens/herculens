@@ -126,7 +126,8 @@ class LensImage(object):
                                   de_lensed=False, k=None, k_lens=None,
                                   adapted_pixels_coords=None, 
                                   return_pixels_coords=False,
-                                  return_as_list=False):
+                                  return_as_list=False,
+                                  psf_kernel=None):
         """
 
         computes the source surface brightness distribution
@@ -160,7 +161,10 @@ class LensImage(object):
         )
         if not supersampled:
             source_light = self.ImageNumerics.re_size_convolve(
-                source_light, unconvolved=unconvolved, input_as_list=return_as_list,
+                source_light,
+                unconvolved=unconvolved,
+                input_as_list=return_as_list,
+                psf_kernel=psf_kernel,
             )
         if return_pixels_coords:
             return source_light, adapted_pixels_coords
@@ -192,7 +196,7 @@ class LensImage(object):
         return source_light
 
     def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False,
-                                supersampled=False, k=None):
+                                supersampled=False, k=None, psf_kernel=None):
         """
 
         computes the lens surface brightness distribution
@@ -206,11 +210,14 @@ class LensImage(object):
         lens_light = self.LensLightModel.surface_brightness(x_grid_img, y_grid_img, kwargs_lens_light, k=k)
         if not supersampled:
             lens_light = self.ImageNumerics.re_size_convolve(
-                lens_light, unconvolved=unconvolved)
+                lens_light,
+                unconvolved=unconvolved,
+                psf_kernel=psf_kernel,
+            )
         return lens_light
 
     def point_source_image(self, kwargs_point_source, kwargs_lens,
-                           kwargs_solver, k=None):
+                           kwargs_solver, k=None, psf_kernel=None):
         """Compute PSF-convolved point sources rendered on the image plane.
 
         :param kwargs_point_source: list of keyword arguments corresponding to the point sources
@@ -227,7 +234,7 @@ class LensImage(object):
         )
         for i in range(len(theta_x)):
             result += self.ImageNumerics.render_point_sources(
-                theta_x[i], theta_y[i], amplitude[i]
+                theta_x[i], theta_y[i], amplitude[i], psf_kernel=psf_kernel
             )
         return result
 
@@ -236,7 +243,8 @@ class LensImage(object):
               kwargs_point_source=None, unconvolved=False, supersampled=False,
               source_add=True, lens_light_add=True, point_source_add=True,
               k_lens=None, k_source=None, k_lens_light=None, k_point_source=None,
-              adapted_source_pixels_coords=None, return_source_pixels_coords=False):
+              adapted_source_pixels_coords=None, return_source_pixels_coords=False,
+              psf_kernel=None):
         """
         Create the 2D model image from parameter values.
         Note: due to JIT compilation, the first call to this method will be slower.
@@ -271,7 +279,9 @@ class LensImage(object):
                 supersampled=supersampled, k=k_source, k_lens=k_lens,
                 adapted_pixels_coords=adapted_source_pixels_coords, 
                 return_pixels_coords=True,
-                return_as_list=return_as_list)
+                return_as_list=return_as_list,
+                psf_kernel=psf_kernel,
+            )
             if return_as_list:  # i.e. if self.source_arc_mask is not None
                 source_model[self.SourceModel.pixelated_index] *= self.source_arc_mask
                 source_model = jnp.sum(jnp.array(source_model), axis=0)
@@ -279,11 +289,11 @@ class LensImage(object):
         if lens_light_add is True:
             model += self.lens_surface_brightness(kwargs_lens_light, 
                                                   unconvolved=unconvolved, supersampled=supersampled,
-                                                  k=k_lens_light)
+                                                  k=k_lens_light, psf_kernel=psf_kernel)
         if point_source_add:
             model += self.point_source_image(kwargs_point_source, kwargs_lens,
                                              kwargs_solver=self.kwargs_lens_equation_solver,
-                                             k=k_point_source)
+                                             k=k_point_source, psf_kernel=psf_kernel)
         if return_source_pixels_coords:
             return model, adapted_source_pixels_coords
         return model
