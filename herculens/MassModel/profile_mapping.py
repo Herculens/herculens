@@ -5,6 +5,7 @@
 from herculens.MassModel.Profiles.gaussian_potential import Gaussian
 from herculens.MassModel.Profiles.point_mass import PointMass
 from herculens.MassModel.Profiles.multipole import Multipole
+from herculens.MassModel.Profiles.convergence import Convergence
 from herculens.MassModel.Profiles.shear import Shear, ShearGammaPsi
 from herculens.MassModel.Profiles.sis import SIS
 from herculens.MassModel.Profiles.sie import SIE
@@ -28,6 +29,7 @@ STRING_MAPPING = {
     'PIEMD': PIEMD,
     'GAUSSIAN': Gaussian,
     'POINT_MASS': PointMass,
+    'CONVERGENCE': Convergence,
     'SHEAR': Shear,
     'SHEAR_GAMMA_PSI': ShearGammaPsi,
     'MULTIPOLE': Multipole,
