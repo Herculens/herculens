@@ -127,7 +127,7 @@ class LensImage(object):
                                   adapted_pixels_coords=None, 
                                   return_pixels_coords=False,
                                   return_as_list=False,
-                                  psf_kernel=None):
+                                  kwargs_psf=None):
         """
 
         computes the source surface brightness distribution
@@ -164,7 +164,7 @@ class LensImage(object):
                 source_light,
                 unconvolved=unconvolved,
                 input_as_list=return_as_list,
-                psf_kernel=psf_kernel,
+                kwargs_psf=kwargs_psf,
             )
         if return_pixels_coords:
             return source_light, adapted_pixels_coords
@@ -196,7 +196,7 @@ class LensImage(object):
         return source_light
 
     def lens_surface_brightness(self, kwargs_lens_light, unconvolved=False,
-                                supersampled=False, k=None, psf_kernel=None):
+                                supersampled=False, k=None, kwargs_psf=None):
         """
 
         computes the lens surface brightness distribution
@@ -212,12 +212,12 @@ class LensImage(object):
             lens_light = self.ImageNumerics.re_size_convolve(
                 lens_light,
                 unconvolved=unconvolved,
-                psf_kernel=psf_kernel,
+                kwargs_psf=kwargs_psf,
             )
         return lens_light
 
     def point_source_image(self, kwargs_point_source, kwargs_lens,
-                           kwargs_solver, k=None, psf_kernel=None):
+                           kwargs_solver, k=None, kwargs_psf=None):
         """Compute PSF-convolved point sources rendered on the image plane.
 
         :param kwargs_point_source: list of keyword arguments corresponding to the point sources
@@ -234,7 +234,7 @@ class LensImage(object):
         )
         for i in range(len(theta_x)):
             result += self.ImageNumerics.render_point_sources(
-                theta_x[i], theta_y[i], amplitude[i], psf_kernel=psf_kernel
+                theta_x[i], theta_y[i], amplitude[i], kwargs_psf=kwargs_psf
             )
         return result
 
@@ -244,7 +244,7 @@ class LensImage(object):
               source_add=True, lens_light_add=True, point_source_add=True,
               k_lens=None, k_source=None, k_lens_light=None, k_point_source=None,
               adapted_source_pixels_coords=None, return_source_pixels_coords=False,
-              psf_kernel=None):
+              kwargs_psf=None):
         """
         Create the 2D model image from parameter values.
         Note: due to JIT compilation, the first call to this method will be slower.
@@ -280,7 +280,7 @@ class LensImage(object):
                 adapted_pixels_coords=adapted_source_pixels_coords, 
                 return_pixels_coords=True,
                 return_as_list=return_as_list,
-                psf_kernel=psf_kernel,
+                kwargs_psf=kwargs_psf,
             )
             if return_as_list:  # i.e. if self.source_arc_mask is not None
                 source_model[self.SourceModel.pixelated_index] *= self.source_arc_mask
@@ -289,11 +289,11 @@ class LensImage(object):
         if lens_light_add is True:
             model += self.lens_surface_brightness(kwargs_lens_light, 
                                                   unconvolved=unconvolved, supersampled=supersampled,
-                                                  k=k_lens_light, psf_kernel=psf_kernel)
+                                                  k=k_lens_light, kwargs_psf=kwargs_psf)
         if point_source_add:
             model += self.point_source_image(kwargs_point_source, kwargs_lens,
                                              kwargs_solver=self.kwargs_lens_equation_solver,
-                                             k=k_point_source, psf_kernel=psf_kernel)
+                                             k=k_point_source, kwargs_psf=kwargs_psf)
         if return_source_pixels_coords:
             return model, adapted_source_pixels_coords
         return model
