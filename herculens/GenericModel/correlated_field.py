@@ -45,6 +45,8 @@ class CorrelatedField(object):
     kernel_type : str, optional
         Type of kernel to use for the field, either 'powerlaw' or 'matern', by default 'powerlaw'.
         If 'matern', use the `prior_matern_...` parameters below instead.
+        For now, the 'matern' type used with correlation_type_wl != 'none' is only implemented 
+        for the case num_pix_wl=1 (i.e. a stack of 2D fields).
     prior_loglogavgslope : tuple, optional
         The mean and scatter of the log-normal distribution for the average slope
          of the power-spectrum in log-log space, by default (-4., 0.5).
@@ -167,6 +169,12 @@ class CorrelatedField(object):
         elif correlation_type_wl != 'none':
             # correlated field along both spatial and spectral dimensions
             self._field_type = '3d'
+            if kernel_type == 'matern':
+                raise NotImplementedError("The 'matern' kernel type is not implemented "
+                                          "yet for the case of a '3D' field (i.e. with correlation "
+                                          "along both spatial and spectral dimensions). "
+                                          "Use the 'powerlaw' kernel type instead, or set `correlation_type_wl` "
+                                          "to 'none' to get a stack of 2D fields.")
         else:
             # stack of 2D correlated fields (i.e. uncorrelated along the spectral dimension)
             self._field_type = '2d_stack'
@@ -354,26 +362,63 @@ class CorrelatedField(object):
     @property
     def latent_parameter_props(self):
         key_base = f'{self._param_prefix}_{self._field_key}'
-        if (self._kernel_type, self._field_type) == ('powerlaw', '2d'):
-            param_props = {
-                # NOTE: such grids of independent variables could be achieved using the 'plate' feature
-                # of numpyro. However, this causes issues downstream when using
-                # the numpyro wrapper and utilities from Herculens.
-                f'{key_base}_xi': (self._num_pix_tot, self._num_pix_tot),
-                f'{key_base}_zeromode': (),
-                f'{key_base}_{self._key_xy}_fluctuations': (),
-                f'{key_base}_{self._key_xy}_loglogavgslope': (),
-            }
-            if self._kw_fluctuations['flexibility'] is not None:
-                param_props[f'{key_base}_{self._key_xy}_flexibility'] = ()
-                if self._kw_fluctuations['asperity'] is not None:
-                    param_props[f'{key_base}_{self._key_xy}_asperity'] = ()
-                param_props[f'{key_base}_{self._key_xy}_spectrum'] = (
-                    self._cfm._target_grids[-1].harmonic_grid.log_volume.size, 2
-                )
+        if self._kernel_type == 'powerlaw':
+            if self._field_type in ('2d', '3d'):
+                param_props = {
+                    # NOTE: such grids of independent variables could be achieved using the 'plate' feature
+                    # of numpyro. However, this causes issues downstream when using
+                    # the numpyro wrapper and utilities from Herculens.
+                    f'{key_base}_xi': (self._num_pix_tot, self._num_pix_tot),
+                    f'{key_base}_zeromode': (),
+                    f'{key_base}_{self._key_xy}_fluctuations': (),
+                    f'{key_base}_{self._key_xy}_loglogavgslope': (),
+                }
+                if self._kw_fluctuations['flexibility'] is not None:
+                    param_props[f'{key_base}_{self._key_xy}_flexibility'] = ()
+                    if self._kw_fluctuations['asperity'] is not None:
+                        param_props[f'{key_base}_{self._key_xy}_asperity'] = ()
+                    param_props[f'{key_base}_{self._key_xy}_spectrum'] = (
+                        self._cfm._target_grids[-1].harmonic_grid.log_volume.size, 2
+                    )
+                if self._field_type == '3d':
+                    param_props.update(
+                        {
+                            f'{key_base}_xi': (self._num_pix_wl_tot, self._num_pix_tot, self._num_pix_tot), # NOTE: this one will replace the 2d case set above
+                            f'{key_base}_{self._key_wl}_fluctuations': (),
+                            f'{key_base}_{self._key_wl}_loglogavgslope': (),
+                        }
+                    )
+                    if self._kw_fluctuations['flexibility'] is not None:
+                        param_props.update(
+                            {
+                                f'{key_base}_{self._key_wl}_flexibility': (),
+                            }
+                        )
+                        if self._kw_fluctuations['asperity'] is not None:
+                            param_props.update(
+                                {
+                                    f'{key_base}_{self._key_wl}_asperity': (),
+                                }
+                            )
+
+            elif self._field_type == '2d_stack':
+                param_props = {}
+                for i_wl in range(self._num_pix_wl):
+                    key_base_stack = f'{key_base}_stack{i_wl}'
+                    param_props.update({
+                        f'{key_base_stack}_xi': (self._num_pix_tot, self._num_pix_tot),
+                        f'{key_base_stack}_zeromode': (),
+                        f'{key_base_stack}_{self._key_xy}_fluctuations': (),
+                        f'{key_base_stack}_{self._key_xy}_loglogavgslope': (),
+                    })
+                    if self._kw_fluctuations['flexibility'] is not None:
+                        param_props[f'{key_base_stack}_{self._key_xy}_flexibility'] = ()
+                        if self._kw_fluctuations['asperity'] is not None:
+                            param_props[f'{key_base_stack}_{self._key_xy}_asperity'] = ()
+                        
         else:
             # TODO
-            raise NotImplementedError("The method `latent_parameter_names` is only implemented for the 'powerlaw' kernel and '2d' field type for now.")
+            raise NotImplementedError(f"`latent_parameter_props()` is not yet implemented for the kernel type '{self._kernel_type}' and field type '{self._field_type}'.")
         return param_props
 
     def numpyro_sample_pixels(self):
@@ -485,8 +530,9 @@ class CorrelatedField(object):
         }
         return self.model(params)
     
-    def _numpyro_sample_pixels_3d(self):
+    def _numpyro_sample_pixels_powerlaw_3d(self):
         # TODO: reduce code duplication
+        # TODO: implement the 'matern' kernel case for the 3d field type
         # imports here to prevent the need for numpyro to be installed
         # if the CorrelatedField class is used in a non-numpyro context.
         import numpyro
@@ -555,25 +601,26 @@ class CorrelatedField(object):
         params = {}
         key_base = f'{self._param_prefix}_{self._field_key}'
         for i_wl in range(self._num_pix_wl):
+            key_base_stack = f'{key_base}_stack{i_wl}'
             # Base field parameters
             params.update({
-                f'{key_base}_stack{i_wl}_xi': numpyro.sample(
-                    f'{key_base}_stack{i_wl}_xi', 
+                f'{key_base_stack}_xi': numpyro.sample(
+                    f'{key_base_stack}_xi', 
                     Independent(Normal(
                         jnp.zeros((self._num_pix_tot, self._num_pix_tot)), 
                         jnp.ones((self._num_pix_tot, self._num_pix_tot))
                     ), reinterpreted_batch_ndims=2)
                 ),
-                f'{key_base}_stack{i_wl}_zeromode': numpyro.sample(
-                    f'{key_base}_stack{i_wl}_zeromode', 
+                f'{key_base_stack}_zeromode': numpyro.sample(
+                    f'{key_base_stack}_zeromode', 
                     Normal(0., 1.),
                 ),
-                f'{key_base}_stack{i_wl}_{self._key_xy}_fluctuations': numpyro.sample(
-                    f'{key_base}_stack{i_wl}_{self._key_xy}_fluctuations', 
+                f'{key_base_stack}_{self._key_xy}_fluctuations': numpyro.sample(
+                    f'{key_base_stack}_{self._key_xy}_fluctuations', 
                     Normal(0., 1.),
                 ),
-                f'{key_base}_stack{i_wl}_{self._key_xy}_loglogavgslope': numpyro.sample(
-                    f'{key_base}_stack{i_wl}_{self._key_xy}_loglogavgslope', 
+                f'{key_base_stack}_{self._key_xy}_loglogavgslope': numpyro.sample(
+                    f'{key_base_stack}_{self._key_xy}_loglogavgslope', 
                     Normal(0., 1.),
                 ),
             })
@@ -581,8 +628,8 @@ class CorrelatedField(object):
             if self._kw_fluctuations['flexibility'] is not None:
                 params.update(
                     {
-                        f'{key_base}_stack{i_wl}_{self._key_xy}_flexibility': numpyro.sample(
-                            f'{key_base}_stack{i_wl}_{self._key_xy}_flexibility', 
+                        f'{key_base_stack}_{self._key_xy}_flexibility': numpyro.sample(
+                            f'{key_base_stack}_{self._key_xy}_flexibility', 
                             Normal(0., 1.),
                         )
                     }
@@ -590,8 +637,8 @@ class CorrelatedField(object):
                 if self._kw_fluctuations['asperity'] is not None:
                     params.update(
                         {
-                            f'{key_base}_stack{i_wl}_{self._key_xy}_asperity': numpyro.sample(
-                                f'{key_base}_stack{i_wl}_{self._key_xy}_asperity', 
+                            f'{key_base_stack}_{self._key_xy}_asperity': numpyro.sample(
+                                f'{key_base_stack}_{self._key_xy}_asperity', 
                                 Normal(0., 1.),
                             )
                         }

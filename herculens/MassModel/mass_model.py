@@ -98,7 +98,7 @@ class MassModel(MassModelBase):
         :param x_source: source position
         :param y_source: source position
         :param kwargs_lens: list of keyword arguments of lens model parameters matching the lens model classes
-        :return: fermat potential in arcsec**2 without geometry term (second part of Eqn 1 in Suyu et al. 2013) as a list
+        :return: fermat potential in arcsec**2
         """
         potential = self.potential(x_image, y_image, kwargs_lens, k=k)
         if x_source is None or y_source is None:
@@ -354,7 +354,7 @@ class ZeroMassModel(MassModelBase):
         :param x_source: source position
         :param y_source: source position
         :param kwargs_lens: list of keyword arguments of lens model parameters matching the lens model classes
-        :return: fermat potential in arcsec**2 without geometry term (second part of Eqn 1 in Suyu et al. 2013) as a list
+        :return: fermat potential in arcsec**2
         """
         return jnp.zeros_like(x_image)
 

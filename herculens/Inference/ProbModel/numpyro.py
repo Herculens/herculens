@@ -29,17 +29,12 @@ class NumpyroModel(BaseProbModel):
         Returns the number of parameters in the model.
         It is advised to use the more general count_sampled_parameters() method. This property
         is only here for backward compatibility with older Herculens+Numpyro code.
+
+        Important: this property assumes that the numpyro model() function 
+        does not take any args nor kwargs (i.e. model_args=(), model_kwargs={}).
+        Use count_sampled_parameters() instead if your model() function takes args and/or kwargs.
         """
-        if not hasattr(self, '_num_param'):
-            try:
-                self._num_param = self.count_sampled_parameters(model_args=(), model_kwargs={})
-            except TypeError as e:
-                print("Error while calling the property NumpyroModel.num_parameters."
-                      "The cause might be that the underlying numpyro model requires"
-                      "specific positional and/or keyword arguments."
-                      "Use the count_sampled_parameters(model_args=(), model_kwargs={}) method instead.\n"
-                      f"Here is the original error:\n{e}")
-        return self._num_param
+        return self.count_sampled_parameters(model_args=(), model_kwargs={})
     
     def count_sampled_parameters(self, model_args=(), model_kwargs={}):
         return numpyro_util.count_sampled_parameters(self.model, model_args=model_args, model_kwargs=model_kwargs)

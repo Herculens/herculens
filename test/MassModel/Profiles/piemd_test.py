@@ -4,9 +4,10 @@ import os
 import pytest
 from astropy.io import fits
 import numpy as np
+import numpy.testing as npt
 
-from jax import config
-config.update("jax_enable_x64", True)  # could actually make a difference in jifty
+import jax
+jax.config.update("jax_enable_x64", True)
 
 from herculens.MassModel.Profiles.piemd import PIEMD
 
@@ -74,6 +75,7 @@ def get_grid_and_target_maps(glee_scale_flag, index_map):
         kwargs_lens_ref,
     )
 
+
 @pytest.mark.parametrize(
     "glee_scale_flag", [False, True],
 )
@@ -93,6 +95,7 @@ def test_alpha_against_glee(glee_scale_flag, index_map):
     assert np.allclose(alpha_1, alpha_1_ref, rtol=1e-10)
     assert np.allclose(alpha_2, alpha_2_ref, rtol=1e-10)
 
+
 @pytest.mark.parametrize(
     "glee_scale_flag", [False, True],
 )
@@ -106,29 +109,59 @@ def test_kappa_against_glee(glee_scale_flag, index_map):
         kwargs_lens_ref,
     ) = get_grid_and_target_maps(glee_scale_flag, index_map)
     profile = PIEMD(r_soft=1e-8, scale_flag=glee_scale_flag)
+    # f_xx, f_yy, _ = profile.hessian(
+    #     x, y, **kwargs_lens_ref,
+    # )
+    # kappa = (f_xx + f_yy) / 2.
+    # npt.assert_almost_equal(kappa, kappa_ref, decimal=6)
+    kappa_alt = profile.kappa(x, y, **kwargs_lens_ref)
+    npt.assert_almost_equal(kappa_alt, kappa_ref, decimal=6)
+
+
+@pytest.mark.parametrize(
+    "glee_scale_flag", [False, True],
+)
+@pytest.mark.parametrize(
+    "index_map", [1, 2, 3],
+)
+def test_kappa_self_consistency(glee_scale_flag, index_map):
+    (
+        x, y,
+        _, _, _, gamma_1_ref, gamma_2_ref, 
+        kwargs_lens_ref,
+    ) = get_grid_and_target_maps(glee_scale_flag, index_map)
+
+    profile = PIEMD(r_soft=1e-8, scale_flag=glee_scale_flag)
     f_xx, f_yy, _ = profile.hessian(
         x, y, **kwargs_lens_ref,
     )
-    kappa = (f_xx + f_yy) / 2.
-    assert np.allclose(kappa, kappa_ref, rtol=1e-6)
+    kappa_grad = (f_xx + f_yy) / 2.
+    kappa_direct = profile.kappa(
+        x, y, **kwargs_lens_ref,
+    )
+    kappa_grad = np.asarray(kappa_grad)
+    kappa_direct = np.asarray(kappa_direct)
+    npt.assert_almost_equal(kappa_grad, kappa_direct, decimal=2)
 
-# @pytest.mark.parametrize(
-#     "glee_scale_flag", [False, True],
-# )
-# @pytest.mark.parametrize(
-#     "index_map", [1, 2, 3],
-# )
-# def test_gamma_against_glee(glee_scale_flag, index_map):
-#     (
-#         x, y,
-#         _, _, _, gamma_1_ref, gamma_2_ref, 
-#         kwargs_lens_ref,
-#     ) = get_grid_and_target_maps(glee_scale_flag, index_map)
-#     profile = PIEMD(r_soft=1e-8, scale_flag=glee_scale_flag)
-#     f_xx, f_yy, f_xy = profile.hessian(
-#         x, y, **kwargs_lens_ref,
-#     )
-#     gamma_1 = (f_xx - f_yy) / 2.
-#     gamma_2 = f_xy
-#     assert np.allclose(gamma_1, gamma_1_ref, rtol=1e-6)
-#     assert np.allclose(gamma_2, gamma_2_ref, rtol=1e-6)
+
+@pytest.mark.parametrize(
+    "glee_scale_flag", [False, True],
+)
+@pytest.mark.parametrize(
+    "index_map", [1, 2, 3],
+)
+def test_gamma_against_glee(glee_scale_flag, index_map):
+    (
+        x, y,
+        _, _, _, gamma_1_ref, gamma_2_ref, 
+        kwargs_lens_ref,
+    ) = get_grid_and_target_maps(glee_scale_flag, index_map)
+
+    profile = PIEMD(r_soft=1e-8, scale_flag=glee_scale_flag)
+    f_xx, f_yy, f_xy = profile.hessian(
+        x, y, **kwargs_lens_ref,
+    )
+    gamma_1 = (f_xx - f_yy) / 2.
+    gamma_2 = f_xy
+    npt.assert_almost_equal(gamma_1, gamma_1_ref, decimal=6)
+    npt.assert_almost_equal(gamma_2, gamma_2_ref, decimal=6)

@@ -20,49 +20,83 @@ class NIE(object):
     """
     Non-singular isothermal ellipsoid
     kappa = theta_E/2 [s2IE + r2(1 - e * cos(2*phi)]^-1/2
+
+    where s (or s_scale) has been named r_core in the input parameters.
     """
-    param_names = ['theta_E', 'e1', 'e2', 's_scale', 'center_x', 'center_y']
-    lower_limit_default = {'theta_E': 0, 'e1': -0.5, 'e2': -0.5, 's_scale': 0, 'center_x': -100, 'center_y': -100}
-    upper_limit_default = {'theta_E': 10, 'e1': 0.5, 'e2': 0.5, 's_scale': 100, 'center_x': 100, 'center_y': 100}
+    param_names = ['theta_E', 'e1', 'e2', 'r_core', 'center_x', 'center_y']
+    lower_limit_default = {'theta_E': 0, 'e1': -0.5, 'e2': -0.5, 'r_core': 0, 'center_x': -100, 'center_y': -100}
+    upper_limit_default = {'theta_E': 10, 'e1': 0.5, 'e2': 0.5, 'r_core': 100, 'center_x': 100, 'center_y': 100}
     fixed_default = {key: False for key in param_names}
     
     def __init__(self):
         self.nie_major_axis = NIEMajorAxis()
         super(NIE, self).__init__()
 
-    def param_conv(self, theta_E, e1, e2, s_scale):
+    def param_conv(self, theta_E, e1, e2, r_core):
         """
-        convert parameters from 2*kappa = bIE [s2IE + r2(1 - e *cos(2*phi)]^-1/2 to
+        Convert parameters from 2*kappa = bIE [s2IE + r2(1 - e *cos(2*phi)]^-1/2 to
         2*kappa=  b *(q2(s2 + x2) + y2)^-1/2
         see expressions after Equation 8 in Keeton and Kochanek 1998, https://arxiv.org/pdf/astro-ph/9705194.pdf
 
-        :param theta_E: Einstein radius
-        :param e1: eccentricity component
-        :param e2: eccentricity component
-        :param s_scale: smoothing scale
-        :return: critical radius b, smoothing scale s, axis ratio q, orientation angle phi_G
+        Parameters
+        ----------
+        theta_E : float
+            Einstein radius
+        e1 : float
+            Eccentricity component
+        e2 : float
+            Eccentricity component
+        r_core : float
+            Core radius (sometimes referred to as scale radius or smoothing scale)
+
+        Returns
+        -------
+        b : float
+            Critical radius
+        s : float
+            Smoothing scale
+        q : float
+            Axis ratio
+        phi_G : float
+            Orientation angle
         """
 
         phi_G, q = param_util.ellipticity2phi_q(e1, e2)
-        theta_E_conv = self._theta_E_q_convert(theta_E, q)
+        theta_E_conv = self._convert_theta_E_to_major_axis(theta_E, q)
         b = theta_E_conv * jnp.sqrt((1 + q**2)/2)
-        s = s_scale * jnp.sqrt((1 + q**2) / (2*q**2))
+        s = r_core / jnp.sqrt(q)
+        # s = r_core * jnp.sqrt((1 + q**2) / (2*q**2))
         return b, s, q, phi_G
 
-    def function(self, x, y, theta_E, e1, e2, s_scale, center_x=0, center_y=0):
+    def function(self, x, y, theta_E, e1, e2, r_core, center_x=0, center_y=0):
         """
+        Lensing potential.
 
-        :param x: x-coordinate in image plane
-        :param y: y-coordinate in image plane
-        :param theta_E: Einstein radius
-        :param e1: eccentricity component
-        :param e2: eccentricity component
-        :param s_scale: smoothing scale
-        :param center_x: profile center
-        :param center_y: profile center
-        :return: lensing potential
+        Parameters
+        ----------
+        x : float
+            x-coordinate in image plane
+        y : float
+            y-coordinate in image plane
+        theta_E : float
+            Einstein radius
+        e1 : float
+            Eccentricity component
+        e2 : float
+            Eccentricity component
+        r_core : float
+            Core radius (sometimes referred to as scale radius or smoothing scale)
+        center_x : float
+            Profile center x-coordinate
+        center_y : float
+            Profile center y-coordinate
+
+        Returns
+        -------
+        float
+            Lensing potential
         """
-        b, s, q, phi_G = self.param_conv(theta_E, e1, e2, s_scale)
+        b, s, q, phi_G = self.param_conv(theta_E, e1, e2, r_core)
         # shift
         x_ = x - center_x
         y_ = y - center_y
@@ -73,20 +107,37 @@ class NIE(object):
         # rotate back
         return f_
 
-    def derivatives(self, x, y, theta_E, e1, e2, s_scale, center_x=0, center_y=0):
+    def derivatives(self, x, y, theta_E, e1, e2, r_core, center_x=0, center_y=0):
         """
+        Lensing potential derivatives.
 
-        :param x: x-coordinate in image plane
-        :param y: y-coordinate in image plane
-        :param theta_E: Einstein radius
-        :param e1: eccentricity component
-        :param e2: eccentricity component
-        :param s_scale: smoothing scale
-        :param center_x: profile center
-        :param center_y: profile center
-        :return: alpha_x, alpha_y
+        Parameters
+        ----------
+        x : float
+            x-coordinate in image plane
+        y : float
+            y-coordinate in image plane
+        theta_E : float
+            Einstein radius
+        e1 : float
+            Eccentricity component
+        e2 : float
+            Eccentricity component
+        r_core : float
+            Core radius (sometimes referred to as scale radius or smoothing scale)
+        center_x : float
+            Profile center x-coordinate
+        center_y : float
+            Profile center y-coordinate
+
+        Returns
+        -------
+        float
+            Lensing potential derivative in x-direction
+        float
+            Lensing potential derivative in y-direction
         """
-        b, s, q, phi_G = self.param_conv(theta_E, e1, e2, s_scale)
+        b, s, q, phi_G = self.param_conv(theta_E, e1, e2, r_core)
         # shift
         x_ = x - center_x
         y_ = y - center_y
@@ -98,20 +149,39 @@ class NIE(object):
         f_x, f_y = util.rotate(f__x, f__y, -phi_G)
         return f_x, f_y
 
-    def hessian(self, x, y, theta_E, e1, e2, s_scale, center_x=0, center_y=0):
+    def hessian(self, x, y, theta_E, e1, e2, r_core, center_x=0, center_y=0):
         """
+        Hessian matrix of the lensing potential.
 
-        :param x: x-coordinate in image plane
-        :param y: y-coordinate in image plane
-        :param theta_E: Einstein radius
-        :param e1: eccentricity component
-        :param e2: eccentricity component
-        :param s_scale: smoothing scale
-        :param center_x: profile center
-        :param center_y: profile center
-        :return: f_xx, f_yy, f_xy
+        Parameters
+        ----------
+        x : float
+            x-coordinate in image plane
+        y : float
+            y-coordinate in image plane
+        theta_E : float
+            Einstein radius
+        e1 : float
+            Eccentricity component
+        e2 : float
+            Eccentricity component
+        r_core : float
+            Core radius (sometimes referred to as scale radius or smoothing scale)
+        center_x : float
+            Profile center x-coordinate
+        center_y : float
+            Profile center y-coordinate
+
+        Returns
+        -------
+        float
+            Hessian second derivative in x-direction
+        float
+            Hessian second derivative in y-direction
+        float
+            Hessian cross derivative
         """
-        b, s, q, phi_G = self.param_conv(theta_E, e1, e2, s_scale)
+        b, s, q, phi_G = self.param_conv(theta_E, e1, e2, r_core)
         # shift
         x_ = x - center_x
         y_ = y - center_y
@@ -130,17 +200,23 @@ class NIE(object):
         f_xy = gamma2
         return f_xx, f_yy, f_xy
 
-    def _theta_E_q_convert(self, theta_E, q):
+    def _convert_theta_E_to_major_axis(self, theta_E, q):
         """
-        converts a spherical averaged Einstein radius to an elliptical (major axis) Einstein radius.
-        This then follows the convention of the SPEMD profile in lenstronomy.
-        (theta_E / theta_E_gravlens) = sqrt[ (1+q^2) / (2 q) ]
+        Convert a product-averaged Einstein radius to a major axis Einstein radius.
 
-        :param theta_E: Einstein radius in lenstronomy conventions
-        :param q: axis ratio minor/major
-        :return: theta_E in convention of kappa=  b *(q2(s2 + x2) + y2)^-1/2
+        Parameters
+        ----------
+        theta_E : float
+            Product-averaged Einstein radius
+        q : float
+            Axis ratio minor/major
+
+        Returns
+        -------
+        float
+            theta_E in convention of kappa = b *(q2(s2 + x2) + y2)^-1/2
         """
-        theta_E_new = theta_E / (jnp.sqrt((1. + q**2) / (2. * q))) #/ (1+(1-q)/2.)
+        theta_E_new = theta_E / (jnp.sqrt((1. + q**2) / (2. * q)))
         return theta_E_new
 
 
@@ -150,7 +226,7 @@ class NIEMajorAxis(object):
     See Keeton and Kochanek 1998, https://arxiv.org/pdf/astro-ph/9705194.pdf
 
     .. math::
-        \kappa =  b *(q2(s2 + x2) + y2)^{-1/2}`
+        kappa =  b *(q2(s2 + x2) + y2)^{-1/2}`
 
     """
 
