@@ -58,7 +58,7 @@ else:
 
 try:
     import numpyro
-except ImportError:
+except ImportError as e:
     from .unimports import unimport_class
     NumpyroModel = unimport_class('NumpyroModel', 'numpyro', e)
 else:
