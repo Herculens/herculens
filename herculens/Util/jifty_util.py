@@ -464,24 +464,34 @@ def prepare_nifty_likelihood(
     NIFTy likelihood model : 
          A NIFTy model that computes the negative log-likelihood of the data given the model parameters, which can be used in NIFTy's VI algorithms.
     """
+    # Multi-band (LensImage3D) returns lists of per-band arrays; flatten to 1-D for NIFTy.
+    def _to_flat(x):
+        if isinstance(x, list):
+            return jnp.concatenate([jnp.ravel(xi) for xi in x])
+        return x
+
     # Create a likelihood mask operator if any
     if likelihood_mask is None:
-        apply_mask = lambda x: x 
-        masked_data = data
+        apply_mask = lambda x: x
     else:
-        mask = likelihood_mask.astype(bool)
+        if isinstance(likelihood_mask, list):
+            mask = jnp.concatenate([m.ravel().astype(bool) for m in likelihood_mask])
+        else:
+            mask = likelihood_mask.astype(bool).ravel()
         apply_mask = lambda x: x[mask]
-    
-    # Apply the mask to the data
-    masked_data = apply_mask(data)
 
-    # Define a suitable function as expected by the NIFTy likelihood  
+    # Apply the mask to the data (flatten multi-band first)
+    masked_data = apply_mask(_to_flat(data))
+
+    # Define a suitable function as expected by the NIFTy likelihood
     def masked_model_and_inv_std_fn(x):
         model = lens_image.model(
             **params2kwargs_fn(prior_transform(x))
         )
-        masked_model = apply_mask(model)
-        masked_inv_std = apply_mask(1. / jnp.sqrt(lens_image.C_D_model(model)))
+        model_flat = _to_flat(model)
+        c_d_flat = _to_flat(lens_image.C_D_model(model))
+        masked_model = apply_mask(model_flat)
+        masked_inv_std = apply_mask(1. / jnp.sqrt(c_d_flat))
         return (masked_model, masked_inv_std)
     
     # Wrap it as a nifty Model so that the domain gets properly tracked
