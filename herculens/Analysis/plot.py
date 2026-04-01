@@ -125,6 +125,7 @@ class Plotter(object):
         show_shear_field=False,
         shear_field_type='external_single',
         show_lens_position=False,
+        show_reduced_chi2=True,
         only_pixelated_potential=False,
         shift_pixelated_potential='none',
         likelihood_mask=None,
@@ -181,6 +182,8 @@ class Plotter(object):
             The type of shear field, by default 'external_single'.
         show_lens_position : bool, optional
             Whether to show the lens position, by default False.
+        show_reduced_chi2 : bool, optional
+            Whether to indicate the reduced chi2 in the model panel, by default True.
         only_pixelated_potential : bool, optional
             Whether to show only the pixelated potential, by default False.
         shift_pixelated_potential : str, optional
@@ -524,9 +527,6 @@ class Plotter(object):
                 residuals_to_show = model_residuals
             else:
                 residuals_to_show = residuals
-            red_chi2 = lens_image.reduced_chi2(
-                data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
-            )
             im = ax.imshow(residuals_to_show, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
             im.set_rasterized(True)
             if mask_bool is True and masked_residuals is False:
@@ -536,10 +536,14 @@ class Plotter(object):
             nice_colorbar_residuals(im, residuals_to_show, position='top', pad=0.4, size=0.2, 
                                     vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                     colorbar_kwargs={'orientation': 'horizontal'})
-            text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
-            ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
-                    horizontalalignment='left', verticalalignment='bottom',
-                    transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
+            if show_reduced_chi2:
+                red_chi2 = lens_image.reduced_chi2(
+                    data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
+                )
+                text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
+                ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
+                        horizontalalignment='left', verticalalignment='bottom',
+                        transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
             i_row += 1
 
         if show_source:
@@ -733,6 +737,7 @@ class Plotter(object):
             likelihood_mask=None,
             masked_residuals=True,
             show_shear_field=False,
+            show_reduced_chi2=True,
             norm_kappa=LogNorm(1e-1, 1e1),
             extent_zoom=[-0.5, 0.5, -0.5, 0.5],
             kwargs_grid_source=None,
@@ -794,9 +799,6 @@ class Plotter(object):
             residuals_to_show = model_residuals
         else:
             residuals_to_show = residuals
-        red_chi2 = lens_image.reduced_chi2(
-            data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
-        )
         # Get the extent of the image
         extent = lens_image.Grid.plt_extent
         # Get the critical lines and caustics
@@ -913,10 +915,14 @@ class Plotter(object):
         nice_colorbar_residuals(im, residuals_to_show, position='top', pad=0.4, size=0.2, 
                                 vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                 colorbar_kwargs={'orientation': 'horizontal'})
-        text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
-        ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
-                horizontalalignment='left', verticalalignment='bottom',
-                transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
+        if show_reduced_chi2:
+            red_chi2 = lens_image.reduced_chi2(
+                data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
+            )
+            text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
+            ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
+                    horizontalalignment='left', verticalalignment='bottom',
+                    transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
         
         # Model with critical lines overlayed
         ax = axes[0, 3]
