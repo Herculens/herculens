@@ -218,19 +218,19 @@ class Plotter(object):
         vmax_pot : float, optional
             The maximum potential value, by default None.
         k_source : float, optional
-            The source model normalization factor, by default None.
+            Index of source profiles to consider, by default None (all profiles used).
         k_lens : float, optional
-            The lens model normalization factor, by default None.
+            Index of lens profiles to consider, by default None (all profiles used).
         k_lens_light : float, optional
-            The lens light model normalization factor, by default None.
+            Index of lens light profiles to consider, by default None (all profiles used).
         k_point_source : float, optional
-            The point source normalization factor (for single-plane models), by default None.
+            Index of point source profiles to consider (for single-plane models), by default None (all profiles used).
         k_light : float, optional
-            The light model normalization factor, by default None.
+            Index of light profiles to consider (for multi-plane models), by default None (all profiles used).
         k_mass : float, optional
-            The mass model normalization factor, by default None.
+            Index of mass profiles to consider (for multi-plane models), by default None (all profiles used).
         k_planes : float, optional
-            The planes normalization factor (for multi-plane models), by default None.
+            Index of lensing planes to consider (for multi-plane models), by default None (all planes used).
         kwargs_noise : dict, optional
             Parameters given to Noise.C_D_model(mode, **kwargs_noise), by default None.
         figsize : tuple, optional
