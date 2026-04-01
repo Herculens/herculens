@@ -9,6 +9,7 @@ import copy
 import numpy as np
 import jax.numpy as jnp
 from scipy.ndimage import morphology
+from scipy.spatial import Delaunay
 from scipy import ndimage
 from skimage import measure
 from jax import config
@@ -316,6 +317,146 @@ def pixelated_region_from_arc_mask(arc_mask, image_grid, mass_model, mass_params
 
     # Create the new, reduced source plane grid
     return kwargs_pixelated_grid
+
+
+def source_plane_mask_from_arc_mask(
+        lens_image, 
+        kwargs_lens,
+        alpha=1,
+        dilation_iterations=0,
+        source_arc_mask=None,
+    ):
+    """
+    Compute a boolean mask in the source plane identifying pixels constrained
+    by the image-plane arc mask, using an alpha-shape approach based on
+    Delaunay triangulation (no external geometry packages required).
+
+    The mask includes interior regions not directly mapped from the arc but
+    enclosed by the traced boundary — these pixels are regularised by the
+    source prior (e.g. CorrelatedField) rather than excluded.
+
+    Parameters
+    ----------
+    lens_image : LensImage
+        Herculens LensImage instance. Must have source_arc_mask and a pixelated
+        source model with an associated pixel_grid.
+    mass_params : list of dict
+        Lens mass model kwargs.
+    alpha : float or None
+        Circumradius threshold in arcsec. Delaunay triangles with circumradius
+        <= alpha are accepted as part of the alpha shape. Increase to fill larger interior gaps;
+        decrease to tighten the mask around the arc traces.
+    dilation_iterations : int
+        Number of binary dilation iterations applied after the triangle test
+        (default 0 — usually not needed since the polygon approach already
+        fills interior gaps).
+    source_arc_mask : 2D bool array, optional
+        If provided, use this arc mask instead of the one in lens_image.source_arc_mask.
+
+    Returns
+    -------
+    source_mask : 2D bool array
+        Shape matches lens_image.SourceModel.pixel_grid.num_pixel_axes.
+        True for source pixels that fall inside the alpha-shape polygon.
+    """
+    if lens_image.source_arc_mask is None and source_arc_mask is None:
+        raise ValueError("LensImage has no source_arc_mask set.")
+    if lens_image.SourceModel.pixel_grid is None:
+        raise ValueError("LensImage has no pixelated source grid (source model is not pixelated).")
+
+    # --- Step 1: ray-shoot arc mask pixels to source plane ---
+    if source_arc_mask is None:
+        source_arc_mask = lens_image.source_arc_mask
+    arc_mask = np.array(source_arc_mask).astype(bool)
+    x_img, y_img = lens_image.Grid.pixel_coordinates        # (ny, nx)
+    x_pts = x_img[arc_mask]
+    y_pts = y_img[arc_mask]
+
+    beta_x, beta_y = lens_image.MassModel.ray_shooting(x_pts, y_pts, kwargs_lens)
+    pts = np.column_stack([np.array(beta_x), np.array(beta_y)])  # (N, 2)
+
+    # --- Step 2: Delaunay triangulation + circumradius filtering ---
+    tri = Delaunay(pts)
+    simplices = tri.simplices                               # (M, 3)
+
+    A = pts[simplices[:, 0]]                               # (M, 2)
+    B = pts[simplices[:, 1]]
+    C = pts[simplices[:, 2]]
+    a = np.linalg.norm(B - C, axis=1)
+    b = np.linalg.norm(A - C, axis=1)
+    c = np.linalg.norm(A - B, axis=1)
+    s = (a + b + c) / 2.0
+    area = np.sqrt(np.maximum(s * (s - a) * (s - b) * (s - c), 0.0))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        circumradius = np.where(area > 0, (a * b * c) / (4.0 * area), np.inf)
+
+    accepted = simplices[circumradius <= alpha]             # (K, 3)
+    tri_pts = pts[accepted]                                 # (K, 3, 2)
+
+    # --- Step 3: vectorized point-in-triangle test for each source pixel ---
+    # Use get_source_coordinates so that the adaptive grid case (adaptive_grid=True)
+    # correctly returns the dynamically computed source extent, rather than the
+    # placeholder grid that spans the full image FOV.
+    x_src, y_src, _ = lens_image.get_source_coordinates(kwargs_lens)
+    x_src = np.array(x_src)
+    y_src = np.array(y_src)
+    test_pts = np.column_stack([x_src.ravel(), y_src.ravel()])  # (P, 2)
+
+    source_mask_flat = np.zeros(len(test_pts), dtype=bool)
+    batch_size = 64
+    for i in range(0, len(tri_pts), batch_size):
+        Ab = tri_pts[i:i + batch_size, 0, :]               # (b, 2)
+        Bb = tri_pts[i:i + batch_size, 1, :]
+        Cb = tri_pts[i:i + batch_size, 2, :]
+        v0 = Cb - Ab                                        # (b, 2)
+        v1 = Bb - Ab
+        v2 = test_pts[:, None, :] - Ab[None, :, :]         # (P, b, 2)
+        dot00 = (v0 * v0).sum(-1)                           # (b,)
+        dot01 = (v0 * v1).sum(-1)
+        dot11 = (v1 * v1).sum(-1)
+        dot02 = (v2 * v0[None]).sum(-1)                     # (P, b)
+        dot12 = (v2 * v1[None]).sum(-1)
+        denom = dot00 * dot11 - dot01 ** 2                  # (b,)
+        inv = np.where(np.abs(denom) > 1e-30,
+                       1.0 / np.maximum(np.abs(denom), 1e-30), 0.0)
+        u = (dot11[None] * dot02 - dot01[None] * dot12) * inv[None]
+        v = (dot00[None] * dot12 - dot01[None] * dot02) * inv[None]
+        source_mask_flat |= ((u >= 0) & (v >= 0) & (u + v <= 1)).any(axis=1)
+
+    source_mask = source_mask_flat.reshape(x_src.shape)
+
+    if dilation_iterations > 0:
+        source_mask = morphology.binary_dilation(source_mask, iterations=dilation_iterations)
+
+    return source_mask
+
+
+def border_mask(image, border_fraction=0.1):
+    """Returns a mask (2D binary array) filled with zeros on each edge
+    with width equal to `border_fraction` times the shape of the input image.
+    The remaining values are ones.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Input 2D array
+    border_fraction : float, optional
+        Fraction of the shape along a given dimension that should be masked,
+        by default 0.1 (i.e. 10% of the width/height on each side).
+    """
+    if image.ndim != 2:
+        raise ValueError("Input image must be a 2D array.")
+    if border_fraction < 0 or border_fraction > 0.5:
+        raise ValueError("border_fraction must be between 0 and 0.5.")
+    ny, nx = image.shape
+    mask = np.ones_like(image, dtype=float)
+    x_border = int(border_fraction * nx / 2.)
+    y_border = int(border_fraction * ny / 2.)
+    mask[:, :x_border] = 0.0
+    mask[:, -x_border:] = 0.0
+    mask[:y_border, :] = 0.0
+    mask[-y_border:, :] = 0.0
+    return mask
 
 
 def estimate_model_covariance(lens_image, parameters, samples, return_cross_covariance=False):
