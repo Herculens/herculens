@@ -119,7 +119,7 @@ class Plotter(object):
             only_pixelated_potential=False, shift_pixelated_potential='none',
             likelihood_mask=None, potential_mask=None, apply_mask_to_model=False,
             show_lens_lines=False, supersampling_lens_lines=3,
-            show_shear_field=False, show_lens_position=False,
+            show_shear_field=False, shear_field_type='external_single', show_lens_position=False,
             kwargs_grid_source=None,
             lock_colorbars=False, masked_residuals=True,
             vmin_pot=None, vmax_pot=None,
@@ -426,13 +426,16 @@ class Plotter(object):
                     ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
                 ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
             if show_shear_field:
-                shear_field = model_util.shear_deflection_field(lens_image, kwargs_result['kwargs_lens'], num_pixels=8)
+                shear_field = model_util.shear_deflection_field(
+                    lens_image, kwargs_result['kwargs_lens'],
+                    num_pixels=8, shear_type=shear_field_type,
+                )
                 if shear_field is not None:
                     x_field, y_field, gx_field, gy_field = shear_field
                     ax.quiver(
-                        x_field, y_field, # + overall_shift, 
-                        gx_field, gy_field, 
-                        scale=0.2, 
+                        x_field, y_field, # + overall_shift,
+                        gx_field, gy_field,
+                        scale=0.2,
                         width=0.05,
                         scale_units='xy', units='xy',
                         pivot='middle',
@@ -442,7 +445,7 @@ class Plotter(object):
                     ax.set_xlim(extent[0], extent[1])
                     ax.set_ylim(extent[2], extent[3])
                 else:
-                    print("Warning: no external shear to plot have been found.")
+                    print(f"Warning: no {shear_field_type} shear field to plot.")
             data_title = self.data_name if self.data_name is not None else "data"
             ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 

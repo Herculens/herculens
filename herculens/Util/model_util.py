@@ -81,37 +81,66 @@ def critical_lines_caustics(lens_image, kwargs_mass, eta_flat=None, supersamplin
     return crit_lines, caustics
 
 
-def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
+def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20, shear_type='external_single'):
+    """Return a coarse shear field for plotting.
+
+    Parameters
+    ----------
+    shear_type : str
+        'external_single' (default) — shear from the first SHEAR/SHEAR_GAMMA_PSI profile only.
+        'external_all' — sum of shear from all SHEAR/SHEAR_GAMMA_PSI and PixelatedFixed profiles.
+        'total' — total shear from all mass profiles (via MassModel.gamma).
+    """
+    if shear_type == 'total':
+        return total_shear_deflection_field(lens_image, kwargs_lens, num_pixels=num_pixels)
     from herculens.MassModel.Profiles.shear import Shear, ShearGammaPsi
-    shear_idx, shear_type = None, None
-    num_profiles = len(lens_image.MassModel.profile_type_list)
+    from herculens.MassModel.Profiles.pixelated import PixelatedFixed
+    profile_list = lens_image.MassModel.profile_type_list
+    if shear_type == 'external_all':
+        selected_indices = [
+            i for i, p in enumerate(profile_list)
+            if (p in ('SHEAR', 'SHEAR_GAMMA_PSI') or
+                isinstance(p, (Shear, ShearGammaPsi, PixelatedFixed)))
+        ]
+        if not selected_indices:
+            return None
+        grid = lens_image.Grid.create_model_grid(num_pixels=num_pixels)
+        x_grid_img, y_grid_img = grid.pixel_coordinates
+        gamma_x = np.zeros_like(x_grid_img)
+        gamma_y = np.zeros_like(y_grid_img)
+        for k in selected_indices:
+            gx_k, gy_k = lens_image.MassModel.gamma(x_grid_img, y_grid_img, kwargs_lens, k=k)
+            gamma_x = gamma_x + gx_k
+            gamma_y = gamma_y + gy_k
+        return (np.array(x_grid_img), np.array(y_grid_img), gamma_x, gamma_y)
+    # 'external_single': find the first SHEAR/SHEAR_GAMMA_PSI profile
+    shear_idx, shear_profile_type = None, None
+    num_profiles = len(profile_list)
     assert num_profiles == len(kwargs_lens)
     for i in range(num_profiles):
-        if (lens_image.MassModel.profile_type_list[i] == 'SHEAR' or
-            isinstance(lens_image.MassModel.profile_type_list[i], Shear)):
+        if (profile_list[i] == 'SHEAR' or isinstance(profile_list[i], Shear)):
             shear_idx = i
-            shear_type = 'SHEAR'
+            shear_profile_type = 'SHEAR'
             break
-        elif (lens_image.MassModel.profile_type_list[i] == 'SHEAR_GAMMA_PSI' or
-              isinstance(lens_image.MassModel.profile_type_list[i], ShearGammaPsi)):
+        elif (profile_list[i] == 'SHEAR_GAMMA_PSI' or isinstance(profile_list[i], ShearGammaPsi)):
             shear_idx = i
-            shear_type = 'SHEAR_GAMMA_PSI'
+            shear_profile_type = 'SHEAR_GAMMA_PSI'
             break
     if shear_idx is None:
         return None
-    if shear_type == 'SHEAR_GAMMA_PSI':
+    if shear_profile_type == 'SHEAR_GAMMA_PSI':
         phi_ext, gamma_ext = kwargs_lens[shear_idx]['psi_ext'], kwargs_lens[shear_idx]['gamma_ext']
     else:
         # imports are here to avoid issues with circular imports
         from herculens.Util.param_util import shear_cartesian2polar_numpy
         phi_ext, gamma_ext = shear_cartesian2polar_numpy(
-            kwargs_lens[shear_idx]['gamma1'], 
+            kwargs_lens[shear_idx]['gamma1'],
             kwargs_lens[shear_idx]['gamma2'],
         )
     grid = lens_image.Grid.create_model_grid(num_pixels=num_pixels)
     x_grid_img, y_grid_img = grid.pixel_coordinates
-    gamma_x = gamma_ext*np.cos(phi_ext)
-    gamma_y = gamma_ext*np.sin(phi_ext)
+    gamma_x = gamma_ext * np.cos(phi_ext)
+    gamma_y = gamma_ext * np.sin(phi_ext)
     if gamma_x.size == 1:
         gamma_x = np.full_like(x_grid_img, float(gamma_x))
         gamma_y = np.full_like(y_grid_img, float(gamma_y))
@@ -121,7 +150,7 @@ def shear_deflection_field(lens_image, kwargs_lens, num_pixels=20):
 def total_shear_deflection_field(lens_image, kwargs_mass, eta_flat=None, num_pixels=20, k_plane=-1):
     if isinstance(lens_image, (LensImage, LensImage3D)):
         mass_model = lens_image.MassModel
-        gamma_fn = partial(mass_model.gamma, kwargs_lens=kwargs_mass)
+        gamma_fn = partial(mass_model.gamma, kwargs=kwargs_mass)
         multiplane_mode = False
     elif isinstance(lens_image, MPLensImage):
         mass_model = lens_image.MPMassModel

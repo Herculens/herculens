@@ -212,6 +212,85 @@ def UniformTransform_inverse_func(x, l, h):
     """m: mean, s: std, to go from uniform distribution to standard normal distribution"""
     return jstats.norm.ppf( (x - l) / (h - l) )
 
+def LogUniformTransform(l, h, key):
+    """l: low, h: high (in original, non-log space).
+    Maps xi ~ N(0,1) to x ~ LogUniform(l, h) via x = exp(log(l) + Phi(xi)*(log(h)-log(l))).
+    """
+    log_l = float(jnp.log(l))
+    log_h = float(jnp.log(h))
+    if not hasattr(l, 'shape'):
+        shape = ()
+    else:
+        shape = l.shape
+    return jft.Model(
+        lambda x: {key: jnp.exp(log_l + jstats.norm.cdf(x[key]) * (log_h - log_l))},
+        domain={key: ShapeWithDtype(shape, jnp.float64)},
+    )
+
+def TruncatedNormalTransform(loc, scale, low, high, key):
+    """Exact transform: standard normal → truncated normal (one- or two-sided).
+
+    Uses the quantile transform: maps xi ~ N(0,1) to the truncated normal via
+    ``loc + scale * ndtri(cdf_a + norm.cdf(xi) * (cdf_b - cdf_a))``,
+    where cdf_a = Phi((low-loc)/scale) and cdf_b = Phi((high-loc)/scale).
+    Pass ``low=-inf`` or ``high=+inf`` for one-sided truncation.
+
+    Parameters
+    ----------
+    loc, scale : float
+        Mean and standard deviation of the (untruncated) base normal.
+    low, high : float
+        Truncation bounds (use -inf / +inf for one-sided truncation).
+    key : str
+        Parameter name used as key in the NIFTy domain dict.
+    """
+    from scipy.stats import norm as scipy_norm
+    _loc, _scale = float(loc), float(scale)
+    _low, _high = float(low), float(high)
+    a = -np.inf if np.isinf(_low)  and _low  < 0 else (_low  - _loc) / _scale
+    b =  np.inf if np.isinf(_high) and _high > 0 else (_high - _loc) / _scale
+    cdf_a = float(scipy_norm.cdf(a))   # 0.0 when low = -inf
+    cdf_b = float(scipy_norm.cdf(b))   # 1.0 when high = +inf
+    _range = cdf_b - cdf_a
+    shape = loc.shape if hasattr(loc, 'shape') else ()
+    def _fn(x):
+        u_trunc = cdf_a + jstats.norm.cdf(x[key]) * _range
+        return {key: _loc + _scale * jax.scipy.special.ndtri(u_trunc)}
+    return jft.Model(_fn, domain={key: ShapeWithDtype(shape, jnp.float64)})
+
+def TruncatedLognormalTransform(loc, scale, low, high, key):
+    """Exact transform: standard normal → truncated log-normal (one- or two-sided).
+
+    ``loc`` and ``scale`` follow numpyro's LogNormal parameterisation: they are
+    the mean and std of log(X), i.e. log(X) ~ Normal(loc, scale).
+    ``low`` and ``high`` are truncation bounds in the **original** (not log) space.
+    Pass ``low=0`` (treated as no lower bound) or ``high=+inf`` for one-sided truncation.
+
+    Parameters
+    ----------
+    loc, scale : float
+        Numpyro LogNormal log-space parameters (mean and std of log X).
+    low, high : float
+        Truncation bounds in the original space (must be > 0 when finite).
+    key : str
+        Parameter name used as key in the NIFTy domain dict.
+    """
+    from scipy.stats import norm as scipy_norm
+    _loc, _scale = float(loc), float(scale)
+    _low, _high = float(low), float(high)
+    log_low  = np.log(_low)  if _low  > 0     else -np.inf
+    log_high = np.log(_high) if _high < np.inf else  np.inf
+    a = (log_low  - _loc) / _scale
+    b = (log_high - _loc) / _scale
+    cdf_a = float(scipy_norm.cdf(a))   # 0.0 when low <= 0
+    cdf_b = float(scipy_norm.cdf(b))   # 1.0 when high = +inf
+    _range = cdf_b - cdf_a
+    shape = loc.shape if hasattr(loc, 'shape') else ()
+    def _fn(x):
+        u_trunc = cdf_a + jstats.norm.cdf(x[key]) * _range
+        return {key: jnp.exp(_loc + _scale * jax.scipy.special.ndtri(u_trunc))}
+    return jft.Model(_fn, domain={key: ShapeWithDtype(shape, jnp.float64)})
+
 def ExpCroppedFieldTransform(key, cf, bxy, bwl):
     #print(f"Exponential Cropped correlated field prior for '{key}'")
     def crop(x):
@@ -238,7 +317,8 @@ def numpyro_to_nifty_prior(
     ):
     """Utility to convert a numpyro probabilistic model into a NIFTy field-like prior model, 
     by iterating through the model trace and converting all sampled parameters 
-    with supported distributions (currently Normal, Log-normal and Uniform) 
+    with supported distributions (Normal, LogNormal, Uniform, TruncatedNormal,
+    TruncatedLogNormal — truncated variants use an exact quantile transform) 
     into the corresponding NIFTy field transforms. Such a conversion is needed 
     as NIFTy's VI algrithms always assume that the (latent) model parameters are
     sampled from a standard normal distribution.
@@ -277,7 +357,7 @@ def numpyro_to_nifty_prior(
         or if no sampled parameters are found in the model trace.
     NotImplementedError
         If a distribution type in the model is not supported. 
-        Currently supported types are Normal, LogNormal, and Uniform.
+        Currently supported types are Normal, LogNormal, Uniform, TruncatedNormal, and TruncatedLogNormal.
     """
     if field_components is None:
         field_components = {}
@@ -345,17 +425,41 @@ def numpyro_to_nifty_prior(
                     print(f"Adding Uniform prior for '{site_name}' with low {dist_fn.low} and high {dist_fn.high}")
                 fields.append(UniformTransform(dist_fn.low, dist_fn.high, site_name))
 
-            # Approximated transforms
-            # - Truncated normal           
-            elif (isinstance(dist_fn, dist.TwoSidedTruncatedDistribution) and
-                  isinstance(dist_fn.base_dist, dist.Normal)):
+            # - Log-uniform (must be checked before the generic truncated-distribution branch,
+            #   because numpyro implements LogUniform as a TransformedDistribution whose
+            #   base_dist is a Uniform — which would otherwise trigger the truncated branch)
+            elif isinstance(dist_fn, dist.LogUniform):
                 if verbose:
-                    print(f"Adding *Normal* instead of *TruncatedNormal* prior for '{site_name}' with mean {dist_fn.base_dist.loc} and std {dist_fn.base_dist.scale}")
-                fields.append(NormalTransform(dist_fn.base_dist.loc, dist_fn.base_dist.scale, site_name))
+                    print(f"Adding LogUniform prior for '{site_name}' with low {dist_fn.low} and high {dist_fn.high}")
+                fields.append(LogUniformTransform(dist_fn.low, dist_fn.high, site_name))
+
+            # Exact transforms for truncated distributions.
+            # Detected generically via `base_dist` so that TwoSidedTruncatedDistribution,
+            # LeftTruncatedDistribution, and RightTruncatedDistribution are all handled.
+            elif hasattr(dist_fn, 'base_dist') and (hasattr(dist_fn, 'low') or hasattr(dist_fn, 'high')):
+                base = dist_fn.base_dist
+                low  = float(getattr(dist_fn, 'low',  -np.inf))
+                high = float(getattr(dist_fn, 'high',  np.inf))
+                if isinstance(base, dist.Normal):
+                    if verbose:
+                        print(f"Adding TruncatedNormal prior for '{site_name}' with "
+                              f"loc={base.loc}, scale={base.scale}, low={low}, high={high}")
+                    fields.append(TruncatedNormalTransform(base.loc, base.scale, low, high, site_name))
+                elif isinstance(base, dist.LogNormal):
+                    if verbose:
+                        print(f"Adding TruncatedLogNormal prior for '{site_name}' with "
+                              f"loc={base.loc}, scale={base.scale}, low={low}, high={high}")
+                    fields.append(TruncatedLognormalTransform(base.loc, base.scale, low, high, site_name))
+                else:
+                    raise NotImplementedError(
+                        f"Truncated distribution with base type '{type(base)}' not supported. "
+                        f"Supported base types for truncated distributions: Normal, LogNormal.")
 
             # Any other unsupported transforms
             else:
-                raise NotImplementedError(f"Distribution type '{type(dist_fn)}' not supported. Supported types are Normal, LogNormal and Uniform.")
+                raise NotImplementedError(
+                    f"Distribution type '{type(dist_fn)}' not supported. "
+                    f"Supported types: Normal, LogNormal, Uniform, TruncatedNormal, TruncatedLogNormal.")
         
     # concatenate all the fields to get the final prior model
     if len(fields) == 0:
@@ -464,24 +568,34 @@ def prepare_nifty_likelihood(
     NIFTy likelihood model : 
          A NIFTy model that computes the negative log-likelihood of the data given the model parameters, which can be used in NIFTy's VI algorithms.
     """
+    # Multi-band (LensImage3D) returns lists of per-band arrays; flatten to 1-D for NIFTy.
+    def _to_flat(x):
+        if isinstance(x, list):
+            return jnp.concatenate([jnp.ravel(xi) for xi in x])
+        return x
+
     # Create a likelihood mask operator if any
     if likelihood_mask is None:
-        apply_mask = lambda x: x 
-        masked_data = data
+        apply_mask = lambda x: x
     else:
-        mask = likelihood_mask.astype(bool)
+        if isinstance(likelihood_mask, list) or likelihood_mask.ndim == 3:
+            mask = jnp.concatenate([m.ravel().astype(bool) for m in likelihood_mask])
+        else:
+            mask = likelihood_mask.astype(bool)
         apply_mask = lambda x: x[mask]
-    
-    # Apply the mask to the data
-    masked_data = apply_mask(data)
 
-    # Define a suitable function as expected by the NIFTy likelihood  
+    # Apply the mask to the data (flatten multi-band first)
+    masked_data = apply_mask(_to_flat(data))
+
+    # Define a suitable function as expected by the NIFTy likelihood
     def masked_model_and_inv_std_fn(x):
         model = lens_image.model(
             **params2kwargs_fn(prior_transform(x))
         )
-        masked_model = apply_mask(model)
-        masked_inv_std = apply_mask(1. / jnp.sqrt(lens_image.C_D_model(model)))
+        model_flat = _to_flat(model)
+        c_d_flat = _to_flat(lens_image.C_D_model(model))
+        masked_model = apply_mask(model_flat)
+        masked_inv_std = apply_mask(1. / jnp.sqrt(c_d_flat))
         return (masked_model, masked_inv_std)
     
     # Wrap it as a nifty Model so that the domain gets properly tracked

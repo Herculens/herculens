@@ -591,7 +591,7 @@ class CorrelatedField(object):
                 )
         return self.model(params)
     
-    def _numpyro_sample_pixels_2d_stack(self):
+    def _numpyro_sample_pixels_powerlaw_2d_stack(self):
         # TODO: reduce code duplication
         # imports here to prevent the need for numpyro to be installed
         # if the CorrelatedField class is used in a non-numpyro context.
