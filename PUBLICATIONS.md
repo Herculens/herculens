@@ -10,13 +10,17 @@
 
 - "**_El Gordo needs El Anzuelo: Probing the structure of cluster members with multi-band extended arcs in JWST data_**" ([**Galan et al. 2024a**](https://ui.adsabs.harvard.edu/abs/2024A%26A...689A.304G/abstract)): high-resolution and multi-wavelength reconstruction of a star-forming galaxy by three members of the supermassive cluster _El Gordo_, using 3D correlated fields. <ins>Please cite this work if you use the `CorrelatedField` model of `Herculens`; please also cite the [`NIFTy.re` paper](https://ui.adsabs.harvard.edu/abs/2024JOSS....9.6593E/abstract), which implements the underlying forward model</ins> ([bibtex entries](CITATION.md)).
 
+- "**_Unveiling a 36 billion solar mass black hole at the centre of the Cosmic Horseshoe gravitational lens_**" ([**Melo-Carneiro et al. 2025**](https://ui.adsabs.harvard.edu/abs/2025MNRAS.541.2853M/abstract)): test for systematic errors using a different lens modeling code in the study of the super-massive black hole at the center of the "Cosmic Horseshoe" gravitational lens.
+
+- "**_A Salpeter IMF and an NFW halo: Disentangling the dark and stellar mass through precise lens modelling of a double-source-plane system reinforces the canonical model of elliptical galaxies_**" ([**Li et al. 2026**](https://ui.adsabs.harvard.edu/abs/2026arXiv260220889L/abstract)): strong lensing analysis of the "Jackpot" to measure the its inner dark matter density profile, stellar-to-halo mass ratio, and stellar initial mass function normalisation.
+
 ## Dark matter with strong lenses
 
-- "**_The overconcentrated dark halo in the strong lens SDSS J0946+1006 is a subhalo: evidence for self interacting dark matter?_**" ([**Enzi et al. 2024**](https://ui.adsabs.harvard.edu/abs/2024arXiv241108565E/abstract)): multi-plane field modeling of the unique _Jackpot_ lensing system to measure robustly the mass density profile of a dark matter substructure, further confirming its CDM-challenging nature.
+- "**_The overconcentrated dark halo in the strong lens SDSS J0946+1006 is a subhalo: evidence for self interacting dark matter?_**" ([**Enzi et al. 2024**](https://ui.adsabs.harvard.edu/abs/2025MNRAS.540..247E/abstract)): multi-plane field modeling of the unique "Jackpot" lensing system to measure robustly the mass density profile of a dark matter substructure, further confirming its CDM-challenging nature.
 
 ## Confirmation of lens candidates
 
-- "**_Euclid Quick Data Release (Q1). The Strong Lensing Discovery Engine D — Double-source-plane lens candidates_**" ([**Li et al. 2025**](https://ui.adsabs.harvard.edu/abs/2025arXiv250315327E/abstract)): detailed lens models of five double-source-plane lens candidates found in Euclid data, including four confirmed to have two sources at different redshifts by the models.
+- "**_Euclid Quick Data Release (Q1). The Strong Lensing Discovery Engine D — Double-source-plane lens candidates_**" ([**Li et al. 2025**](https://ui.adsabs.harvard.edu/abs/2025arXiv250315327E/abstract)): detailed lens models of five double-source-plane lens candidates found in _Euclid_ data, including four confirmed to have two sources at different redshifts by the models.
 
 ## Methodology & exploration of systematics
 
