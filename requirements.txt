@@ -7,8 +7,8 @@ scikit-image>=0.20.0
 utax>=0.0.2   # JAX utilities (convolution, interpolation, etc.)
 
 # the following packages are optional (pay attention to the versions)
-#jaxinterp2d @ git+https://github.com/adam-coogan/jaxinterp2d@master  # for fast bilinear interpolation (e.g. for pixelated profiles)
-#helens @ git+https://github.com/Herculens/helens.git@main   # JAX lens equation solver for some point source features
+helens>=0.0.1   # JAX lens equation solver for some point source features
+#jaxinterp2d  # not on PyPI; install manually: pip install git+https://github.com/adam-coogan/jaxinterp2d@master
 #nifty>=9.1.0       # NOTE: in case nifty>=9.0.0 could not be installed, you can install nifty8 instead: nifty8>=8.5.7
 #optax>=0.2.0        # for optimizers
 #matplotlib>=3.7.0   # for plotting

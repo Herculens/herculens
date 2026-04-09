@@ -33,8 +33,9 @@ install_requires = [
 
 # Minimal optional packages (see also requirements.txt for even more optional packages)
 install_optional = [
-    'helens @ git+https://github.com/Herculens/helens.git@main', # for a JAX-based lens equation solver
-    'jaxinterp2d @ git+https://github.com/adam-coogan/jaxinterp2d@master',  # for faster bilinear interpolation for pixelated profiles
+    'helens>=0.0.1',  # for a JAX-based lens equation solver
+    # 'jaxinterp2d' is not available on PyPI; install manually via:
+    # pip install git+https://github.com/adam-coogan/jaxinterp2d@master
     'matplotlib>=3.7.0',    # for plotting
     'optax>=0.2.0',         # for optimizers
     'numpyro>=0.20.0',      # for probabilistic modelling and sampling algorithms
