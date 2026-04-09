@@ -28,7 +28,7 @@ install_requires = [
     'jaxlib>=0.7.0',
     'objax>=1.8.0',
     'scikit-image>=0.20.0',
-    'utax @ git+https://github.com/aymgal/utax.git@main',
+    'utax>=0.0.2',
 ]
 
 # Minimal optional packages (see also requirements.txt for even more optional packages)

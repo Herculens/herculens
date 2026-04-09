@@ -4,7 +4,7 @@ jax>=0.7.0
 jaxlib>=0.7.0
 objax>=1.8.0
 scikit-image>=0.20.0
-utax @ git+https://github.com/aymgal/utax.git@main   # JAX utilities (convolution, interpolation, etc.)
+utax>=0.0.2   # JAX utilities (convolution, interpolation, etc.)
 
 # the following packages are optional (pay attention to the versions)
 #jaxinterp2d @ git+https://github.com/adam-coogan/jaxinterp2d@master  # for fast bilinear interpolation (e.g. for pixelated profiles)
