@@ -36,7 +36,7 @@ class MPLightModel(object):
         string_input = all([isinstance(lm, list) or lm is None for lm in mp_light_model_list])
         instance_input = all([isinstance(lm, LightModel) or lm is None for lm in mp_light_model_list])
         if string_input:
-            self.light_models = [LightModel(lm, **light_model_kwargs) if lm is None else None for lm in mp_light_model_list]
+            self.light_models = [LightModel(lm, **light_model_kwargs) if lm is not None else None for lm in mp_light_model_list]
             self.mp_profile_type_list = mp_light_model_list
         elif instance_input:
             self.light_models = mp_light_model_list
