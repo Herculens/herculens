@@ -3,6 +3,7 @@
 # to the MassModel() constructor.
 
 from herculens.MassModel.Profiles.gaussian_potential import Gaussian
+from herculens.MassModel.Profiles.convergence import Convergence
 from herculens.MassModel.Profiles.point_mass import PointMass
 from herculens.MassModel.Profiles.multipole import Multipole
 from herculens.MassModel.Profiles.convergence import Convergence
@@ -28,6 +29,7 @@ STRING_MAPPING = {
     'DPIE': DPIE,
     'PIEMD': PIEMD,
     'GAUSSIAN': Gaussian,
+    'CONVERGENCE': Convergence,
     'POINT_MASS': PointMass,
     'CONVERGENCE': Convergence,
     'SHEAR': Shear,

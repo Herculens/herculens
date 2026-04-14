@@ -23,6 +23,7 @@ from .MassModel.Profiles.nie import NIE
 from .MassModel.Profiles.epl import EPL
 from .MassModel.Profiles.shear import Shear, ShearGammaPsi
 from .MassModel.Profiles.gaussian_potential import Gaussian as GaussianPotential
+from .MassModel.Profiles.convergence import Convergence
 from .MassModel.Profiles.point_mass import PointMass
 from .MassModel.Profiles.multipole import Multipole
 from .MassModel.Profiles.piemd import PIEMD
@@ -58,7 +59,7 @@ else:
 
 try:
     import numpyro
-except ImportError:
+except ImportError as e:
     from .unimports import unimport_class
     NumpyroModel = unimport_class('NumpyroModel', 'numpyro', e)
 else:

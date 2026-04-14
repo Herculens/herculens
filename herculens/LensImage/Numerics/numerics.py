@@ -15,7 +15,7 @@ from herculens.LensImage.Numerics.grid import RegularGrid
 from herculens.LensImage.Numerics.convolution import (PixelKernelConvolution,
                                                       SubgridKernelConvolution,
                                                       GaussianConvolution)
-from herculens.Util import kernel_util, util
+from herculens.Util import image_util, kernel_util, util
 
 
 __all__ = ['Numerics']
@@ -87,7 +87,7 @@ class Numerics(object):
 
         self._point_source_supersampling_factor = point_source_supersampling_factor
 
-    def re_size_convolve(self, flux_array, unconvolved=False, input_as_list=False):
+    def re_size_convolve(self, flux_array, unconvolved=False, input_as_list=False, kwargs_psf=None):
         """
         Resize and convolve the flux array.
 
@@ -107,12 +107,20 @@ class Numerics(object):
             Convolved image on the regular pixel grid.
         """
         if input_as_list is False:
-            return self._re_size_convolve_sgl(flux_array, unconvolved=unconvolved)
+            return self._re_size_convolve_sgl(
+                flux_array,
+                unconvolved=unconvolved,
+                kwargs_psf=kwargs_psf,
+            )
         return [
-            self._re_size_convolve_sgl(flux_array[i], unconvolved=unconvolved) for i in range(len(flux_array))
+            self._re_size_convolve_sgl(
+                flux_array[i],
+                unconvolved=unconvolved,
+                kwargs_psf=kwargs_psf,
+            ) for i in range(len(flux_array))
         ]
     
-    def _re_size_convolve_sgl(self, flux_array, unconvolved=False):
+    def _re_size_convolve_sgl(self, flux_array, unconvolved=False, kwargs_psf=None):
         """
 
         :param flux_array: 1d array, flux values corresponding to coordinates_evaluate
@@ -124,12 +132,31 @@ class Numerics(object):
         if unconvolved is True or self._conv is None:
             image_conv = image_low_res
         else:
-            # convolve low res grid and high res grid
-            image_conv = self._conv.re_size_convolve(image_low_res, image_high_res_partial)
+            psf_kernel = kwargs_psf['pixels'] if kwargs_psf is not None else None
+            if psf_kernel is not None and self._psf_type == 'PIXEL':
+                if self._high_res_return:
+                    raise NotImplementedError(
+                        "Explicit `kwargs_psf['pixels']` override is not supported when "
+                        "supersampling_convolution=True."
+                    )
+                image_conv = self._conv.re_size_convolve(
+                    image_low_res,
+                    image_high_res_partial,
+                    kernel=psf_kernel,
+                )
+            else:
+                # convolve low res grid and high res grid
+                image_conv = self._conv.re_size_convolve(image_low_res, image_high_res_partial)
         return image_conv * self._pixel_width**2
 
-    def render_point_sources(self, theta_x, theta_y, amplitude):
+    def render_point_sources(self, theta_x, theta_y, amplitude, kwargs_psf=None):
         """Put the PSF at the locations of multiply imaged point sources.
+
+        When supersampled convolution is active, the point sources are rendered
+        on the supersampled grid using the supersampled PSF kernel and then
+        degraded back to the native pixel resolution.  This ensures consistency
+        with how extended-source light is convolved and avoids artefacts caused
+        by interpolating a degraded (low-resolution) PSF kernel.
 
         Parameters
         ----------
@@ -147,9 +174,6 @@ class Numerics(object):
             been placed at the locations of the point sources.
 
         """
-        # TODO Account for supersampling
-        result = jnp.zeros(self._pixel_grid.num_pixel_axes)
-
         # Verify inputs
         theta_x = jnp.atleast_1d(theta_x)
         theta_y = jnp.atleast_1d(theta_y)
@@ -164,14 +188,54 @@ class Numerics(object):
                 "example, if `pixel_size` was not provided for type GAUSSIAN.")
             raise ValueError(err_msg)
 
-        kernel = self._psf.kernel_point_source.T  # taking the transpose for map_coordinates
-        nx, ny = self._pixel_grid.num_pixel_axes
-        xrange = jnp.arange(nx) + kernel.shape[0] // 2
-        yrange = jnp.arange(ny) + kernel.shape[1] // 2
+        f = self._grid.supersampling_factor
+        if self._high_res_return and f > 1 and self._psf_type == 'PIXEL':
+            # Render on the supersampled grid using the supersampled PSF
+            kernel_super = jnp.array(
+                np.ascontiguousarray(
+                    self._psf.kernel_point_source_supersampled(f),
+                    dtype=np.float64,
+                )
+            ).T
 
-        for x0, y0, amp in zip(x, y, amplitude):
-            xy_grid = jnp.meshgrid(xrange - x0, yrange - y0)
-            result += amp * map_coordinates(kernel, xy_grid, order=1)
+            nx, ny = self._pixel_grid.num_pixel_axes
+            nx_s, ny_s = nx * f, ny * f
+
+            result_super = jnp.zeros((nx_s, ny_s))
+
+            # Convert native pixel coords to supersampled pixel coords.
+            # Native pixel center i maps to supersampled index i*f + (f-1)/2.
+            x_s = x * f + (f - 1) / 2.0
+            y_s = y * f + (f - 1) / 2.0
+
+            xrange = jnp.arange(nx_s) + kernel_super.shape[0] // 2
+            yrange = jnp.arange(ny_s) + kernel_super.shape[1] // 2
+
+            for x0, y0, amp in zip(x_s, y_s, amplitude):
+                xy_grid = jnp.meshgrid(xrange - x0, yrange - y0)
+                result_super += amp * map_coordinates(kernel_super, xy_grid, order=1)
+
+            # Degrade to native resolution.  re_size uses average pooling so
+            # we multiply by f**2 to preserve total flux.
+            result = image_util.re_size(result_super, f) * f**2
+        else:
+            # Native resolution rendering
+            result = jnp.zeros(self._pixel_grid.num_pixel_axes)
+
+            psf_kernel = kwargs_psf['pixels'] if kwargs_psf is not None else None
+            if psf_kernel is None:
+                kernel = self._psf.kernel_point_source.T
+            else:
+                kernel = jnp.asarray(psf_kernel).T
+                if kernel.ndim != 2:
+                    raise ValueError("`kwargs_psf['pixels']` must be a 2D array.")
+            nx, ny = self._pixel_grid.num_pixel_axes
+            xrange = jnp.arange(nx) + kernel.shape[0] // 2
+            yrange = jnp.arange(ny) + kernel.shape[1] // 2
+
+            for x0, y0, amp in zip(x, y, amplitude):
+                xy_grid = jnp.meshgrid(xrange - x0, yrange - y0)
+                result += amp * map_coordinates(kernel, xy_grid, order=1)
 
         return result
 
