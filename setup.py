@@ -20,25 +20,26 @@ long_description = readme.replace('<img src="https://raw.githubusercontent.com/H
 # Python version
 python_requires = '>=3.10'
 
-# Minimal required packages (see requirements.txt for versions)
+# Minimal required packages (see also requirements.txt)
 install_requires = [
-    'numpy',
-    'scipy',
-    'jax',
-    'jaxlib',
-    'objax',
-    'scikit-image',
-    # 'https://github.com/aymgal/utax.git',  # use requirements.txt
+    'numpy>=1.20.3',
+    'scipy>=1.6.3',
+    'jax>=0.7.0',
+    'jaxlib>=0.7.0',
+    'objax>=1.8.0',
+    'scikit-image>=0.20.0',
+    'utax>=0.0.2',
 ]
 
-# Minimal optional packages (see requirements.txt for versions and complete list)
+# Minimal optional packages (see also requirements.txt for even more optional packages)
 install_optional = [
-    'matplotlib',    # for plotting
-    'optax',         # for optimizers
-    'jaxopt',        # for optimizers
-    'findiff',       # for building matrix with finite difference coefficients
-    'numpyro',       # for SVI and HMC sampling
-    'blackjax',      # for JAX-based HMC sampling
+    'helens>=0.0.1',  # for a JAX-based lens equation solver
+    # 'jaxinterp2d' is not available on PyPI; install manually via:
+    # pip install git+https://github.com/adam-coogan/jaxinterp2d@master
+    'matplotlib>=3.7.0',    # for plotting
+    'optax>=0.2.0',         # for optimizers
+    'numpyro>=0.20.0',      # for probabilistic modelling and sampling algorithms
+    'nifty>=9.1.0',         # for correlated fields and VI sampling
 ]
 
 version = release_info['__version__']
@@ -62,6 +63,4 @@ setuptools.setup(
     extras_require={
         "opt": install_optional,  # installable via `pip install herculens[opt]`
     },
-    setup_requires=['pytest-runner',],
-    tests_require=['pytest', 'pytest-cov', 'pytest-pep8'],
 )

@@ -113,25 +113,48 @@ class Plotter(object):
         return fig
 
     def model_summary(
-            self, lens_image, kwargs_result,
-            show_image=True, show_source=True, 
-            show_lens_light=False, show_lens_potential=False, show_lens_others=False,
-            only_pixelated_potential=False, shift_pixelated_potential='none',
-            likelihood_mask=None, potential_mask=None, apply_mask_to_model=False,
-            show_lens_lines=False, supersampling_lens_lines=3,
-            show_shear_field=False, show_lens_position=False,
-            kwargs_grid_source=None,
-            lock_colorbars=False, masked_residuals=True,
-            vmin_pot=None, vmax_pot=None,
-            k_source=None, k_lens=None, k_lens_light=None, k_point_source=None,  # for single-plane models
-            k_light=None, k_mass=None, k_planes=None,  # for multi-plane models
-            kwargs_noise=None, 
-            figsize=None, show_plot=True,
+        self,
+        lens_image,
+        kwargs_result,
+        show_image=True,
+        show_source=True,
+        show_lens_light=False,
+        show_lens_potential=False,
+        show_lens_others=False,
+        show_lens_lines=False,
+        show_shear_field=False,
+        shear_field_type='external_single',
+        show_lens_position=False,
+        show_reduced_chi2=True,
+        only_pixelated_potential=False,
+        shift_pixelated_potential='none',
+        likelihood_mask=None,
+        potential_mask=None,
+        masked_residuals=True,
+        masked_image_model=False,
+        masked_source_model=True,
+        source_mask_shape_parameter=None,
+        source_mask_dilation=0,
+        source_mask_border_fracion=0,
+        supersampling_lens_lines=3,
+        kwargs_grid_source=None,
+        lock_colorbars=False,
+        vmin_pot=None,
+        vmax_pot=None,
+        k_source=None,
+        k_lens=None,
+        k_lens_light=None,
+        k_point_source=None,  # for single-plane models
+        k_light=None,
+        k_mass=None,
+        k_planes=None,  # for multi-plane models
+        kwargs_noise=None,
+        figsize=None,
+        show_plot=True,
 
-            # TODO: this is a dirty quick fix to correctly read multi-band heterogenous LensImage models
-            # This will not be necessary once the LensImage3D class is properly supported.
-            adapted_source_pixels_coords=None,
-        ):
+        # NOTE: the following keyword argument is a temporary way to correctly read multi-band heterogenous LensImage instances. This will not be necessary once the LensImage3D class is properly supported.
+        adapted_source_pixels_coords=None,
+    ):
         """
         Generate a summary plot of the lens model.
 
@@ -151,6 +174,16 @@ class Plotter(object):
             Whether to show the lens potential model, by default False.
         show_lens_others : bool, optional
             Whether to show other lens models, by default False.
+        show_lens_lines : bool, optional
+            Whether to show lens lines, by default False.
+        show_shear_field : bool, optional
+            Whether to show the shear field, by default False.
+        shear_field_type : str, optional
+            The type of shear field, by default 'external_single'.
+        show_lens_position : bool, optional
+            Whether to show the lens position, by default False.
+        show_reduced_chi2 : bool, optional
+            Whether to indicate the reduced chi2 in the model panel, by default True.
         only_pixelated_potential : bool, optional
             Whether to show only the pixelated potential, by default False.
         shift_pixelated_potential : str, optional
@@ -159,32 +192,56 @@ class Plotter(object):
             The likelihood mask, by default None.
         potential_mask : ndarray, optional
             The potential mask, by default None.
-        apply_mask_to_model : bool, optional
+        masked_image_model : bool, optional
             Whether to apply the likelihood mask to the model image, in order
             to hide away regions of the model that were not used in the likelihood.
             By default False.
-        show_lens_lines : bool, optional
-            Whether to show lens lines, by default False.
-        show_shear_field : bool, optional
-            Whether to show the shear field, by default False.
-        show_lens_position : bool, optional
-            Whether to show the lens position, by default False.
+        masked_source_model : bool, optional
+            Whether to apply the mask to the pixelated source model, by default True.
+            If `source_arc_mask` has been set in the LensImage, it will be used as mask, 
+            otherwise the `likelihood_mask` will be used.
+            If the source model is not pixelated, this keyword has no effect.
+        source_mask_shape_parameter : float, optional
+            The alpha parameter for the source mask, if `masked_source_model` is True, by default None.
+        source_mask_dilation : int, optional
+            The number of dilation iterations for the source mask, if `masked_source_model` is True, by default 0.
+        source_mask_border_fracion : float, optional
+            If not None, fraction of the source plane is further masked out
+            to avoid showing unconstrained pixels. By default 0.
+        masked_residuals : bool, optional
+            Whether to show masked residuals, by default True.
+        supersampling_lens_lines : int, optional
+            The supersampling factor for lens lines, by default 3.
         kwargs_grid_source : dict, optional
             The grid source parameters, by default None.
         lock_colorbars : bool, optional
             Whether to lock the colorbars, by default False.
-        masked_residuals : bool, optional
-            Whether to show masked residuals, by default True.
         vmin_pot : float, optional
             The minimum potential value, by default None.
         vmax_pot : float, optional
             The maximum potential value, by default None.
+        k_source : float, optional
+            Index of source profiles to consider, by default None (all profiles used).
         k_lens : float, optional
-            The lens model normalization factor, by default None.
+            Index of lens profiles to consider, by default None (all profiles used).
+        k_lens_light : float, optional
+            Index of lens light profiles to consider, by default None (all profiles used).
+        k_point_source : float, optional
+            Index of point source profiles to consider (for single-plane models), by default None (all profiles used).
+        k_light : float, optional
+            Index of light profiles to consider (for multi-plane models), by default None (all profiles used).
+        k_mass : float, optional
+            Index of mass profiles to consider (for multi-plane models), by default None (all profiles used).
+        k_planes : float, optional
+            Index of lensing planes to consider (for multi-plane models), by default None (all planes used).
         kwargs_noise : dict, optional
             Parameters given to Noise.C_D_model(mode, **kwargs_noise), by default None.
+        figsize : tuple, optional
+            The figure size, by default None.
         show_plot : bool, optional
             Whether to call plt.show(), by default True.
+        adapted_source_pixels_coords : ndarray, optional
+            Adapted source pixel coordinates for multi-band heterogenous LensImage models, by default None.
 
         Returns
         -------
@@ -426,13 +483,16 @@ class Plotter(object):
                     ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
                 ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
             if show_shear_field:
-                shear_field = model_util.shear_deflection_field(lens_image, kwargs_result['kwargs_lens'], num_pixels=8)
+                shear_field = model_util.shear_deflection_field(
+                    lens_image, kwargs_result['kwargs_lens'],
+                    num_pixels=8, shear_type=shear_field_type,
+                )
                 if shear_field is not None:
                     x_field, y_field, gx_field, gy_field = shear_field
                     ax.quiver(
-                        x_field, y_field, # + overall_shift, 
-                        gx_field, gy_field, 
-                        scale=0.2, 
+                        x_field, y_field, # + overall_shift,
+                        gx_field, gy_field,
+                        scale=0.2,
                         width=0.05,
                         scale_units='xy', units='xy',
                         pivot='middle',
@@ -442,15 +502,15 @@ class Plotter(object):
                     ax.set_xlim(extent[0], extent[1])
                     ax.set_ylim(extent[2], extent[3])
                 else:
-                    print("Warning: no external shear to plot have been found.")
+                    print(f"Warning: no {shear_field_type} shear field to plot.")
             data_title = self.data_name if self.data_name is not None else "data"
             ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
                           colorbar_kwargs={'orientation': 'horizontal'})
             
             ax = axes[i_row, 1]
-            if apply_mask_to_model is True:
-                model_to_show = model * likelihood_mask
+            if masked_image_model is True:
+                model_to_show = np.ma.array(model, mask=(1-likelihood_mask).astype(bool))
             else:
                 model_to_show = model
             im = ax.imshow(model_to_show, extent=extent, cmap=self.cmap_flux, norm=norm_flux)
@@ -464,25 +524,26 @@ class Plotter(object):
                 data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
             )
             if masked_residuals is True:
-                residuals_plot = model_residuals
+                residuals_to_show = model_residuals
             else:
-                residuals_plot = residuals
-            red_chi2 = lens_image.reduced_chi2(
-                data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
-            )
-            im = ax.imshow(residuals_plot, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
+                residuals_to_show = residuals
+            im = ax.imshow(residuals_to_show, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
             im.set_rasterized(True)
             if mask_bool is True and masked_residuals is False:
                 ax.contour(likelihood_mask, extent=extent, levels=[0], 
                            colors='black', alpha=0.5, linewidths=0.5)
             ax.set_title(r"(f${}_{\rm data}$ - f${}_{\rm model})/\sigma$", fontsize=self.base_fontsize)
-            nice_colorbar_residuals(im, residuals_plot, position='top', pad=0.4, size=0.2, 
+            nice_colorbar_residuals(im, residuals_to_show, position='top', pad=0.4, size=0.2, 
                                     vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                     colorbar_kwargs={'orientation': 'horizontal'})
-            text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
-            ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
-                    horizontalalignment='left', verticalalignment='bottom',
-                    transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
+            if show_reduced_chi2:
+                red_chi2 = lens_image.reduced_chi2(
+                    data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
+                )
+                text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
+                ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
+                        horizontalalignment='left', verticalalignment='bottom',
+                        transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
             i_row += 1
 
         if show_source:
@@ -500,8 +561,30 @@ class Plotter(object):
                 ax.axis('off')
             ax = axes[i_row, 1]
             if source_model is not None:
-                im = ax.imshow(source_model, extent=src_extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
-                #im = ax.imshow(source_model, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
+                if masked_source_model is True and lens_image.SourceModel.has_pixels:
+                    if lens_image.source_arc_mask is None:
+                        source_arc_mask = likelihood_mask
+                    else:
+                        source_arc_mask = None  # will use the one from the lens_image instance
+                    if source_mask_shape_parameter is None:
+                        if lens_image.source_arc_mask is not None:
+                            source_mask_shape_parameter = 1
+                        else:
+                            source_mask_shape_parameter = 0.05
+                    source_mask = model_util.source_plane_mask_from_arc_mask(
+                        lens_image, kwargs_result['kwargs_lens'], 
+                        alpha=source_mask_shape_parameter, 
+                        dilation_iterations=source_mask_dilation,
+                        source_arc_mask=source_arc_mask,
+                    )
+                    if source_mask_border_fracion > 0:
+                        source_mask_borders = model_util.border_mask(source_mask, border_fraction=source_mask_border_fracion)
+                        source_mask[source_mask_borders == 0] = 0
+                    source_model_to_show = np.ma.array(source_model, mask=(1-source_mask).astype(bool))
+                else:
+                    source_model_to_show = source_model
+                im = ax.imshow(source_model_to_show, extent=src_extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
+                #im = ax.imshow(source_model_to_show, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
                 im.set_rasterized(True)
             ax.set_title("source model", fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -583,8 +666,8 @@ class Plotter(object):
                 ax.axis('off')
 
             ax = axes[i_row, 1]
-            if apply_mask_to_model is True:
-                potential_model_to_show = model * potential_mask
+            if masked_image_model is True:
+                potential_model_to_show = np.ma.array(model, mask=(1-potential_mask).astype(bool))
             else:
                 potential_model_to_show = potential_model
             im = ax.imshow(potential_model_to_show, extent=extent,
@@ -654,6 +737,7 @@ class Plotter(object):
             likelihood_mask=None,
             masked_residuals=True,
             show_shear_field=False,
+            show_reduced_chi2=True,
             norm_kappa=LogNorm(1e-1, 1e1),
             extent_zoom=[-0.5, 0.5, -0.5, 0.5],
             kwargs_grid_source=None,
@@ -712,12 +796,9 @@ class Plotter(object):
             data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
         )
         if masked_residuals is True:
-            residuals_plot = model_residuals
+            residuals_to_show = model_residuals
         else:
-            residuals_plot = residuals
-        red_chi2 = lens_image.reduced_chi2(
-            data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
-        )
+            residuals_to_show = residuals
         # Get the extent of the image
         extent = lens_image.Grid.plt_extent
         # Get the critical lines and caustics
@@ -821,7 +902,7 @@ class Plotter(object):
         
         # Residuals
         ax = axes[0, 2]
-        im = ax.imshow(residuals_plot, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
+        im = ax.imshow(residuals_to_show, cmap=self.cmap_res, extent=extent, norm=self.norm_res)
         im.set_rasterized(True)
         self._plot_masks_contours(
             ax, lens_image, likelihood_mask=likelihood_mask, extent=extent, color='black', alpha=0.6,
@@ -831,13 +912,17 @@ class Plotter(object):
                        colors='black', alpha=0.5, linewidths=0.5)
             
         ax.set_title(r"(f${}_{\rm data}$ - f${}_{\rm model})/\sigma$", fontsize=self.base_fontsize)
-        nice_colorbar_residuals(im, residuals_plot, position='top', pad=0.4, size=0.2, 
+        nice_colorbar_residuals(im, residuals_to_show, position='top', pad=0.4, size=0.2, 
                                 vmin=self.norm_res.vmin, vmax=self.norm_res.vmax,
                                 colorbar_kwargs={'orientation': 'horizontal'})
-        text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
-        ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
-                horizontalalignment='left', verticalalignment='bottom',
-                transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
+        if show_reduced_chi2:
+            red_chi2 = lens_image.reduced_chi2(
+                data, model, kwargs_noise=kwargs_noise, mask=likelihood_mask,
+            )
+            text = r"$\chi^2_\nu={:.2f}$".format(red_chi2)
+            ax.text(0.05, 0.05, text, color='black', fontsize=self.base_fontsize-4, 
+                    horizontalalignment='left', verticalalignment='bottom',
+                    transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
         
         # Model with critical lines overlayed
         ax = axes[0, 3]

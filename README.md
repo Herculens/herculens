@@ -57,7 +57,12 @@ The mandatory dependencies will be installed automatically.
 
 ### Package requirements
 
-The [`requirements.txt`](https://github.com/Herculens/herculens/blob/main/requirements.txt) file lists all required and optional package dependencies, along with their specific versions. **IMPORTANT NOTE:** do not only install blindly the required packages; please also have a look at the content of [the file](https://github.com/Herculens/herculens/blob/main/requirements.txt) itself to learn more about additional optional packages, depending on your goals.
+The [`requirements.txt`](https://github.com/Herculens/herculens/blob/main/requirements.txt) file lists all required and optional package dependencies, along with their specific versions.
+
+> **Note on `jaxinterp2d`:** This optional dependency (used for fast bilinear interpolation in pixelated profiles) is not available on PyPI and must be installed manually:
+> ```sh
+> pip install git+https://github.com/adam-coogan/jaxinterp2d@master
+> ```
 
 ## Slack channel
 

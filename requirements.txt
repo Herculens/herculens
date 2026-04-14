@@ -4,19 +4,21 @@ jax>=0.7.0
 jaxlib>=0.7.0
 objax>=1.8.0
 scikit-image>=0.20.0
-git+https://github.com/aymgal/utax.git@main#egg=utax   # JAX utilities (convolution, interpolation, etc.)
+utax>=0.0.2   # JAX utilities (convolution, interpolation, etc.)
 
 # the following packages are optional (pay attention to the versions)
+helens>=0.0.1   # JAX lens equation solver for some point source features
+#jaxinterp2d  # not on PyPI; install manually: pip install git+https://github.com/adam-coogan/jaxinterp2d@master
+#nifty>=9.1.0       # NOTE: in case nifty>=9.0.0 could not be installed, you can install nifty8 instead: nifty8>=8.5.7
 #optax>=0.2.0        # for optimizers
-#jaxopt>=0.8.0       # for optimizers
 #matplotlib>=3.7.0   # for plotting
+#numpyro>=0.20.0     # for SVI and HMC sampling
+
+# even more optional but useful packages are the following:
+#jaxopt>=0.8.0       # for optimizers # WARNING: the package is not maintained anymore
 #findiff==0.8.9      # for building matrix with finite difference coefficients
 #tqdm>=4.61.0        # for progress bars with certain optimizers and samplers
-#numpyro>=0.20.0     # for SVI and HMC sampling
-#blackjax==1.0.0     # for JAX-based HMC sampling
+#blackjax>=1.0.0     # for JAX-based HMC sampling
 #emcee==3.0.2        # for Ensemble MCMC sampling
 #gigalens==0.1.8     # for a JAX implementation of Shapelets
 #lenstronomy>=1.9.0  # for interpolated Shapelets (via `gigalens`), or for Particle Swarm Optimization
-#git://github.com/adam-coogan/jaxinterp2d@master#egg=jaxinterp2d  # for fast bilinear interpolation (e.g. for pixelated profiles)
-#git+https://github.com/Herculens/helens.git@main#egg=helens   # JAX lens equation solver for some point source features
-#nifty>=9.1.0       # NOTE: in case nifty>=9.0.0 could not be installed, you can install nifty8 instead: nifty8>=8.5.7
