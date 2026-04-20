@@ -118,6 +118,7 @@ class Plotter(object):
         kwargs_result,
         show_image=True,
         show_source=True,
+        show_point_source=True,
         show_lens_light=False,
         show_lens_potential=False,
         show_lens_others=False,
@@ -168,6 +169,8 @@ class Plotter(object):
             Whether to show the lens image, by default True.
         show_source : bool, optional
             Whether to show the source model, by default True.
+        show_point_source:bool, optional
+            Whether to show the point source model, by default True.
         show_lens_light : bool, optional
             Whether to show the lens light model, by default False.
         show_lens_potential : bool, optional
@@ -248,17 +251,21 @@ class Plotter(object):
         type
             The summary plot.
         """
-        if isinstance(lens_image, MPLensImage) and any([
-            show_source, show_lens_light, show_lens_potential, show_lens_others,
-            show_shear_field, show_lens_position, show_lens_lines,
-        ]):
-            raise NotImplementedError("The full plotting of multi-plane lens models, "
-                                      "other than just the data model (observed image plane), "
-                                      "is not supported yet.")
-            
+        # For multi-plane models, pixelated potential plots are not supported
+        if isinstance(lens_image, MPLensImage) and show_lens_potential:
+            warnings.warn("show_lens_potential is not supported for multi-plane models and will be ignored.")
+            show_lens_potential = False
+
+        # Number of source rows: one per source plane for multiplane, one for single-plane
+        if isinstance(lens_image, MPLensImage):
+            num_source_planes = lens_image.MPLightModel.number_light_planes - 1
+        else:
+            num_source_planes = 1
+
         n_cols = 3
-        n_rows = sum([show_image, show_source, show_lens_light, 
+        n_rows = sum([show_image, show_lens_light,
                       show_lens_potential, show_lens_others])
+        n_rows += (num_source_planes if show_source else 0)
         
         # extent = lens_image.Grid.extent
         extent = lens_image.Grid.plt_extent
@@ -278,6 +285,7 @@ class Plotter(object):
                     k_source=k_source,
                     k_point_source=k_point_source,
                     adapted_source_pixels_coords=adapted_source_pixels_coords,
+                    point_source_add=show_point_source
                 )
             elif isinstance(lens_image, MPLensImage):
                 model = lens_image.model(
@@ -285,6 +293,7 @@ class Plotter(object):
                     k_mass=k_mass,
                     k_light=k_light,
                     k_planes=k_planes,
+                    point_source_add=show_point_source,
                 )
             if likelihood_mask is None:
                 mask_bool = False
@@ -348,6 +357,55 @@ class Plotter(object):
                 ref_src_extent = None
                 show_source_diff = False
 
+        elif show_source and isinstance(lens_image, MPLensImage) and kwargs_result.get('kwargs_light', None) is not None:
+            # Multi-plane: evaluate each source plane (planes 1..N-1) and store as a list
+            mp_source_models = []
+            x_coords_all, y_coords_all, extents_all = lens_image.get_source_coordinates(
+                kwargs_result['eta_flat'],
+                kwargs_result['kwargs_mass'],
+            )
+            for i_plane in range(1, lens_image.MPLightModel.number_light_planes):
+                plane_light_model = lens_image.MPLightModel.light_models[i_plane]
+                if plane_light_model is None:
+                    mp_source_models.append((None, extent))
+                    continue
+                x_coord = x_coords_all[i_plane]
+                y_coord = y_coords_all[i_plane]
+                plane_extent_raw = extents_all[i_plane]
+                if x_coord is not None:
+                    # adaptive pixelated grid: build 2D meshgrid and compute imshow extent
+                    x_grid_src_i, y_grid_src_i = np.meshgrid(x_coord, y_coord)
+                    pix_scl_x = float(jnp.abs(plane_extent_raw[0] - plane_extent_raw[1]))
+                    pix_scl_y = float(jnp.abs(plane_extent_raw[2] - plane_extent_raw[3]))
+                    half_pix_scl = np.sqrt(pix_scl_x * pix_scl_y) / 2.
+                    src_extent_i = [
+                        float(plane_extent_raw[0]) - half_pix_scl,
+                        float(plane_extent_raw[1]) + half_pix_scl,
+                        float(plane_extent_raw[2]) - half_pix_scl,
+                        float(plane_extent_raw[3]) + half_pix_scl,
+                    ]
+                elif kwargs_grid_source is not None:
+                    grid_src_i = lens_image.Grid.create_model_grid(**kwargs_grid_source)
+                    x_grid_src_i, y_grid_src_i = grid_src_i.pixel_coordinates
+                    src_extent_i = grid_src_i.plt_extent
+                else:
+                    x_grid_src_i, y_grid_src_i = lens_image.ImageNumerics.coordinates_evaluate
+                    src_extent_i = extent
+                source_model_i = plane_light_model.surface_brightness(
+                    x_grid_src_i, y_grid_src_i,
+                    kwargs_result['kwargs_light'][i_plane],
+                    pixels_x_coord=x_coord,
+                    pixels_y_coord=y_coord,
+                ) * lens_image.Grid.pixel_area
+                if np.ndim(source_model_i) == 1:
+                    n_side = int(np.sqrt(source_model_i.size))
+                    source_model_i = np.array(source_model_i).reshape((n_side, n_side))
+                mp_source_models.append((source_model_i, src_extent_i))
+
+        elif show_source and isinstance(lens_image, MPLensImage):
+            # no kwargs_light found: fill with empty models
+            mp_source_models = [(None, extent)] * (lens_image.MPLightModel.number_light_planes - 1)
+
         elif show_source:
             source_model = None
             ref_source = None
@@ -357,7 +415,9 @@ class Plotter(object):
                 src_extent = grid_src.plt_extent
                 source_model = np.zeros(x_grid_src.shape)
 
-        if len(lens_image.PointSourceModel.type_list) > 0:
+        if isinstance(lens_image, MPLensImage):
+            ps_src_pos = None  # point source source-plane positions not yet supported for multiplane
+        elif len(lens_image.PointSourceModel.type_list) > 0:
             #TODO: support several point source models
             ps0_params = kwargs_result['kwargs_point_source'][0]
             all_ps_src_x, all_ps_src_y = lens_image.PointSourceModel.get_source_plane_points(
@@ -370,13 +430,26 @@ class Plotter(object):
             ps_src_pos = None
 
         if show_lens_light:
-            kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
-            if lens_image.LensLightModel.has_pixels:
-                ll_idx = lens_image.LensLightModel.pixelated_index
-                lens_light_model = kwargs_lens_light[ll_idx]['pixels']
+            if isinstance(lens_image, MPLensImage):
+                # plane 0 of MPLightModel is the lens-light plane
+                x_grid_ll, y_grid_ll = lens_image.ImageNumerics.coordinates_evaluate
+                lens_light_model = lens_image.MPLightModel.light_models[0].surface_brightness(
+                    x_grid_ll, y_grid_ll,
+                    kwargs_result['kwargs_light'][0],
+                    pixels_x_coord=None,
+                    pixels_y_coord=None,
+                ) * lens_image.Grid.pixel_area
+                if np.ndim(lens_light_model) == 1:
+                    n_side = int(np.sqrt(lens_light_model.size))
+                    lens_light_model = np.array(lens_light_model).reshape((n_side, n_side))
             else:
-                lens_light_model = lens_image.lens_surface_brightness(kwargs_lens_light, unconvolved=True)
-            
+                kwargs_lens_light = copy.deepcopy(kwargs_result['kwargs_lens_light'])
+                if lens_image.LensLightModel.has_pixels:
+                    ll_idx = lens_image.LensLightModel.pixelated_index
+                    lens_light_model = kwargs_lens_light[ll_idx]['pixels']
+                else:
+                    lens_light_model = lens_image.lens_surface_brightness(kwargs_lens_light, unconvolved=True)
+
             if hasattr(self, '_ref_lens_light'):
                 ref_lens_light = self._ref_lens_light
                 if lens_light_model.shape != ref_lens_light.shape:
@@ -389,65 +462,102 @@ class Plotter(object):
                 show_lens_light_diff = False
 
         if show_lens_potential or show_lens_others:
-            kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
-            pot_idx = lens_image.MassModel.pixelated_index if only_pixelated_potential else None
-            if pot_idx is not None and only_pixelated_potential:
-                x_grid_lens, y_grid_lens = lens_image.MassModel.pixel_grid.pixel_coordinates
-                potential_model = kwargs_lens[pot_idx]['pixels']
-            else:
+            if isinstance(lens_image, MPLensImage):
+                # Multi-plane: use MPMassModel for kappa, magnification and total deflection
                 x_grid_lens, y_grid_lens = lens_image.Grid.pixel_coordinates
-                if show_lens_potential:
-                    potential_model = lens_image.MassModel.potential(x_grid_lens, y_grid_lens, 
-                                                                     kwargs_lens, k=pot_idx)
-            alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_lens, y_grid_lens, 
-                                                          kwargs_lens, k=pot_idx)
-            kappa = lens_image.MassModel.kappa(x_grid_lens, y_grid_lens, 
-                                               kwargs_lens, k=pot_idx)
-            #kappa = ndimage.gaussian_filter(kappa, 1)
-            magnification = lens_image.MassModel.magnification(x_grid_lens, y_grid_lens, kwargs_lens)
-            
-            if potential_mask is None:
-                potential_mask = np.ones_like(x_grid_lens)
-
-            # here we know that there are no perturbations in the reference potential
-            if hasattr(self, '_ref_pixel_pot') and show_lens_potential:
-                ref_potential = self._ref_pixel_pot
-                if ref_potential.shape != potential_model.shape:
-                    warnings.warn("Reference potential does not have the same shape as model potential.")
-                    show_pot_diff = False
-                else:
-                    show_pot_diff = True
-            
-                if shift_pixelated_potential == 'min':
-                    min_in_mask = potential_model[potential_mask == 1].min()
-                    potential_model = potential_model - min_in_mask
-                    ref_min_in_mask = ref_potential[potential_mask == 1].min()
-                    ref_potential = ref_potential - ref_min_in_mask
-                    print("delta_psi shift by min:", min_in_mask)
-                if shift_pixelated_potential == 'max':
-                    max_in_mask = potential_model[potential_mask == 1].max()
-                    potential_model = potential_model - max_in_mask
-                    ref_max_in_mask = ref_potential[potential_mask == 1].max()
-                    ref_potential = ref_potential - ref_max_in_mask
-                    print("delta_psi shift by max:", max_in_mask)
-                elif shift_pixelated_potential == 'mean':
-                    mean_in_mask = potential_model[potential_mask == 1].mean()
-                    potential_model = potential_model - mean_in_mask
-                    ref_mean_in_mask = ref_potential[potential_mask == 1].mean()
-                    ref_potential = ref_potential - ref_mean_in_mask
-                    print("delta_psi shift by mean values:", mean_in_mask, ref_mean_in_mask)
-
-            else:
+                # kappa and magnification return shape (N_planes+1, *grid_shape); take the last plane
+                kappa = np.array(lens_image.MPMassModel.kappa(
+                    x_grid_lens, y_grid_lens,
+                    kwargs_result['eta_flat'],
+                    kwargs_result['kwargs_mass'],
+                ))[-1]
+                magnification = np.array(lens_image.MPMassModel.magnification(
+                    x_grid_lens, y_grid_lens,
+                    kwargs_result['eta_flat'],
+                    kwargs_result['kwargs_mass'],
+                ))[-1]
+                # Total deflection to the last source plane via ray shooting.
+                # ray_shooting requires flat (1D) coordinate arrays, so flatten and reshape back.
+                x_flat = x_grid_lens.flatten()
+                y_flat = y_grid_lens.flatten()
+                xs_planes, ys_planes = lens_image.MPMassModel.ray_shooting(
+                    x_flat, y_flat,
+                    kwargs_result['eta_flat'],
+                    kwargs_result['kwargs_mass'],
+                )
+                alpha_x = np.array(x_flat - xs_planes[-1]).reshape(x_grid_lens.shape)
+                if potential_mask is None:
+                    potential_mask = np.ones_like(x_grid_lens)
                 ref_potential = None
                 show_pot_diff = False
+            else:
+                kwargs_lens = copy.deepcopy(kwargs_result['kwargs_lens'])
+                pot_idx = lens_image.MassModel.pixelated_index if only_pixelated_potential else None
+                if pot_idx is not None and only_pixelated_potential:
+                    x_grid_lens, y_grid_lens = lens_image.MassModel.pixel_grid.pixel_coordinates
+                    potential_model = kwargs_lens[pot_idx]['pixels']
+                else:
+                    x_grid_lens, y_grid_lens = lens_image.Grid.pixel_coordinates
+                    if show_lens_potential:
+                        potential_model = lens_image.MassModel.potential(x_grid_lens, y_grid_lens,
+                                                                         kwargs_lens, k=pot_idx)
+                alpha_x, alpha_y = lens_image.MassModel.alpha(x_grid_lens, y_grid_lens,
+                                                              kwargs_lens, k=pot_idx)
+                kappa = lens_image.MassModel.kappa(x_grid_lens, y_grid_lens,
+                                                   kwargs_lens, k=pot_idx)
+                magnification = lens_image.MassModel.magnification(x_grid_lens, y_grid_lens, kwargs_lens)
+
+                if potential_mask is None:
+                    potential_mask = np.ones_like(x_grid_lens)
+
+                # here we know that there are no perturbations in the reference potential
+                if hasattr(self, '_ref_pixel_pot') and show_lens_potential:
+                    ref_potential = self._ref_pixel_pot
+                    if ref_potential.shape != potential_model.shape:
+                        warnings.warn("Reference potential does not have the same shape as model potential.")
+                        show_pot_diff = False
+                    else:
+                        show_pot_diff = True
+
+                    if shift_pixelated_potential == 'min':
+                        min_in_mask = potential_model[potential_mask == 1].min()
+                        potential_model = potential_model - min_in_mask
+                        ref_min_in_mask = ref_potential[potential_mask == 1].min()
+                        ref_potential = ref_potential - ref_min_in_mask
+                        print("delta_psi shift by min:", min_in_mask)
+                    if shift_pixelated_potential == 'max':
+                        max_in_mask = potential_model[potential_mask == 1].max()
+                        potential_model = potential_model - max_in_mask
+                        ref_max_in_mask = ref_potential[potential_mask == 1].max()
+                        ref_potential = ref_potential - ref_max_in_mask
+                        print("delta_psi shift by max:", max_in_mask)
+                    elif shift_pixelated_potential == 'mean':
+                        mean_in_mask = potential_model[potential_mask == 1].mean()
+                        potential_model = potential_model - mean_in_mask
+                        ref_mean_in_mask = ref_potential[potential_mask == 1].mean()
+                        ref_potential = ref_potential - ref_mean_in_mask
+                        print("delta_psi shift by mean values:", mean_in_mask, ref_mean_in_mask)
+
+                else:
+                    ref_potential = None
+                    show_pot_diff = False
 
         if show_lens_lines:
-            clines, caustics, centers = model_util.critical_lines_caustics(
-                lens_image, 
-                kwargs_result['kwargs_lens'], 
-                return_lens_centers=True,
-                supersampling=supersampling_lens_lines,
-            )
+            if isinstance(lens_image, MPLensImage):
+                clines, caustics, centers = model_util.critical_lines_caustics(
+                    lens_image,
+                    kwargs_result['kwargs_mass'],
+                    eta_flat=kwargs_result['eta_flat'],
+                    return_lens_centers=True,
+                    supersampling=supersampling_lens_lines,
+                )
+            else:
+                clines, caustics, centers = model_util.critical_lines_caustics(
+                    lens_image,
+                    kwargs_result['kwargs_lens'],
+                    return_lens_centers=True,
+                    supersampling=supersampling_lens_lines,
+                )
 
 
         ##### BUILD UP THE PLOTS #####
@@ -468,14 +578,19 @@ class Plotter(object):
             if mask_bool is True:
                 ax.contour(likelihood_mask, extent=extent, levels=[0], 
                            colors='white', alpha=0.3, linewidths=0.5)
-            if show_lens_position and 'kwargs_lens_light' in kwargs_result:
+            if show_lens_position:
+                # For multiplane, lens positions come from plane-0 kwargs_light; for single-plane from kwargs_lens_light
+                if isinstance(lens_image, MPLensImage):
+                    lens_pos_kwargs = kwargs_result.get('kwargs_light', [[]])[0]
+                else:
+                    lens_pos_kwargs = kwargs_result.get('kwargs_lens_light', [])
                 plotted_centers = []
-                for kw in kwargs_result['kwargs_lens_light']:
+                for kw in lens_pos_kwargs:
                     if 'center_x' in kw:
                         center = (kw['center_x'], kw['center_y'])
                         if center not in plotted_centers:
-                            ax.plot(*center, linestyle='none', color='black', 
-                                    markeredgecolor='black', markersize=15, marker='o', 
+                            ax.plot(*center, linestyle='none', color='black',
+                                    markeredgecolor='black', markersize=15, marker='o',
                                     fillstyle='none', markeredgewidth=1)
                         plotted_centers.append(center)
             if show_lens_lines:
@@ -483,14 +598,21 @@ class Plotter(object):
                     ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
                 ax.scatter(*centers, s=20, c='gray', marker='+', linewidths=0.5)
             if show_shear_field:
-                shear_field = model_util.shear_deflection_field(
-                    lens_image, kwargs_result['kwargs_lens'],
-                    num_pixels=8, shear_type=shear_field_type,
-                )
+                if isinstance(lens_image, MPLensImage):
+                    shear_field = model_util.total_shear_deflection_field(
+                        lens_image, kwargs_result['kwargs_mass'],
+                        eta_flat=kwargs_result['eta_flat'],
+                        num_pixels=8,
+                    )
+                else:
+                    shear_field = model_util.shear_deflection_field(
+                        lens_image, kwargs_result['kwargs_lens'],
+                        num_pixels=8, shear_type=shear_field_type,
+                    )
                 if shear_field is not None:
                     x_field, y_field, gx_field, gy_field = shear_field
                     ax.quiver(
-                        x_field, y_field, # + overall_shift,
+                        x_field, y_field,
                         gx_field, gy_field,
                         scale=0.2,
                         width=0.05,
@@ -502,7 +624,7 @@ class Plotter(object):
                     ax.set_xlim(extent[0], extent[1])
                     ax.set_ylim(extent[2], extent[3])
                 else:
-                    print(f"Warning: no {shear_field_type} shear field to plot.")
+                    print(f"Warning: no shear field to plot.")
             data_title = self.data_name if self.data_name is not None else "data"
             ax.set_title(data_title, fontsize=self.base_fontsize)
             nice_colorbar(im, position='top', pad=0.4, size=0.2, 
@@ -546,7 +668,33 @@ class Plotter(object):
                         transform=ax.transAxes, bbox={'color': 'white', 'alpha': 0.8})
             i_row += 1
 
-        if show_source:
+        if show_source and isinstance(lens_image, MPLensImage):
+            ##### MULTI-PLANE SOURCE MODELS (one row per source plane) #####
+            for i_src, (source_model_i, src_extent_i) in enumerate(mp_source_models):
+                i_plane = i_src + 1
+                norm_flux = self._get_norm_for_model(source_model_i, lock_colorbars)
+                ax = axes[i_row, 0]
+                ax.axis('off')
+                ax = axes[i_row, 1]
+                if source_model_i is not None:
+                    im = ax.imshow(source_model_i, extent=src_extent_i,
+                                   cmap=self.cmap_flux_alt, norm=norm_flux)
+                    im.set_rasterized(True)
+                    ax.set_title(f"source model (plane {i_plane})", fontsize=self.base_fontsize)
+                    nice_colorbar(im, position='top', pad=0.4, size=0.2,
+                                  colorbar_kwargs={'orientation': 'horizontal'})
+                    if show_lens_lines:
+                        for curve in caustics:
+                            ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
+                        ax.set_xlim(src_extent_i[0], src_extent_i[1])
+                        ax.set_ylim(src_extent_i[2], src_extent_i[3])
+                else:
+                    ax.axis('off')
+                ax = axes[i_row, 2]
+                ax.axis('off')
+                i_row += 1
+
+        elif show_source:
             norm_flux = self._get_norm_for_model(source_model, lock_colorbars)
 
             ##### UNLENSED AND UNCONVOLVED SOURCE MODEL #####
@@ -555,7 +703,7 @@ class Plotter(object):
                 im = ax.imshow(ref_source, extent=ref_src_extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
                 im.set_rasterized(True)
                 ax.set_title("ref. source", fontsize=self.base_fontsize)
-                nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+                nice_colorbar(im, position='top', pad=0.4, size=0.2,
                               colorbar_kwargs={'orientation': 'horizontal'})
             else:
                 ax.axis('off')
@@ -572,8 +720,8 @@ class Plotter(object):
                         else:
                             source_mask_shape_parameter = 0.05
                     source_mask = model_util.source_plane_mask_from_arc_mask(
-                        lens_image, kwargs_result['kwargs_lens'], 
-                        alpha=source_mask_shape_parameter, 
+                        lens_image, kwargs_result['kwargs_lens'],
+                        alpha=source_mask_shape_parameter,
                         dilation_iterations=source_mask_dilation,
                         source_arc_mask=source_arc_mask,
                     )
@@ -584,30 +732,29 @@ class Plotter(object):
                 else:
                     source_model_to_show = source_model
                 im = ax.imshow(source_model_to_show, extent=src_extent, cmap=self.cmap_flux_alt, norm=norm_flux) #, vmax=vmax)
-                #im = ax.imshow(source_model_to_show, extent=extent, cmap=self.cmap_flux_alt, norm=LogNorm(1e-5))
                 im.set_rasterized(True)
             ax.set_title("source model", fontsize=self.base_fontsize)
-            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+            nice_colorbar(im, position='top', pad=0.4, size=0.2,
                           colorbar_kwargs={'orientation': 'horizontal'})
             if show_lens_lines:
                 for curve in caustics:
                     ax.plot(curve[0], curve[1], linewidth=0.8, color='white')
-                    # force x, y limits to stay the same as 
+                    # force x, y limits to stay the same as
                     ax.set_xlim(src_extent[0], src_extent[1])
                     ax.set_ylim(src_extent[2], src_extent[3])
             if ps_src_pos is not None:
-                ax.scatter(*ps_src_pos, s=100, c='tab:green', marker='*', linewidths=0.5, 
+                ax.scatter(*ps_src_pos, s=100, c='tab:green', marker='*', linewidths=0.5,
                            label="point source")
                 ax.legend()
             ax = axes[i_row, 2]
             if ref_source is not None and source_model is not None and show_source_diff is True:
                 diff = source_model - ref_source
                 vmax_diff = ref_source.max() / 10.
-                im = ax.imshow(diff, extent=src_extent, 
+                im = ax.imshow(diff, extent=src_extent,
                                cmap=self.cmap_res, norm=Normalize(-vmax_diff, vmax_diff))
                 im.set_rasterized(True)
                 ax.set_title(r"s${}_{\rm model}$ - s${}_{\rm ref}$", fontsize=self.base_fontsize)
-                nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2, 
+                nice_colorbar_residuals(im, diff, position='top', pad=0.4, size=0.2,
                                         vmin=-vmax_diff, vmax=vmax_diff,
                                         colorbar_kwargs={'orientation': 'horizontal'})
             else:
@@ -702,25 +849,40 @@ class Plotter(object):
             ax = axes[i_row, 0]
             im = ax.imshow(alpha_x * potential_mask, cmap=self.cmap_deriv1, alpha=1, extent=extent)
             im.set_rasterized(True)
-            title = r"$\alpha_{x,\rm pix}$" if only_pixelated_potential else r"deflection field ($x$)"
+            if isinstance(lens_image, MPLensImage):
+                title = r"total deflection ($x$, last plane)"
+            elif only_pixelated_potential:
+                title = r"$\alpha_{x,\rm pix}$"
+            else:
+                title = r"deflection field ($x$)"
             ax.set_title(title, fontsize=self.base_fontsize)
-            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+            nice_colorbar(im, position='top', pad=0.4, size=0.2,
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 1]
             im = ax.imshow(kappa * potential_mask, cmap=self.cmap_deriv2, norm=LogNorm(),
                            alpha=1, extent=extent)
             im.set_rasterized(True)
-            title = r"$\kappa_{\rm pix}$" if only_pixelated_potential else "convergence"
+            if isinstance(lens_image, MPLensImage):
+                title = r"convergence $\kappa$ (last plane)"
+            elif only_pixelated_potential:
+                title = r"$\kappa_{\rm pix}$"
+            else:
+                title = "convergence"
             ax.set_title(title, fontsize=self.base_fontsize)
-            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+            nice_colorbar(im, position='top', pad=0.4, size=0.2,
                           colorbar_kwargs={'orientation': 'horizontal'})
             ax = axes[i_row, 2]
             im = ax.imshow(magnification * potential_mask, cmap=self.cmap_default, norm=Normalize(-10, 10),
                            alpha=1, extent=extent)
             im.set_rasterized(True)
-            title = r"$\mu_{\rm pix}$" if only_pixelated_potential else "magnification"
+            if isinstance(lens_image, MPLensImage):
+                title = r"magnification $\mu$ (last plane)"
+            elif only_pixelated_potential:
+                title = r"$\mu_{\rm pix}$"
+            else:
+                title = "magnification"
             ax.set_title(title, fontsize=self.base_fontsize)
-            nice_colorbar(im, position='top', pad=0.4, size=0.2, 
+            nice_colorbar(im, position='top', pad=0.4, size=0.2,
                           colorbar_kwargs={'orientation': 'horizontal'})
             i_row += 1
 
