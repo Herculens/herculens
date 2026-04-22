@@ -4,7 +4,7 @@
 # Copyright (c) 2018, Simon Birrer & lenstronomy contributors
 # based on the LensModel.Profiles module from lenstronomy
 
-__author__ = 'sibirrer', 'martin-millon'
+__author__ = 'sibirrer', 'martin-millon', 'astroskylee'
 
 
 __all__ = ['Convergence']
