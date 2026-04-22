@@ -1,6 +1,6 @@
 numpy>=1.20.3
 scipy>=1.6.3
-jax>=0.7.0
+jax>=0.7.0,<=0.9.0
 jaxlib>=0.7.0
 objax>=1.8.0
 scikit-image>=0.20.0
@@ -22,3 +22,4 @@ helens>=0.0.1   # JAX lens equation solver for some point source features
 #emcee==3.0.2        # for Ensemble MCMC sampling
 #gigalens==0.1.8     # for a JAX implementation of Shapelets
 #lenstronomy>=1.9.0  # for interpolated Shapelets (via `gigalens`), or for Particle Swarm Optimization
+#git+https://github.com/martin-millon/jax_cosmo.git #For cosmology calculation
