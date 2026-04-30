@@ -20,6 +20,5 @@ helens>=0.0.1   # JAX lens equation solver for some point source features
 #tqdm>=4.61.0        # for progress bars with certain optimizers and samplers
 #blackjax>=1.0.0     # for JAX-based HMC sampling
 #emcee==3.0.2        # for Ensemble MCMC sampling
-#gigalens==0.1.8     # for a JAX implementation of Shapelets
-#lenstronomy>=1.9.0  # for interpolated Shapelets (via `gigalens`), or for Particle Swarm Optimization
+#lenstronomy>=1.9.0  # for Particle Swarm Optimization
 #git+https://github.com/martin-millon/jax_cosmo.git #For cosmology calculation in Jax
