@@ -29,6 +29,7 @@ install_requires = [
     'objax>=1.8.0',
     'scikit-image>=0.20.0',
     'utax>=0.0.2',
+    'jax_cosmo @ git+https://github.com/martin-millon/jax_cosmo.git', # as soon as this fork gets merged, change to jax-cosmo only
 ]
 
 # Minimal optional packages (see also requirements.txt for even more optional packages)
