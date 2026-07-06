@@ -124,6 +124,8 @@ class Pixelated(object):
         # setup interpolation, assuming cartesian grid
         if not self._adaptive_grid:  # in this case pixels_x_coord and pixels_y_coord should be None
             pixels_x_coord, pixels_y_coord = self._x_coords, self._y_coords
+        else:  # in this case pixels_x_coord and pixels_y_coord should be converted to pixel units as well
+            pixels_x_coord, pixels_y_coord = self.pixel_grid.map_coord2pix(pixels_x_coord, pixels_y_coord)
         interp = self._interp_class(pixels_y_coord, pixels_x_coord, pixels,
                                     allow_extrapolation=self._extrapol_bool)
         # evaluate the interpolator
