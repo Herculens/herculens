@@ -11,6 +11,7 @@ import scipy.ndimage
 
 from functools import partial
 from herculens.LensImage.Numerics.numerics import Numerics
+from herculens.PointSourceModel.point_source_multiplane import MPPointSourceModel
 
 
 class MPLensImage(object):
@@ -26,7 +27,9 @@ class MPLensImage(object):
         source_arc_masks=None,
         source_grid_scale=None,
         conjugate_points=None,
-        kwargs_numerics=None
+        kwargs_numerics=None,
+        point_source_model_class=None,
+        kwargs_solver_point_source=None,
     ):
         '''Generate a multi-plane lensed images from source light, lens mass/light, and point source models.
 
@@ -57,6 +60,16 @@ class MPLensImage(object):
         kwargs_numerics : dict, optional
             keyword arguments for various numerical settings (see herculens.Numerics.numerics),
             by default None
+        point_source_model_class : MPPointSourceModel instance, optional
+            multi-plane point source model, instance of MPPointSourceModel() from
+            herculens.PointSourceModel.point_source_multiplane. Supports two types:
+            ``'LENSED_POSITIONS'`` (image-plane positions given directly) and
+            ``'SOURCE_POSITION'`` (source-plane position given in a specified plane).
+            If None, no point sources are modeled. by default None
+        kwargs_solver_point_source : dict, optional
+            keyword arguments for the lens equation solver, forwarded to
+            ``MPPointSourceModel.get_multiple_images()`` when evaluating
+            ``'SOURCE_POSITION'`` point sources. by default None
         '''
         self.Grid = grid_class
         self.PSF = psf_class
@@ -104,6 +117,9 @@ class MPLensImage(object):
             kwargs_numerics = {}
         self.ImageNumerics = Numerics(pixel_grid=self.Grid, psf=self.PSF, **kwargs_numerics)
 
+        self.MPPointSourceModel = point_source_model_class
+        self._kwargs_solver_ps = kwargs_solver_point_source if kwargs_solver_point_source is not None else {}
+
         ssf = self.ImageNumerics.grid_supersampling_factor
 
         # get masks in super sampled space
@@ -130,6 +146,44 @@ class MPLensImage(object):
             -1
         ).astype(bool)
 
+    def point_source_image(self, kwargs_point_source, eta_flat, kwargs_mass, k=None):
+        """Compute the PSF-convolved point source contribution to the image plane.
+
+        Parameters
+        ----------
+        kwargs_point_source : list of dict
+            One dict per point source with keys ``'ra'``, ``'dec'``, ``'amp'``.
+        eta_flat : jax.numpy array
+            Flattened eta matrix for the multi-plane mass model.
+        kwargs_mass : list of list of dict
+            Per-plane mass model parameters.
+        k : int, optional
+            If given, only render point source number *k*. Default ``None``
+            renders all point sources.
+
+        Returns
+        -------
+        jax.numpy array
+            2-D image at the pixel-grid resolution with the rendered point sources.
+        """
+        result = jnp.zeros(self.Grid.num_pixel_axes)
+        if self.MPPointSourceModel is None:
+            return result
+        theta_x_list, theta_y_list, amp_list = self.MPPointSourceModel.get_multiple_images(
+            kwargs_point_source,
+            eta_flat=eta_flat,
+            kwargs_mass=kwargs_mass,
+            kwargs_solver=self._kwargs_solver_ps,
+            k=k,
+            with_amplitude=True,
+            zero_amp_duplicates=True,
+        )
+        for i in range(len(theta_x_list)):
+            result = result + self.ImageNumerics.render_point_sources(
+                theta_x_list[i], theta_y_list[i], amp_list[i]
+            )
+        return result
+
     def k_extend(self, k, amount):
         if k is None:
             return jnp.arange(amount)
@@ -138,7 +192,7 @@ class MPLensImage(object):
         else:
             return jnp.array(k)
 
-    @partial(jax.jit, static_argnums=(0, 4, 5, 6, 7, 8, 9, 10))
+    @partial(jax.jit, static_argnums=(0, 4, 5, 6, 7, 8, 9, 10, 11))
     def model(
         self,
         eta_flat=None,
@@ -151,6 +205,8 @@ class MPLensImage(object):
         k_planes=None,
         apply_mask=True,
         return_pixel_scale=False,
+        point_source_add=False,
+        kwargs_point_source=None,
     ):
         '''Create the 2D model image from the parameter values.  Note: due to JIT compilation,
         the first call to this method will be slower.
@@ -188,6 +244,13 @@ class MPLensImage(object):
         return_pixel_scale : bool, optional
             If True returns the pixel scale (arcsec/pixel) of each source plane, by default False.
             Note: requites and pixelated adaptive source grid to be used.
+        point_source_add : bool, optional
+            If True, add the point source contribution to the model image. Requires
+            ``MPPointSourceModel`` to have been provided at class instantiation and
+            ``kwargs_point_source`` to be passed here. by default False
+        kwargs_point_source : list of dict, optional
+            One dict per point source with keys ``'ra'``, ``'dec'``, ``'amp'``.
+            Required when ``point_source_add=True``. by default None
 
         Returns
         -------
@@ -227,6 +290,10 @@ class MPLensImage(object):
         model = light_planes[k_planes].sum(axis=0)
         if not supersampled:
             model = self.ImageNumerics.re_size_convolve(model, unconvolved=unconvolved)
+            if point_source_add:
+                model = model + self.point_source_image(
+                    kwargs_point_source, eta_flat, kwargs_mass
+                )
         if return_pixel_scale:
             pixel_scale = [x[1] - x[0] if x is not None else None for x in pixels_x_coord]
             return model, pixel_scale

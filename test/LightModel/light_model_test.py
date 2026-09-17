@@ -9,8 +9,8 @@ from herculens.LightModel.light_model import LightModel
 from herculens.LightModel.profile_mapping import SUPPORTED_MODELS
 
 
-# Set to True to include the Shapelets profile in the tests, but this requires gigalens
-TEST_SHAPELETS = False
+# Set to True to include the Shapelets profile in the tests
+TEST_SHAPELETS = True
 
 
 @pytest.fixture
