@@ -246,7 +246,7 @@ class NIEMajorAxis(object):
         """
         returns df/dx and df/dy of the function
         """
-        q = jnp.clip(q, a_max=0.99999999)
+        q = jnp.clip(q, max=0.99999999)
         psi = self._psi(x, y, q, s)
         f_x = b / jnp.sqrt(1. - q**2) * jnp.arctan(jnp.sqrt(1. - q**2) * x / (psi + s))
         f_y = b / jnp.sqrt(1. - q**2) * jnp.arctanh(jnp.sqrt(1. - q**2) * y / (psi + q**2 * s))

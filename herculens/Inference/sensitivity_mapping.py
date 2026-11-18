@@ -97,7 +97,7 @@ class MassSensitivityMapping(object):
             sensitivity_map = util.array2image(sensitivity_map)
 
         # get the coordinates where the sensitivity is the highest
-        peak_indices_2d = feature.peak_local_max(-np.clip(sensitivity_map, a_min=None, a_max=0))
+        peak_indices_2d = feature.peak_local_max(-np.minimum(sensitivity_map, 0))
         
         x_coords, y_coords = x_grid[0, :], y_grid[:, 0]
         x_minima = x_coords[peak_indices_2d[:, 1]]
@@ -163,7 +163,7 @@ class MassSensitivityMapping(object):
             logL_map = util.array2image(logL_map)
 
         # get the coordinates where the sensitivity is the highest
-        peak_indices_2d = feature.peak_local_max(-np.clip(sensitivity_map, a_min=None, a_max=0))
+        peak_indices_2d = feature.peak_local_max(-np.minimum(sensitivity_map, 0))
         
         x_coords, y_coords = x_grid[0, :], y_grid[:, 0]
         x_minima = x_coords[peak_indices_2d[:, 1]]

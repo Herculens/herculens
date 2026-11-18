@@ -268,11 +268,11 @@ class Parameters(object):
             uniform_prior  = self._prior_types[i] == 'uniform'
             # logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] < self._lowers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
             # logP += lax.cond(uniform_prior, lambda _: lax.cond(args[i] > self._uppers[i], lambda _: - self._unif_prior_penalty, lambda _: 0., operand=None), lambda _: 0., operand=None)
-            logP += lax.cond(uniform_prior, lambda _: - (args[i] - jnp.clip(args[i], a_min=self._lowers[i], a_max=self._uppers[i]))**2, lambda _: 0., operand=None)
+            logP += lax.cond(uniform_prior, lambda _: - (args[i] - jnp.clip(args[i], min=self._lowers[i], max=self._uppers[i]))**2, lambda _: 0., operand=None)
         return logP
 
     def apply_bounds(self, args):
-        return jnp.clip(args, a_min=self._lowers, a_max=self._uppers)
+        return jnp.clip(args, min=self._lowers, max=self._uppers)
 
     def log_prior_nojit(self, args):
         logP = 0

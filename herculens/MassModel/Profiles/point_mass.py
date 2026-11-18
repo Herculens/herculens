@@ -36,7 +36,7 @@ class PointMass(object):
         x_ = x - center_x
         y_ = y - center_y
         r_ = jnp.sqrt(x_**2 + y_**2)
-        r  = jnp.clip(r_, a_min=self.r_min)
+        r  = jnp.clip(r_, min=self.r_min)
         phi = theta_E**2*np.log(r)
         return phi
 
@@ -51,7 +51,7 @@ class PointMass(object):
         x_ = x - center_x
         y_ = y - center_y
         r_ = jnp.sqrt(x_**2 + y_**2)
-        r  = jnp.clip(r_, a_min=self.r_min)
+        r  = jnp.clip(r_, min=self.r_min)
         alpha = theta_E**2/r
         return alpha*x_/r, alpha*y_/r
 
@@ -67,7 +67,7 @@ class PointMass(object):
         y_ = y - center_y
         C = theta_E**2
         r2_ = x_**2 + y_**2
-        r2  = jnp.clip(r2_, a_min=self.r_min**2)
+        r2  = jnp.clip(r2_, min=self.r_min**2)
         f_xx = C * (y_**2-x_**2)/r2**2
         f_yy = C * (x_**2-y_**2)/r2**2
         f_xy = -C * 2*x_*y_/r2**2

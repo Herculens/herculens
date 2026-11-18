@@ -39,7 +39,7 @@ install_optional = [
     # pip install git+https://github.com/adam-coogan/jaxinterp2d@master
     'matplotlib>=3.7.0',    # for plotting
     'optax>=0.2.0',         # for optimizers
-    'numpyro>=0.20.0',      # for probabilistic modelling and sampling algorithms
+    'numpyro>=0.21.0',      # for probabilistic modelling and sampling algorithms
     'nifty>=9.1.0',         # for correlated fields and VI sampling
 ]
 
