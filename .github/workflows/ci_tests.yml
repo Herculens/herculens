@@ -1,4 +1,5 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# This workflow installs Python dependencies and runs the test suite
+# against the oldest and newest supported versions of Python and JAX.
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
 name: Tests
@@ -11,29 +12,35 @@ on:
 
 jobs:
   build:
-
+    name: py${{ matrix.python-version }} / jax ${{ matrix.jax-version || 'latest' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJson(needs.set-matrix.outputs.python-versions) }}
-    needs: set-matrix
+        include:
+          # oldest supported Python and JAX versions
+          - python-version: "3.11"
+            jax-version: "0.7.0"
+          # newest JAX version allowed by requirements.txt (coverage is uploaded from this job)
+          - python-version: "3.12"
+            jax-version: ""
+            coverage: true
 
     steps:
 
-    - uses: actions/checkout@v4
-    
+    - uses: actions/checkout@v6
+
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
         cache: "pip"
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest pytest-cov coveralls
-    
+
         # install nifty.re
         # (we do this first because it causes too older versions of jax to be installed)
         cd ..
@@ -52,32 +59,39 @@ jobs:
         # install herculens
         pip install --editable .
 
+    - name: Pin JAX to version ${{ matrix.jax-version }}
+      if: matrix.jax-version != ''
+      run: |
+        pip install "jax==${{ matrix.jax-version }}" "jaxlib==${{ matrix.jax-version }}"
+
+    - name: Show and check installed versions
+      env:
+        EXPECTED_JAX: ${{ matrix.jax-version }}
+      run: |
+        python - <<'EOF'
+        import os, sys
+        from importlib.metadata import version
+        for pkg in ("jax", "jaxlib", "numpyro", "nifty", "utax", "numpy"):
+            print(f"{pkg:>8}: {version(pkg)}")
+        expected = os.environ["EXPECTED_JAX"]
+        if expected and version("jax") != expected:
+            sys.exit(f"Expected jax {expected} but jax {version('jax')} is installed")
+        EOF
+
     # - name: Lint with flake8
     #   run: |
     #     # stop the build if there are Python syntax errors or undefined names
     #     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
     #     # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
     #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    
+
     - name: Test with pytest
       run: |
         pytest --cov-report lcov --cov=herculens --ignore=test/MassModel/Profiles/dpie_test.py test
 
     - name: Coveralls
-      uses: coverallsapp/github-action@master
+      if: matrix.coverage
+      uses: coverallsapp/github-action@v2
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         path-to-lcov: coverage.lcov
-
-  set-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      python-versions: ${{ steps.set.outputs.matrix }}
-    steps:
-      - id: set
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo '::set-output name=matrix::["3.12"]'
-          else
-            echo '::set-output name=matrix::["3.11", "3.12"]'
-          fi

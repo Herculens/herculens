@@ -1,0 +1,73 @@
+# Weekly early-warning check: runs the test suite against the newest JAX release,
+# ignoring the upper bound on jax set in requirements.txt / setup.py.
+# A failure here means that a new JAX release breaks herculens: either fix the code
+# or keep the upper bound, then raise it once tests pass.
+# This workflow does not run on pull requests, so it never blocks them.
+
+name: Next JAX
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # every Monday at 06:00 UTC
+  workflow_dispatch:      # can also be run manually from the Actions tab
+
+jobs:
+  test-newest-jax:
+    name: py3.12 / newest jax
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - uses: actions/checkout@v6
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+        cache: "pip"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pytest
+
+        # install nifty.re
+        # (we do this first because it causes too older versions of jax to be installed)
+        cd ..
+        mkdir git_packages
+        cd git_packages
+        git clone https://gitlab.mpcdf.mpg.de/ift/nifty.git
+        cd nifty
+        git checkout tags/9.1.0
+        pip install --user --editable '.[re]'
+        cd ../../herculens
+
+        # install herculens' requirements
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        if [ -f test_requirements.txt ]; then pip install -r test_requirements.txt; fi
+
+        # install herculens
+        pip install --editable .
+
+    - name: Upgrade to the newest JAX (ignoring the upper bound)
+      run: |
+        pip install --upgrade jax jaxlib
+
+    - name: Show and check installed versions
+      run: |
+        python - <<'EOF'
+        import json, urllib.request
+        from importlib.metadata import version
+        for pkg in ("jax", "jaxlib", "numpyro", "nifty", "utax", "numpy"):
+            print(f"{pkg:>8}: {version(pkg)}")
+        with urllib.request.urlopen("https://pypi.org/pypi/jax/json") as resp:
+            latest = json.load(resp)["info"]["version"]
+        if version("jax") != latest:
+            # e.g. if the newest JAX no longer supports this Python version
+            print(f"::warning::Newest JAX on PyPI is {latest} but {version('jax')} "
+                  f"was installed; consider bumping the Python version of this workflow.")
+        EOF
+
+    - name: Test with pytest
+      run: |
+        pytest --ignore=test/MassModel/Profiles/dpie_test.py test

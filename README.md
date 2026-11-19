@@ -4,7 +4,7 @@
 # Herculens: differentiable gravitational lensing
 
 [![PyPi version](https://img.shields.io/pypi/v/herculens)](https://pypi.org/project/herculens/)
-![PyPi python support](https://img.shields.io/badge/Python-%E2%89%A53.10-blue)
+![PyPi python support](https://img.shields.io/badge/Python-%E2%89%A53.11-blue)
 ![JAX support](https://img.shields.io/badge/JAX-%E2%89%A50.7%2C%20%3C0.13-blue)
 [![Tests](https://github.com/austinpeel/herculens/actions/workflows/ci_tests.yml/badge.svg?branch=main)](https://github.com/austinpeel/herculens/actions/workflows/ci_tests.yml)
 [![arXiv](https://img.shields.io/badge/arXiv-2207.05763-b31b1b.svg)](https://arxiv.org/abs/2207.05763)
@@ -37,7 +37,7 @@ Several examples to run `Herculens` in many different situations are available i
 
 ## Installation
 
-`Herculens` is tested against Python >= 3.10 and JAX >= 0.7 and < 0.13.
+`Herculens` is tested against Python >= 3.11 and JAX >= 0.7 and < 0.13 (note that JAX >= 0.12 requires Python >= 3.12).
 
 Good practice is to create a new python environment:
 ```sh
