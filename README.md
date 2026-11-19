@@ -3,11 +3,12 @@
 
 # Herculens: differentiable gravitational lensing
 
-![PyPi python support](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue)
+[![PyPi version](https://img.shields.io/pypi/v/herculens)](https://pypi.org/project/herculens/)
+![PyPi python support](https://img.shields.io/badge/Python-%E2%89%A53.10-blue)
+![JAX support](https://img.shields.io/badge/JAX-%E2%89%A50.7%2C%20%3C0.13-blue)
 [![Tests](https://github.com/austinpeel/herculens/actions/workflows/ci_tests.yml/badge.svg?branch=main)](https://github.com/austinpeel/herculens/actions/workflows/ci_tests.yml)
 [![arXiv](https://img.shields.io/badge/arXiv-2207.05763-b31b1b.svg)](https://arxiv.org/abs/2207.05763)
 ![License](https://img.shields.io/github/license/austinpeel/herculens)
-<!-- ![PyPi version](https://img.shields.io/pypi/v/herculens) -->
 <!-- [![Coverage Status](https://coveralls.io/repos/github/herculens/herculens/badge.svg?branch=main)](https://coveralls.io/github/aymgal/utax?branch=main) -->
 
 ## Analysis of strong lensing imaging data
@@ -38,9 +39,7 @@ Several examples to run `Herculens` in many different situations are available i
 
 ## Installation
 
-### Manual installation
-
-The package will be soon available through PyPi directly, but it is as easy to install it manually. It has been texted against Python 3.7, but should work with Python 3.8 or more recent versions.
+`Herculens` is tested against Python >= 3.10 and JAX >= 0.7 and < 0.13.
 
 Good practice is to create a new python environment:
 ```sh
@@ -48,7 +47,21 @@ conda create -n herculens-env python=3.12
 conda activate herculens-env
 ```
 
-Download the package `cd` into the directory. Then install the local `Herculens` package (or use `-e` for a development install) as follows:
+### Installation from PyPI
+
+`Herculens` is available on [PyPI](https://pypi.org/project/herculens/):
+```sh
+pip install herculens
+```
+
+To also install the main optional dependencies (`helens`, `optax`, `numpyro`, `nifty`), use:
+```sh
+pip install "herculens[opt]"
+```
+
+### Manual installation
+
+Alternatively, download the package and `cd` into the directory. Then install the local `Herculens` package (or use `-e` for a development install) as follows:
 ```sh
 pip install (-e) .
 ```
@@ -62,6 +75,11 @@ The [`requirements.txt`](https://github.com/Herculens/herculens/blob/main/requir
 > **Note on `jaxinterp2d`:** This optional dependency (used for fast bilinear interpolation in pixelated profiles) is not available on PyPI and must be installed manually:
 > ```sh
 > pip install git+https://github.com/adam-coogan/jaxinterp2d@master
+> ```
+
+> **Note on `jax_cosmo`:** This optional dependency (to use a `jax_cosmo` cosmology with the multi-plane mass model `MPMassModel`; `astropy` cosmologies work without it) currently requires a fork that is not available on PyPI, and must be installed manually:
+> ```sh
+> pip install git+https://github.com/martin-millon/jax_cosmo.git
 > ```
 
 ## Slack channel

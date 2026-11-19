@@ -24,12 +24,11 @@ python_requires = '>=3.10'
 install_requires = [
     'numpy>=1.20.3',
     'scipy>=1.6.3',
-    'jax>=0.7.0',
+    'jax>=0.7.0,<0.13',
     'jaxlib>=0.7.0',
-    'objax>=1.8.0',
     'scikit-image>=0.20.0',
-    'utax>=0.0.2',
-    'jax_cosmo @ git+https://github.com/martin-millon/jax_cosmo.git', # as soon as this fork gets merged, change to jax-cosmo only
+    'utax>=0.0.3',
+    'matplotlib>=3.7.0',    # for plotting (imported by herculens.Util.plot_util)
 ]
 
 # Minimal optional packages (see also requirements.txt for even more optional packages)
@@ -37,7 +36,8 @@ install_optional = [
     'helens>=0.0.1',  # for a JAX-based lens equation solver
     # 'jaxinterp2d' is not available on PyPI; install manually via:
     # pip install git+https://github.com/adam-coogan/jaxinterp2d@master
-    'matplotlib>=3.7.0',    # for plotting
+    # 'jax_cosmo' (fork) is not available on PyPI; install manually via:
+    # pip install git+https://github.com/martin-millon/jax_cosmo.git
     'optax>=0.2.0',         # for optimizers
     'numpyro>=0.21.0',      # for probabilistic modelling and sampling algorithms
     'nifty>=9.1.0',         # for correlated fields and VI sampling
