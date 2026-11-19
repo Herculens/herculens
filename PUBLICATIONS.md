@@ -16,7 +16,7 @@
 
 - "**_Disentangling the dark and stellar mass through precise lens modelling of the JWST observation of lensed quasar WFI2033-4723_**" ([**Li et al. 2026b**](https://scixplorer.org/abs/2026MNRAS.553g1986L/abstract)): multiplane lens modelling of JWST imaging of the lensed quasar WFI2033-4723 with a stars-plus-generalised-NFW mass model, separating the dark and stellar mass of the main deflector.
 
-- "**_Microlensing of microlensing: effects of random stars on the double-source-plane gravitational lens_**" ([**Salama et al. 2026**](https://scixplorer.org/abs/2026MNRAS.551g1382S/abstract)): multi-plane lens model of the "Jackpot", used to study how microlensing by stars in the foreground deflector affects the double-source-plane lens.
+- "**_Microlensing of microlensing: effects of random stars on the double-source-plane gravitational lens_**" ([**Salama et al. 2026**](https://scixplorer.org/abs/2026MNRAS.551g1382S/abstract)): multi-plane lens model of an "Einstein zig-zag" lensed quasar, used to study how microlensing by stars in the foreground deflector affects this double-source-plane lens.
 
 ## Dark matter properties
 
