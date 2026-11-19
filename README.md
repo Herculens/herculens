@@ -13,9 +13,7 @@
 
 ## Analysis of strong lensing imaging data
 
-The primary purpose of `Herculens` is to provide flexible modeling methods to model current and future observations of strong gravitational lenses. Currently, it supports various degrees of model complexity, ranging from standard smooth analytical profiles to pixelated models combined with machine learning approaches.
-
-Currently, `Herculens` supports several of the most widely-used analytical profiles, as well as multi-scale pixelated models regularized with wavelets. Future updates will include the support of point source modeling, new regularization techniques, and more expressive models based on neural networks.
+The primary purpose of `Herculens` is to provide flexible modeling methods to model current and future observations of strong gravitational lenses. It supports various degrees of model complexity, ranging from standard smooth analytical profiles to pixelated models combined with machine learning approaches. The core `Herculens` package includes several of the most widely-used analytical light and mass profiles, as well as multi-scale pixelated models regularized with wavelets or with Gaussian processes (a.k.a. _correlated fields_) for source reconstruction and gravitational imaging.
 
 ## `JAX`-based automatic differentiation and code compilation 
 
