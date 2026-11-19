@@ -8,7 +8,6 @@ __author__ = 'aymgal'
 import copy
 import numpy as np
 import jax.numpy as jnp
-from scipy.ndimage import morphology
 from scipy.spatial import Delaunay
 from scipy import ndimage
 from skimage import measure
@@ -199,8 +198,8 @@ def mask_from_source_area(lens_image, parameters):
     model_mask = np.array(model_mask)
     model_mask[model_mask < 0.1] = 0.
     model_mask[model_mask >= 0.1] = 1.
-    model_mask = morphology.binary_opening(model_mask, iterations=10)
-    model_mask = morphology.binary_dilation(model_mask, iterations=3)
+    model_mask = ndimage.binary_opening(model_mask, iterations=10)
+    model_mask = ndimage.binary_dilation(model_mask, iterations=3)
     return model_mask
 
 
@@ -238,8 +237,8 @@ def mask_from_lensed_source(lens_image, parameters=None, source_model=None,
     model_mask = np.array(model_mask)
     model_mask[model_mask < 0.1] = 0.
     model_mask[model_mask >= 0.1] = 1.
-    #model_mask = morphology.binary_opening(model_mask, iterations=10)
-    #model_mask = morphology.binary_dilation(model_mask, iterations=3)
+    #model_mask = ndimage.binary_opening(model_mask, iterations=10)
+    #model_mask = ndimage.binary_dilation(model_mask, iterations=3)
     return model_mask, binary_source
 
 
@@ -426,7 +425,7 @@ def source_plane_mask_from_arc_mask(
     source_mask = source_mask_flat.reshape(x_src.shape)
 
     if dilation_iterations > 0:
-        source_mask = morphology.binary_dilation(source_mask, iterations=dilation_iterations)
+        source_mask = ndimage.binary_dilation(source_mask, iterations=dilation_iterations)
 
     return source_mask
 
