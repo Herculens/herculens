@@ -42,5 +42,5 @@ class Loss(Differentiable):
         loss = - self._log_prob(args)
         loss = jnp.nan_to_num(loss, nan=1e15, posinf=1e15, neginf=1e15)
         if self._cap_value is not None:
-            loss = jnp.clip(loss, a_min=self._cap_value)
+            loss = jnp.clip(loss, min=self._cap_value)
         return loss

@@ -587,7 +587,7 @@ class Plotter(object):
                 plotted_centers = []
                 for kw in lens_pos_kwargs:
                     if 'center_x' in kw:
-                        center = (kw['center_x'], kw['center_y'])
+                        center = (float(np.mean(kw['center_x'])), float(np.mean(kw['center_y'])))
                         if center not in plotted_centers:
                             ax.plot(*center, linestyle='none', color='black',
                                     markeredgecolor='black', markersize=15, marker='o',

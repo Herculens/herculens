@@ -20,9 +20,11 @@ from herculens.MassModel.mass_model import MassModel, ZeroMassModel
 
 def _is_jax_cosmo(cosmology):
     """Check if the cosmology object is a jax_cosmo.Cosmology instance."""
-    has_jc_attr = hasattr(cosmology, '_Omega_c') and hasattr(cosmology, '_workspace')
-    if has_jc_attr and jc is None:
-        raise ImportError("The passed cosmology instance seems like a jax_cosmo.Cosmology instance. However, jax_cosmo is not installed. Please install jax_cosmo to use this function.")
+    if jc is None:
+        has_jc_attr = hasattr(cosmology, '_Omega_c') and hasattr(cosmology, '_workspace')
+        if has_jc_attr:
+            raise ImportError("The passed cosmology instance seems like a jax_cosmo.Cosmology instance. However, jax_cosmo is not installed. Please install jax_cosmo to use this function.")
+        return False
     return isinstance(cosmology, jc.Cosmology)
 
 
