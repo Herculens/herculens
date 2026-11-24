@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### New features
+
+* New `BPL3D` mass profile: elliptical lens whose convergence is the projection of a 3D broken power-law density (Du et al. 2020, ApJ 892, 62). It has an inner slope `gamma_in`, an outer slope `gamma` and a break radius `r_break`; `gamma_in = 0` gives a constant-density 3D core. Deflections are the EPL ones plus a break correction, computed as a single 1D integral over the 3D radius with fixed quadrature nodes. This is valid inside and outside the break radius and for any axis ratio, and is differentiable everywhere. The Hessian uses `jax.jacfwd`. Also provides `einstein_radius()` and `mean_convergence()` helpers.
+
 ## 0.4.0 (2026-11-19)
 
 ### Compatibility

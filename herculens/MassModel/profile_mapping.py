@@ -12,6 +12,7 @@ from herculens.MassModel.Profiles.sis import SIS
 from herculens.MassModel.Profiles.sie import SIE
 from herculens.MassModel.Profiles.nie import NIE
 from herculens.MassModel.Profiles.epl import EPL
+from herculens.MassModel.Profiles.bpl3d import BPL3D
 from herculens.MassModel.Profiles.piemd import PIEMD
 from herculens.MassModel.Profiles.dpie import DPIE
 from herculens.MassModel.Profiles.pixelated import (
@@ -23,6 +24,7 @@ from herculens.MassModel.Profiles.pixelated import (
 # mapping between the string name to the mass profile class.
 STRING_MAPPING = {
     'EPL': EPL,
+    'BPL3D': BPL3D,
     'NIE': NIE,
     'SIE': SIE,
     'SIS': SIS,

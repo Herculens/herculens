@@ -21,6 +21,7 @@ from .MassModel.Profiles.sis import SIS  # NOTE: this will be suppressed in the 
 from .MassModel.Profiles.sie import SIE
 from .MassModel.Profiles.nie import NIE
 from .MassModel.Profiles.epl import EPL
+from .MassModel.Profiles.bpl3d import BPL3D
 from .MassModel.Profiles.shear import Shear, ShearGammaPsi
 from .MassModel.Profiles.gaussian_potential import Gaussian as GaussianPotential
 from .MassModel.Profiles.convergence import Convergence
