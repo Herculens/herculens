@@ -626,6 +626,8 @@ def run_vi(
         draw_linear_kwargs=None,
         nonlinearly_update_kwargs=None,
         kl_kwargs=None,
+        kl_map=None,
+        residual_map=None,
     ):
     """Function that sets up and run variational inference strategies implemented in NIFTy.
     The two families of algorithms currently supported are:
@@ -677,6 +679,15 @@ def run_vi(
         Keyword arguments to pass to the underlying KL optimization step.
         See NIFTy source code for more details about the supported settings.
         If None (default), some nice settings are used that work well for lens modeling.
+    kl_map : str or callable, optional
+        How the KL gradient and metric are mapped over the (mirrored) samples during the KL
+        minimization: 'vmap' (all samples in one vectorized computation; memory grows with the
+        number of samples), 'smap' (sequential `jax.lax.scan` inside the compiled function; memory
+        of a single sample) or 'lmap' (Python loop over the samples), or any callable with the
+        signature of `jax.vmap`. If None (default), NIFTy's default is used (`jax.vmap`).
+    residual_map : str or callable, optional
+        Same as `kl_map` for drawing the samples (residuals). If None (default), NIFTy's default
+        is used ('lmap').
 
     Returns
     -------
@@ -786,6 +797,10 @@ def run_vi(
 
         # NOTE: to get intermediate results at each iteration, we need to specify a callback function that saves the samples and other info at each iteration
         callback=callback_fn,
+
+        # how the per-sample computations are mapped over the samples (only passed if set, to keep NIFTy's defaults)
+        **({'kl_map': kl_map} if kl_map is not None else {}),
+        **({'residual_map': residual_map} if residual_map is not None else {}),
     )
 
     return latent_samples_vi, final_state_vi
